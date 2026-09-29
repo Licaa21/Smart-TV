@@ -930,7 +930,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 							});
 							Promise.race([reloadPlaybackRef.current?.() ?? Promise.resolve(false), timedOut]).then((reloaded) => {
 								serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded});
-								if (!reloaded) setError($L('Playback failed. The file format may not be supported.'));
+								if (reloaded) {
+									// The attempt this is recovering from may have kept running in the
+									// background and thrown its own error after this reload already
+									// succeeded - clear it so a stale error screen doesn't sit on top
+									// of playback that's actually working.
+									setError(null);
+								} else {
+									setError($L('Playback failed. The file format may not be supported.'));
+								}
 							});
 						};
 						avplayRestore(suspended.url, suspended.positionMs).then((ok) => {
