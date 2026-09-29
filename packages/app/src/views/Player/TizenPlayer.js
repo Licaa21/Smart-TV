@@ -81,6 +81,9 @@ const CANVAS_WAIT_STEP_MS = 50;
 const PLAYBACK_SETTLE_MS = 2000;
 // How long a resume gets to start moving after an error was swallowed in pause.
 const RESUME_CHECK_MS = 5000;
+// A stream reload after a failed restore gets this long before it's given up on -
+// a request already in flight when the TV powers off can stay unsettled far longer.
+const RELOAD_TIMEOUT_MS = 12000;
 
 const getRootFontSizePx = () => {
 	if (typeof window === 'undefined' || typeof document === 'undefined') return 24;
@@ -913,7 +916,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					if (suspended) {
 						const recoverByReload = () => {
 							console.warn('[Player] AVPlay restore left the session unplayable, reloading stream');
-							reloadPlaybackRef.current?.().then((reloaded) => {
+							// A request already in flight when the TV actually powers off is
+							// frozen along with everything else and can sit unsettled for the
+							// entire outage, so this can't wait on it indefinitely - past this
+							// timeout the reload is treated as failed even if it later resolves.
+							const timedOut = new Promise((resolve) => {
+								setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
+							});
+							Promise.race([reloadPlaybackRef.current?.() ?? Promise.resolve(false), timedOut]).then((reloaded) => {
 								if (!reloaded) setError($L('Playback failed. The file format may not be supported.'));
 							});
 						};
