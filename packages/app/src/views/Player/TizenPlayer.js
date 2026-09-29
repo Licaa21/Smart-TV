@@ -939,6 +939,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 										return;
 									}
 									playback.reportProgress(positionRef.current, {isPaused: false, eventName: 'unpause'});
+								} else {
+									// Nothing here calls play(), so a restore that reports success
+									// while the session actually dropped back to IDLE would otherwise
+									// go unnoticed - check the state directly instead of trusting ok.
+									const stateAfterRestore = avplayGetState();
+									if (stateAfterRestore !== 'PAUSED' && stateAfterRestore !== 'READY') {
+										recoverByReload();
+									}
 								}
 							} else {
 								// the transcode session likely expired while backgrounded
