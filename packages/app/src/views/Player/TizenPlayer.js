@@ -918,39 +918,39 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					}
 					const suspended = suspendedRef.current;
 					suspendedRef.current = null;
+					const recoverByReload = () => {
+						console.warn('[Player] AVPlay restore left the session unplayable, reloading stream');
+						// A request already in flight when the TV actually powers off is
+						// frozen along with everything else and can sit unsettled for the
+						// entire outage, so this can't wait on it indefinitely - past this
+						// timeout the reload is treated as failed even if it later resolves.
+						const reloadPromise = reloadPlaybackRef.current?.() ?? Promise.resolve(false);
+						const timedOut = new Promise((resolve) => {
+							setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
+						});
+						Promise.race([reloadPromise, timedOut]).then((reloaded) => {
+							serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded});
+							if (reloaded) {
+								// The attempt this is recovering from may have kept running in the
+								// background and thrown its own error after this reload already
+								// succeeded - clear it so a stale error screen doesn't sit on top
+								// of playback that's actually working.
+								setError(null);
+								return;
+							}
+							setError($L('Playback failed. The file format may not be supported.'));
+							// The reload itself keeps running even after the timeout gives up
+							// waiting on it - a heavy transcode negotiation can legitimately take
+							// longer than that without actually being stuck, so if it succeeds
+							// late, clear the stale error instead of leaving it stuck in front of
+							// playback that's now actually working.
+							reloadPromise.then((lateReloaded) => {
+								serverLogger.playback('Standby diag: reloadPlaybackRef late result', {lateReloaded});
+								if (lateReloaded) setError(null);
+							});
+						});
+					};
 					if (suspended) {
-						const recoverByReload = () => {
-							console.warn('[Player] AVPlay restore left the session unplayable, reloading stream');
-							// A request already in flight when the TV actually powers off is
-							// frozen along with everything else and can sit unsettled for the
-							// entire outage, so this can't wait on it indefinitely - past this
-							// timeout the reload is treated as failed even if it later resolves.
-							const reloadPromise = reloadPlaybackRef.current?.() ?? Promise.resolve(false);
-							const timedOut = new Promise((resolve) => {
-								setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
-							});
-							Promise.race([reloadPromise, timedOut]).then((reloaded) => {
-								serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded});
-								if (reloaded) {
-									// The attempt this is recovering from may have kept running in the
-									// background and thrown its own error after this reload already
-									// succeeded - clear it so a stale error screen doesn't sit on top
-									// of playback that's actually working.
-									setError(null);
-									return;
-								}
-								setError($L('Playback failed. The file format may not be supported.'));
-								// The reload itself keeps running even after the timeout gives up
-								// waiting on it - a heavy transcode negotiation can legitimately take
-								// longer than that without actually being stuck, so if it succeeds
-								// late, clear the stale error instead of leaving it stuck in front of
-								// playback that's now actually working.
-								reloadPromise.then((lateReloaded) => {
-									serverLogger.playback('Standby diag: reloadPlaybackRef late result', {lateReloaded});
-									if (lateReloaded) setError(null);
-								});
-							});
-						};
 						avplayRestore(suspended.url, suspended.positionMs).then((ok) => {
 							serverLogger.playback('Standby diag: avplayRestore result', {ok, wasPlaying: suspended.wasPlaying});
 							if (ok) {
@@ -991,10 +991,20 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						isPaused,
 						avplayState: stateAtResume
 					});
-					if (avplayReadyRef.current && !isPaused) {
-						if (stateAtResume === 'PAUSED' || stateAtResume === 'READY') {
+					const looksResumable = avplayReadyRef.current
+						&& (stateAtResume === 'PLAYING' || stateAtResume === 'PAUSED' || stateAtResume === 'READY');
+					if (looksResumable) {
+						if (!isPaused && stateAtResume !== 'PLAYING') {
 							try { avplayPlay(); } catch (e) { void e; }
 						}
+					} else {
+						// Backgrounding happened before the session ever became ready - possibly
+						// even before a URL was assigned at all, so there was nothing to record
+						// for a restore attempt - but this observer only runs while the player is
+						// mounted trying to play something, so there IS an active attempt to
+						// recover. Reload fresh instead of leaving the screen stuck with nothing
+						// having been attempted at all.
+						recoverByReload();
 					}
 				},
 				() => {
