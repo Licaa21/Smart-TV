@@ -925,10 +925,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 							// frozen along with everything else and can sit unsettled for the
 							// entire outage, so this can't wait on it indefinitely - past this
 							// timeout the reload is treated as failed even if it later resolves.
+							const reloadPromise = reloadPlaybackRef.current?.() ?? Promise.resolve(false);
 							const timedOut = new Promise((resolve) => {
 								setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
 							});
-							Promise.race([reloadPlaybackRef.current?.() ?? Promise.resolve(false), timedOut]).then((reloaded) => {
+							Promise.race([reloadPromise, timedOut]).then((reloaded) => {
 								serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded});
 								if (reloaded) {
 									// The attempt this is recovering from may have kept running in the
@@ -936,9 +937,18 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 									// succeeded - clear it so a stale error screen doesn't sit on top
 									// of playback that's actually working.
 									setError(null);
-								} else {
-									setError($L('Playback failed. The file format may not be supported.'));
+									return;
 								}
+								setError($L('Playback failed. The file format may not be supported.'));
+								// The reload itself keeps running even after the timeout gives up
+								// waiting on it - a heavy transcode negotiation can legitimately take
+								// longer than that without actually being stuck, so if it succeeds
+								// late, clear the stale error instead of leaving it stuck in front of
+								// playback that's now actually working.
+								reloadPromise.then((lateReloaded) => {
+									serverLogger.playback('Standby diag: reloadPlaybackRef late result', {lateReloaded});
+									if (lateReloaded) setError(null);
+								});
 							});
 						};
 						avplayRestore(suspended.url, suspended.positionMs).then((ok) => {
