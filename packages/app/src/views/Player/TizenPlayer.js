@@ -997,13 +997,20 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					if (wasPlaying) {
 						try { avplayPause(); } catch (e) { void e; }
 					}
-					if (avplayReadyRef.current && currentUrlRef.current) {
+					if (currentUrlRef.current) {
+						// Recording a suspended record whenever there's a URL in flight - not
+						// only when avplayReady/avplaySuspend succeed - means a session that
+						// was never properly opened yet still gets a restore attempt on resume,
+						// which naturally falls through to the same reload fallback below
+						// instead of resuming into a dead end with nothing to recover from.
 						const positionMs = avplayGetCurrentTime();
-						const suspended = avplaySuspend();
-						serverLogger.playback('Standby diag: avplaySuspend result', {suspended, avplayState: state});
-						if (suspended) {
-							suspendedRef.current = {url: currentUrlRef.current, positionMs, wasPlaying};
-						}
+						const suspended = avplayReadyRef.current ? avplaySuspend() : false;
+						serverLogger.playback('Standby diag: avplaySuspend result', {
+							suspended,
+							avplayState: state,
+							avplayReady: avplayReadyRef.current
+						});
+						suspendedRef.current = {url: currentUrlRef.current, positionMs, wasPlaying};
 					} else {
 						serverLogger.playback('Standby diag: skipped avplaySuspend', {
 							avplayReady: avplayReadyRef.current,
