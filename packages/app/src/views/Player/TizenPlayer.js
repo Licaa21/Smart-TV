@@ -906,7 +906,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			unregisterAppStateRef.current = registerAppStateObserver(
 				() => {
 					console.log('[Player] App resumed');
-					if (playback.consumeBackgroundStopFired()) {
+					const backgroundStopFired = playback.consumeBackgroundStopFired();
+					serverLogger.playback('Standby diag: player foregrounded', {
+						hadSuspendedRecord: !!suspendedRef.current,
+						backgroundStopFired
+					});
+					if (backgroundStopFired) {
 						// the session was stopped on the server while we were
 						// backgrounded, so bring it back before we resume playback
 						resumeReportingRef.current?.();
@@ -924,14 +929,20 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 								setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
 							});
 							Promise.race([reloadPlaybackRef.current?.() ?? Promise.resolve(false), timedOut]).then((reloaded) => {
+								serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded});
 								if (!reloaded) setError($L('Playback failed. The file format may not be supported.'));
 							});
 						};
 						avplayRestore(suspended.url, suspended.positionMs).then((ok) => {
+							serverLogger.playback('Standby diag: avplayRestore result', {ok, wasPlaying: suspended.wasPlaying});
 							if (ok) {
 								if (suspended.wasPlaying) {
 									let playError = null;
 									try { avplayPlay(); } catch (e) { playError = e; }
+									serverLogger.playback('Standby diag: avplayPlay after restore result', {
+										playError: playError ? (playError.message || String(playError)) : null,
+										avplayState: avplayGetState()
+									});
 									if (playError) {
 										// restoreAsync reported success but the session had already
 										// dropped back to IDLE, so there's nothing for play() to resume
@@ -944,6 +955,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 									// while the session actually dropped back to IDLE would otherwise
 									// go unnoticed - check the state directly instead of trusting ok.
 									const stateAfterRestore = avplayGetState();
+									serverLogger.playback('Standby diag: state check after paused restore', {stateAfterRestore});
 									if (stateAfterRestore !== 'PAUSED' && stateAfterRestore !== 'READY') {
 										recoverByReload();
 									}
@@ -955,9 +967,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						});
 						return;
 					}
+					const stateAtResume = avplayGetState();
+					serverLogger.playback('Standby diag: player foregrounded without a suspended record', {
+						avplayReady: avplayReadyRef.current,
+						isPaused,
+						avplayState: stateAtResume
+					});
 					if (avplayReadyRef.current && !isPaused) {
-						const state = avplayGetState();
-						if (state === 'PAUSED' || state === 'READY') {
+						if (stateAtResume === 'PAUSED' || stateAtResume === 'READY') {
 							try { avplayPlay(); } catch (e) { void e; }
 						}
 					}
@@ -971,14 +988,27 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					playback.reportBackgroundStop(positionRef.current);
 					const state = avplayGetState();
 					const wasPlaying = state === 'PLAYING';
+					serverLogger.playback('Standby diag: player backgrounded', {
+						avplayState: state,
+						wasPlaying,
+						avplayReady: avplayReadyRef.current,
+						hasUrl: !!currentUrlRef.current
+					});
 					if (wasPlaying) {
 						try { avplayPause(); } catch (e) { void e; }
 					}
 					if (avplayReadyRef.current && currentUrlRef.current) {
 						const positionMs = avplayGetCurrentTime();
-						if (avplaySuspend()) {
+						const suspended = avplaySuspend();
+						serverLogger.playback('Standby diag: avplaySuspend result', {suspended, avplayState: state});
+						if (suspended) {
 							suspendedRef.current = {url: currentUrlRef.current, positionMs, wasPlaying};
 						}
+					} else {
+						serverLogger.playback('Standby diag: skipped avplaySuspend', {
+							avplayReady: avplayReadyRef.current,
+							hasUrl: !!currentUrlRef.current
+						});
 					}
 				}
 			);
