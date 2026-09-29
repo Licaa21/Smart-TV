@@ -911,18 +911,28 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					const suspended = suspendedRef.current;
 					suspendedRef.current = null;
 					if (suspended) {
+						const recoverByReload = () => {
+							console.warn('[Player] AVPlay restore left the session unplayable, reloading stream');
+							reloadPlaybackRef.current?.().then((reloaded) => {
+								if (!reloaded) setError($L('Playback failed. The file format may not be supported.'));
+							});
+						};
 						avplayRestore(suspended.url, suspended.positionMs).then((ok) => {
 							if (ok) {
 								if (suspended.wasPlaying) {
-									try { avplayPlay(); } catch (e) { void e; }
+									let playError = null;
+									try { avplayPlay(); } catch (e) { playError = e; }
+									if (playError) {
+										// restoreAsync reported success but the session had already
+										// dropped back to IDLE, so there's nothing for play() to resume
+										recoverByReload();
+										return;
+									}
 									playback.reportProgress(positionRef.current, {isPaused: false, eventName: 'unpause'});
 								}
 							} else {
 								// the transcode session likely expired while backgrounded
-								console.warn('[Player] AVPlay restore failed, reloading stream');
-								reloadPlaybackRef.current?.().then((reloaded) => {
-									if (!reloaded) setError($L('Playback failed. The file format may not be supported.'));
-								});
+								recoverByReload();
 							}
 						});
 						return;
