@@ -6,6 +6,13 @@ import {ensureVisible, isValidHexColor, toRgbTriplet} from '../../theme/themeSpe
 // stylesheet keeps drawing the prompt exactly as before.
 export const SKIP_LAYOUTS = ['capsule', 'rectangle', 'outline', 'sweep', 'text'];
 
+// The fill and ink each layout wears when nothing is picked. Only the rectangle is light, so it is
+// the one that writes dark text; the rest sit on the dark fill or straight on the picture.
+const LIGHT_FILL = {rgb: '244, 244, 246', hex: '#f4f4f6', text: '#14161c'};
+const DARK_FILL_HEX = '#1e1e28';
+export const skipDefaultFill = (layout) => (layout === 'rectangle' ? LIGHT_FILL.hex : DARK_FILL_HEX);
+export const skipDefaultText = (layout) => (layout === 'rectangle' ? LIGHT_FILL.text : '#ffffff');
+
 export const SKIP_DEFAULTS = {
 	layout: 'capsule',
 	position: 'bottomRight',
@@ -94,7 +101,7 @@ export const resolveSkipOverlayLook = (settings = {}) => {
 	const background = colorOf(settings.skipOverlayBackground);
 	// Text and accent are drawn on the prompt's own fill, so a pick that would blend into it,
 	// black text on a black fill, is nudged just far enough to be read.
-	const fill = background || SKIP_DEFAULTS.backgroundHex;
+	const fill = background || (layout === 'rectangle' ? LIGHT_FILL.hex : SKIP_DEFAULTS.backgroundHex);
 	const chosenText = colorOf(settings.skipOverlayText);
 	const chosenAccent = colorOf(settings.skipOverlayAccent);
 	const text = chosenText ? ensureVisible(chosenText, [fill]) : '';
@@ -102,7 +109,7 @@ export const resolveSkipOverlayLook = (settings = {}) => {
 
 	const button = {};
 	if (filled && (background || opacity !== SKIP_DEFAULTS.opacity)) {
-		const rgb = background ? toRgbTriplet(background) : SKIP_DEFAULTS.backgroundRgb;
+		const rgb = background ? toRgbTriplet(background) : (layout === 'rectangle' ? LIGHT_FILL.rgb : SKIP_DEFAULTS.backgroundRgb);
 		button.background = rgba(rgb, Math.min(1, Math.max(0, opacity / 100)));
 	}
 	if (text) button.color = text;
