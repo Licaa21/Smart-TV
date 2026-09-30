@@ -3028,6 +3028,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		});
 	}, [focusRow, controlsVisible]);
 
+	// The error view has nothing else on screen to hold focus, so without this,
+	// whatever was focused before the error appeared (which may no longer even be
+	// on screen) keeps it, and Go Back never receives the OK press at all.
+	useEffect(() => {
+		if (!error) return;
+		window.requestAnimationFrame(() => Spotlight.focus('player-error-back-btn'));
+	}, [error]);
+
 	// ==============================
 	// Render
 	// ==============================
@@ -3059,7 +3067,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				<div className={css.error}>
 					<h2>{$L('Playback Error')}</h2>
 					<p>{error}</p>
-					<Button onClick={onBack}>{$L('Go Back')}</Button>
+					<Button onClick={onBack} spotlightId="player-error-back-btn">{$L('Go Back')}</Button>
 				</div>
 			</div>
 		);
