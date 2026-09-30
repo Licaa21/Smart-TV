@@ -18,3 +18,9 @@ dist
 .DS_Store
 .vscode
 *.log
+
+# Claude session memory (local notes across sessions, not project content)
+.remember/
+
+# Scratch diagnostic report exports pasted in during testing
+/logs.md
