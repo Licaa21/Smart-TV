@@ -1,4 +1,4 @@
-import {fireEvent, render, screen} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 
 import {defaultSettings} from '../../context/defaultSettings';
 import EpisodeBrowser from './EpisodeBrowser';
@@ -154,4 +154,33 @@ describe('EpisodeBrowser', () => {
 		open();
 		expect(screen.getByText(text)).toBeTruthy();
 	});
+
+	describe('long seasons', () => {
+		const many = (size) => Array.from({length: size}, (unused, i) => episode({
+			Id: `m${i + 1}`, Name: `Episode ${i + 1}`, IndexNumber: i + 1, Overview: `Plot ${i + 1}`
+		}));
+		const rows = () => document.querySelectorAll('[data-episode-id]').length;
+
+		it('draws the first screenful at once and the rest over the next frames', async () => {
+			mockEpisodes = {...mockEpisodes, episodes: many(30)};
+			open({item: {...item, Id: 'm1'}});
+			expect(rows()).toBeGreaterThan(0);
+			expect(rows()).toBeLessThan(30);
+			await waitFor(() => expect(rows()).toBe(30));
+		});
+
+		it('always draws the episode that is playing in that first batch, even deep in the season', async () => {
+			mockEpisodes = {...mockEpisodes, episodes: many(30)};
+			open({item: {...item, Id: 'm24'}});
+			expect(document.querySelector('[data-episode-id="m24"]')).not.toBeNull();
+			expect(rows()).toBeLessThan(30);
+			await waitFor(() => expect(rows()).toBe(30));
+		});
+
+		it('draws a short season all at once', () => {
+			open();
+			expect(rows()).toBe(3);
+		});
+	});
 });
+
