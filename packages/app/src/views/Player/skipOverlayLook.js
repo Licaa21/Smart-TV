@@ -4,7 +4,10 @@ import {ensureVisible, isValidHexColor, toRgbTriplet} from '../../theme/themeSpe
 // Where the skip prompt has always sat, in the 1920x1080 pixels its stylesheet is written in,
 // and the fill and ink it wears. A setting left at these values changes nothing, so the
 // stylesheet keeps drawing the prompt exactly as before.
+export const SKIP_LAYOUTS = ['capsule', 'rectangle', 'outline', 'sweep', 'text'];
+
 export const SKIP_DEFAULTS = {
+	layout: 'capsule',
 	position: 'bottomRight',
 	size: 'medium',
 	opacity: 88,
@@ -82,6 +85,9 @@ const colorOf = (value) => (isValidHexColor(value) ? value : '');
  * @returns {Object} styles for the wrapper, button, icon, timer and ring
  */
 export const resolveSkipOverlayLook = (settings = {}) => {
+	const layout = SKIP_LAYOUTS.includes(settings.skipOverlayLayout) ? settings.skipOverlayLayout : SKIP_DEFAULTS.layout;
+	// A box-less layout has no fill to paint, so the background picks only reach the ones with one.
+	const filled = layout !== 'outline' && layout !== 'text';
 	const position = settings.skipOverlayPosition || SKIP_DEFAULTS.position;
 	const size = settings.skipOverlaySize || SKIP_DEFAULTS.size;
 	const opacity = Number.isFinite(settings.skipOverlayOpacity) ? settings.skipOverlayOpacity : SKIP_DEFAULTS.opacity;
@@ -95,23 +101,54 @@ export const resolveSkipOverlayLook = (settings = {}) => {
 	const accent = chosenAccent ? ensureVisible(chosenAccent, [fill]) : '';
 
 	const button = {};
-	if (background || opacity !== SKIP_DEFAULTS.opacity) {
+	if (filled && (background || opacity !== SKIP_DEFAULTS.opacity)) {
 		const rgb = background ? toRgbTriplet(background) : SKIP_DEFAULTS.backgroundRgb;
 		button.background = rgba(rgb, Math.min(1, Math.max(0, opacity / 100)));
 	}
 	if (text) button.color = text;
+	// The outline layout draws its edge in the text color until the button is focused.
+	if (text && layout === 'outline') button.borderColor = rgba(toRgbTriplet(text), 0.7);
 
 	return {
+		layout,
 		overlay: placement(position, size),
 		button,
 		accent,
 		icon: accent ? {color: accent} : undefined,
 		timer: text ? {color: rgba(toRgbTriplet(text), 0.5)} : undefined,
 		ringTrack: text ? {stroke: rgba(toRgbTriplet(text), 0.16)} : undefined,
-		ringValue: accent ? {stroke: accent} : undefined
+		ringValue: accent ? {stroke: accent} : undefined,
+		// The bar and the sweep are the countdown drawn as a fill, in the layouts that have one.
+		bar: accent ? {background: accent} : undefined,
+		sweep: accent ? {background: rgba(toRgbTriplet(accent), 0.38)} : undefined
 	};
 };
 
 // The color the Skip surface shows when nothing is picked on this page: the one chosen on the
 // Accent Colors page, else the cyan the prompt ships with.
 export const skipAccentDefault = (settings) => pickedAccent(settings, 'skip') || '#00a4dc';
+
+/**
+ * The prompts the player can raise during an episode, given how intros, credits and the next
+ * episode are set. The preview cycles through exactly these, so it shows what will really appear.
+ *
+ * An intro or credits set to skip by itself never puts a button up, and one set to none has no
+ * prompt either. Credits give way to the next episode card when it is set to replace them.
+ * Recaps are offered whenever the server marks one, so the list is never empty.
+ *
+ * @param {Object} settings
+ * @returns {Array<{kind: string, type?: string}>} kind is 'segment' or 'nextUp'
+ */
+export const skipPromptKinds = (settings = {}) => {
+	const introAction = settings.introAction || 'ask';
+	const outroAction = settings.outroAction || 'ask';
+	const nextUpOn = settings.nextUpBehavior !== 'disabled';
+	const creditsBecomeNextUp = settings.replaceSkipOutroWithNextUp === true && nextUpOn;
+
+	const prompts = [];
+	if (introAction === 'ask') prompts.push({kind: 'segment', type: 'intro'});
+	prompts.push({kind: 'segment', type: 'recap'});
+	if (outroAction === 'ask' && !creditsBecomeNextUp) prompts.push({kind: 'segment', type: 'outro'});
+	if (nextUpOn) prompts.push({kind: 'nextUp'});
+	return prompts;
+};

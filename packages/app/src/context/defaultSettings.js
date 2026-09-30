@@ -306,6 +306,7 @@ export const defaultSettings = {
 	accentOther: '',
 	// The skip prompt's own look. Every value here is what the prompt has always been, so it
 	// only changes once something is picked. An empty color means the default one. Local only.
+	skipOverlayLayout: 'capsule',
 	skipOverlayPosition: 'bottomRight',
 	skipOverlaySize: 'medium',
 	skipOverlayBackground: '',
