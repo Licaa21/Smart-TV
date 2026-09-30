@@ -26,7 +26,7 @@ import {episodeLine} from '../../utils/liveTvGuide';
 import {chapterMarkerPositions} from '../../utils/chapterMarkers';
 import {keepFocusInView} from '../../utils/focusScroll';
 import {SLEEP_TIMER_MINUTES} from './useSleepTimer';
-import {arrange, OSD_ORDER_KEY, OSD_HIDDEN_KEY} from '../../utils/buttonLayout';
+import {arrange, OSD_BUTTONS, OSD_ORDER_KEY, OSD_HIDDEN_KEY} from '../../utils/buttonLayout';
 import {formatPlaybackTimeSlot, formatPlaybackTrailingTime} from '../../utils/playbackTimeLabels';
 import { useSettings } from '../../context/SettingsContext';
 
@@ -107,7 +107,7 @@ export const usePlayerButtons = ({
 			{id: 'zoom', icon: <IconZoom />, label: $L('Zoom').concat(` (${zoomModeLabel})`), action: 'zoom', active: zoomModeKey !== 'fit'},
 			{id: 'sleep', icon: <IconSleep />, label: $L('Sleep timer'), action: 'sleep', active: sleepMinutes != null},
 			{id: 'info', icon: <IconInfo />, label: $L('Playback Information'), action: 'info'}
-		], {order: osdOrder, hidden: osdHidden});
+		], {order: osdOrder, hidden: osdHidden, catalogue: OSD_BUTTONS});
 	}, [audioStreams.length, chapters.length, canBrowseEpisodes, subtitleStreams.length, isAudioMode, isLiveTV, selectedQuality, selectedSubtitleIndex, canDownloadRemoteSubtitles, hasCastMembers, zoomModeLabel, zoomModeKey, sleepMinutes, osdOrder, osdHidden]);
 
 	return {topButtons, bottomButtons};
