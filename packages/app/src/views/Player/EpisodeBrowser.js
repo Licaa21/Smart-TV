@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef} from 'react';
+import {memo, useCallback, useEffect, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
 import Spotlight from '@enact/spotlight';
 
@@ -26,9 +26,18 @@ const episodeLine = (episode) => {
 	return parts.join(' · ');
 };
 
-const EpisodeRow = ({episode, serverUrl, isCurrent, hideOverview, onSelect}) => {
+// A long season is drawn in pieces, the first screenful at once and the rest over the next few
+// frames, since building twenty rows and their stills in one go is what makes the panel hang
+// on a TV. The rows are about 230px tall, so this covers what fits on screen.
+const FIRST_ROWS = 5;
+const ROWS_PER_FRAME = 4;
+
+// The still is drawn 320px wide, so that is the size asked for.
+const THUMB_OPTIONS = {maxWidth: 320, quality: 70};
+
+const EpisodeRow = memo(({episode, serverUrl, isCurrent, hideOverview, onSelect}) => {
 	const thumb = episode.ImageTags?.Primary
-		? getImageUrl(episode._serverUrl || serverUrl, episode.Id, 'Primary', {maxWidth: 400, quality: 80})
+		? getImageUrl(episode._serverUrl || serverUrl, episode.Id, 'Primary', THUMB_OPTIONS)
 		: null;
 	const percent = watchedPercent(episode);
 	const played = episode.UserData?.Played === true;
@@ -43,7 +52,7 @@ const EpisodeRow = ({episode, serverUrl, isCurrent, hideOverview, onSelect}) => 
 		>
 			<div className={css.thumb}>
 				{thumb ? (
-					<img className={css.thumbImage} src={thumb} alt="" />
+					<img className={css.thumbImage} src={thumb} alt="" decoding="async" />
 				) : (
 					<div className={css.thumbPlaceholder}>
 						<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM9.5 7.5l7 4.5-7 4.5z" /></svg>
@@ -67,7 +76,7 @@ const EpisodeRow = ({episode, serverUrl, isCurrent, hideOverview, onSelect}) => 
 			</div>
 		</SpottableDiv>
 	);
-};
+});
 
 /**
  * The Netflix style episode list over the video. The video keeps playing behind it, so this
@@ -87,6 +96,26 @@ const EpisodeBrowser = ({item, logoUrl, onLogoError, onSelect, onClose}) => {
 	const listRef = useRef(null);
 	const focusedOnceRef = useRef(false);
 	const serverUrl = item?._serverUrl || getServerUrl();
+
+	// How many rows are drawn so far. It always covers the episode that is playing, since that is
+	// where the remote lands, and then grows a few rows a frame until the season is all there.
+	const total = episodes ? episodes.length : 0;
+	const playingIndex = episodes ? episodes.findIndex((candidate) => String(candidate.Id) === String(item.Id)) : -1;
+	const [drawn, setDrawn] = useState(0);
+	useEffect(() => {
+		const first = Math.min(total, Math.max(FIRST_ROWS, playingIndex + 3));
+		setDrawn(first);
+		if (first >= total) return undefined;
+		let frame = 0;
+		let count = first;
+		const grow = () => {
+			count = Math.min(total, count + ROWS_PER_FRAME);
+			setDrawn(count);
+			if (count < total) frame = window.requestAnimationFrame(grow);
+		};
+		frame = window.requestAnimationFrame(grow);
+		return () => window.cancelAnimationFrame(frame);
+	}, [episodes, total, playingIndex]);
 
 	// Once the season that is playing has loaded, the remote moves to the episode that is on.
 	useEffect(() => {
@@ -145,7 +174,7 @@ const EpisodeBrowser = ({item, logoUrl, onLogoError, onSelect, onClose}) => {
 					{failed && <SpottableDiv className={css.message}>{$L('Failed to load')}</SpottableDiv>}
 					{!failed && episodes === null && <SpottableDiv className={css.message}>{$L('Loading...')}</SpottableDiv>}
 					{!failed && episodes && episodes.length === 0 && <SpottableDiv className={css.message}>{$L('Nothing here yet.')}</SpottableDiv>}
-					{!failed && episodes && episodes.map((episode) => (
+					{!failed && episodes && episodes.slice(0, drawn).map((episode) => (
 						<EpisodeRow
 							key={episode.Id}
 							episode={episode}

@@ -1,6 +1,6 @@
 import {renderHook, waitFor, act} from '@testing-library/react';
 
-import useSeriesEpisodes from './useSeriesEpisodes';
+import useSeriesEpisodes, {clearSeriesEpisodesCache} from './useSeriesEpisodes';
 
 const mockApi = {getSeasons: jest.fn(), getEpisodes: jest.fn()};
 const mockCreateApi = jest.fn(() => mockApi);
@@ -23,6 +23,7 @@ const episodesOf = (season) => ({
 });
 
 beforeEach(() => {
+	clearSeriesEpisodesCache();
 	mockApi.getSeasons.mockReset().mockResolvedValue(seasons);
 	mockApi.getEpisodes.mockReset().mockImplementation((series, season) => Promise.resolve(episodesOf(season)));
 	mockCreateApi.mockReset().mockReturnValue(mockApi);
@@ -83,4 +84,66 @@ describe('useSeriesEpisodes', () => {
 		await waitFor(() => expect(result.current.failed).toBe(true));
 		expect(result.current.episodes).toBeNull();
 	});
+
+	describe('speed', () => {
+		it('asks for the playing season\'s episodes at the same moment as the season list, not after it', () => {
+			mockApi.getSeasons.mockReturnValue(new Promise(() => {}));
+			renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			expect(mockApi.getSeasons).toHaveBeenCalledTimes(1);
+			expect(mockApi.getEpisodes).toHaveBeenCalledWith('series', 's2');
+		});
+
+		it('shows the episodes even while the season list is still on its way', async () => {
+			mockApi.getSeasons.mockReturnValue(new Promise(() => {}));
+			const {result} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			await waitFor(() => expect(result.current.episodes).not.toBeNull());
+			expect(result.current.selectedSeasonId).toBe('s2');
+			expect(result.current.seasons).toBeNull();
+		});
+
+		const open = (playing = item) => renderHook(() => useSeriesEpisodes({item: playing, enabled: true}));
+
+		it('draws straight from memory the next time the series is opened, then refreshes behind it', async () => {
+			const {result: firstResult, unmount: closeFirst} = open();
+			await waitFor(() => expect(firstResult.current.episodes).not.toBeNull());
+			await waitFor(() => expect(firstResult.current.seasons).not.toBeNull());
+			closeFirst();
+			mockApi.getSeasons.mockClear();
+			mockApi.getEpisodes.mockClear();
+
+			const {result: secondResult, unmount: closeSecond} = open();
+			// Nothing has resolved yet, and it is already all there.
+			expect(secondResult.current.seasons.map((entry) => entry.Id)).toEqual(['s1', 's2']);
+			expect(secondResult.current.episodes.map((entry) => entry.Id)).toEqual(['s2-a']);
+			// And the server is asked again, so a watched mark that changed is picked up.
+			expect(mockApi.getSeasons).toHaveBeenCalledTimes(1);
+			expect(mockApi.getEpisodes).toHaveBeenCalledWith('series', 's2');
+			mockApi.getEpisodes.mockResolvedValue({Items: [{Id: 's2-a', Name: 'A', UserData: {Played: true}}]});
+			closeSecond();
+			const {result: thirdResult} = open();
+			await waitFor(() => expect(thirdResult.current.episodes[0].UserData?.Played).toBe(true));
+		});
+
+		it('keeps what it was showing when the refresh fails', async () => {
+			const {result: firstResult, unmount: closeFirst} = open();
+			await waitFor(() => expect(firstResult.current.episodes).not.toBeNull());
+			closeFirst();
+			mockApi.getEpisodes.mockRejectedValue(new Error('down'));
+			const {result: secondResult} = open();
+			await act(async () => {
+				await new Promise((resolve) => setTimeout(resolve, 20));
+			});
+			expect(secondResult.current.episodes.map((entry) => entry.Id)).toEqual(['s2-a']);
+			expect(secondResult.current.failed).toBe(false);
+		});
+
+		it('keeps each series apart in memory', async () => {
+			const {result: firstResult, unmount: closeFirst} = open();
+			await waitFor(() => expect(firstResult.current.episodes).not.toBeNull());
+			closeFirst();
+			const {result: otherResult} = open({...item, SeriesId: 'other'});
+			expect(otherResult.current.episodes).toBeNull();
+		});
+	});
 });
+
