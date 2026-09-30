@@ -2,7 +2,7 @@ import {useState, useEffect} from 'react';
 
 import {useSeerr} from '../context/SeerrContext';
 import * as seerrApi from '../services/seerrApi';
-import {prepareCredits} from '../utils/personCredits';
+import {prepareCredits, popularBackdropPath} from '../utils/personCredits';
 import {normalizeMediaItem} from '../utils/seerrHomeRows';
 
 const EMPTY = [];
@@ -30,8 +30,9 @@ const usePersonSeerrCredits = (tmdbId) => {
 	}, [tmdbId, isEnabled]);
 
 	return {
-		appearances: credits ? prepareCredits(credits.cast, {isCrew: false}).map(normalizeMediaItem) : EMPTY,
-		crewCredits: credits ? prepareCredits(credits.crew, {isCrew: true}).map(normalizeMediaItem) : EMPTY,
+		appearances: credits ? prepareCredits(credits.cast, {isCrew: false, group: true}).map(normalizeMediaItem) : EMPTY,
+		crewCredits: credits ? prepareCredits(credits.crew, {isCrew: true, group: true}).map(normalizeMediaItem) : EMPTY,
+		backdropPath: credits ? popularBackdropPath(credits.cast) : null,
 		seerrEnabled: isEnabled
 	};
 };

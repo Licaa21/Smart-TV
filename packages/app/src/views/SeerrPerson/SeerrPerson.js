@@ -7,7 +7,7 @@ import {useAuth} from '../../context/AuthContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import MediaRow from '../../components/MediaRow';
 import PersonDetailShell from '../../components/PersonDetailShell';
-import {personDateLines, prepareCredits} from '../../utils/personCredits';
+import {personDateLines, prepareCredits, popularBackdropPath} from '../../utils/personCredits';
 import {normalizeMediaItem} from '../../utils/seerrHomeRows';
 
 import css from './SeerrPerson.module.less';
@@ -65,17 +65,19 @@ const SeerrPerson = ({personId, personName, onClose, onSelectItem, onBack}) => {
 		return urls;
 	}, [rawCast, rawCrew]);
 
+	// The title they are best known for, or anything with a backdrop when nothing qualifies.
 	const randomBackdrop = useMemo(() => {
-		if (backdropCandidates.length === 0) return null;
-		return backdropCandidates[Math.floor(Math.random() * backdropCandidates.length)];
-	}, [backdropCandidates]);
+		const popular = popularBackdropPath(rawCast);
+		if (popular) return seerrApi.getImageUrl(popular, 'w1280');
+		return backdropCandidates[0] || null;
+	}, [rawCast, backdropCandidates]);
 
 	const handleSelectMedia = useCallback((item) => {
 		if (item?._seerrRaw) onSelectItem?.(item._seerrRaw);
 	}, [onSelectItem]);
 
-	const appearances = useMemo(() => prepareCredits(rawCast, {isCrew: false}).map(normalizeMediaItem), [rawCast]);
-	const crewCredits = useMemo(() => prepareCredits(rawCrew, {isCrew: true}).map(normalizeMediaItem), [rawCrew]);
+	const appearances = useMemo(() => prepareCredits(rawCast, {isCrew: false, group: true}).map(normalizeMediaItem), [rawCast]);
+	const crewCredits = useMemo(() => prepareCredits(rawCrew, {isCrew: true, group: true}).map(normalizeMediaItem), [rawCrew]);
 
 	const tabs = useMemo(() => {
 		const list = [];
