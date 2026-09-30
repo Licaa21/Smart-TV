@@ -12,6 +12,15 @@
 	pointer-events: all;
 }
 
+// The same prompt drawn inside the settings preview, which places it itself.
+.overlayPreview {
+	position: absolute;
+	right: 35px;
+	bottom: 174px;
+	z-index: 1;
+	pointer-events: none;
+}
+
 .button {
 	display: flex;
 	flex-direction: row;
@@ -36,6 +45,11 @@
 		border-color: @accent;
 		outline: none;
 	}
+}
+
+// The real prompt always holds focus, so the preview wears the focused border too.
+.buttonPreview {
+	border-color: @accent;
 }
 
 .icon {
