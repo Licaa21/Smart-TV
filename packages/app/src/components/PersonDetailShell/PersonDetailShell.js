@@ -7,6 +7,9 @@ import {KEYS} from '../../utils/keys';
 
 import css from './PersonDetailShell.module.less';
 
+// Three lines at this size hold about this much, so shorter text has nothing to expand.
+const LONG_OVERVIEW = 240;
+
 const SpottableDiv = Spottable('div');
 const TabsContainer = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'div');
 
@@ -65,6 +68,7 @@ const PersonDetailShell = ({
 			{backdropUrl && (
 				<div className={css.randomBackdrop} style={{backgroundImage: `url(${backdropUrl})`}} />
 			)}
+			{backdropUrl && <div className={css.scrim} />}
 			<div className={css.content}>
 				<div className={css.personInfo}>
 					{imageUrl ? (
@@ -89,7 +93,9 @@ const PersonDetailShell = ({
 								spotlightId="person-overview"
 							>
 								{overview}
-								<span className={css.overviewToggle}>{overviewExpanded ? $L('Show Less') : $L('Show More')}</span>
+								{overview.length > LONG_OVERVIEW && (
+									<span className={css.overviewToggle}>{overviewExpanded ? $L('Show Less') : $L('Show More')}</span>
+								)}
 							</SpottableDiv>
 						)}
 						{actions.length > 0 && (
