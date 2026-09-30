@@ -97,6 +97,16 @@ describe('the button catalogues', () => {
 		});
 	});
 
+	it('offers the episode browser in the player buttons list, and it can be arranged and hidden', () => {
+		expect(ids(OSD_BUTTONS)).toContain('episodes');
+		// Someone who arranged the row before it existed gets it right after Chapters.
+		const saved = ['chapters', 'subtitles', 'audio', 'castAndCrew', 'quality', 'zoom', 'sleep', 'info'];
+		expect(ids(ordered(OSD_BUTTONS, saved)).slice(0, 3)).toEqual(['chapters', 'episodes', 'subtitles']);
+		// Moved to the end, it stays there.
+		expect(ids(ordered(OSD_BUTTONS, [...saved, 'episodes'])).pop()).toBe('episodes');
+		expect(ids(arrange(OSD_BUTTONS, {hidden: ['episodes']}))).not.toContain('episodes');
+	});
+
 	it('names the cast and crew button the way Core does, since Core uses cast for Chromecast', () => {
 		expect(ids(OSD_BUTTONS)).toContain('castAndCrew');
 		expect(ids(OSD_BUTTONS)).not.toContain('cast');
