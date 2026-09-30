@@ -97,39 +97,49 @@ const EpisodeBrowser = memo(({item, logoUrl, onLogoError, onSelect, onClose}) =>
 	const focusedOnceRef = useRef(false);
 	const serverUrl = item?._serverUrl || getServerUrl();
 
-	// How many rows are drawn so far. It always covers the episode that is playing, since that is
-	// where the remote lands, and then grows a few rows a frame until the season is all there.
+	// How many rows are drawn. The first batch is worked out while rendering and not in an effect,
+	// so the episode that is playing is in the very first frame: everything that scrolls or focuses
+	// to it afterwards needs it to exist. The batch always covers that episode, and the rest of the
+	// season is then added a few rows a frame.
 	const total = episodes ? episodes.length : 0;
 	const playingIndex = episodes ? episodes.findIndex((candidate) => String(candidate.Id) === String(item.Id)) : -1;
-	const [drawn, setDrawn] = useState(0);
+	const firstBatch = Math.min(total, Math.max(FIRST_ROWS, playingIndex + 3));
+	// Tied to the list it was counted for, so a season that loads later starts from its own first batch.
+	const [growth, setGrowth] = useState({list: null, count: 0});
+	const drawn = Math.max(firstBatch, growth.list === episodes ? growth.count : 0);
 	useEffect(() => {
-		const first = Math.min(total, Math.max(FIRST_ROWS, playingIndex + 3));
-		setDrawn(first);
-		if (first >= total) return undefined;
+		if (!episodes || firstBatch >= total) return undefined;
 		let frame = 0;
-		let count = first;
+		let count = firstBatch;
 		const grow = () => {
 			count = Math.min(total, count + ROWS_PER_FRAME);
-			setDrawn(count);
+			setGrowth({list: episodes, count});
 			if (count < total) frame = window.requestAnimationFrame(grow);
 		};
 		frame = window.requestAnimationFrame(grow);
 		return () => window.cancelAnimationFrame(frame);
-	}, [episodes, total, playingIndex]);
+	}, [episodes, total, firstBatch]);
 
-	// Once the season that is playing has loaded, the remote moves to the episode that is on.
+	// Once the season that is playing has loaded, the list opens scrolled to the episode that is on
+	// and the remote moves to it. The scroll happens straight away, since the row is already drawn,
+	// and does not wait on focus, which only lands a frame later and does not scroll by itself.
 	useEffect(() => {
 		if (focusedOnceRef.current || !episodes || episodes.length === 0) return;
 		focusedOnceRef.current = true;
+		const list = listRef.current;
+		const scrollToPlaying = () => {
+			const row = list && list.querySelector(`[data-episode-id="${item.Id}"]`);
+			if (row) list.scrollTop = Math.max(0, row.offsetTop - 24);
+			return row;
+		};
+		scrollToPlaying();
 		window.requestAnimationFrame(() => {
-			const target = Spotlight.focus(CURRENT_EPISODE_ID) ? document.querySelector(`[data-episode-id="${item.Id}"]`) : null;
-			if (!target) {
-				const first = listRef.current?.querySelector('[data-episode-id]');
-				if (first) Spotlight.focus(first);
+			if (Spotlight.focus(CURRENT_EPISODE_ID)) {
+				scrollToPlaying();
 				return;
 			}
-			// Focus doesn't scroll, so bring the row up under the season tabs.
-			if (listRef.current) listRef.current.scrollTop = Math.max(0, target.offsetTop - 24);
+			const first = list && list.querySelector('[data-episode-id]');
+			if (first) Spotlight.focus(first);
 		});
 	}, [episodes, item.Id]);
 

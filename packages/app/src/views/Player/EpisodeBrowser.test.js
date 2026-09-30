@@ -1,4 +1,5 @@
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import Spotlight from '@enact/spotlight';
 
 import {defaultSettings} from '../../context/defaultSettings';
 import EpisodeBrowser from './EpisodeBrowser';
@@ -202,6 +203,59 @@ describe('EpisodeBrowser', () => {
 			// jsdom has no layout, so offsets are zero and the strip is left at the start.
 			const strip = document.querySelector('[data-active-tab="true"]').parentNode;
 			expect(strip.scrollLeft).toBe(0);
+		});
+	});
+
+	describe('opening on the episode that is playing', () => {
+		const many = (size) => Array.from({length: size}, (unused, i) => episode({
+			Id: `m${i + 1}`, Type: 'Episode', Name: `Episode ${i + 1}`, IndexNumber: i + 1, Overview: `Plot ${i + 1}`
+		}));
+
+		it('has the playing episode in the first render, before any frame-driven update can run', () => {
+			// With frames frozen nothing an effect schedules can happen, so whatever is on screen was
+			// drawn by the first render alone.
+			const frames = jest.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+			try {
+				mockEpisodes = {...mockEpisodes, episodes: many(30)};
+				open({item: {...item, Id: 'm10'}});
+				const row = document.querySelector('[data-episode-id="m10"]');
+				expect(row).not.toBeNull();
+				expect(row.getAttribute('data-selected')).toBe('true');
+				expect(document.querySelectorAll('[data-episode-id]').length).toBeLessThan(30);
+			} finally {
+				frames.mockRestore();
+			}
+		});
+
+		it('scrolls the list down to that episode straight away, not up at the first one', () => {
+			mockEpisodes = {...mockEpisodes, episodes: many(30)};
+			const original = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'offsetTop');
+			Object.defineProperty(window.HTMLElement.prototype, 'offsetTop', {
+				configurable: true,
+				get() { return this.dataset && this.dataset.episodeId === 'm10' ? 2000 : 0; }
+			});
+			try {
+				open({item: {...item, Id: 'm10'}});
+				expect(document.querySelector('[data-episode-id="m10"]').parentNode.scrollTop).toBe(1976);
+			} finally {
+				if (original) Object.defineProperty(window.HTMLElement.prototype, 'offsetTop', original);
+				else delete window.HTMLElement.prototype.offsetTop;
+			}
+		});
+
+		it('sends the remote to that episode', async () => {
+			Spotlight.focus.mockReturnValue(true);
+			mockEpisodes = {...mockEpisodes, episodes: many(30)};
+			open({item: {...item, Id: 'm10'}});
+			await waitFor(() => expect(Spotlight.focus).toHaveBeenCalledWith('episodes-current'));
+			await waitFor(() => expect(document.querySelectorAll('[data-episode-id]').length).toBe(30));
+		});
+
+		it('falls back to the first episode when the playing one is not in the list', async () => {
+			Spotlight.focus.mockReturnValue(false);
+			mockEpisodes = {...mockEpisodes, episodes: many(8)};
+			open({item: {...item, Id: 'elsewhere'}});
+			await waitFor(() => expect(Spotlight.focus).toHaveBeenCalledWith(document.querySelector('[data-episode-id="m1"]')));
 		});
 	});
 });
