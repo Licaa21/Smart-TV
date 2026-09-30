@@ -89,11 +89,11 @@ const RELOAD_TIMEOUT_MS = 12000;
 // up after a long standby gets retried instead of leaving the user to back out and
 // start over by hand.
 const RELOAD_RETRY_DELAYS = [5000, 10000, 20000];
-const RELOAD_RETRY_MAX_DELAY_MS = 30000;
 // avplayRestore()'s promise only resolves from restoreAsync's own success/error
 // callback - on some Tizen 9 sets that callback never fires at all, so without a
 // bound this hangs forever with no error screen and nothing left to press.
 const RESTORE_TIMEOUT_MS = 6000;
+const RELOAD_RETRY_MAX_DELAY_MS = 30000;
 const reloadRetryDelay = (attempt) => RELOAD_RETRY_DELAYS[attempt] ?? RELOAD_RETRY_MAX_DELAY_MS;
 
 const getRootFontSizePx = () => {
@@ -890,7 +890,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// the app-state observer (automatic, on resume) and handleKeyDown (manual, on
 	// any key while the error screen is up) below.
 	const recoverByReload = useCallback((attempt = 0) => {
-		if (reloadInFlightRef.current) return;
+		if (reloadInFlightRef.current) {
+			serverLogger.playback('Standby diag: recoverByReload skipped, already in flight', {attempt});
+			return;
+		}
 		reloadInFlightRef.current = true;
 		console.warn(`[Player] AVPlay restore left the session unplayable, reloading stream${attempt ? ` (retry ${attempt})` : ''}`);
 		// A request already in flight when the TV actually powers off is frozen
@@ -903,6 +906,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		});
 		Promise.race([reloadPromise, timedOut]).then((reloaded) => {
 			reloadInFlightRef.current = false;
+			serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded, attempt});
 			if (isUnmountedRef.current) return;
 			if (reloaded) {
 				// The attempt this is recovering from may have kept running in the
@@ -920,6 +924,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			// here still clears the error instead of leaving it stuck in front of
 			// playback that's now actually working.
 			reloadPromise.then((lateReloaded) => {
+				serverLogger.playback('Standby diag: reloadPlaybackRef late result', {lateReloaded, attempt});
 				if (!isUnmountedRef.current && lateReloaded) setError(null);
 			});
 			// A scheduled retry relies on setTimeout, which - like every other
@@ -929,9 +934,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			// any-key-retries-immediately handling below is what covers the
 			// genuinely-frozen case, since nothing here runs again on its own
 			// until real input arrives regardless of any timer.
+			const nextDelay = reloadRetryDelay(attempt);
+			serverLogger.playback('Standby diag: reload retry scheduled', {nextAttempt: attempt + 1, nextDelay});
 			reloadRetryTimeoutRef.current = setTimeout(() => {
 				if (!isUnmountedRef.current) recoverByReload(attempt + 1);
-			}, reloadRetryDelay(attempt));
+			}, nextDelay);
 		});
 	}, [setError]);
 
@@ -939,6 +946,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// when a key press is what tells us the engine is actually running again,
 	// rather than waiting on a timer that may never fire.
 	const triggerManualRetry = useCallback(() => {
+		serverLogger.playback('Standby diag: manual retry triggered by key press', {});
 		if (reloadRetryTimeoutRef.current) {
 			clearTimeout(reloadRetryTimeoutRef.current);
 			reloadRetryTimeoutRef.current = null;
@@ -984,7 +992,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			unregisterAppStateRef.current = registerAppStateObserver(
 				() => {
 					console.log('[Player] App resumed');
-					if (playback.consumeBackgroundStopFired()) {
+					const backgroundStopFired = playback.consumeBackgroundStopFired();
+					serverLogger.playback('Standby diag: player foregrounded', {
+						hadSuspendedRecord: !!suspendedRef.current,
+						backgroundStopFired
+					});
+					if (backgroundStopFired) {
 						// the session was stopped on the server while we were
 						// backgrounded, so bring it back before we resume playback
 						resumeReportingRef.current?.();
@@ -992,15 +1005,27 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					const suspended = suspendedRef.current;
 					suspendedRef.current = null;
 					if (suspended) {
+						let restoreSettledInTime = false;
 						const restorePromise = avplayRestore(suspended.url, suspended.positionMs);
 						const restoreTimedOut = new Promise((resolve) => {
 							setTimeout(() => resolve(false), RESTORE_TIMEOUT_MS);
 						});
+						restorePromise.then((lateOk) => {
+							if (!restoreSettledInTime) {
+								serverLogger.playback('Standby diag: avplayRestore late result', {lateOk});
+							}
+						});
 						Promise.race([restorePromise, restoreTimedOut]).then((ok) => {
+							restoreSettledInTime = true;
+							serverLogger.playback('Standby diag: avplayRestore result', {ok, wasPlaying: suspended.wasPlaying});
 							if (ok) {
 								if (suspended.wasPlaying) {
 									let playError = null;
 									try { avplayPlay(); } catch (e) { playError = e; }
+									serverLogger.playback('Standby diag: avplayPlay after restore result', {
+										playError: playError ? (playError.message || String(playError)) : null,
+										avplayState: avplayGetState()
+									});
 									if (playError) {
 										// restoreAsync reported success but the session had already
 										// dropped back to IDLE, so there's nothing for play() to resume
@@ -1013,6 +1038,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 									// while the session actually dropped back to IDLE would otherwise
 									// go unnoticed - check the state directly instead of trusting ok.
 									const stateAfterRestore = avplayGetState();
+									serverLogger.playback('Standby diag: state check after paused restore', {stateAfterRestore});
 									if (stateAfterRestore !== 'PAUSED' && stateAfterRestore !== 'READY') {
 										recoverByReload();
 									}
@@ -1025,6 +1051,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						return;
 					}
 					const stateAtResume = avplayGetState();
+					serverLogger.playback('Standby diag: player foregrounded without a suspended record', {
+						avplayReady: avplayReadyRef.current,
+						isPaused,
+						avplayState: stateAtResume
+					});
 					const looksResumable = avplayReadyRef.current
 						&& (stateAtResume === 'PLAYING' || stateAtResume === 'PAUSED' || stateAtResume === 'READY');
 					if (looksResumable) {
@@ -1050,6 +1081,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					playback.reportBackgroundStop(positionRef.current);
 					const state = avplayGetState();
 					const wasPlaying = state === 'PLAYING';
+					serverLogger.playback('Standby diag: player backgrounded', {
+						avplayState: state,
+						wasPlaying,
+						avplayReady: avplayReadyRef.current,
+						hasUrl: !!currentUrlRef.current
+					});
 					if (wasPlaying) {
 						try { avplayPause(); } catch (e) { void e; }
 					}
@@ -1057,11 +1094,21 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						// Recording a suspended record whenever there's a URL in flight - not
 						// only when avplayReady/avplaySuspend succeed - means a session that
 						// was never properly opened yet still gets a restore attempt on resume,
-						// which naturally falls through to the same reload fallback above instead
-						// of resuming into a dead end with nothing to recover from.
+						// which naturally falls through to the same reload fallback below
+						// instead of resuming into a dead end with nothing to recover from.
 						const positionMs = avplayGetCurrentTime();
-						if (avplayReadyRef.current) avplaySuspend();
+						const suspended = avplayReadyRef.current ? avplaySuspend() : false;
+						serverLogger.playback('Standby diag: avplaySuspend result', {
+							suspended,
+							avplayState: state,
+							avplayReady: avplayReadyRef.current
+						});
 						suspendedRef.current = {url: currentUrlRef.current, positionMs, wasPlaying};
+					} else {
+						serverLogger.playback('Standby diag: skipped avplaySuspend', {
+							avplayReady: avplayReadyRef.current,
+							hasUrl: !!currentUrlRef.current
+						});
 					}
 				}
 			);
