@@ -8,7 +8,6 @@ import {
 	usableCredits,
 	groupCredits,
 	popularBackdropPath,
-	portraitCrop,
 	sortCredits,
 	prepareCredits
 } from './personCredits';
@@ -174,20 +173,5 @@ describe('the backdrop they are best known for', () => {
 	test('is nothing when no credit has one', () => {
 		expect(popularBackdropPath([{voteCount: 5}])).toBeNull();
 		expect(popularBackdropPath(null)).toBeNull();
-	});
-});
-
-describe('the round portrait crop', () => {
-	test('a tall photo fills the width and starts near the top, where the head is', () => {
-		expect(portraitCrop(600, 900)).toEqual({size: '100% auto', position: 'center 4%'});
-	});
-
-	test('a wide photo fills the height and stays centred', () => {
-		expect(portraitCrop(900, 600)).toEqual({size: 'auto 100%', position: 'center center'});
-	});
-
-	test('a squarish photo is lightly cropped, and an unknown size gets the same', () => {
-		expect(portraitCrop(500, 520)).toEqual({size: 'cover', position: 'center 12%'});
-		expect(portraitCrop(0, 0)).toEqual({size: 'cover', position: 'center 12%'});
 	});
 });

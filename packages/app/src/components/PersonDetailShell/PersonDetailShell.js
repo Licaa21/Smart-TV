@@ -4,7 +4,6 @@ import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import $L from '@enact/i18n/$L';
 import {KEYS} from '../../utils/keys';
-import {portraitCrop} from '../../utils/personCredits';
 
 import css from './PersonDetailShell.module.less';
 
@@ -32,19 +31,6 @@ const PersonDetailShell = ({
 }) => {
 	const [overviewExpanded, setOverviewExpanded] = useState(false);
 	const [activeTab, setActiveTab] = useState(0);
-	// The photo's own shape decides how it is cropped, so it is read before it is drawn.
-	const [crop, setCrop] = useState(null);
-
-	useEffect(() => {
-		setCrop(null);
-		if (!imageUrl) return;
-		const probe = new window.Image();
-		let live = true;
-		probe.onload = () => { if (live) setCrop(portraitCrop(probe.naturalWidth, probe.naturalHeight)); };
-		probe.onerror = () => { if (live) setCrop(portraitCrop(0, 0)); };
-		probe.src = imageUrl;
-		return () => { live = false; };
-	}, [imageUrl]);
 
 	useEffect(() => {
 		if (activeTab >= tabs.length && tabs.length > 0) setActiveTab(0);
@@ -86,7 +72,7 @@ const PersonDetailShell = ({
 			<div className={css.content}>
 				<div className={css.personInfo}>
 					{imageUrl ? (
-						<div className={css.personImage} style={crop ? {backgroundImage: `url("${imageUrl}")`, backgroundSize: crop.size, backgroundPosition: crop.position} : undefined} role="img" aria-label={name} />
+						<img className={css.personImage} src={imageUrl} alt={name} />
 					) : (
 						<div className={css.noImage}>{placeholderInitial}</div>
 					)}
