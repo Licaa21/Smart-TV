@@ -181,6 +181,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const [currentSubtitleText, setCurrentSubtitleText] = useState(null);
 	const [controlsVisible, setControlsVisible] = useState(false);
 	const [activeModal, setActiveModal] = useState(null);
+	// Read by the time update, which runs from an interval or a media event and so sees no fresh state.
+	const episodesOpenRef = useRef(false);
+	episodesOpenRef.current = activeModal === 'episodes';
 	// Seeded from the advanced playback menu, which picks a cap before playback starts.
 	const [selectedQuality, setSelectedQuality] = useState(initialQuality || null);
 	const [remoteSubtitleResults, setRemoteSubtitleResults] = useState([]);
@@ -412,7 +415,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const time = ms / 1000;
 		const ticks = Math.floor(ms * 10000);
 
-		setCurrentTime(time);
+		// Nothing on screen reads the time while the episode panel is up, and each update redraws the
+		// whole player, which is what makes that panel drag. The first tick after it closes catches up.
+		if (!episodesOpenRef.current) setCurrentTime(time);
 		positionRef.current = ticks;
 
 		// A corrective skip is judged on every reading rather than only at the

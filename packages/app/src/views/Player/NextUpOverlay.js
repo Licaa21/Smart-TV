@@ -1,4 +1,5 @@
 import $L from '@enact/i18n/$L';
+import {useSettings} from '../../context/SettingsContext';
 import {SpottableButton} from './PlayerConstants';
 import {CountdownRing, PlayGlyph, formatRemaining, useOverlayFocus} from './overlayParts';
 import AnimeMarkerPills, {useEpisodeMarker, hasAnimeMarkerPills} from '../../components/AnimeMarkerPills';
@@ -7,6 +8,13 @@ import css from './NextUpOverlay.module.less';
 
 const RING_SIZE = 32;
 const RING_STROKE = 4;
+
+// What each layout adds to the overlay. The card is the base, and the others reshape it.
+const LAYOUT_CLASS = {
+	card: '',
+	banner: css.layoutBanner,
+	button: css.layoutButton
+};
 
 const ringClasses = {ring: css.ring, svg: css.ringSvg, track: css.ringTrack, value: css.ringValue, center: css.ringCenter};
 
@@ -20,9 +28,12 @@ const episodeLabel = (episode) => {
 /**
  * Offers the next episode as the current one runs out. The ring sits inside the
  * play button rather than under the card, so the countdown reads as part of the
- * thing it is about to do. `preview` draws it inert inside the settings screen.
+ * thing it is about to do. The card, the banner and the button are the same prompt built three ways,
+ * chosen in settings. `preview` draws it inert inside the settings screen.
  */
 const NextUpOverlay = ({episode, imageUrl, serverUrl, countdown, timeout, countdownStyle, minimal, preview = false, onPlay, onDismiss}) => {
+	const {settings} = useSettings();
+	const layoutClass = LAYOUT_CLASS[settings.nextUpLayout] || '';
 	useOverlayFocus(preview ? null : 'next-up-play-btn');
 	// A preview must not put buttons in the way of the remote on the screen it sits in.
 	const Button = preview ? 'div' : SpottableButton;
@@ -36,7 +47,7 @@ const NextUpOverlay = ({episode, imageUrl, serverUrl, countdown, timeout, countd
 	const marker = useEpisodeMarker(episode, {serverUrl});
 
 	return (
-		<div className={`${preview ? css.overlayPreview : css.overlay} ${minimal ? css.minimal : ''}`}>
+		<div className={[preview ? css.overlayPreview : css.overlay, minimal ? css.minimal : '', layoutClass].filter(Boolean).join(' ')}>
 			<div className={css.card}>
 				{!minimal && imageUrl && (
 					<div className={css.thumb}>

@@ -534,6 +534,8 @@ export const ACCENT_RULES = {
 		["views/Player/NextUpOverlay.module.less","",".{playBtn}","background","{accent}"],
 		["views/Player/NextUpOverlay.module.less","",".{dismissBtn}:focus","background","rgba({rgb}, 0.24)"],
 		["views/Player/NextUpOverlay.module.less","",".{dismissBtn}:focus","border-color","{accent}"],
+		["views/Player/NextUpOverlay.module.less","",".{layoutButton} .{playBtn}:focus","border-color","{accent}"],
+		["views/Player/NextUpOverlay.module.less","",".{layoutButton} .{ringValue}","stroke","{accent}"],
 		["views/Player/Player.module.less","",".{offsetBtn}:hover, .{offsetBtn}:focus","background","rgba({rgb}, 0.3)"],
 		["views/Player/Player.module.less","",".{offsetBtn}:hover, .{offsetBtn}:focus","border-color","{accent}"],
 		["views/Player/Player.module.less","",".{timelineEventActive}","background","rgba({rgb}, 0.55)"],
@@ -655,8 +657,6 @@ export const ACCENT_RULES = {
 		["views/Player/SkipSegmentOverlay.module.less","",".{ringValue}","stroke","{accent}"],
 		["views/Player/SkipSegmentOverlay.module.less","",".{ringIcon}","color","{accent}"],
 		["views/Player/SkipSegmentOverlay.module.less","",".{barFill}","background","{accent}"],
-		["views/Player/SkipSegmentOverlay.module.less","",".{button}.{layoutOutline}:focus","border-color","{accent}"],
-		["views/Player/SkipSegmentOverlay.module.less","",".{button}.{layoutOutline}.{buttonPreview}","border-color","{accent}"],
 		["views/Player/SkipSegmentOverlay.module.less","",".{sweep}","background","rgba({rgb}, 0.38)"]
 	]
 };

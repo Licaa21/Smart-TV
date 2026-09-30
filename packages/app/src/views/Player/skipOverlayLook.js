@@ -4,7 +4,7 @@ import {ensureVisible, isValidHexColor, toRgbTriplet} from '../../theme/themeSpe
 // Where the skip prompt has always sat, in the 1920x1080 pixels its stylesheet is written in,
 // and the fill and ink it wears. A setting left at these values changes nothing, so the
 // stylesheet keeps drawing the prompt exactly as before.
-export const SKIP_LAYOUTS = ['capsule', 'rectangle', 'outline', 'sweep', 'text'];
+export const SKIP_LAYOUTS = ['capsule', 'rectangle', 'sweep'];
 
 // The fill and ink each layout wears when nothing is picked. Only the rectangle is light, so it is
 // the one that writes dark text; the rest sit on the dark fill or straight on the picture.
@@ -93,8 +93,6 @@ const colorOf = (value) => (isValidHexColor(value) ? value : '');
  */
 export const resolveSkipOverlayLook = (settings = {}) => {
 	const layout = SKIP_LAYOUTS.includes(settings.skipOverlayLayout) ? settings.skipOverlayLayout : SKIP_DEFAULTS.layout;
-	// A box-less layout has no fill to paint, so the background picks only reach the ones with one.
-	const filled = layout !== 'outline' && layout !== 'text';
 	const position = settings.skipOverlayPosition || SKIP_DEFAULTS.position;
 	const size = settings.skipOverlaySize || SKIP_DEFAULTS.size;
 	const opacity = Number.isFinite(settings.skipOverlayOpacity) ? settings.skipOverlayOpacity : SKIP_DEFAULTS.opacity;
@@ -108,13 +106,11 @@ export const resolveSkipOverlayLook = (settings = {}) => {
 	const accent = chosenAccent ? ensureVisible(chosenAccent, [fill]) : '';
 
 	const button = {};
-	if (filled && (background || opacity !== SKIP_DEFAULTS.opacity)) {
+	if (background || opacity !== SKIP_DEFAULTS.opacity) {
 		const rgb = background ? toRgbTriplet(background) : (layout === 'rectangle' ? LIGHT_FILL.rgb : SKIP_DEFAULTS.backgroundRgb);
 		button.background = rgba(rgb, Math.min(1, Math.max(0, opacity / 100)));
 	}
 	if (text) button.color = text;
-	// The outline layout draws its edge in the text color until the button is focused.
-	if (text && layout === 'outline') button.borderColor = rgba(toRgbTriplet(text), 0.7);
 
 	return {
 		layout,

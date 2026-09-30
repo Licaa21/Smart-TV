@@ -613,13 +613,19 @@ export const getSeasonalThemeOptions = () => [
 	{ value: 'halloween', label: $L('Halloween') }
 ];
 
-// How the skip prompt is built, not just where it sits. Minimal is the one that has no box.
+// How the skip prompt is built, not just where it sits.
 export const getSkipOverlayLayoutOptions = () => [
 	{ value: 'capsule', label: $L('Capsule') },
 	{ value: 'rectangle', label: $L('Rectangle') },
-	{ value: 'outline', label: $L('Outline') },
-	{ value: 'sweep', label: $L('Sweep') },
-	{ value: 'text', label: $L('Minimal') }
+	{ value: 'sweep', label: $L('Sweep') }
+];
+
+// How the next episode prompt is built. The card is the one with the still, the banner runs
+// wide with the still beside the words, and the button is only a button.
+export const getNextUpLayoutOptions = () => [
+	{ value: 'card', label: $L('Card') },
+	{ value: 'banner', label: $L('Banner') },
+	{ value: 'button', label: $L('Button') }
 ];
 
 // `defaultColor` is what an empty pick falls back to, drawn as the swatch of the first option so
