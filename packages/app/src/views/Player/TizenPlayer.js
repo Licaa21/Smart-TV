@@ -89,6 +89,10 @@ const RELOAD_TIMEOUT_MS = 12000;
 // up after a long standby gets retried instead of leaving the user to back out and
 // start over by hand.
 const RELOAD_RETRY_DELAYS = [5000, 10000, 20000];
+// avplayRestore()'s promise only resolves from restoreAsync's own success/error
+// callback - on some Tizen 9 sets that callback never fires at all, so without a
+// bound this hangs forever with no error screen and nothing left to press.
+const RESTORE_TIMEOUT_MS = 6000;
 const RELOAD_RETRY_MAX_DELAY_MS = 30000;
 const reloadRetryDelay = (attempt) => RELOAD_RETRY_DELAYS[attempt] ?? RELOAD_RETRY_MAX_DELAY_MS;
 
@@ -1001,7 +1005,18 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					const suspended = suspendedRef.current;
 					suspendedRef.current = null;
 					if (suspended) {
-						avplayRestore(suspended.url, suspended.positionMs).then((ok) => {
+						let restoreSettledInTime = false;
+						const restorePromise = avplayRestore(suspended.url, suspended.positionMs);
+						const restoreTimedOut = new Promise((resolve) => {
+							setTimeout(() => resolve(false), RESTORE_TIMEOUT_MS);
+						});
+						restorePromise.then((lateOk) => {
+							if (!restoreSettledInTime) {
+								serverLogger.playback('Standby diag: avplayRestore late result', {lateOk});
+							}
+						});
+						Promise.race([restorePromise, restoreTimedOut]).then((ok) => {
+							restoreSettledInTime = true;
 							serverLogger.playback('Standby diag: avplayRestore result', {ok, wasPlaying: suspended.wasPlaying});
 							if (ok) {
 								if (suspended.wasPlaying) {
