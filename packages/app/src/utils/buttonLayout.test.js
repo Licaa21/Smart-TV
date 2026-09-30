@@ -107,6 +107,15 @@ describe('the button catalogues', () => {
 		expect(ids(arrange(OSD_BUTTONS, {hidden: ['episodes']}))).not.toContain('episodes');
 	});
 
+	it('keeps an unplaced button behind its neighbour even when that neighbour is missing from the row', () => {
+		const saved = ['subtitles', 'chapters', 'audio', 'castAndCrew', 'quality', 'zoom', 'sleep', 'info'];
+		const row = (list) => ids(arrange(list, {order: saved, catalogue: OSD_BUTTONS}));
+		const withoutChapters = OSD_BUTTONS.filter((b) => b.id !== 'chapters');
+		expect(row(OSD_BUTTONS).slice(0, 3)).toEqual(['subtitles', 'chapters', 'episodes']);
+		expect(row(withoutChapters).slice(0, 2)).toEqual(['subtitles', 'episodes']);
+		expect(row(withoutChapters.filter((b) => b.id !== 'subtitles'))[0]).toBe('episodes');
+	});
+
 	it('names the cast and crew button the way Core does, since Core uses cast for Chromecast', () => {
 		expect(ids(OSD_BUTTONS)).toContain('castAndCrew');
 		expect(ids(OSD_BUTTONS)).not.toContain('cast');
