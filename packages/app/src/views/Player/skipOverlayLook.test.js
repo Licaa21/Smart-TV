@@ -1,4 +1,4 @@
-import {resolveSkipOverlayLook, SKIP_DEFAULTS, SKIP_LAYOUTS, skipAccentDefault, skipPromptKinds} from './skipOverlayLook';
+import {resolveSkipOverlayLook, SKIP_DEFAULTS, SKIP_LAYOUTS, skipAccentDefault, skipDefaultFill, skipDefaultText, skipPromptKinds} from './skipOverlayLook';
 import {defaultSettings} from '../../context/defaultSettings';
 
 const look = (changes = {}) => resolveSkipOverlayLook({...defaultSettings, ...changes});
@@ -132,6 +132,21 @@ describe('resolveSkipOverlayLook', () => {
 		it('draws the outline\'s edge in the text color', () => {
 			expect(look({skipOverlayLayout: 'outline', skipOverlayText: '#ffff00'}).button.borderColor).toBe('rgba(255, 255, 0, 0.7)');
 			expect(look({skipOverlayLayout: 'rectangle', skipOverlayText: '#ffff00'}).button.borderColor).toBeUndefined();
+		});
+
+		it('makes the rectangle a light box, so white text on it is darkened and dark text is left alone', () => {
+			expect(skipDefaultFill('rectangle')).toBe('#f4f4f6');
+			expect(skipDefaultText('rectangle')).toBe('#14161c');
+			expect(skipDefaultFill('capsule')).toBe('#1e1e28');
+			expect(skipDefaultText('capsule')).toBe('#ffffff');
+			expect(look({skipOverlayLayout: 'rectangle', skipOverlayText: '#ffffff'}).button.color).not.toBe('#ffffff');
+			expect(look({skipOverlayLayout: 'rectangle', skipOverlayText: '#000000'}).button.color).toBe('#000000');
+			// The same black is lifted on the layouts that sit on a dark fill.
+			expect(look({skipOverlayLayout: 'capsule', skipOverlayText: '#000000'}).button.color).not.toBe('#000000');
+		});
+
+		it('keeps the rectangle light when only its opacity moves', () => {
+			expect(look({skipOverlayLayout: 'rectangle', skipOverlayOpacity: 60}).button.background).toBe('rgba(244, 244, 246, 0.6)');
 		});
 
 		it('colors the bar and the sweep from the accent', () => {

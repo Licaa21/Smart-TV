@@ -243,4 +243,35 @@ describe('per-surface accents', () => {
 			expect(withHandRule(rulesFor({settings: '#ffffff'}), '.toggleOn .')).toContain('rgba(0, 0, 0, 0.92)');
 		});
 	});
+
+	describe('focused fills', () => {
+		const focusRule = (lines, selector) => lines.find((line) => line.includes(`${selector} {`));
+
+		it('gives Settings rows the picked color as their focused fill, with dark text on a white one', () => {
+			const lines = rulesFor({settings: '#ffffff'});
+			const row = focusRule(lines, '.themeCard:focus');
+			expect(row).toContain('background: rgb(255, 255, 255)');
+			expect(withHandRule(lines, '.listItem:focus .listItemHeading')).toContain('rgba(0, 0, 0, 0.96)');
+			expect(lines.find((line) => line.includes('.actionButton:focus {') && line.includes('background'))).toContain('background: rgb(255, 255, 255)');
+			expect(withHandRule(lines, '.actionButtonActive')).toContain('background: rgb(255, 255, 255)');
+		});
+
+		it('picks the text ink from the fill, dark on a bright pick', () => {
+			const lines = rulesFor({settings: '#4a72d7'});
+			expect(focusRule(lines, '.themeCard:focus')).toContain('background: rgb(74, 114, 215)');
+			expect(withHandRule(lines, '.listItem:focus .listItemHeading')).toContain('rgba(0, 0, 0, 0.96)');
+		});
+
+		it('gives the details buttons the picked fill and readable icons', () => {
+			const lines = rulesFor({details: '#ffffff'});
+			expect(withHandRule(lines, '.btnWrapper:focus .btnAction {')).toContain('background: rgb(255, 255, 255)');
+			expect(withHandRule(lines, '.btnWrapper:focus .btnAction .btnIcon')).toContain('rgba(0, 0, 0, 0.92)');
+		});
+
+		it('leaves the theme\'s fill alone on a surface that was not picked', () => {
+			const lines = rulesFor({details: '#ffffff'});
+			expect(focusRule(lines, '.themeCard:focus')).not.toContain('background: rgb(255, 255, 255)');
+		});
+	});
 });
+

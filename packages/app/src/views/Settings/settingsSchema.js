@@ -74,7 +74,7 @@ import {
 } from './settingsOptions';
 import {toCssColor} from '../../theme/themeSpec';
 import {ACCENT_SURFACES, defaultAccentSwatch} from '../../theme/accentSurfaces';
-import {SKIP_DEFAULTS, skipAccentDefault} from '../Player/skipOverlayLook';
+import {skipAccentDefault, skipDefaultFill, skipDefaultText} from '../Player/skipOverlayLook';
 
 // This module describes every settings screen as data. Settings.js renders it and the
 // search index reads it, so a row only ever has to be written once. It deliberately
@@ -440,7 +440,7 @@ export const SETTINGS_SCHEMA = [
 						kind: KIND.OPTION,
 						key: 'skipOverlayBackground',
 						label: () => $L('Background Color'),
-						options: () => getAccentColorOptions(`rgb(${SKIP_DEFAULTS.backgroundRgb})`, $L('Default')),
+						options: (ctx) => getAccentColorOptions(skipDefaultFill(ctx.settings.skipOverlayLayout), $L('Default')),
 						fallback: () => $L('Default'),
 						icon: 'format_color_fill'
 					},
@@ -457,7 +457,7 @@ export const SETTINGS_SCHEMA = [
 						kind: KIND.OPTION,
 						key: 'skipOverlayText',
 						label: () => $L('Text Color'),
-						options: () => getAccentColorOptions(`rgb(${SKIP_DEFAULTS.textRgb})`, $L('Default')),
+						options: (ctx) => getAccentColorOptions(skipDefaultText(ctx.settings.skipOverlayLayout), $L('Default')),
 						fallback: () => $L('Default'),
 						icon: 'format_color_text'
 					}
