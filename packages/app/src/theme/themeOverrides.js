@@ -247,6 +247,32 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		? onButtonFocused
 		: `rgba(${focusInk}, 0.92)`;
 
+	// The fill of a focused row or button comes from the theme's button color, which no surface
+	// accent reaches. A surface that was given an accent takes it for that fill too, with ink chosen
+	// to read on it, so a white pick gives white rows with dark text and not the theme's blue ones.
+	const focusStyle = (id) => {
+		const hex = picked[id];
+		if (!hex) {
+			return {
+				fill: toCssColor(tileFocusFill), strong: invertedStrong, soft: invertedSoft, button: buttonFocused, buttonInk,
+				active: buttonActive, activeInk: toCssColor(c.onButtonNormal), bar: rangeProgress
+			};
+		}
+		const ink = inkOn(hex);
+		return {
+			fill: toCssColor(hex),
+			strong: `rgba(${ink}, 0.96)`,
+			soft: `rgba(${ink}, 0.78)`,
+			button: toCssColor(hex),
+			buttonInk: readableInk(hex, c.onButtonFocused),
+			active: toCssColor(hex),
+			activeInk: readableInk(hex, c.onButtonNormal),
+			bar: toCssColor(hex)
+		};
+	};
+	const settingsFocus = focusStyle('settings');
+	const detailsFocus = focusStyle('details');
+
 	const rules = [];
 	// Doubling the attribute keeps these rules winning ties against stylesheets
 	// injected after this one, whatever order the head ends up in.
@@ -300,7 +326,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${settingsCss.page}`, `background: ${background};`);
 	rule(`.${settingsCss.sectionTitle}`, `color: ${onBackground};`);
 	rule(`.${settingsCss.listItem}, .${settingsCss.sliderContainer}, .${settingsCss.themeCard}`, `background: ${surfaceA(0.82)}; border: 1px solid ${tileBorderColor};`);
-	const tileFocus = `background: ${toCssColor(tileFocusFill)}; border-color: ${settingsAccent.a(0.72)}; box-shadow: ${tileGlow};`;
+	const tileFocus = `background: ${settingsFocus.fill}; border-color: ${settingsAccent.a(0.72)}; box-shadow: ${tileGlow};`;
 	rule(`.${settingsCss.listItem}:focus, .${settingsCss.themeCard}:focus`, tileFocus);
 	// The older engines treat focus-within as a parse error that voids the whole
 	// rule, so it always stands alone instead of joining the selectors above.
@@ -310,22 +336,22 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${settingsCss.listItemCaption}, .${settingsCss.listItemValue}, .${settingsCss.chevronIcon}, .${settingsCss.sliderValue}`, `color: ${os(0.7)};`);
 	rule(`.${settingsCss.sliderTitle}, .${settingsCss.themeCardName}, .${settingsCss.playbackTimeRow}`, `color: ${onSurface};`);
 	// The focused tile fills with the light button color, so its content flips dark.
-	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemHeading}`, `color: ${invertedStrong};`);
-	rule(`.${settingsCss.sliderContainer}:focus-within .${settingsCss.sliderTitle}`, `color: ${invertedStrong};`);
-	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemCaption}, .${settingsCss.listItem}:focus .${settingsCss.listItemValue}, .${settingsCss.listItem}:focus .${settingsCss.chevronIcon}`, `color: ${invertedSoft};`);
+	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemHeading}`, `color: ${settingsFocus.strong};`);
+	rule(`.${settingsCss.sliderContainer}:focus-within .${settingsCss.sliderTitle}`, `color: ${settingsFocus.strong};`);
+	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemCaption}, .${settingsCss.listItem}:focus .${settingsCss.listItemValue}, .${settingsCss.listItem}:focus .${settingsCss.chevronIcon}`, `color: ${settingsFocus.soft};`);
 	// The theme cards fill the same way the rows do, so their text flips with them
-	rule(`.${settingsCss.themeCard}:focus .${settingsCss.themeCardName}`, `color: ${invertedStrong};`);
-	rule(`.${settingsCss.themeCard}:focus .${settingsCss.themeCardDescription}`, `color: ${invertedSoft};`);
-	rule(`.${settingsCss.sliderContainer}:focus-within .${settingsCss.sliderValue}`, `color: ${invertedSoft};`);
+	rule(`.${settingsCss.themeCard}:focus .${settingsCss.themeCardName}`, `color: ${settingsFocus.strong};`);
+	rule(`.${settingsCss.themeCard}:focus .${settingsCss.themeCardDescription}`, `color: ${settingsFocus.soft};`);
+	rule(`.${settingsCss.sliderContainer}:focus-within .${settingsCss.sliderValue}`, `color: ${settingsFocus.soft};`);
 	rule(`.${settingsCss.listItemIcon}`, `background: ${settingsAccent.a(0.14)}; border: 1px solid ${settingsAccent.a(0.42)}; box-sizing: border-box; color: ${os(0.78)};`);
-	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemIcon}`, `background: ${settingsAccent.a(0.22)}; border-color: ${settingsAccent.a(0.64)}; color: ${invertedSoft};`);
+	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemIcon}`, `background: ${settingsAccent.a(0.22)}; border-color: ${settingsAccent.a(0.64)}; color: ${settingsFocus.soft};`);
 	// An achievement row carries its own figures on the end, so they follow the tile rather than
 	// keeping a resting colour nobody can read once it lights up.
 	rule(`.${achievementsCss.points}, .${achievementsCss.progressText}`, `color: ${os(0.7)};`);
 	rule(`.${achievementsCss.boardValue}, .${achievementsCss.rankGutter}`, `color: ${onSurface};`);
 	rule(`.${achievementsCss.reward}`, `color: ${achievementsAccent.css};`);
-	rule(`.${settingsCss.listItem}:focus .${achievementsCss.points}, .${settingsCss.listItem}:focus .${achievementsCss.progressText}`, `color: ${invertedSoft};`);
-	rule(`.${settingsCss.listItem}:focus .${achievementsCss.boardValue}, .${settingsCss.listItem}:focus .${achievementsCss.rankGutter}, .${settingsCss.listItem}:focus .${achievementsCss.reward}`, `color: ${invertedStrong};`);
+	rule(`.${settingsCss.listItem}:focus .${achievementsCss.points}, .${settingsCss.listItem}:focus .${achievementsCss.progressText}`, `color: ${settingsFocus.soft};`);
+	rule(`.${settingsCss.listItem}:focus .${achievementsCss.boardValue}, .${settingsCss.listItem}:focus .${achievementsCss.rankGutter}, .${settingsCss.listItem}:focus .${achievementsCss.reward}`, `color: ${settingsFocus.strong};`);
 	rule(`.${settingsCss.toggleTrack}`, `background: ${surfaceVariant};`);
 	rule(`.${settingsCss.toggleOn}`, `background: ${settingsAccent.css};`);
 	rule(`.${settingsCss.toggleThumb}`, `background: ${onSurface};`);
@@ -342,16 +368,16 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${settingsCss.input} input::-webkit-input-placeholder, .${settingsCss.searchInput} input::-webkit-input-placeholder`, `color: ${os(0.45)};`);
 	rule(`.${settingsCss.input} input::placeholder, .${settingsCss.searchInput} input::placeholder`, `color: ${os(0.45)};`);
 	rule(`.${settingsCss.actionButton}`, `background: ${buttonNormal}; color: ${onButtonNormal}; border-color: ${tileBorderColor};`);
-	rule(`.${settingsCss.actionButton}:focus`, `background: ${buttonFocused}; border-color: ${focusColor}; color: ${buttonInk};`);
+	rule(`.${settingsCss.actionButton}:focus`, `background: ${settingsFocus.button}; border-color: ${focusColor}; color: ${settingsFocus.buttonInk};`);
 	rule(`.${settingsCss.dangerButton}:focus`, `background: ${recordingActive} !important; border-color: ${recordingActive} !important; color: #fff;`);
-	rule(`.${settingsCss.actionButtonActive}`, `background: ${buttonActive}; color: ${onButtonNormal};`);
+	rule(`.${settingsCss.actionButtonActive}`, `background: ${settingsFocus.active}; color: ${settingsFocus.activeInk};`);
 	rule(`.${settingsCss.statusMessage}, .${settingsCss.authHint}, .${settingsCss.viewDescription}, .${settingsCss.viewCaption}, .${settingsCss.themeCardDescription}, .${settingsCss.themeStoreMessage}`, `color: ${os(0.7)};`);
 	rule(`.${settingsCss.statusError}`, `color: ${error};`);
 	rule(`.${settingsCss.loadingMessage}, .${settingsCss.integrationSpec}`, `color: ${os(0.45)};`);
 	rule(`.${settingsCss.themeCardCheck}, .${settingsCss.themeStoreCardAction}`, `color: ${settingsAccent.css};`);
 	rule(`.${settingsCss.playbackTimePreview}`, `background: ${surface};`);
 	rule(`.${settingsCss.playbackTimeBar}`, `background: ${rangeTrack};`);
-	rule(`.${settingsCss.playbackTimeBarFill}`, `background: ${rangeProgress};`);
+	rule(`.${settingsCss.playbackTimeBarFill}`, `background: ${settingsFocus.bar};`);
 
 	// Search input
 	rule(`.${searchCss.searchInputWrapper}`, `background: ${inputBackground}; border-color: ${inputBorder};`);
@@ -371,8 +397,8 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${detailsCss.overview}`, `color: ${os(0.8)};`);
 	rule(`.${detailsCss.btnAction}`, `background: ${buttonNormal};`);
 	rule(`.${detailsCss.btnIcon}`, `color: ${onButtonNormal};`);
-	rule(`.${detailsCss.btnWrapper}:focus .${detailsCss.btnAction}`, `background: ${buttonFocused}; border-color: ${focusColor};`);
-	rule(`.${detailsCss.btnWrapper}:focus .${detailsCss.btnAction} .${detailsCss.btnIcon}`, `color: ${buttonInk}; fill: ${buttonInk};`);
+	rule(`.${detailsCss.btnWrapper}:focus .${detailsCss.btnAction}`, `background: ${detailsFocus.button}; border-color: ${focusColor};`);
+	rule(`.${detailsCss.btnWrapper}:focus .${detailsCss.btnAction} .${detailsCss.btnIcon}`, `color: ${detailsFocus.buttonInk}; fill: ${detailsFocus.buttonInk};`);
 	rule(`.${detailsCss.favorited}, .${detailsCss.btnWrapper}:focus .${detailsCss.btnAction} .${detailsCss.favorited}`, `color: ${recordingActive}; fill: ${recordingActive};`);
 	rule(`.${detailsCss.watched}, .${detailsCss.btnWrapper}:focus .${detailsCss.btnAction} .${detailsCss.watched}`, `color: ${detailsAccent.css}; fill: ${detailsAccent.css};`);
 	rule(`.${detailsCss.btnDetail}`, `color: ${os(0.5)};`);
@@ -406,7 +432,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	// Detail screens, modern layout
 	rule(`.${modernDetailCss.metaRow}, .${modernDetailCss.techSize}`, `color: ${os(0.75)};`);
 	rule(`.${modernDetailCss.actionPrimary}`, `background-color: ${detailsAccent.css}; color: ${detailsAccent.on};`);
-	rule(`.${modernDetailCss.actionBtn}:focus`, `background: ${buttonFocused}; border-color: ${focusColor}; color: ${buttonInk};`);
+	rule(`.${modernDetailCss.actionBtn}:focus`, `background: ${detailsFocus.button}; border-color: ${focusColor}; color: ${detailsFocus.buttonInk};`);
 	rule(`.${modernDetailCss.overflowList} .${modernDetailCss.actionBtn}:focus`, `background: ${os(0.1)}; border-color: ${focusColor}; color: ${onBackground};`);
 	rule(`.${modernDetailCss.upNextCard}`, `background-color: ${surfaceA(0.82)};`);
 	rule(`.${modernDetailCss.upNextCard}:focus`, `border-color: ${focusColor};`);
@@ -430,7 +456,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${spotlightModalCss.sectionCount}`, `background: ${os(0.08)}; color: ${os(0.7)};`);
 	rule(`.${spotlightGridCss.personCard}:focus, .${spotlightGridCss.studioCard}:focus, .${spotlightGridCss.chapterCard}:focus`, `border-color: ${focusColor};`);
 	rule(`.${spotlightGridCss.personName}, .${spotlightGridCss.studioName}, .${spotlightGridCss.chapterName}`, `color: ${onBackground};`);
-	rule(`.${trackListCss.trackRow}:focus`, `background: ${buttonFocused}; border-color: ${focusColor};`);
+	rule(`.${trackListCss.trackRow}:focus`, `background: ${detailsFocus.button}; border-color: ${focusColor};`);
 	rule(`.${trackListCss.trackTitle}, .${trackListCss.discHeading}`, `color: ${onBackground};`);
 
 	// Detail screens, nouveau layout

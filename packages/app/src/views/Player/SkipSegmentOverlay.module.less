@@ -144,15 +144,25 @@
 	transition: width 0.3s linear;
 }
 
-// A flat, squared off box with the label and the countdown along its bottom edge.
+// A solid light box with dark text, the one layout that reads as a plain button on any picture.
 .button.layoutRectangle {
 	position: relative;
 	overflow: hidden;
 	border-radius: 10px;
 	padding: 20px 30px 24px 26px;
-	background: rgba(var(--theme-surface-rgb, 30, 30, 40), 0.9);
+	color: #14161c;
+	background: rgba(244, 244, 246, 0.96);
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
 	-webkit-backdrop-filter: none;
 	backdrop-filter: none;
+}
+
+.layoutRectangle .timer {
+	color: rgba(20, 22, 28, 0.6);
+}
+
+.layoutRectangle .bar {
+	background: rgba(20, 22, 28, 0.18);
 }
 
 .layoutRectangle .icon {
@@ -160,21 +170,26 @@
 	height: 26px;
 }
 
-// Only an edge and a light tint, so the picture stays visible through it.
+// Hollow: a heavy frame and no fill at all, so the picture shows straight through the button.
 .button.layoutOutline {
 	position: relative;
 	overflow: hidden;
-	border: 2px solid rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.75);
-	border-radius: 6px;
+	border: 3px solid rgba(255, 255, 255, 0.92);
+	border-radius: 4px;
 	padding: 18px 28px 22px 24px;
-	background: rgba(0, 0, 0, 0.35);
+	background: transparent;
 	box-shadow: none;
+	text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
 	-webkit-backdrop-filter: none;
 	backdrop-filter: none;
 
 	&:focus {
 		border-color: @accent;
 	}
+}
+
+.layoutOutline .bar {
+	height: 5px;
 }
 
 .button.layoutOutline.buttonPreview {
