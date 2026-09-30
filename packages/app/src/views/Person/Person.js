@@ -45,7 +45,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	}, [api, personId]);
 
 	const tmdbId = person?.ProviderIds?.Tmdb;
-	const {appearances, crewCredits, backdropPath, seerrEnabled} = usePersonSeerrCredits(tmdbId);
+	const {appearances, crewCredits, backdropPath, creditsSettled, seerrEnabled} = usePersonSeerrCredits(tmdbId);
 
 	const handleSelectCredit = useCallback((item) => {
 		if (item?._seerrRaw) onSelectSeerrItem?.(item._seerrRaw);
@@ -71,13 +71,17 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	const {movies, series, guestAppearances, musicVideos} = useMemo(() => splitFilmography(syncedItems), [syncedItems]);
 
 	// The backdrop of what they are best known for, which the credits know and the library does
-	// not. Without Seerr it falls back to the best rated movie or series held here.
+	// not. Without Seerr it is the best rated movie or series held here. Nothing is drawn until
+	// the credits have answered, so the picture never changes once it is up.
 	const randomBackdrop = useMemo(() => {
+		if (!creditsSettled) return null;
 		if (backdropPath) return seerrApi.getImageUrl(backdropPath, 'w1280');
-		const rated = [...movies, ...series].filter((f) => f.ImageTags?.Backdrop)
-			.sort((a, b) => (b.CommunityRating || 0) - (a.CommunityRating || 0));
-		return rated.length ? getImageUrl(serverUrl, rated[0].Id, 'Backdrop', {maxWidth: 1920}) : null;
-	}, [backdropPath, movies, series, serverUrl]);
+		const rated = [...movies, ...series]
+			.filter((f) => f.BackdropImageTags?.length > 0)
+			.map((f, index) => ({f, index}))
+			.sort((a, b) => ((b.f.CommunityRating || 0) - (a.f.CommunityRating || 0)) || (a.index - b.index));
+		return rated.length ? getImageUrl(serverUrl, rated[0].f.Id, 'Backdrop', {maxWidth: 1920}) : null;
+	}, [creditsSettled, backdropPath, movies, series, serverUrl]);
 
 	const tabs = useMemo(() => {
 		const list = [];
