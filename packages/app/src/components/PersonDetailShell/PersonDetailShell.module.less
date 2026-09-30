@@ -35,6 +35,8 @@
 
 .personInfo {
 	display: flex;
+	// The list below takes whatever height is left, so this must not give any up.
+	flex-shrink: 0;
 	margin-bottom: 32px;
 
 	> * + * {
@@ -43,11 +45,20 @@
 }
 
 .personImage {
+	// A fixed square that nothing can squeeze, so the round crop stays a circle. The photo is a
+	// background, cropped from the middle, rather than an image that takes its own shape.
 	width: 250px;
 	height: 250px;
+	min-width: 250px;
+	min-height: 250px;
+	box-sizing: border-box;
 	border-radius: 50%;
 	border: 3px solid var(--theme-accent, #00a4dc);
-	flex-shrink: 0;
+	background-color: var(--theme-surface-variant, #333);
+	background-size: cover;
+	background-position: center 20%;
+	background-repeat: no-repeat;
+	flex: 0 0 250px;
 }
 
 .noImage {
@@ -61,7 +72,10 @@
 	justify-content: center;
 	font-size: 72px;
 	color: var(--theme-text-muted, #666);
-	flex-shrink: 0;
+	box-sizing: border-box;
+	min-width: 250px;
+	min-height: 250px;
+	flex: 0 0 250px;
 }
 
 .personDetails {

@@ -5,6 +5,7 @@ import {withoutBlockedItems} from '../../services/parentalControls';
 import MediaRow from '../../components/MediaRow';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import PersonDetailShell from '../../components/PersonDetailShell';
+import * as seerrApi from '../../services/seerrApi';
 import usePersonSeerrCredits from '../../hooks/usePersonSeerrCredits';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import {getImageUrl} from '../../utils/helpers';
@@ -44,7 +45,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	}, [api, personId]);
 
 	const tmdbId = person?.ProviderIds?.Tmdb;
-	const {appearances, crewCredits, seerrEnabled} = usePersonSeerrCredits(tmdbId);
+	const {appearances, crewCredits, backdropPath, seerrEnabled} = usePersonSeerrCredits(tmdbId);
 
 	const handleSelectCredit = useCallback((item) => {
 		if (item?._seerrRaw) onSelectSeerrItem?.(item._seerrRaw);
@@ -69,20 +70,14 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	const syncedItems = useUserDataList(items);
 	const {movies, series, guestAppearances, musicVideos} = useMemo(() => splitFilmography(syncedItems), [syncedItems]);
 
-	const backdropCandidates = useMemo(() => {
-		const urls = [];
-		for (const f of [...movies, ...series]) {
-			if (f.ImageTags?.Backdrop) {
-				urls.push(getImageUrl(serverUrl, f.Id, 'Backdrop', {maxWidth: 1920}));
-			}
-		}
-		return urls;
-	}, [movies, series, serverUrl]);
-
+	// The backdrop of what they are best known for, which the credits know and the library does
+	// not. Without Seerr it falls back to the best rated movie or series held here.
 	const randomBackdrop = useMemo(() => {
-		if (backdropCandidates.length === 0) return null;
-		return backdropCandidates[Math.floor(Math.random() * backdropCandidates.length)];
-	}, [backdropCandidates]);
+		if (backdropPath) return seerrApi.getImageUrl(backdropPath, 'w1280');
+		const rated = [...movies, ...series].filter((f) => f.ImageTags?.Backdrop)
+			.sort((a, b) => (b.CommunityRating || 0) - (a.CommunityRating || 0));
+		return rated.length ? getImageUrl(serverUrl, rated[0].Id, 'Backdrop', {maxWidth: 1920}) : null;
+	}, [backdropPath, movies, series, serverUrl]);
 
 	const tabs = useMemo(() => {
 		const list = [];

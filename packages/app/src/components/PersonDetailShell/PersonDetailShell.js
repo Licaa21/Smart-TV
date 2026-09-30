@@ -2,7 +2,6 @@ import {useState, useCallback, useEffect} from 'react';
 import Spotlight from '@enact/spotlight';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
-import Image from '@enact/sandstone/Image';
 import $L from '@enact/i18n/$L';
 import {KEYS} from '../../utils/keys';
 
@@ -69,7 +68,7 @@ const PersonDetailShell = ({
 			<div className={css.content}>
 				<div className={css.personInfo}>
 					{imageUrl ? (
-						<Image className={css.personImage} src={imageUrl} sizing="fill" />
+						<div className={css.personImage} style={{backgroundImage: `url("${imageUrl}")`}} role="img" aria-label={name} />
 					) : (
 						<div className={css.noImage}>{placeholderInitial}</div>
 					)}
