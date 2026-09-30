@@ -1,4 +1,4 @@
-import {resolveSkipOverlayLook, SKIP_DEFAULTS, skipAccentDefault} from './skipOverlayLook';
+import {resolveSkipOverlayLook, SKIP_DEFAULTS, SKIP_LAYOUTS, skipAccentDefault, skipPromptKinds} from './skipOverlayLook';
 import {defaultSettings} from '../../context/defaultSettings';
 
 const look = (changes = {}) => resolveSkipOverlayLook({...defaultSettings, ...changes});
@@ -16,6 +16,7 @@ describe('resolveSkipOverlayLook', () => {
 	});
 
 	it('ships defaults that match the stylesheet', () => {
+		expect(defaultSettings.skipOverlayLayout).toBe(SKIP_DEFAULTS.layout);
 		expect(defaultSettings.skipOverlayPosition).toBe(SKIP_DEFAULTS.position);
 		expect(defaultSettings.skipOverlaySize).toBe(SKIP_DEFAULTS.size);
 		expect(defaultSettings.skipOverlayOpacity).toBe(SKIP_DEFAULTS.opacity);
@@ -111,4 +112,63 @@ describe('resolveSkipOverlayLook', () => {
 			expect(skipAccentDefault({accentSkip: ''})).toBe('#00a4dc');
 		});
 	});
+
+	describe('layout', () => {
+		it('is the capsule unless another is picked, and an unknown one is the capsule too', () => {
+			expect(look().layout).toBe('capsule');
+			expect(look({skipOverlayLayout: 'nonsense'}).layout).toBe('capsule');
+			SKIP_LAYOUTS.forEach((layout) => expect(look({skipOverlayLayout: layout}).layout).toBe(layout));
+		});
+
+		it('paints no fill on a layout that has no box', () => {
+			['outline', 'text'].forEach((layout) => {
+				expect(look({skipOverlayLayout: layout, skipOverlayBackground: '#ff0000', skipOverlayOpacity: 50}).button.background).toBeUndefined();
+			});
+			['capsule', 'rectangle', 'sweep'].forEach((layout) => {
+				expect(look({skipOverlayLayout: layout, skipOverlayBackground: '#ff0000', skipOverlayOpacity: 50}).button.background).toBe('rgba(255, 0, 0, 0.5)');
+			});
+		});
+
+		it('draws the outline\'s edge in the text color', () => {
+			expect(look({skipOverlayLayout: 'outline', skipOverlayText: '#ffff00'}).button.borderColor).toBe('rgba(255, 255, 0, 0.7)');
+			expect(look({skipOverlayLayout: 'rectangle', skipOverlayText: '#ffff00'}).button.borderColor).toBeUndefined();
+		});
+
+		it('colors the bar and the sweep from the accent', () => {
+			const result = look({skipOverlayLayout: 'sweep', skipOverlayAccent: '#00ff00'});
+			expect(result.bar).toEqual({background: '#00ff00'});
+			expect(result.sweep).toEqual({background: 'rgba(0, 255, 0, 0.38)'});
+			expect(look().bar).toBeUndefined();
+		});
+	});
+
+	describe('skipPromptKinds', () => {
+		const kinds = (changes) => skipPromptKinds({...defaultSettings, ...changes})
+			.map((prompt) => (prompt.kind === 'nextUp' ? 'nextUp' : prompt.type));
+
+		it('offers the intro, recap, credits and next episode by default', () => {
+			expect(kinds({})).toEqual(['intro', 'recap', 'outro', 'nextUp']);
+		});
+
+		it('leaves out an intro or credits that skip by themselves or are off, since no button appears', () => {
+			expect(kinds({introAction: 'auto'})).not.toContain('intro');
+			expect(kinds({introAction: 'none'})).not.toContain('intro');
+			expect(kinds({outroAction: 'auto'})).not.toContain('outro');
+			expect(kinds({outroAction: 'none'})).not.toContain('outro');
+		});
+
+		it('swaps the credits for the next episode card when it is set to replace them', () => {
+			expect(kinds({replaceSkipOutroWithNextUp: true})).toEqual(['intro', 'recap', 'nextUp']);
+		});
+
+		it('keeps the credits when the next episode card is off, whatever the replace setting says', () => {
+			expect(kinds({replaceSkipOutroWithNextUp: true, nextUpBehavior: 'disabled'})).toEqual(['intro', 'recap', 'outro']);
+			expect(kinds({nextUpBehavior: 'disabled'})).not.toContain('nextUp');
+		});
+
+		it('always has something to show, since recaps are offered whenever there is one', () => {
+			expect(kinds({introAction: 'none', outroAction: 'none', nextUpBehavior: 'disabled'})).toEqual(['recap']);
+		});
+	});
 });
+

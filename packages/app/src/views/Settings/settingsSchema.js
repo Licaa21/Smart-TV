@@ -48,6 +48,7 @@ import {
 	getScreensaverMovementOptions,
 	getScreensaverPositionOptions,
 	getScreensaverSizeOptions,
+	getSkipOverlayLayoutOptions,
 	getScreensaverTimeoutOptions,
 	getSeasonalThemeOptions,
 	getSeekStepOptions,
@@ -427,11 +428,12 @@ export const SETTINGS_SCHEMA = [
 				icon: 'skip',
 				section: () => $L('Appearance'),
 				label: () => $L('Skip Intro/Recap/Credits'),
-				description: () => $L('Position, size and colors of the skip button'),
+				description: () => $L('Layout, position, size and colors of the skip button'),
 				keywords: () => ['skip', 'intro', 'recap', 'credits', 'outro', 'button', 'prompt', 'overlay'],
 				rows: [
 					{kind: KIND.SECTION, id: 'skipSegmentsPreview', label: () => $L('Preview')},
 					{kind: KIND.CUSTOM, id: 'skipSegmentPreview', render: 'skipSegmentPreview'},
+					{kind: KIND.OPTION, key: 'skipOverlayLayout', label: () => $L('Layout'), options: getSkipOverlayLayoutOptions, fallback: () => $L('Capsule'), icon: 'view_carousel'},
 					{kind: KIND.OPTION, key: 'skipOverlayPosition', label: () => $L('Position'), options: getScreensaverPositionOptions, fallback: () => $L('Bottom-Right'), icon: 'grid_view'},
 					{kind: KIND.OPTION, key: 'skipOverlaySize', label: () => $L('Size'), options: getScreensaverSizeOptions, fallback: () => $L('Medium'), icon: 'photo_size_select_large'},
 					{

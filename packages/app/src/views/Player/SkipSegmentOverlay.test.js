@@ -91,4 +91,49 @@ describe('SkipSegmentOverlay', () => {
 		// jsdom keeps a shorthand color as it was written, a browser turns it into rgb().
 		expect(['#00ff00', 'rgb(0, 255, 0)']).toContain(button().style.borderColor);
 	});
+
+	describe('layouts', () => {
+		const pick = (layout, extra = {}) => {
+			mockSettings = {...mockSettings, skipOverlayLayout: layout, ...extra};
+			return overlay();
+		};
+		const has = (name) => document.querySelector(`[class~="${name}"]`) !== null;
+
+		it('draws the capsule with its ring', () => {
+			pick('capsule');
+			expect(count('circle')).toBe(2);
+			expect(has('bar')).toBe(false);
+			expect(has('sweep')).toBe(false);
+		});
+
+		it.each(['rectangle', 'outline', 'text'])('draws %s with a bar in place of the ring', (layout) => {
+			pick(layout);
+			expect(has(`layout${layout[0].toUpperCase()}${layout.slice(1)}`)).toBe(true);
+			expect(count('circle')).toBe(0);
+			expect(document.querySelector('[class~="barFill"]').style.width).toBe('50%');
+		});
+
+		it('draws sweep as a fill that follows the countdown, with no icon or bar', () => {
+			pick('sweep');
+			expect(document.querySelector('[class~="sweep"]').style.width).toBe('50%');
+			expect(has('bar')).toBe(false);
+			expect(count('svg')).toBe(0);
+		});
+
+		it('keeps the timer as text outside the capsule, even inside the last minute', () => {
+			const {unmount} = pick('capsule');
+			expect(screen.queryByText(/Ends in/)).toBeNull();
+			unmount();
+			pick('rectangle');
+			expect(screen.getByText('Ends in :24')).toBeTruthy();
+		});
+
+		it('leaves out the countdown graphic when the style asks for the timer only', () => {
+			mockSettings = {...mockSettings, skipOverlayLayout: 'rectangle'};
+			overlay({countdownStyle: 'timer'});
+			expect(has('bar')).toBe(false);
+			expect(screen.getByText('Ends in :24')).toBeTruthy();
+		});
+	});
 });
+

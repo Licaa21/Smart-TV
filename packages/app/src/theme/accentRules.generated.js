@@ -653,6 +653,10 @@ export const ACCENT_RULES = {
 		["views/Player/SkipSegmentOverlay.module.less","",".{buttonPreview}","border-color","{accent}"],
 		["views/Player/SkipSegmentOverlay.module.less","",".{icon}","color","{accent}"],
 		["views/Player/SkipSegmentOverlay.module.less","",".{ringValue}","stroke","{accent}"],
-		["views/Player/SkipSegmentOverlay.module.less","",".{ringIcon}","color","{accent}"]
+		["views/Player/SkipSegmentOverlay.module.less","",".{ringIcon}","color","{accent}"],
+		["views/Player/SkipSegmentOverlay.module.less","",".{barFill}","background","{accent}"],
+		["views/Player/SkipSegmentOverlay.module.less","",".{button}.{layoutOutline}:focus","border-color","{accent}"],
+		["views/Player/SkipSegmentOverlay.module.less","",".{button}.{layoutOutline}.{buttonPreview}","border-color","{accent}"],
+		["views/Player/SkipSegmentOverlay.module.less","",".{sweep}","background","rgba({rgb}, 0.38)"]
 	]
 };
