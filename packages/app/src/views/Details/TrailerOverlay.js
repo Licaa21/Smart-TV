@@ -15,7 +15,7 @@ const TrailerOverlay = ({videoId, streamUrl, videoRef, muted, onClose, onKeyDown
 
 	const content = (
 		<OverlayContainer className={css.trailerOverlay} onClick={onClose} onKeyDown={onKeyDown}>
-			<div className={css.trailerCloseHint}>{$L('Press Back to close')}</div>
+			<div className={css.trailerCloseHint}>{$L('Press BACK to close')}</div>
 			<div className={css.trailerIframeWrap} onClick={stopPropagation}>
 				{streamUrl ? (
 					// No src here, since Tizen plays YouTube's manifest through hls.js and
