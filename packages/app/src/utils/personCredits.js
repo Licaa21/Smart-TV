@@ -179,3 +179,15 @@ export const prepareCredits = (credits, {isCrew = false, group = false, sortOpti
 	const usable = usableCredits(credits, isCrew);
 	return sortCredits(group ? groupCredits(usable, isCrew) : usable, sortOption);
 };
+
+// How to lay a photo of any shape into the round portrait so the head is whole and sits in the
+// same place each time. Nothing here can find a face, so it relies on where heads sit in a
+// portrait photo: the top third. A tall photo fills the width and is shown from just below its
+// top edge, a wide one fills the height and is centred, and a squarish one is cropped lightly.
+export const portraitCrop = (width, height) => {
+	if (!width || !height) return {size: 'cover', position: 'center 12%'};
+	const ratio = height / width;
+	if (ratio >= 1.15) return {size: '100% auto', position: 'center 4%'};
+	if (ratio <= 0.87) return {size: 'auto 100%', position: 'center center'};
+	return {size: 'cover', position: 'center 12%'};
+};
