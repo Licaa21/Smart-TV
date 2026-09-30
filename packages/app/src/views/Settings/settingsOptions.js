@@ -613,6 +613,15 @@ export const getSeasonalThemeOptions = () => [
 	{ value: 'halloween', label: $L('Halloween') }
 ];
 
+// How the skip prompt is built, not just where it sits. Minimal is the one that has no box.
+export const getSkipOverlayLayoutOptions = () => [
+	{ value: 'capsule', label: $L('Capsule') },
+	{ value: 'rectangle', label: $L('Rectangle') },
+	{ value: 'outline', label: $L('Outline') },
+	{ value: 'sweep', label: $L('Sweep') },
+	{ value: 'text', label: $L('Minimal') }
+];
+
 // `defaultColor` is what an empty pick falls back to, drawn as the swatch of the first option so
 // the list shows what leaving it alone really looks like.
 export const getAccentColorOptions = (defaultColor, defaultLabel = $L('Theme Default')) => [
