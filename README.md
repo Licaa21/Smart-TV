@@ -4,4 +4,4 @@ Unsigned Tizen `.wgt` builds of `local/combined-daily-driver`. Re-sign with your
 
 | File | Built from |
 |---|---|
-| `Moonfin_Tizen_Regular_2.9.0-daily-54860e29.wgt` | `local/combined-daily-driver` at `54860e29` (latest) |
+| `Moonfin_Tizen_Regular_2.9.0-daily-fad316e6.wgt` | `local/combined-daily-driver` at `fad316e6` (latest) |
