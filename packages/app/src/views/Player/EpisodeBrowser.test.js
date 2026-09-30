@@ -243,6 +243,32 @@ describe('EpisodeBrowser', () => {
 			}
 		});
 
+		// Every position in a season, the first and the last included, not just the ones a test happened to use.
+		it.each([1, 2, 5, 6, 7, 12, 17, 23, 29, 30])('opens on episode %i of 30, drawn, marked and scrolled to', (number) => {
+			mockEpisodes = {...mockEpisodes, episodes: many(30)};
+			const original = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'offsetTop');
+			// Each row is 230px tall, so a row's top is its position times that.
+			Object.defineProperty(window.HTMLElement.prototype, 'offsetTop', {
+				configurable: true,
+				get() {
+					const id = this.dataset && this.dataset.episodeId;
+					return id ? (Number(id.slice(1)) - 1) * 230 : 0;
+				}
+			});
+			try {
+				open({item: {...item, Id: `m${number}`}});
+				const row = document.querySelector(`[data-episode-id="m${number}"]`);
+				expect(row).not.toBeNull();
+				expect(row.getAttribute('data-selected')).toBe('true');
+				expect(row.parentNode.scrollTop).toBe(Math.max(0, (number - 1) * 230 - 24));
+				// And it is the only one marked, so the remote has one place to go.
+				expect(document.querySelectorAll('[data-selected="true"]').length).toBe(1);
+			} finally {
+				if (original) Object.defineProperty(window.HTMLElement.prototype, 'offsetTop', original);
+				else delete window.HTMLElement.prototype.offsetTop;
+			}
+		});
+
 		it('sends the remote to that episode', async () => {
 			Spotlight.focus.mockReturnValue(true);
 			mockEpisodes = {...mockEpisodes, episodes: many(30)};
