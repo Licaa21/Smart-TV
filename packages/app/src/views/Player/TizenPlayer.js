@@ -286,6 +286,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// loop doesn't keep firing after the player is gone
 	const reloadRetryTimeoutRef = useRef(null);
 	const isUnmountedRef = useRef(false);
+	const reloadInFlightRef = useRef(false);
 	// index of a subtitle the server is currently burning into the stream
 	const burnInSubtitleRef = useRef(null);
 
@@ -879,6 +880,76 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		await restartFromResult(result, currentPositionTicks);
 	}, [restartFromResult]);
 
+	// Recovers a session that a restore left unplayable, whether that's because
+	// avplayRestore()/avplayPlay() failed outright or because backgrounding
+	// happened before there was ever a suspendable session to restore. Shared by
+	// the app-state observer (automatic, on resume) and handleKeyDown (manual, on
+	// any key while the error screen is up) below.
+	const recoverByReload = useCallback((attempt = 0) => {
+		if (reloadInFlightRef.current) {
+			serverLogger.playback('Standby diag: recoverByReload skipped, already in flight', {attempt});
+			return;
+		}
+		reloadInFlightRef.current = true;
+		console.warn(`[Player] AVPlay restore left the session unplayable, reloading stream${attempt ? ` (retry ${attempt})` : ''}`);
+		// A request already in flight when the TV actually powers off is frozen
+		// along with everything else and can sit unsettled for the entire outage,
+		// so this can't wait on it indefinitely - past this timeout the reload is
+		// treated as failed even if it later resolves.
+		const reloadPromise = reloadPlaybackRef.current?.() ?? Promise.resolve(false);
+		const timedOut = new Promise((resolve) => {
+			setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
+		});
+		Promise.race([reloadPromise, timedOut]).then((reloaded) => {
+			reloadInFlightRef.current = false;
+			serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded, attempt});
+			if (isUnmountedRef.current) return;
+			if (reloaded) {
+				// The attempt this is recovering from may have kept running in the
+				// background and thrown its own error after this reload already
+				// succeeded - clear it so a stale error screen doesn't sit on top
+				// of playback that's actually working.
+				setError(null);
+				return;
+			}
+			setError($L("Playback didn't resume automatically. Press any button to try again."));
+			// The reload itself keeps running even after the timeout gives up
+			// waiting on it - a heavy transcode negotiation, or a network stack
+			// still catching up after a long standby, can legitimately take
+			// longer than this without actually being stuck - so a late success
+			// here still clears the error instead of leaving it stuck in front of
+			// playback that's now actually working.
+			reloadPromise.then((lateReloaded) => {
+				serverLogger.playback('Standby diag: reloadPlaybackRef late result', {lateReloaded, attempt});
+				if (!isUnmountedRef.current && lateReloaded) setError(null);
+			});
+			// A scheduled retry relies on setTimeout, which - like every other
+			// timer - does not fire while the TV is genuinely frozen, not just
+			// backgrounded. It still helps for the "slow but not actually frozen"
+			// case (a heavy transcode negotiation), so it stays; handleKeyDown's
+			// any-key-retries-immediately handling below is what covers the
+			// genuinely-frozen case, since nothing here runs again on its own
+			// until real input arrives regardless of any timer.
+			const nextDelay = reloadRetryDelay(attempt);
+			serverLogger.playback('Standby diag: reload retry scheduled', {nextAttempt: attempt + 1, nextDelay});
+			reloadRetryTimeoutRef.current = setTimeout(() => {
+				if (!isUnmountedRef.current) recoverByReload(attempt + 1);
+			}, nextDelay);
+		});
+	}, [setError]);
+
+	// Cancels any pending scheduled retry before trying again right now - used
+	// when a key press is what tells us the engine is actually running again,
+	// rather than waiting on a timer that may never fire.
+	const triggerManualRetry = useCallback(() => {
+		serverLogger.playback('Standby diag: manual retry triggered by key press', {});
+		if (reloadRetryTimeoutRef.current) {
+			clearTimeout(reloadRetryTimeoutRef.current);
+			reloadRetryTimeoutRef.current = null;
+		}
+		recoverByReload(0);
+	}, [recoverByReload]);
+
 	// ==============================
 	// Initialization
 	// ==============================
@@ -929,52 +1000,6 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					}
 					const suspended = suspendedRef.current;
 					suspendedRef.current = null;
-					const recoverByReload = (attempt = 0) => {
-						console.warn(`[Player] AVPlay restore left the session unplayable, reloading stream${attempt ? ` (retry ${attempt})` : ''}`);
-						// A request already in flight when the TV actually powers off is
-						// frozen along with everything else and can sit unsettled for the
-						// entire outage, so this can't wait on it indefinitely - past this
-						// timeout the reload is treated as failed even if it later resolves.
-						const reloadPromise = reloadPlaybackRef.current?.() ?? Promise.resolve(false);
-						const timedOut = new Promise((resolve) => {
-							setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
-						});
-						Promise.race([reloadPromise, timedOut]).then((reloaded) => {
-							serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded, attempt});
-							if (isUnmountedRef.current) return;
-							if (reloaded) {
-								// The attempt this is recovering from may have kept running in the
-								// background and thrown its own error after this reload already
-								// succeeded - clear it so a stale error screen doesn't sit on top
-								// of playback that's actually working.
-								setError(null);
-								return;
-							}
-							setError($L('Playback failed. The file format may not be supported.'));
-							// The reload itself keeps running even after the timeout gives up
-							// waiting on it - a heavy transcode negotiation, or a network stack
-							// still catching up after a long standby, can legitimately take
-							// longer than this without actually being stuck - so a late success
-							// here still clears the error instead of leaving it stuck in front of
-							// playback that's now actually working.
-							reloadPromise.then((lateReloaded) => {
-								serverLogger.playback('Standby diag: reloadPlaybackRef late result', {lateReloaded, attempt});
-								if (!isUnmountedRef.current && lateReloaded) setError(null);
-							});
-							// One attempt timing out doesn't mean the server or network are
-							// actually unrecoverable - especially right after a long standby,
-							// where the network stack itself can still be catching up - so retry
-							// with backoff instead of leaving this on the user to back out and
-							// start over by hand. Keeps going until it succeeds or the player
-							// unmounts; Go Back on the error screen remains available the whole
-							// time either way.
-							const nextDelay = reloadRetryDelay(attempt);
-							serverLogger.playback('Standby diag: reload retry scheduled', {nextAttempt: attempt + 1, nextDelay});
-							reloadRetryTimeoutRef.current = setTimeout(() => {
-								if (!isUnmountedRef.current) recoverByReload(attempt + 1);
-							}, nextDelay);
-						});
-					};
 					if (suspended) {
 						avplayRestore(suspended.url, suspended.positionMs).then((ok) => {
 							serverLogger.playback('Standby diag: avplayRestore result', {ok, wasPlaying: suspended.wasPlaying});
@@ -1098,7 +1123,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				unregisterAppStateRef.current();
 			}
 		};
-	}, [isPaused]);
+	}, [isPaused, recoverByReload]);
 
 	// Dedicated true-mount/unmount tracking, independent of the isPaused-keyed
 	// effect above (which re-runs its own cleanup on every pause toggle, not just
@@ -2929,6 +2954,21 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			const key = e.key || e.keyCode;
 			// The channel carousel takes every key while it's up.
 			if (carouselOpenRef.current) return;
+
+			// The error view has no input handling of its own beyond the Go Back
+			// button. Any other key retries the reload immediately instead of
+			// waiting on a timer that may never fire if the TV was genuinely
+			// frozen rather than just backgrounded - a real freeze suspends
+			// setTimeout along with everything else, so a key press is the only
+			// reliable signal that the engine is actually running again. Back
+			// still falls through to its normal handling below and exits in one
+			// press, same as always.
+			if (error && !(isBackKey(e) || key === 'GoBack' || key === 'Backspace')) {
+				e.preventDefault();
+				e.stopPropagation();
+				triggerManualRetry();
+				return;
+			}
 
 			// Media playback keys (Tizen remote)
 			if (e.keyCode === KEYS.PLAY) {
