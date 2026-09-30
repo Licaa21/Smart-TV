@@ -170,37 +170,6 @@
 	height: 26px;
 }
 
-// Hollow: a heavy frame and no fill at all, so the picture shows straight through the button.
-.button.layoutOutline {
-	position: relative;
-	overflow: hidden;
-	border: 3px solid rgba(255, 255, 255, 0.92);
-	border-radius: 4px;
-	padding: 18px 28px 22px 24px;
-	background: transparent;
-	box-shadow: none;
-	text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
-	-webkit-backdrop-filter: none;
-	backdrop-filter: none;
-
-	&:focus {
-		border-color: @accent;
-	}
-}
-
-.layoutOutline .bar {
-	height: 5px;
-}
-
-.button.layoutOutline.buttonPreview {
-	border-color: @accent;
-}
-
-.layoutOutline .icon {
-	width: 26px;
-	height: 26px;
-}
-
 // The countdown is a fill that drains across the button behind the label.
 .button.layoutSweep {
 	position: relative;
@@ -232,38 +201,4 @@
 
 .layoutSweep > .timer {
 	margin-left: 14px;
-}
-
-// No box at all: the words, with the countdown as the line under them.
-.button.layoutText {
-	position: relative;
-	padding: 8px 6px 18px;
-	border: 2px solid transparent;
-	border-radius: 0;
-	background: transparent;
-	box-shadow: none;
-	text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
-	-webkit-backdrop-filter: none;
-	backdrop-filter: none;
-
-	&:focus {
-		border-color: transparent;
-	}
-}
-
-.layoutText .label {
-	font-size: 26px;
-}
-
-.layoutText .bar {
-	height: 4px;
-	border-radius: 2px;
-}
-
-.layoutText .barFill {
-	border-radius: 2px;
-}
-
-.button.layoutText.buttonPreview {
-	border-color: transparent;
 }

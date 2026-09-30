@@ -32,6 +32,13 @@ describe('accent surfaces', () => {
 		expect(accentSignature({...defaultSettings, accentSkip: '#ff0000'})).not.toBe(base);
 	});
 
+	it('draws the Settings Focus swatch from the fill a focused row really has, not the accent', () => {
+		const theme = {colors: {accent: '#FFFF2E92', buttonFocused: '#FF101010'}};
+		const surface = ACCENT_SURFACES.find((s) => s.id === 'settingsFocus');
+		expect(defaultAccentSwatch(surface, theme)).toBe('rgb(16, 16, 16)');
+		expect(defaultAccentSwatch(surface, undefined)).toBeUndefined();
+	});
+
 	it('draws the default swatch from the theme only where the theme reaches', () => {
 		const theme = {colors: {accent: '#FFFF2E92'}};
 		const themed = ACCENT_SURFACES.find((s) => s.id === 'details');

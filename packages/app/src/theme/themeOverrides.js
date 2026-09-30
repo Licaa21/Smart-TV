@@ -270,7 +270,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 			bar: toCssColor(hex)
 		};
 	};
-	const settingsFocus = focusStyle('settings');
+	const settingsFocus = focusStyle('settingsFocus');
 	const detailsFocus = focusStyle('details');
 
 	const rules = [];

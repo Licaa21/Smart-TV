@@ -106,7 +106,7 @@ describe('SkipSegmentOverlay', () => {
 			expect(has('sweep')).toBe(false);
 		});
 
-		it.each(['rectangle', 'outline', 'text'])('draws %s with a bar in place of the ring', (layout) => {
+		it.each(['rectangle'])('draws %s with a bar in place of the ring', (layout) => {
 			pick(layout);
 			expect(has(`layout${layout[0].toUpperCase()}${layout.slice(1)}`)).toBe(true);
 			expect(count('circle')).toBe(0);

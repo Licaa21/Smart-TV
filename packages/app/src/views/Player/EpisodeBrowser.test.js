@@ -26,7 +26,8 @@ jest.mock('./PlayerConstants', () => {
 });
 jest.mock('../../utils/spotlightContainers', () => {
 	const React = require('react');
-	return {ModalContainer: ({spotlightId, ...props}) => React.createElement('div', props)}; // eslint-disable-line no-unused-vars
+	const container = ({spotlightId, ...props}) => React.createElement('div', props); // eslint-disable-line no-unused-vars
+	return {ModalContainer: container, ActiveTabContainer: container};
 });
 jest.mock('@enact/spotlight', () => ({__esModule: true, default: {focus: jest.fn(() => true), getPointerMode: () => false}}));
 jest.mock('../../services/jellyfinApi', () => ({getServerUrl: () => 'http://server'}));
@@ -180,6 +181,27 @@ describe('EpisodeBrowser', () => {
 		it('draws a short season all at once', () => {
 			open();
 			expect(rows()).toBe(3);
+		});
+	});
+
+	describe('season tabs', () => {
+		it('marks the season that is open, so the remote lands on it and not on the first tab', () => {
+			open();
+			const marked = document.querySelectorAll('[data-active-tab="true"]');
+			expect(marked.length).toBe(1);
+			expect(marked[0].textContent).toBe('Season 1');
+			mockEpisodes = {...mockEpisodes, selectedSeasonId: 's2'};
+			document.body.innerHTML = '';
+			open();
+			expect(document.querySelector('[data-active-tab="true"]').textContent).toBe('Season 2');
+		});
+
+		it('scrolls the strip so the open season is in the middle of it', () => {
+			mockEpisodes = {...mockEpisodes, selectedSeasonId: 's2'};
+			open();
+			// jsdom has no layout, so offsets are zero and the strip is left at the start.
+			const strip = document.querySelector('[data-active-tab="true"]').parentNode;
+			expect(strip.scrollLeft).toBe(0);
 		});
 	});
 });

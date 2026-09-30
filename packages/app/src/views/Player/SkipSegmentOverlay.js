@@ -24,9 +24,7 @@ const ringClasses = {ring: css.ring, svg: css.ringSvg, track: css.ringTrack, val
 const LAYOUT_CLASS = {
 	capsule: '',
 	rectangle: css.layoutRectangle,
-	outline: css.layoutOutline,
-	sweep: css.layoutSweep,
-	text: css.layoutText
+	sweep: css.layoutSweep
 };
 
 /**
@@ -36,8 +34,7 @@ const LAYOUT_CLASS = {
  * How it is built, where it sits, how big it is and what colors it wears come from the Skip
  * Intro/Recap/Credits page in settings. With those left alone it is the prompt it has always
  * been. The layouts differ in shape and in how the countdown is drawn: a ring in the capsule, a
- * bar along the bottom edge of a rectangle or an outline, a fill sweeping across, or an underline
- * under plain text. `preview` draws the same thing inert, inside the settings screen, in place
+ * bar along the bottom edge of the light rectangle, or a fill sweeping across. `preview` draws the same thing inert, inside the settings screen, in place
  * of over the video.
  */
 const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, onSkip, spotlightId, preview = false}) => {
@@ -96,7 +93,7 @@ const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, o
 							: <SkipGlyph className={css.ringIcon} style={look.icon} />}
 					</CountdownRing>
 				)}
-				{(layout === 'rectangle' || layout === 'outline' || layout === 'text') && showRing && (
+				{layout === 'rectangle' && showRing && (
 					<span className={css.bar}>
 						<span className={css.barFill} style={{...look.bar, width: percent}} />
 					</span>

@@ -48,6 +48,7 @@ import {
 	getScreensaverMovementOptions,
 	getScreensaverPositionOptions,
 	getScreensaverSizeOptions,
+	getNextUpLayoutOptions,
 	getSkipOverlayLayoutOptions,
 	getScreensaverTimeoutOptions,
 	getSeasonalThemeOptions,
@@ -293,6 +294,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.OPTION, key: 'focusBorderColor', label: () => $L('Home & Browse Selection'), options: themeFocusOptions, fallback: () => $L('Default'), icon: 'border_color'},
 					accentRow('home', () => $L('Home & Browse Highlights'), 'home'),
 					accentRow('settings', () => $L('Settings & Controls'), 'settings'),
+					accentRow('settingsFocus', () => $L('Settings Focus'), 'style'),
 					accentRow('achievements', () => $L('Achievement Badges'), 'military_tech'),
 					accentRow('details', () => $L('Details Screen'), 'article'),
 					accentRow('player', () => $L('Player & Playback'), 'play_circle'),
@@ -460,7 +462,8 @@ export const SETTINGS_SCHEMA = [
 						options: (ctx) => getAccentColorOptions(skipDefaultText(ctx.settings.skipOverlayLayout), $L('Default')),
 						fallback: () => $L('Default'),
 						icon: 'format_color_text'
-					}
+					},
+					{kind: KIND.OPTION, key: 'nextUpLayout', label: () => $L('Next Episode Layout'), options: getNextUpLayoutOptions, fallback: () => $L('Card'), icon: 'view_carousel', when: (ctx) => ctx.settings.nextUpBehavior !== 'disabled'}
 				]
 			},
 			{

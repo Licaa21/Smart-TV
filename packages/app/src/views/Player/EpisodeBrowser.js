@@ -7,7 +7,7 @@ import {getServerUrl} from '../../services/jellyfinApi';
 import {getImageUrl} from '../../utils/helpers';
 import {keepFocusInView} from '../../utils/focusScroll';
 import {watchedPercent} from '../../utils/episodeBrowser';
-import {ModalContainer} from '../../utils/spotlightContainers';
+import {ActiveTabContainer, ModalContainer} from '../../utils/spotlightContainers';
 import {hidesMediaDescription} from '../Details/detailsMedia';
 import {WatchedCheckIcon} from '../Details/DetailBadges';
 import {SpottableButton, SpottableDiv} from './PlayerConstants';
@@ -90,7 +90,7 @@ const EpisodeRow = memo(({episode, serverUrl, isCurrent, hideOverview, onSelect}
  *
  * Choosing an episode hands it to `onSelect`, which switches playback to it in place.
  */
-const EpisodeBrowser = ({item, logoUrl, onLogoError, onSelect, onClose}) => {
+const EpisodeBrowser = memo(({item, logoUrl, onLogoError, onSelect, onClose}) => {
 	const {settings} = useSettings();
 	const {seasons, selectedSeasonId, selectSeason, episodes, failed} = useSeriesEpisodes({item, enabled: true});
 	const listRef = useRef(null);
@@ -133,6 +133,18 @@ const EpisodeBrowser = ({item, logoUrl, onLogoError, onSelect, onClose}) => {
 		});
 	}, [episodes, item.Id]);
 
+	// The strip opens scrolled to the season that is playing, so it is on screen without having to
+	// go looking for it along the row.
+	const activeSeasonId = String(selectedSeasonId);
+	const seasonCount = seasons ? seasons.length : 0;
+	useEffect(() => {
+		if (seasonCount === 0) return;
+		const active = document.querySelector('[data-modal="episodes"] [data-active-tab="true"]');
+		const strip = active && active.parentNode;
+		if (!strip) return;
+		strip.scrollLeft = Math.max(0, active.offsetLeft - ((strip.clientWidth - active.offsetWidth) / 2));
+	}, [activeSeasonId, seasonCount]);
+
 	const handleSeason = useCallback((e) => {
 		selectSeason(e.currentTarget.dataset.seasonId);
 	}, [selectSeason]);
@@ -143,7 +155,6 @@ const EpisodeBrowser = ({item, logoUrl, onLogoError, onSelect, onClose}) => {
 		if (episode) onSelect(episode);
 	}, [episodes, onSelect]);
 
-	const currentSeasonId = String(selectedSeasonId);
 
 	return (
 		<div className={css.overlay} onClick={onClose}>
@@ -154,21 +165,22 @@ const EpisodeBrowser = ({item, logoUrl, onLogoError, onSelect, onClose}) => {
 					<h2 className={css.seriesName}>{item.SeriesName}</h2>
 				)}
 				{seasons && seasons.length > 0 && (
-					<div className={css.tabs} onFocus={keepFocusInView}>
+					<ActiveTabContainer className={css.tabs} onFocus={keepFocusInView} spotlightId="episodes-tabs">
 						{seasons.map((season) => {
-							const active = String(season.Id) === currentSeasonId;
+							const active = String(season.Id) === activeSeasonId;
 							return (
 								<SpottableButton
 									key={season.Id}
 									className={`${css.tab} ${active ? css.tabActive : ''}`}
 									data-season-id={season.Id}
+									data-active-tab={active ? 'true' : undefined}
 									onClick={handleSeason}
 								>
 									{season.Name}
 								</SpottableButton>
 							);
 						})}
-					</div>
+					</ActiveTabContainer>
 				)}
 				<div className={css.list} ref={listRef} onFocus={keepFocusInView}>
 					{failed && <SpottableDiv className={css.message}>{$L('Failed to load')}</SpottableDiv>}
@@ -189,6 +201,6 @@ const EpisodeBrowser = ({item, logoUrl, onLogoError, onSelect, onClose}) => {
 			</ModalContainer>
 		</div>
 	);
-};
+});
 
 export default EpisodeBrowser;
