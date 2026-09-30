@@ -72,7 +72,10 @@ const PersonDetailShell = ({
 			<div className={css.content}>
 				<div className={css.personInfo}>
 					{imageUrl ? (
-						<img className={css.personImage} src={imageUrl} alt={name} />
+						<div className={css.personImage} role="img" aria-label={name}>
+							<div className={css.portraitFill} style={{backgroundImage: `url("${imageUrl}")`}} />
+							<div className={css.portraitPhoto} style={{backgroundImage: `url("${imageUrl}")`}} />
+						</div>
 					) : (
 						<div className={css.noImage}>{placeholderInitial}</div>
 					)}
