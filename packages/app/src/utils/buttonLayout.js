@@ -47,6 +47,7 @@ export const DETAIL_BUTTONS = [
 // which drops the audio rather than stretching it, so anything but 1x plays silent.
 export const OSD_BUTTONS = [
 	{id: 'chapters', label: 'Chapters'},
+	{id: 'episodes', label: 'Episodes'},
 	{id: 'subtitles', label: 'Subtitles'},
 	{id: 'audio', label: 'Audio'},
 	{id: 'castAndCrew', label: 'Cast and Crew'},

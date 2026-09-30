@@ -138,3 +138,109 @@ describe('ink on a focused row', () => {
 		}
 	});
 });
+
+describe('per-surface accents', () => {
+	const moonfin = resolveThemeById('moonfin');
+	const rulesFor = (accents) => buildThemeOverrideCss(moonfin, {accents}).split('\n');
+	const withHandRule = (lines, needle) => lines.find((line) => line.includes(needle));
+
+	it('changes nothing until a surface is given a color', () => {
+		expect(buildThemeOverrideCss(moonfin, {accents: {}})).toBe(buildThemeOverrideCss(moonfin));
+	});
+
+	it('colors only the surface it was given to', () => {
+		const lines = rulesFor({settings: '#ff0000'});
+		expect(withHandRule(lines, '.toggleOn')).toContain('rgb(255, 0, 0)');
+		// The details screen and the nav pill keep the theme's cyan.
+		expect(withHandRule(lines, '.seasonEpCheck')).toContain('rgb(0, 164, 220)');
+		expect(withHandRule(lines, '.active')).toContain('rgba(0, 164, 220');
+	});
+
+	it('takes each surface from its own pick', () => {
+		const lines = rulesFor({navigation: '#00ff00', details: '#3b82f6'});
+		expect(withHandRule(lines, '.active')).toContain('rgba(0, 255, 0');
+		expect(withHandRule(lines, '.episodeProgressBar')).toContain('rgb(59, 130, 246)');
+		expect(withHandRule(lines, '.toggleOn')).toContain('rgb(0, 164, 220)');
+	});
+
+	it('replays the stylesheets\' own accent declarations for a surface that has a pick', () => {
+		const none = buildThemeOverrideCss(moonfin);
+		const player = buildThemeOverrideCss(moonfin, {accents: {player: '#ff8800'}});
+		expect(player.length).toBeGreaterThan(none.length);
+		expect(player).toContain('rgb(255, 136, 0)');
+		expect(player).toContain('rgba(255, 136, 0, 0.3)');
+		expect(player).not.toContain('var(--');
+	});
+
+	it('keeps every rule scoped to the theme, media queries included', () => {
+		const css = buildThemeOverrideCss(moonfin, {accents: {other: '#ff8800', liveTv: '#ff8800', home: '#ff8800'}});
+		for (const line of css.split('\n').filter(Boolean)) {
+			const body = line.startsWith('@') ? line.slice(line.indexOf('{') + 1).trim() : line;
+			expect(body.startsWith("html[data-theme-id='moonfin'][data-theme-id]")).toBe(true);
+		}
+	});
+
+	it('gives one selector its own rule so an unknown pseudo cannot void the rest', () => {
+		const css = buildThemeOverrideCss(moonfin, {accents: {player: '#ff8800'}});
+		const withFocusWithin = css.split('\n').filter((line) => line.includes(':focus-within'));
+		expect(withFocusWithin.length).toBeGreaterThan(0);
+		withFocusWithin.forEach((line) => expect(line.split('{')[0]).not.toContain(','));
+	});
+
+	it('ignores a value that is not a color', () => {
+		expect(buildThemeOverrideCss(moonfin, {accents: {player: 'nonsense'}})).not.toContain('nonsense');
+	});
+
+	it('writes readable ink on a bright pick and keeps the theme ink on a dark one', () => {
+		const bright = withHandRule(rulesFor({settings: '#ffff00'}), '.toggleOn .');
+		const dark = withHandRule(rulesFor({settings: '#000080'}), '.toggleOn .');
+		expect(bright).toContain('rgba(0, 0, 0, 0.92)');
+		expect(dark).toBeDefined();
+		expect(dark).not.toContain('rgba(0, 0, 0, 0.92)');
+	});
+
+	describe('visibility', () => {
+		it('lifts a black pick so text drawn in the accent still shows on the dark screens', () => {
+			const lines = rulesFor({details: '#000000'});
+			const readMore = withHandRule(lines, '.readMoreBtn');
+			expect(readMore).not.toContain('color: rgb(0, 0, 0)');
+			const [r, g, b] = readMore.match(/rgb\((\d+), (\d+), (\d+)\)/).slice(1).map(Number);
+			expect(r).toBeGreaterThan(60);
+			expect([r, g, b].every((v) => v === r)).toBe(true);
+		});
+
+		it('leaves a pick that already shows exactly as it was picked', () => {
+			expect(withHandRule(rulesFor({details: '#ffffff'}), '.readMoreBtn')).toContain('rgb(255, 255, 255)');
+		});
+
+		it('writes dark ink on the buttons of a surface that was given white, in the label as well', () => {
+			const css = buildThemeOverrideCss(moonfin, {accents: {other: '#ffffff'}});
+			const lines = css.split('\n');
+			const button = lines.find((line) => line.includes('.btn:focus {') && line.includes('background: rgb(255, 255, 255)'));
+			expect(button).toContain('color: rgba(0, 0, 0, 0.92)');
+			expect(lines.some((line) => line.includes('.btn:focus *') && line.includes('color: rgba(0, 0, 0, 0.92)'))).toBe(true);
+		});
+
+		it('keeps the stylesheet\'s own text on a fill that white text still reads on', () => {
+			const css = buildThemeOverrideCss(moonfin, {accents: {other: '#0a3d91'}});
+			expect(css).not.toContain('.btn:focus *');
+		});
+
+		it('gives a heavy white tint dark ink and leaves a faint one alone', () => {
+			const css = buildThemeOverrideCss(moonfin, {accents: {other: '#ffffff'}});
+			const heavy = css.split('\n').find((line) => line.includes('.createBtn {') && line.includes('rgba(255, 255, 255, 0.85)'));
+			expect(heavy).toContain('rgba(0, 0, 0, 0.92)');
+			const faint = css.split('\n').find((line) => line.includes('rgba(255, 255, 255, 0.2)') && !line.includes('rgba(0, 0, 0, 0.92)'));
+			expect(faint).toBeDefined();
+		});
+
+		it('keeps a black focus outline visible', () => {
+			const css = buildThemeOverrideCss(moonfin, {focusBorderColor: '#000000'});
+			expect(css).not.toContain('border-color: rgb(0, 0, 0)');
+		});
+
+		it('picks ink that reads on a bright accent for the hand written buttons too', () => {
+			expect(withHandRule(rulesFor({settings: '#ffffff'}), '.toggleOn .')).toContain('rgba(0, 0, 0, 0.92)');
+		});
+	});
+});

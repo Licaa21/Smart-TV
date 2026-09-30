@@ -31,6 +31,7 @@ import {resolveSeriesAudio} from './initialAudio';
 import {resolveInitialSubtitle} from './initialSubtitle';
 import {api as jellyfinApi, createApiForServer, getServerUrl} from '../../services/jellyfinApi';
 import PlayerControls, {usePlayerButtons} from './PlayerControls';
+import {canBrowseEpisodes} from '../../utils/episodeBrowser';
 import useLiveProgram from './useLiveProgram';
 import {hasTrickplayPreview} from '../../components/TrickplayPreview';
 import useChannelCarousel from './useChannelCarousel';
@@ -380,7 +381,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		nextEpisode, isAudioMode, isLiveTV, hasNextTrack, hasPrevTrack,
 		shuffleMode, repeatMode, selectedQuality,
 		selectedSubtitleIndex, canDownloadRemoteSubtitles: !isAudioMode && Boolean(item?.Id), hasCastMembers, zoomModeLabel, zoomModeKey: zoomMode,
-		sleepMinutes
+		sleepMinutes,
+		canBrowseEpisodes: canBrowseEpisodes({item, isLiveTV, isAudioMode})
 	});
 
 	useEffect(() => {
@@ -1679,7 +1681,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// minus one there, and handing that to the next episode would switch its
 	// subtitles off. A chosen track already carries over through the series
 	// preferences.
-	const onPlayNextWithCleanup = useCallback(async (episode) => {
+	const onPlayNextWithCleanup = useCallback(async (episode, options) => {
 		// An outro skip lands near the end, so the next up countdown can come
 		// round again on the episode it already started. The item never changes
 		// so nothing reloads, and the teardown below would leave the player dead.
@@ -1688,7 +1690,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		await playback.reportStop(positionRef.current);
 		cleanupAVPlay();
 		avplayReadyRef.current = false;
-		onPlayNext(episode);
+		onPlayNext(episode, options);
 	}, [onPlayNext, stopTimeUpdatePolling, item.Id]);
 
 	const {carouselOpenRef, openCarousel, markChannelPlaying, carouselProps} = useChannelCarousel({
@@ -2320,6 +2322,21 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		closeModal();
 	}, [closeModal, groupSeekTo, dropScrub]);
 
+	// Picks an episode from the browser. An episode part way through carries on from where it
+	// stopped and an unstarted one begins at the top, both of which the player already does for
+	// an item it is told to resume. The one already playing just closes the browser.
+	const handleSelectEpisode = useCallback((episode) => {
+		closeModal();
+		if (String(episode.Id) === String(item.Id)) return;
+		onPlayNextWithCleanup(episode, {resume: true});
+	}, [closeModal, item.Id, onPlayNextWithCleanup]);
+
+	// A new episode starting takes the browser with it, whether it was chosen there or the
+	// player moved on by itself while it was open.
+	useEffect(() => {
+		setActiveModal((open) => (open === 'episodes' ? null : open));
+	}, [item.Id]);
+
 	// Progress bar seeking
 	const handleProgressClick = useCallback((e) => {
 		if (!avplayReadyRef.current) return;
@@ -2457,6 +2474,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			case 'subtitle': openModal('subtitle'); break;
 			case 'quality': openModal('quality'); break;
 			case 'chapter': openModal('chapter'); break;
+			case 'episodes': openModal('episodes'); break;
 			case 'cast': handleOpenCast(); break;
 			case 'zoom': handleToggleZoom(); break;
 			case 'sleep': openModal('sleep'); break;
@@ -3148,6 +3166,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				sleepRemainingSeconds={sleepRemainingSeconds}
 				handleSelectQuality={handleSelectQuality}
 				handleSelectChapter={handleSelectChapter}
+				handleSelectEpisode={handleSelectEpisode}
 				handleSelectCastMember={handleSelectCastMember}
 				handleOpenSubtitleOffset={handleOpenSubtitleOffset}
 				handleOpenSubtitleSettings={handleOpenSubtitleSettings}
