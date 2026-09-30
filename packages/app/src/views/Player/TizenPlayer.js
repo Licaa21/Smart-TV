@@ -84,6 +84,13 @@ const RESUME_CHECK_MS = 5000;
 // A stream reload after a failed restore gets this long before it's given up on -
 // a request already in flight when the TV powers off can stay unsettled far longer.
 const RELOAD_TIMEOUT_MS = 12000;
+// Backoff between reload retries after one times out or fails outright - mirrors the
+// server-reconnect backoff in AuthContext so a network/server that's still catching
+// up after a long standby gets retried instead of leaving the user to back out and
+// start over by hand.
+const RELOAD_RETRY_DELAYS = [5000, 10000, 20000];
+const RELOAD_RETRY_MAX_DELAY_MS = 30000;
+const reloadRetryDelay = (attempt) => RELOAD_RETRY_DELAYS[attempt] ?? RELOAD_RETRY_MAX_DELAY_MS;
 
 const getRootFontSizePx = () => {
 	if (typeof window === 'undefined' || typeof document === 'undefined') return 24;
@@ -275,6 +282,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const reloadPlaybackRef = useRef(null);
 	// re-arms server reporting when playback resumes after a background stop
 	const resumeReportingRef = useRef(null);
+	// pending recoverByReload() retry, cleared on unmount so a backgrounded retry
+	// loop doesn't keep firing after the player is gone
+	const reloadRetryTimeoutRef = useRef(null);
+	const isUnmountedRef = useRef(false);
 	// index of a subtitle the server is currently burning into the stream
 	const burnInSubtitleRef = useRef(null);
 
@@ -913,8 +924,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					}
 					const suspended = suspendedRef.current;
 					suspendedRef.current = null;
-					const recoverByReload = () => {
-						console.warn('[Player] AVPlay restore left the session unplayable, reloading stream');
+					const recoverByReload = (attempt = 0) => {
+						console.warn(`[Player] AVPlay restore left the session unplayable, reloading stream${attempt ? ` (retry ${attempt})` : ''}`);
 						// A request already in flight when the TV actually powers off is
 						// frozen along with everything else and can sit unsettled for the
 						// entire outage, so this can't wait on it indefinitely - past this
@@ -924,6 +935,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 							setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
 						});
 						Promise.race([reloadPromise, timedOut]).then((reloaded) => {
+							if (isUnmountedRef.current) return;
 							if (reloaded) {
 								// The attempt this is recovering from may have kept running in the
 								// background and thrown its own error after this reload already
@@ -934,13 +946,24 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 							}
 							setError($L('Playback failed. The file format may not be supported.'));
 							// The reload itself keeps running even after the timeout gives up
-							// waiting on it - a heavy transcode negotiation can legitimately take
-							// longer than that without actually being stuck, so if it succeeds
-							// late, clear the stale error instead of leaving it stuck in front of
+							// waiting on it - a heavy transcode negotiation, or a network stack
+							// still catching up after a long standby, can legitimately take
+							// longer than this without actually being stuck - so a late success
+							// here still clears the error instead of leaving it stuck in front of
 							// playback that's now actually working.
 							reloadPromise.then((lateReloaded) => {
-								if (lateReloaded) setError(null);
+								if (!isUnmountedRef.current && lateReloaded) setError(null);
 							});
+							// One attempt timing out doesn't mean the server or network are
+							// actually unrecoverable - especially right after a long standby,
+							// where the network stack itself can still be catching up - so retry
+							// with backoff instead of leaving this on the user to back out and
+							// start over by hand. Keeps going until it succeeds or the player
+							// unmounts; Go Back on the error screen remains available the whole
+							// time either way.
+							reloadRetryTimeoutRef.current = setTimeout(() => {
+								if (!isUnmountedRef.current) recoverByReload(attempt + 1);
+							}, reloadRetryDelay(attempt));
 						});
 					};
 					if (suspended) {
@@ -1040,6 +1063,21 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			}
 		};
 	}, [isPaused]);
+
+	// Dedicated true-mount/unmount tracking, independent of the isPaused-keyed
+	// effect above (which re-runs its own cleanup on every pause toggle, not just
+	// unmount) - stops a backgrounded recoverByReload() retry loop from continuing
+	// to fire once the player itself is actually gone.
+	useEffect(() => {
+		isUnmountedRef.current = false;
+		return () => {
+			isUnmountedRef.current = true;
+			if (reloadRetryTimeoutRef.current) {
+				clearTimeout(reloadRetryTimeoutRef.current);
+				reloadRetryTimeoutRef.current = null;
+			}
+		};
+	}, []);
 
 	useEffect(() => {
 		onPausedChange?.(isPaused);
