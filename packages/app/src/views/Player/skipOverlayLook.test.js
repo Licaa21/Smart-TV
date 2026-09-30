@@ -120,18 +120,15 @@ describe('resolveSkipOverlayLook', () => {
 			SKIP_LAYOUTS.forEach((layout) => expect(look({skipOverlayLayout: layout}).layout).toBe(layout));
 		});
 
-		it('paints no fill on a layout that has no box', () => {
-			['outline', 'text'].forEach((layout) => {
-				expect(look({skipOverlayLayout: layout, skipOverlayBackground: '#ff0000', skipOverlayOpacity: 50}).button.background).toBeUndefined();
-			});
-			['capsule', 'rectangle', 'sweep'].forEach((layout) => {
-				expect(look({skipOverlayLayout: layout, skipOverlayBackground: '#ff0000', skipOverlayOpacity: 50}).button.background).toBe('rgba(255, 0, 0, 0.5)');
-			});
+		it('offers only the capsule, the rectangle and the sweep, and sends a layout that was removed back to the capsule', () => {
+			expect(SKIP_LAYOUTS).toEqual(['capsule', 'rectangle', 'sweep']);
+			['outline', 'text'].forEach((layout) => expect(look({skipOverlayLayout: layout}).layout).toBe('capsule'));
 		});
 
-		it('draws the outline\'s edge in the text color', () => {
-			expect(look({skipOverlayLayout: 'outline', skipOverlayText: '#ffff00'}).button.borderColor).toBe('rgba(255, 255, 0, 0.7)');
-			expect(look({skipOverlayLayout: 'rectangle', skipOverlayText: '#ffff00'}).button.borderColor).toBeUndefined();
+		it('paints the picked fill on every layout', () => {
+			SKIP_LAYOUTS.forEach((layout) => {
+				expect(look({skipOverlayLayout: layout, skipOverlayBackground: '#ff0000', skipOverlayOpacity: 50}).button.background).toBe('rgba(255, 0, 0, 0.5)');
+			});
 		});
 
 		it('makes the rectangle a light box, so white text on it is darkened and dark text is left alone', () => {

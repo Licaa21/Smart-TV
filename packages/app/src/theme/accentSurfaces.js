@@ -1,4 +1,4 @@
-import {isValidHexColor, toCssColor} from './themeSpec';
+import {deepenForLightInk, isValidHexColor, toCssColor} from './themeSpec';
 
 // The parts of the app that can each take an accent color of their own. `key` is the
 // setting that holds the pick, and an empty value means the surface keeps whatever the
@@ -10,6 +10,9 @@ export const ACCENT_SURFACES = [
 	{id: 'navigation', key: 'accentNavigation', themed: true},
 	{id: 'home', key: 'accentHome', themed: true},
 	{id: 'settings', key: 'accentSettings', themed: true},
+	// The fill of a focused row or button in Settings, which the theme takes from its button color
+	// and not its accent, so it is picked apart from the rest of the screen. It owns no stylesheet.
+	{id: 'settingsFocus', key: 'accentSettingsFocus', themed: true, swatchFrom: 'buttonFocused'},
 	{id: 'achievements', key: 'accentAchievements', themed: true},
 	{id: 'details', key: 'accentDetails', themed: true},
 	{id: 'player', key: 'accentPlayer', themed: false},
@@ -56,6 +59,11 @@ export const accentSignature = (settings) =>
 // surface the theme reaches follows the theme's accent, and any other keeps the shipped cyan.
 export const defaultAccentSwatch = (surface, theme) => {
 	if (!surface.themed) return SHIPPED_ACCENT;
+	// A focused row is filled with the theme's button color, deepened until light text reads on it.
+	if (surface.swatchFrom === 'buttonFocused') {
+		const fill = theme?.colors?.buttonFocused;
+		return fill ? toCssColor(deepenForLightInk(fill)) : undefined;
+	}
 	const accent = theme?.colors?.accent;
 	return accent ? toCssColor(accent) : undefined;
 };

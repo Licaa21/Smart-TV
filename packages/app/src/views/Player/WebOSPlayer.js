@@ -176,6 +176,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	subtitleOffsetRef.current = subtitleOffset;
 	const [controlsVisible, setControlsVisible] = useState(false);
 	const [activeModal, setActiveModal] = useState(null);
+	// Read by the time update, which runs from an interval or a media event and so sees no fresh state.
+	const episodesOpenRef = useRef(false);
+	episodesOpenRef.current = activeModal === 'episodes';
 	// Seeded from the advanced playback menu, which picks a cap before playback starts.
 	const [selectedQuality, setSelectedQuality] = useState(initialQuality || null);
 	const [remoteSubtitleResults, setRemoteSubtitleResults] = useState([]);
@@ -1748,7 +1751,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (videoRef.current) {
 			const rawTime = videoRef.current.currentTime;
 			const time = rawTime;
-			setCurrentTime(time);
+			// Nothing on screen reads the time while the episode panel is up, and each update redraws the
+			// whole player, which is what makes that panel drag. The first tick after it closes catches up.
+			if (!episodesOpenRef.current) setCurrentTime(time);
 			const ticks = Math.floor(time * 10000000);
 			if (ticks !== positionRef.current) {
 				stalledRef.current = false;

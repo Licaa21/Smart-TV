@@ -297,6 +297,7 @@ export const defaultSettings = {
 	accentNavigation: '',
 	accentHome: '',
 	accentSettings: '',
+	accentSettingsFocus: '',
 	accentAchievements: '',
 	accentDetails: '',
 	accentPlayer: '',
@@ -306,6 +307,8 @@ export const defaultSettings = {
 	// The skip prompt's own look. Every value here is what the prompt has always been, so it
 	// only changes once something is picked. An empty color means the default one. Local only.
 	skipOverlayLayout: 'capsule',
+	// How the next episode prompt is built: card (the one with the still), banner or button.
+	nextUpLayout: 'card',
 	skipOverlayPosition: 'bottomRight',
 	skipOverlaySize: 'medium',
 	skipOverlayBackground: '',
