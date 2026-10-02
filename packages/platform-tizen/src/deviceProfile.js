@@ -18,8 +18,6 @@ let cachedCapabilities = null;
 
 const DEFAULT_PASSTHROUGH_SETTINGS = {
 	passthroughEnabled: true,
-	ac3Passthrough: true,
-	eac3Passthrough: true,
 	dtsPassthrough: true,
 	dtshdPassthrough: true,
 	truehdPassthrough: true
@@ -30,14 +28,14 @@ const resolvePassthroughSettings = (options = {}) => ({
 	...(options?.passthroughSettings || {})
 });
 
+// The set decodes AC3 and E-AC3 itself and its own sound output setting decides
+// whether a receiver gets the bitstream, so the passthrough settings leave them alone.
 const applyPassthroughSettings = (caps, options = {}) => {
 	const prefs = resolvePassthroughSettings(options);
 	const passthroughAllowed = prefs.passthroughEnabled;
 
 	return {
 		...caps,
-		ac3: !!caps.ac3 && !!prefs.ac3Passthrough,
-		eac3: !!caps.eac3 && !!prefs.eac3Passthrough,
 		truehd: !!caps.truehd && passthroughAllowed && !!prefs.truehdPassthrough,
 		dts: !!caps.dts && passthroughAllowed && !!prefs.dtsPassthrough,
 		dtshd: !!caps.dtshd && passthroughAllowed && !!prefs.dtshdPassthrough
@@ -70,6 +68,17 @@ const TIZEN_VERSION_TO_YEAR = {
 	5.5: 2020, 5: 2019, 4: 2018, 3: 2017, 2.4: 2016
 };
 
+// Runs one Samsung API call and hands back the fallback when it's missing or throws,
+// so one call failing on older firmware doesnt take the others down with it.
+const readWebapis = (read, fallback) => {
+	try {
+		const value = read();
+		return value === undefined || value === null ? fallback : value;
+	} catch (e) {
+		return fallback;
+	}
+};
+
 /**
  * Get model name from webapis (cached).
  * Prefers getRealModel() over getModel() for accurate model string.
@@ -77,19 +86,8 @@ const TIZEN_VERSION_TO_YEAR = {
 let cachedModelName = null;
 const getModelName = () => {
 	if (cachedModelName !== null) return cachedModelName;
-	cachedModelName = '';
-	if (typeof webapis !== 'undefined' && webapis.productinfo) {
-		try {
-			if (typeof webapis.productinfo.getRealModel === 'function') {
-				cachedModelName = webapis.productinfo.getRealModel() || '';
-			}
-			if (!cachedModelName && typeof webapis.productinfo.getModel === 'function') {
-				cachedModelName = webapis.productinfo.getModel() || '';
-			}
-		} catch (e) {
-			// Fall through
-		}
-	}
+	cachedModelName = readWebapis(() => webapis.productinfo.getRealModel(), '') ||
+		readWebapis(() => webapis.productinfo.getModel(), '');
 	return cachedModelName;
 };
 
@@ -99,16 +97,7 @@ const getModelName = () => {
 let cachedFirmware = null;
 const getFirmwareString = () => {
 	if (cachedFirmware !== null) return cachedFirmware;
-	cachedFirmware = '';
-	if (typeof webapis !== 'undefined' && webapis.productinfo) {
-		try {
-			if (typeof webapis.productinfo.getFirmware === 'function') {
-				cachedFirmware = webapis.productinfo.getFirmware() || '';
-			}
-		} catch (e) {
-			// Fall through
-		}
-	}
+	cachedFirmware = readWebapis(() => webapis.productinfo.getFirmware(), '');
 	return cachedFirmware;
 };
 
@@ -362,52 +351,15 @@ export const getDeviceCapabilities = async () => {
 	const modelYear = detectModelYear();
 	const containerSupport = getDocumentedContainerSupport();
 
-	let modelName = 'Samsung TV';
-	let serialNumber = '';
-	let deviceId = '';
-	let uhd = true;
-	let uhd8K = false;
-	// HDR10: Available on premium/standard UHD models from 2018+
-	// Runtime detection via avinfo API is more accurate
-	let hdr10 = tizenVersion >= 4;
-	// Dolby Vision: Hardware-dependent, detect via avinfo API
-	// Fallback to false; let runtime detection enable it
-	let dolbyVision = false;
-
+	const serialNumber = '';
 	// Use cached helpers for model name and firmware (already fetched during version detection)
-	modelName = getModelName() || modelName;
+	const modelName = getModelName() || 'Samsung TV';
 	const firmwareVersion = getFirmwareString();
-
-	if (typeof webapis !== 'undefined') {
-		try {
-			if (webapis.productinfo) {
-				if (typeof webapis.productinfo.getDuid === 'function') {
-					deviceId = webapis.productinfo.getDuid();
-				}
-
-				// Check resolution support
-				if (typeof webapis.productinfo.is8KPanelSupported === 'function' &&
-					webapis.productinfo.is8KPanelSupported()) {
-					uhd8K = true;
-					uhd = true;
-				} else if (typeof webapis.productinfo.isUdPanelSupported === 'function') {
-					uhd = webapis.productinfo.isUdPanelSupported();
-				}
-			}
-
-			// Check HDR support
-			if (webapis.avinfo) {
-				if (typeof webapis.avinfo.isHdrTvSupport === 'function') {
-					hdr10 = webapis.avinfo.isHdrTvSupport();
-				}
-				if (typeof webapis.avinfo.isDolbyVisionSupport === 'function') {
-					dolbyVision = webapis.avinfo.isDolbyVisionSupport();
-				}
-			}
-		} catch (e) {
-			console.log('[deviceProfile] Error getting Tizen capabilities:', e);
-		}
-	}
+	const deviceId = readWebapis(() => webapis.productinfo.getDuid(), '');
+	const uhd8K = readWebapis(() => webapis.productinfo.is8KPanelSupported(), false);
+	const uhd = uhd8K || readWebapis(() => webapis.productinfo.isUdPanelSupported(), true);
+	const hdr10 = readWebapis(() => webapis.avinfo.isHdrTvSupport(), tizenVersion >= 4);
+	const dolbyVision = readWebapis(() => webapis.avinfo.isDolbyVisionSupport(), false);
 
 	const audioProbe = probeTizenAudioCodecSupport();
 
@@ -708,7 +660,8 @@ export const getJellyfinDeviceProfile = async (options = {}) => {
 				{
 					Condition: 'LessThanEqual',
 					Property: 'VideoBitDepth',
-					Value: caps.hdr10 || caps.dolbyVision ? '10' : '8',
+					// UHD sets decode Main 10 even when the panel reports no HDR
+					Value: caps.hdr10 || caps.dolbyVision || caps.uhd ? '10' : '8',
 					IsRequired: false
 				},
 				{

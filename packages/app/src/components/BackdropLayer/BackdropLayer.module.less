@@ -19,6 +19,9 @@
 	background-repeat: no-repeat;
 	opacity: 0;
 	transition: opacity 0.45s ease;
+	// Without a layer of its own the engine only lifts the image out for the fade
+	// and folds it back in after, repainting the whole screen at both ends.
+	will-change: opacity;
 }
 
 .globalBackdropOverlay {
