@@ -4,6 +4,7 @@ import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import $L from '@enact/i18n/$L';
 import {KEYS} from '../../utils/keys';
+import {useSettings} from '../../context/SettingsContext';
 
 import css from './PersonDetailShell.module.less';
 
@@ -29,6 +30,7 @@ const PersonDetailShell = ({
 	actions = [],
 	tabs = []
 }) => {
+	const {settings} = useSettings();
 	const [overviewExpanded, setOverviewExpanded] = useState(false);
 	const [activeTab, setActiveTab] = useState(0);
 
@@ -69,7 +71,7 @@ const PersonDetailShell = ({
 				<div className={css.randomBackdrop} style={{backgroundImage: `url(${backdropUrl})`}} />
 			)}
 			{backdropUrl && <div className={css.scrim} />}
-			<div className={css.content}>
+			<div className={`${css.content} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>
 				<div className={css.personInfo}>
 					{imageUrl ? (
 						<div className={css.personImage} role="img" aria-label={name} style={{backgroundImage: `url("${imageUrl}")`}} />
