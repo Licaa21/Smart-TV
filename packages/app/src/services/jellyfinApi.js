@@ -1217,6 +1217,8 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		checkWriteAccess: () =>
 			serverRequest('/Moonfin/Libraries/CheckWriteAccess'),
 
+		getPublicInfo: () => serverRequest('/System/Info/Public'),
+
 		// Return server info for playback routing
 		getServerInfo: () => ({
 			serverUrl: url,
