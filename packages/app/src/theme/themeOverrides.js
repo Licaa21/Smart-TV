@@ -302,7 +302,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${modernDetailCss.upNextCard}:focus`, `border-color: ${focusColor};`);
 	rule(`.${modernDetailCss.upNextLabel}`, `color: ${accent};`);
 	rule(`.${modernDetailCss.upNextProgress} > div`, `background: ${accent};`);
-	rule(`.${modernDetailCss.seerrHeading}`, `color: ${onBackground};`);
+	rule(`.${modernDetailCss.sectionHeading}`, `color: ${onBackground};`);
 	rule(`.${modernDetailCss.episodeWatched}`, `background: ${badgeWatched}; border-color: ${onBadge};`);
 	rule(`.${modernDetailCss.episodeWatched} svg`, `fill: ${onBadge}; stroke: ${onBadge};`);
 	rule(`.${tabBarCss.tabBar}`, `background: ${os(0.08)};`);

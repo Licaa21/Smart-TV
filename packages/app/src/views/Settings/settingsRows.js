@@ -1,3 +1,4 @@
+import {useCallback, useEffect, useRef, useState} from 'react';
 import Slider from '@enact/sandstone/Slider';
 
 import {renderSettingsIcon, renderToggle, renderChevron} from './settingsIcons';
@@ -53,24 +54,66 @@ export const InfoRow = ({id, label, value, icon}) => (
 	</SpottableDiv>
 );
 
-export const SliderRow = ({settingKey, title, min, max, step, value, format, icon, onChange}) => (
-	<div className={css.sliderContainer}>
-		<div className={css.sliderLabel}>
-			<div className={css.sliderTitleGroup}>
-				{renderSettingsIcon(icon)}
-				<span className={css.sliderTitle}>{title}</span>
+// Hands the slider's own knob a class this stylesheet can reach
+const sliderCss = {knob: css.sliderKnob};
+
+// Saving a setting re-renders everything that reads settings, the home rows behind the
+// panel included, which is far too slow for every step of a held key. So the knob moves
+// on its own state and the value is saved once the presses stop, focus leaves or the
+// screen closes.
+const SLIDER_SAVE_DELAY_MS = 500;
+
+export const SliderRow = ({settingKey, title, min, max, step, value, format, icon, onChange}) => {
+	const [shown, setShown] = useState(value);
+	const pendingRef = useRef(null);
+	const timerRef = useRef(null);
+	const onChangeRef = useRef(onChange);
+	useEffect(() => {
+		onChangeRef.current = onChange;
+	}, [onChange]);
+
+	const save = useCallback(() => {
+		clearTimeout(timerRef.current);
+		if (pendingRef.current === null) return;
+		const next = pendingRef.current;
+		pendingRef.current = null;
+		onChangeRef.current({value: next});
+	}, []);
+
+	const handleChange = useCallback((e) => {
+		setShown(e.value);
+		pendingRef.current = e.value;
+		clearTimeout(timerRef.current);
+		timerRef.current = setTimeout(save, SLIDER_SAVE_DELAY_MS);
+	}, [save]);
+
+	// A change made somewhere else, like a server sync, still shows unless a press is waiting to save
+	useEffect(() => {
+		if (pendingRef.current === null) setShown(value);
+	}, [value]);
+
+	useEffect(() => save, [save]);
+
+	return (
+		<div className={css.sliderContainer} onBlur={save}>
+			<div className={css.sliderLabel}>
+				<div className={css.sliderTitleGroup}>
+					{renderSettingsIcon(icon)}
+					<span className={css.sliderTitle}>{title}</span>
+				</div>
+				<span className={css.sliderValue}>{format ? format(shown) : shown}</span>
 			</div>
-			<span className={css.sliderValue}>{format ? format(value) : value}</span>
+			<Slider
+				min={min}
+				max={max}
+				step={step}
+				value={shown}
+				onChange={handleChange}
+				className={css.settingsSlider}
+				css={sliderCss}
+				tooltip={false}
+				spotlightId={`setting-${settingKey}`}
+			/>
 		</div>
-		<Slider
-			min={min}
-			max={max}
-			step={step}
-			value={value}
-			onChange={onChange}
-			className={css.settingsSlider}
-			tooltip={false}
-			spotlightId={`setting-${settingKey}`}
-		/>
-	</div>
-);
+	);
+};

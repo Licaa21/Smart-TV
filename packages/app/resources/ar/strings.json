@@ -733,5 +733,7 @@
     "Text Fill Color": "لون تعبئة النص",
     "Queue is empty": "قائمة الانتظار فارغة",
     "Perfect match": "مباراة مثالية",
-    "{count} downloads": "{count} التنزيلات"
+    "{count} downloads": "{count} التنزيلات",
+    "1 (Play only)": "تشغيل",
+    "1 album": "ألبوم واحد"
 }
