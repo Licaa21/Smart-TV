@@ -1,4 +1,4 @@
-import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
+import {memo, useState, useEffect, useCallback, useRef, useMemo} from 'react';
 import $L from '@enact/i18n/$L';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
@@ -179,6 +179,10 @@ const handleToolbarKeyDownGrouped = createToolbarKeyDown('library-group-row-0');
 // alphabet bar is switched off and that letter is not there to land on.
 const handleGridKeyDown = createGridKeyDown(css.grid, 'library-letter-hash');
 const handleGridKeyDownNoLetters = createGridKeyDown(css.grid, 'library-toolbar');
+
+// The list redraws every card it holds each time it renders, so without this a
+// focus move that only changes the header would redraw the whole grid.
+const GridList = memo(VirtualGridList);
 
 const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto, onHome, backHandlerRef}) => {
 	const {api, serverUrl, serverType} = useAuth();
@@ -948,10 +952,12 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const cellPadX = horizontalCellPad(cardWidth, window.innerWidth - GRID_INSET);
 	const cellPadY = Math.max(MIN_ROW_GAP, focusOverhang(cardHeight));
 	const cellPadding = `${cellPadY}px ${cellPadX}px`;
-	const gridItemSize = {minWidth: cardWidth + cellPadX * 2, minHeight: cardHeight + cellPadY * 2};
+	const gridItemSize = useMemo(() => (
+		{minWidth: cardWidth + cellPadX * 2, minHeight: cardHeight + cellPadY * 2}
+	), [cardWidth, cardHeight, cellPadX, cellPadY]);
 
 	const renderItem = useCallback(({index, ...rest}) => {
-		const item = itemsRef.current[index];
+		const item = items[index];
 		const isNearEnd = index >= items.length - 50;
 		if (isNearEnd && apiFetchIndexRef.current < totalCount && !isLoading && !loadingMoreRef.current) {
 			loadItems(apiFetchIndexRef.current, true);
@@ -1035,7 +1041,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 				</div>
 			</SpottableDiv>
 		);
-	}, [effectiveServerUrl, handleItemClick, items.length, totalCount, isLoading, loadItems, effectiveImageType, posterHeight, cellPadding, isFolderView, showCardText, detailedSubtitles]);
+	}, [effectiveServerUrl, handleItemClick, items, totalCount, isLoading, loadItems, effectiveImageType, posterHeight, cellPadding, isFolderView, showCardText, detailedSubtitles]);
 
 	const currentSort = activeSortOptions.find(o => o.key === sortKey);
 	const sortLabel = currentSort ? currentSort.label : $L('Name');
@@ -1385,7 +1391,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 						</div>
 					) : (
 						<div className={css.gridWrapper} {...menuHold}>
-							<VirtualGridList
+							<GridList
 								className={css.grid}
 								cbScrollTo={getGridScrollTo}
 								dataSize={items.length}

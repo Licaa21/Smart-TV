@@ -1,4 +1,5 @@
-import {isTizen} from '../platform';
+import {isTizen, isWebOS} from '../platform';
+import serverLogger from './serverLogger';
 
 const INNERTUBE_URL = 'https://www.youtube.com/youtubei/v1/player';
 const RESOLVE_TIMEOUT_MS = 8000;
@@ -11,6 +12,23 @@ const MANIFEST_URL = /\/manifest\/(hls|dash)_|\.(m3u8|mpd)(\?|$)/;
 // hls.js guesses 500 kbps until it has measured, which opens a trailer at 480p on a TV that
 // has bandwidth to spare for YouTube's 2.6 Mbps 1080p.
 const HLS_START_BANDWIDTH = 8000000;
+// LG's own player is held to 1080p. The rungs above it are VP9 only, and it cant change codec
+// partway through a stream.
+const LG_MAX_WIDTH = 1920;
+const LG_MAX_HEIGHT = 1080;
+// How long a manifest gets to start, and to sit still once it has, before the muxed file takes
+// over, and how much of it has to play before the TV counts as coping with it.
+const MANIFEST_START_MS = 8000;
+const MANIFEST_STALL_MS = 5000;
+const MANIFEST_CONFIRM_S = 10;
+const MANIFEST_WATCH_MS = 500;
+// A TV whose own player keeps failing the manifest goes straight to the muxed file for a week,
+// rather than making every trailer wait out the watch first. One failure can be the network, so
+// it takes two in a row.
+const NATIVE_MANIFEST_SKIP_KEY = 'moonfin:trailerNativeManifestSkipUntil';
+const NATIVE_MANIFEST_FAILURES = 2;
+const NATIVE_MANIFEST_SKIP_MS = 7 * 24 * 60 * 60 * 1000;
+let nativeManifestFailures = 0;
 
 // The Vision Pro app gets a manifest with every resolution in it, and the Android app backs it
 // up with a muxed file that stops at 360p. A client marked needsVisitor turns away a request
@@ -334,16 +352,16 @@ async function tryInnertube (videoId, preferHighQuality, captionLanguage, muxedO
 		const audioLanguage = originalAudioLanguage(data);
 		debugLog('innertube resolved stream', client.name, stream.quality + 'p');
 		if (!preferHighQuality || stream.quality >= HIGH_QUALITY_FLOOR) {
-			return {url: stream.url, captionsUrl, audioLanguage};
+			return {url: stream.url, captionsUrl, audioLanguage, client: client.name};
 		}
 		if (!best || stream.quality > best.quality) {
-			best = {url: stream.url, quality: stream.quality, captionsUrl, audioLanguage};
+			best = {url: stream.url, quality: stream.quality, captionsUrl, audioLanguage, client: client.name};
 		}
 	}
 
 	if (best) {
 		debugLog('innertube settled for', best.quality + 'p');
-		return {url: best.url, captionsUrl: best.captionsUrl, audioLanguage: best.audioLanguage};
+		return {url: best.url, captionsUrl: best.captionsUrl, audioLanguage: best.audioLanguage, client: best.client};
 	}
 
 	debugLog('innertube exhausted without stream');
@@ -381,12 +399,115 @@ export function needsHlsJs (url) {
 	return isTizen() && isManifestUrl(url);
 }
 
+export function playsManifestNatively (url) {
+	return isManifestUrl(url) && !needsHlsJs(url);
+}
+
+export function nativeManifestSkipped (now = Date.now()) {
+	try {
+		return Number(window.localStorage.getItem(NATIVE_MANIFEST_SKIP_KEY)) > now;
+	} catch (e) {
+		return false;
+	}
+}
+
+export function noteNativeManifest (played, now = Date.now()) {
+	try {
+		if (played) {
+			nativeManifestFailures = 0;
+			window.localStorage.removeItem(NATIVE_MANIFEST_SKIP_KEY);
+			return;
+		}
+		nativeManifestFailures += 1;
+		if (nativeManifestFailures < NATIVE_MANIFEST_FAILURES) return;
+		nativeManifestFailures = 0;
+		window.localStorage.setItem(NATIVE_MANIFEST_SKIP_KEY, String(now + NATIVE_MANIFEST_SKIP_MS));
+		serverLogger.warn(serverLogger.LOG_CATEGORIES.PLAYBACK, "YouTube manifests keep failing on this TV's player, so trailers use the 360p file for a week");
+	} catch (e) {
+		// Without storage the TV just doesnt remember.
+	}
+}
+
+// LG's player and hls.js can both stall on a manifest without raising an error, so progress is
+// watched instead. onStall hears a stream that never started or stopped moving, and onConfirmed
+// hears one that has played long enough to trust. Returns what stops the watch.
+export function watchManifestPlayback (video, {onStall, onConfirmed}) {
+	const startedAt = Date.now();
+	const firstTime = video.currentTime;
+	let lastTime = firstTime;
+	let stillSince = startedAt;
+	let started = false;
+	let played = 0;
+	let confirmed = false;
+
+	const timer = setInterval(function () {
+		const now = Date.now();
+		const time = video.currentTime;
+		if (!started) {
+			if (!video.paused && time !== firstTime) {
+				started = true;
+				lastTime = time;
+				stillSince = now;
+			} else if (now - startedAt >= MANIFEST_START_MS) {
+				clearInterval(timer);
+				onStall('did not start');
+			}
+			return;
+		}
+		if (video.paused || time !== lastTime) {
+			// A jump past a sponsor segment is a seek rather than play, so only small steps count.
+			const step = time - lastTime;
+			if (step > 0 && step < 2) played += step;
+			lastTime = time;
+			stillSince = now;
+			if (!confirmed && played >= MANIFEST_CONFIRM_S) {
+				confirmed = true;
+				if (onConfirmed) onConfirmed();
+			}
+		} else if (now - stillSince >= MANIFEST_STALL_MS) {
+			clearInterval(timer);
+			onStall('stalled');
+		}
+	}, MANIFEST_WATCH_MS);
+
+	return function () {
+		clearInterval(timer);
+	};
+}
+
+// LG's media options ride on a source element's type. They hold its player to 1080p and start it
+// at the offset, which spares the seek straight after loading that a manifest can stall on. A
+// source the player turns away reports on the source rather than the element.
+function attachLgManifest (video, url, startTime, onError) {
+	const option = {adaptiveStreaming: {maxWidth: LG_MAX_WIDTH, maxHeight: LG_MAX_HEIGHT}};
+	if (startTime > 0) option.transmission = {playTime: {start: Math.round(startTime * 1000)}};
+	const source = document.createElement('source');
+	source.setAttribute('src', url);
+	source.setAttribute('type', 'application/vnd.apple.mpegurl;mediaOption=' + encodeURI(JSON.stringify({mediaTransportType: 'HLS', option: option})));
+	if (onError) source.addEventListener('error', onError);
+	video.removeAttribute('src');
+	video.appendChild(source);
+	video.load();
+	return function () {
+		if (onError) source.removeEventListener('error', onError);
+		if (source.parentNode) source.parentNode.removeChild(source);
+	};
+}
+
 // Starts a trailer stream on a video element and returns what lets go of it, which has to run
 // before the element plays anything else. Hls is the hls.js class, which the caller loads when
 // needsHlsJs says so. onError hears a manifest hls.js gives up on, since that never reaches the
 // element's own error event.
 export function attachTrailerStream (video, url, {Hls = null, audioLanguage = '', startTime = 0, onError} = {}) {
 	if (!Hls || !Hls.isSupported()) {
+		if (isWebOS() && isManifestUrl(url)) {
+			const releaseSource = attachLgManifest(video, url, startTime, onError);
+			const releaseAudio = keepOriginalAudioTrack(video, audioLanguage);
+			return function () {
+				releaseAudio();
+				releaseSource();
+			};
+		}
 		video.src = url;
 		if (startTime > 0) video.currentTime = startTime;
 		return keepOriginalAudioTrack(video, audioLanguage);
