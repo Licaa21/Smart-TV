@@ -1,7 +1,11 @@
 import {useState, useEffect, useCallback, useRef} from 'react';
 
 import {stopPlaybackForTrailer} from '../../utils/trailerPlayback';
-import {attachTrailerStream, fetchVideoStream, extractYouTubeIdFromUrl, fetchSponsorSegments, isManifestUrl, needsHlsJs} from '../../services/youtubeTrailer';
+import {
+	attachTrailerStream, fetchVideoStream, extractYouTubeIdFromUrl, fetchSponsorSegments, isManifestUrl, nativeManifestSkipped,
+	needsHlsJs, noteNativeManifest, playsManifestNatively, watchManifestPlayback
+} from '../../services/youtubeTrailer';
+import serverLogger from '../../services/serverLogger';
 import {isBackKey} from '../../utils/keys';
 
 // Plays a title's trailer. A local one goes to the real player, and a YouTube link plays in
@@ -12,6 +16,7 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly}
 
 	const trailerVideoRef = useRef(null);
 	const trailerAudioLanguageRef = useRef('');
+	const trailerResumeAtRef = useRef(0);
 	const sponsorSegmentsRef = useRef([]);
 	const sponsorSkipIntervalRef = useRef(null);
 
@@ -107,12 +112,14 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly}
 			// Segments are a bonus, so a failed lookup must not hold up the trailer.
 			const [segments, stream] = await Promise.all([
 				fetchSponsorSegments(trailerOverlay).catch(() => []),
-				fetchVideoStream(trailerOverlay, true)
+				fetchVideoStream(trailerOverlay, true, '', nativeManifestSkipped())
 			]);
 			if (cancelled) return;
 			if (stream) {
 				sponsorSegmentsRef.current = segments || [];
 				trailerAudioLanguageRef.current = stream.audioLanguage || '';
+				trailerResumeAtRef.current = 0;
+				serverLogger.playback(`Trailer: ${isManifestUrl(stream.url) ? 'YouTube manifest' : 'YouTube 360p file'}${stream.client ? ` from ${stream.client}` : ''}`);
 				setTrailerStreamUrl(stream.url);
 			} else {
 				setTrailerOverlay(null);
@@ -131,27 +138,43 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly}
 		let cancelled = false;
 		let fellBack = false;
 		let release = null;
+		let stopWatch = null;
+		const nativeManifest = playsManifestNatively(trailerStreamUrl);
 
-		const fallBack = () => {
+		// A manifest that errors, never starts or stops partway gives way to the muxed file, picking up
+		// where it stopped.
+		const fallBack = (reason = 'failed to play') => {
 			if (cancelled || fellBack || !isManifestUrl(trailerStreamUrl)) return;
 			fellBack = true;
+			if (stopWatch) stopWatch();
+			serverLogger.warn(serverLogger.LOG_CATEGORIES.PLAYBACK, `Trailer ${reason} on the YouTube manifest, trying the 360p file`);
+			if (nativeManifest) noteNativeManifest(false);
+			const at = video.currentTime;
 			fetchVideoStream(trailerOverlay, true, '', true).then((stream) => {
 				if (cancelled || !stream) return;
 				trailerAudioLanguageRef.current = '';
+				trailerResumeAtRef.current = at > 0 ? at : 0;
 				setTrailerStreamUrl(stream.url);
 			});
 		};
-		video.onerror = fallBack;
+		video.onerror = () => fallBack();
 
 		const loadHls = needsHlsJs(trailerStreamUrl) ? import('hls.js').then((m) => m.default) : Promise.resolve(null);
 		loadHls.then((Hls) => {
 			if (cancelled) return;
-			release = attachTrailerStream(video, trailerStreamUrl, {Hls, audioLanguage: trailerAudioLanguageRef.current, onError: fallBack});
-		}).catch(fallBack);
+			release = attachTrailerStream(video, trailerStreamUrl, {Hls, audioLanguage: trailerAudioLanguageRef.current, startTime: trailerResumeAtRef.current, onError: () => fallBack()});
+			if (isManifestUrl(trailerStreamUrl)) {
+				stopWatch = watchManifestPlayback(video, {
+					onStall: fallBack,
+					onConfirmed: nativeManifest ? () => noteNativeManifest(true) : null
+				});
+			}
+		}).catch(() => fallBack());
 
 		return () => {
 			cancelled = true;
 			video.onerror = null;
+			if (stopWatch) stopWatch();
 			if (release) release();
 		};
 	}, [trailerStreamUrl, trailerOverlay]);

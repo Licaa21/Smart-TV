@@ -1,6 +1,8 @@
-jest.mock('../platform', () => ({isTizen: jest.fn()}));
+jest.mock('../platform', () => ({isTizen: jest.fn(), isWebOS: jest.fn()}));
+jest.mock('./serverLogger', () => ({__esModule: true, default: {warn: jest.fn(), LOG_CATEGORIES: {PLAYBACK: 'Playback'}}}));
 
-import {isTizen} from '../platform';
+import {isTizen, isWebOS} from '../platform';
+import serverLogger from './serverLogger';
 import {
 	attachTrailerStream,
 	buildInnertubePayload,
@@ -10,9 +12,13 @@ import {
 	isManifestUrl,
 	isStaleVisitor,
 	keepOriginalAudioTrack,
+	nativeManifestSkipped,
 	needsHlsJs,
+	noteNativeManifest,
 	originalAudioLanguage,
-	pickOriginalAudioTrackIndex
+	pickOriginalAudioTrackIndex,
+	playsManifestNatively,
+	watchManifestPlayback
 } from './youtubeTrailer';
 
 const HLS_URL = 'https://manifest.googlevideo.com/api/manifest/hls_variant/id/abc/file/index.m3u8';
@@ -36,6 +42,7 @@ FakeHls.Events = {ERROR: 'hlsError'};
 
 beforeEach(() => {
 	isTizen.mockReturnValue(false);
+	isWebOS.mockReturnValue(false);
 });
 
 // The shape of a Vision Pro answer for a trailer YouTube has machine dubbed
@@ -213,7 +220,7 @@ describe('fetchVideoStream', () => {
 		const first = await fetchVideoStream('vid', true);
 		const second = await fetchVideoStream('vid', true);
 
-		expect(first).toEqual({url: HLS_URL, captionsUrl: null, audioLanguage: 'en-US'});
+		expect(first).toEqual({url: HLS_URL, captionsUrl: null, audioLanguage: 'en-US', client: 'VISIONOS'});
 		expect(second.url).toBe(HLS_URL);
 		expect(bodies.map((b) => [b.context.client.clientName, b.context.client.visitorData])).toEqual([
 			['VISIONOS', undefined],
@@ -296,5 +303,152 @@ describe('attachTrailerStream', () => {
 		expect(hls.destroyed).toBe(true);
 		hls.handlers.hlsError('hlsError', {fatal: true});
 		expect(onError).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('attachTrailerStream on webOS', () => {
+	const lgVideo = () => {
+		const video = document.createElement('video');
+		video.load = jest.fn();
+		return video;
+	};
+
+	test("hands a manifest to LG's player held to 1080p and started at the offset", () => {
+		isWebOS.mockReturnValue(true);
+		const video = lgVideo();
+
+		const release = attachTrailerStream(video, HLS_URL, {startTime: 12.5});
+		const source = video.querySelector('source');
+		const option = JSON.parse(decodeURI(source.getAttribute('type').split(';mediaOption=')[1]));
+
+		expect(source.getAttribute('src')).toBe(HLS_URL);
+		expect(source.getAttribute('type').indexOf('application/vnd.apple.mpegurl;')).toBe(0);
+		expect(option).toEqual({
+			mediaTransportType: 'HLS',
+			option: {adaptiveStreaming: {maxWidth: 1920, maxHeight: 1080}, transmission: {playTime: {start: 12500}}}
+		});
+		expect(video.load).toHaveBeenCalled();
+		release();
+		expect(video.querySelector('source')).toBeNull();
+	});
+
+	test("hears the player turn the manifest away, which only the source reports", () => {
+		isWebOS.mockReturnValue(true);
+		const video = lgVideo();
+		const onError = jest.fn();
+		const release = attachTrailerStream(video, HLS_URL, {onError});
+		const source = video.querySelector('source');
+		source.dispatchEvent(new Event('error'));
+		expect(onError).toHaveBeenCalledTimes(1);
+		release();
+		source.dispatchEvent(new Event('error'));
+		expect(onError).toHaveBeenCalledTimes(1);
+	});
+
+	test('still gives the muxed file straight to the element', () => {
+		isWebOS.mockReturnValue(true);
+		const video = lgVideo();
+		attachTrailerStream(video, 'https://rr3---sn.googlevideo.com/videoplayback?itag=18');
+		expect(video.querySelector('source')).toBeNull();
+		expect(video.getAttribute('src')).toBe('https://rr3---sn.googlevideo.com/videoplayback?itag=18');
+	});
+});
+
+describe('playsManifestNatively', () => {
+	test("is a manifest that isnt going through hls.js", () => {
+		expect(playsManifestNatively(HLS_URL)).toBe(true);
+		expect(playsManifestNatively('https://rr3---sn.googlevideo.com/videoplayback?itag=18')).toBe(false);
+		isTizen.mockReturnValue(true);
+		expect(playsManifestNatively(HLS_URL)).toBe(false);
+	});
+});
+
+describe('watchManifestPlayback', () => {
+	beforeEach(() => {
+		jest.useFakeTimers();
+	});
+	afterEach(() => {
+		jest.useRealTimers();
+	});
+
+	const advance = (video, seconds, step = 0.5) => {
+		for (let t = 0; t < seconds; t += step) {
+			video.currentTime += step;
+			jest.advanceTimersByTime(step * 1000);
+		}
+	};
+
+	test('gives up on a manifest that never starts', () => {
+		const video = {currentTime: 0, paused: false};
+		const onStall = jest.fn();
+		watchManifestPlayback(video, {onStall});
+		jest.advanceTimersByTime(7500);
+		expect(onStall).not.toHaveBeenCalled();
+		jest.advanceTimersByTime(1000);
+		expect(onStall).toHaveBeenCalledWith('did not start');
+	});
+
+	test('confirms a manifest that keeps playing and catches one that stops', () => {
+		const video = {currentTime: 0, paused: false};
+		const onStall = jest.fn();
+		const onConfirmed = jest.fn();
+		watchManifestPlayback(video, {onStall, onConfirmed});
+		advance(video, 11);
+		expect(onConfirmed).toHaveBeenCalledTimes(1);
+		jest.advanceTimersByTime(4500);
+		expect(onStall).not.toHaveBeenCalled();
+		jest.advanceTimersByTime(1000);
+		expect(onStall).toHaveBeenCalledWith('stalled');
+	});
+
+	test('doesnt count a pause or a skip past a segment as trouble', () => {
+		const video = {currentTime: 0, paused: false};
+		const onStall = jest.fn();
+		const onConfirmed = jest.fn();
+		watchManifestPlayback(video, {onStall, onConfirmed});
+		advance(video, 2);
+		video.paused = true;
+		jest.advanceTimersByTime(20000);
+		video.paused = false;
+		video.currentTime += 30;
+		advance(video, 4);
+		expect(onStall).not.toHaveBeenCalled();
+		expect(onConfirmed).not.toHaveBeenCalled();
+	});
+
+	test('stops watching when asked', () => {
+		const video = {currentTime: 0, paused: false};
+		const onStall = jest.fn();
+		const stop = watchManifestPlayback(video, {onStall});
+		stop();
+		jest.advanceTimersByTime(20000);
+		expect(onStall).not.toHaveBeenCalled();
+	});
+});
+
+describe('native manifest memory', () => {
+	const now = 1000000;
+	const week = 7 * 24 * 60 * 60 * 1000;
+
+	beforeEach(() => {
+		noteNativeManifest(true);
+	});
+
+	test('takes two failures in a row before the TV skips manifests for a week', () => {
+		serverLogger.warn.mockClear();
+		noteNativeManifest(false, now);
+		expect(nativeManifestSkipped(now)).toBe(false);
+		expect(serverLogger.warn).not.toHaveBeenCalled();
+		noteNativeManifest(false, now);
+		expect(nativeManifestSkipped(now + week - 1)).toBe(true);
+		expect(nativeManifestSkipped(now + week + 1)).toBe(false);
+		expect(serverLogger.warn).toHaveBeenCalledTimes(1);
+	});
+
+	test('a manifest that plays clears a failure before it adds up', () => {
+		noteNativeManifest(false, now);
+		noteNativeManifest(true, now);
+		noteNativeManifest(false, now);
+		expect(nativeManifestSkipped(now)).toBe(false);
 	});
 });

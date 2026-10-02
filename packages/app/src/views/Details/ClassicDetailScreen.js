@@ -66,8 +66,7 @@ const ClassicDetailScreen = ({
 	collectionItems,
 	extras,
 	cast,
-	parentCollection,
-	parentCollectionName,
+	collectionSections,
 	similar,
 	onSeasonSelect,
 	onEpisodeSelect,
@@ -486,13 +485,13 @@ const ClassicDetailScreen = ({
 				</RowContainer>
 			)}
 
-			{parentCollection.length > 0 && (
-				<RowContainer className={css.section}>
+			{collectionSections.map((section) => (
+				<RowContainer key={section.id} className={css.section}>
 					<div className={css.sectionHeader}>
-						<h3 className={css.sectionTitle}>{parentCollectionName}</h3>
+						<h3 className={css.sectionTitle}>{section.name}</h3>
 					</div>
 					<div className={css.sectionScroll} onFocus={handleScrollerFocus}>
-						{parentCollection.map(colItem => (
+						{section.items.map(colItem => (
 							<MediaCard
 								key={colItem.Id}
 								item={colItem}
@@ -502,7 +501,7 @@ const ClassicDetailScreen = ({
 						))}
 					</div>
 				</RowContainer>
-			)}
+			))}
 
 			{similar.length > 0 && (
 				<RowContainer className={css.section}>

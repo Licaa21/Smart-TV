@@ -407,15 +407,16 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	const passthroughSettings = await getPlaybackAudioSettings(options, storedSettings);
 	const profileOptions = {...options, passthroughSettings};
 	const capabilities = await getDeviceCapabilities(profileOptions);
-	const deviceProfile = applyProfileTuning(
-		options.deviceProfile || await getDeviceProfile(serverType, profileOptions),
-		storedSettings,
-		capabilities
-	);
 
 	// Cross-server: use item's server if available
 	const api = options.item ? getApiForItem(options.item) : jellyfinApi.api;
 	const creds = options.item ? getServerCredentials(options.item) : null;
+
+	const deviceProfile = applyProfileTuning(
+		options.deviceProfile || await getDeviceProfile(serverType, profileOptions, api),
+		storedSettings,
+		capabilities
+	);
 
 	const isLiveTV = options.isLiveTV || options.item?.Type === 'TvChannel';
 

@@ -8,7 +8,7 @@ import {
 	avplayOpen, avplayPrepare, avplayPlay, avplayPause,
 	avplaySeek, avplaySeekIdle, avplaySetPostSeekHook, avplayGetCurrentTime, avplayGetDuration, avplayGetState,
 	avplaySetListener, avplaySelectTrack, avplaySetSilentSubtitle,
-	avplayGetTracks, avplaySetDisplayMethod, avplaySetStreamingProperty, setDisplayWindow, cleanupAVPlay,
+	avplayGetTracks, avplayGetCurrentTracks, avplaySetDisplayMethod, avplaySetStreamingProperty, setDisplayWindow, cleanupAVPlay,
 	avplaySetBufferingParams, avplaySuspend, avplayRestore, waitForHlsManifest
 } from '@moonfin/platform-tizen/video';
 import {useSettings} from '../../context/SettingsContext';
@@ -584,9 +584,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			try {
 				const tizenIndex = mapJellyfinTrackToTizen(trackInfo, pending.audioStreams, 'AUDIO', pending.audioIndex);
 				if (tizenIndex != null) {
-					avplaySelectTrack('AUDIO', tizenIndex);
+					const playingIndex = avplayGetCurrentTracks().find((t) => t.type === 'AUDIO')?.index;
+					const switched = playingIndex !== tizenIndex;
+					if (switched) avplaySelectTrack('AUDIO', tizenIndex);
 					pending.audioApplied = true;
-					console.log('[Player] Applied initial audio track, jellyfinIndex:', pending.audioIndex, 'tizenIndex:', tizenIndex);
+					serverLogger.playback('Audio: initial track set', {
+						jellyfinIndex: pending.audioIndex,
+						tizenIndex,
+						playingIndex,
+						switched
+					});
 				} else if (expired) {
 					// giving up leaves AVPlays default, which is silence when the set cant
 					// decode it, so try the Jellyfin index in case AVPlay numbers its tracks
@@ -1443,12 +1450,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				}
 
 				// Track pending audio/subtitle setup (apply after AVPlay prepare).
-				// Only actively switch tracks when the choice isn't the one AVPlay
-				// plays natively (the file default).
+				// Direct play always sets the chosen track, since AVPlay can start on the
+				// first audio track whatever the file flags as default.
 				let pendingAudioIndex = null;
 				if (initialAudioIndex != null) {
 					pendingAudioIndex = initialAudioIndex;
-				} else if (!audioNegotiated && autoAudio && autoAudio.index !== fileDefaultAudio?.index) {
+				} else if (!audioNegotiated && autoAudio
+					&& (result.playMethod === playback.PlayMethod.DirectPlay || autoAudio.index !== fileDefaultAudio?.index)) {
 					pendingAudioIndex = autoAudio.index;
 				}
 

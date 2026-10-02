@@ -48,17 +48,18 @@ const movie = (over = {}) => ({Id: 'movie-1', Name: 'Ace Ventura', ...over});
 describe('findParentCollection', () => {
 	beforeEach(() => __resetCollectionMembership());
 
-	test('a title naming a collection is matched on that id alone', async () => {
-		const {api, calls} = serverWith([ALIEN, ACE]);
+	test('a title naming a collection still has every collection asked, and that one leads', async () => {
+		const {api, calls} = serverWith([ALIEN, HAND_MADE, ACE], {'box-mine': [{Id: 'movie-1'}], 'box-ace': [{Id: 'movie-1'}]});
 
-		const found = await findParentCollection(api, movie({ProviderIds: {TmdbCollection: '3167'}}));
+		const found = await findParentCollections(api, movie({ProviderIds: {TmdbCollection: '3167'}}));
 
-		expect(found).toBe(ACE);
-		expect(calls.members).toBe(0);
+		expect(found.map((c) => c.Id)).toEqual(['box-ace', 'box-mine']);
+		expect(calls.members).toBe(3);
 	});
 
 	test('the ids are read whatever case the server spells them in', async () => {
-		const {api} = serverWith([{...ACE, ProviderIds: {tmdb: '3167'}}]);
+		const ace = {...ACE, ProviderIds: {tmdb: '3167'}};
+		const {api} = serverWith([HAND_MADE, ace], {'box-mine': [{Id: 'movie-1'}], 'box-ace': [{Id: 'movie-1'}]});
 
 		const found = await findParentCollection(api, movie({ProviderIds: {tmdbcollection: '3167'}}));
 
@@ -80,6 +81,19 @@ describe('findParentCollection', () => {
 		await findParentCollection(api, movie());
 		await findParentCollection(api, movie({Id: 'movie-2'}));
 
+		expect(calls.members).toBe(2);
+	});
+
+	test('titles opened while the asking is still running share it', async () => {
+		const {api, calls} = serverWith([ACE, HAND_MADE], {'box-mine': [{Id: 'movie-1'}, {Id: 'movie-2'}]});
+
+		const [first, second] = await Promise.all([
+			findParentCollection(api, movie()),
+			findParentCollection(api, movie({Id: 'movie-2'}))
+		]);
+
+		expect(first).toBe(HAND_MADE);
+		expect(second).toBe(HAND_MADE);
 		expect(calls.members).toBe(2);
 	});
 
@@ -183,6 +197,21 @@ describe('findParentCollections', () => {
 
 	it('lists every hand made collection holding the title on a server without the route', async () => {
 		const {api} = serverWith([HAND_MADE, ACE], {'box-mine': [{Id: 'movie-1'}], 'box-ace': [{Id: 'movie-1'}]});
+		const found = await findParentCollections(api, {Id: 'movie-1'});
+		expect(found.map((c) => c.Id)).toEqual(['box-mine', 'box-ace']);
+	});
+
+	it('keeps the server order of the collections however their answers arrive', async () => {
+		const api = {
+			getItemCollections: notFound,
+			getItems: ({IncludeItemTypes, ParentId}) => {
+				if (IncludeItemTypes === 'BoxSet') return Promise.resolve({Items: [HAND_MADE, ACE]});
+				const reply = {Items: [{Id: 'movie-1'}]};
+				return ParentId === 'box-mine'
+					? new Promise((resolve) => setTimeout(() => resolve(reply), 20))
+					: Promise.resolve(reply);
+			}
+		};
 		const found = await findParentCollections(api, {Id: 'movie-1'});
 		expect(found.map((c) => c.Id)).toEqual(['box-mine', 'box-ace']);
 	});
