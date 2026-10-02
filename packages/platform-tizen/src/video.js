@@ -10,8 +10,6 @@ let isAVPlayAvailable = false;
 
 const DEFAULT_PASSTHROUGH_SETTINGS = {
 	passthroughEnabled: true,
-	ac3Passthrough: true,
-	eac3Passthrough: true,
 	dtsPassthrough: true,
 	dtshdPassthrough: true,
 	truehdPassthrough: true
@@ -142,8 +140,9 @@ export const getSupportedAudioCodecs = (capabilities, _container, passthroughOpt
 	const passthrough = resolvePassthroughSettings(passthroughOptions);
 	const passthroughAllowed = passthrough.passthroughEnabled;
 	const codecs = ['aac', 'mp3', 'flac', 'vorbis', 'pcm', 'wav'];
-	if (capabilities.ac3 && passthrough.ac3Passthrough) codecs.push('ac3');
-	if (capabilities.eac3 && passthrough.eac3Passthrough) codecs.push('eac3');
+	// Left alone by the passthrough settings, same as the device profile
+	if (capabilities.ac3) codecs.push('ac3');
+	if (capabilities.eac3) codecs.push('eac3');
 	if (capabilities.opus) codecs.push('opus');
 	if (capabilities.truehd && passthroughAllowed && passthrough.truehdPassthrough) codecs.push('truehd', 'mlp');
 	// DTS: Samsung explicitly states not supported on any TV (2018-2025)
@@ -939,6 +938,16 @@ export const avplayGetTracks = () => {
 	}
 };
 
+export const avplayGetCurrentTracks = () => {
+	if (!isAVPlayAvailable) return [];
+	try {
+		return webapis.avplay.getCurrentStreamInfo();
+	} catch (e) {
+		console.warn('[tizenVideo] Failed to get current stream info:', e);
+		return [];
+	}
+};
+
 export const avplaySelectTrack = (type, index) => {
 	if (!isAVPlayAvailable) return;
 	try {
@@ -1143,6 +1152,7 @@ export default {
 	avplaySetSilentSubtitle,
 	avplaySetStreamingProperty,
 	avplayGetTracks,
+	avplayGetCurrentTracks,
 	avplaySetDisplayMethod,
 	cleanupAVPlay
 };
