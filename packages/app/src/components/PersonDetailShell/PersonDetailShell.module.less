@@ -48,6 +48,12 @@
 	flex-direction: column;
 }
 
+// A docked sidebar is drawn over the page, so the portrait, tabs, and everything
+// below start clear of it - matches Details' and Browse's own sidebarOffset.
+.sidebarOffset {
+	padding-left: 174px;
+}
+
 .personInfo {
 	display: flex;
 	// The list below takes whatever height is left, so this must not give any up.
