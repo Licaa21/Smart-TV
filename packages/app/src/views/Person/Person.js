@@ -75,12 +75,15 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	// the credits have answered, so the picture never changes once it is up.
 	const randomBackdrop = useMemo(() => {
 		if (!creditsSettled) return null;
-		if (backdropPath) return seerrApi.getImageUrl(backdropPath, 'w1280');
+		// This is the one backdrop on screen, not a grid of many, so it can afford TMDB's
+		// 'original' size - 'w1280' is under 1080p and the CSS covers the full screen with
+		// it, so anything smaller than the screen gets visibly upscaled and goes soft.
+		if (backdropPath) return seerrApi.getImageUrl(backdropPath, 'original');
 		const rated = [...movies, ...series]
 			.filter((f) => f.BackdropImageTags?.length > 0)
 			.map((f, index) => ({f, index}))
 			.sort((a, b) => ((b.f.CommunityRating || 0) - (a.f.CommunityRating || 0)) || (a.index - b.index));
-		return rated.length ? getImageUrl(serverUrl, rated[0].f.Id, 'Backdrop', {maxWidth: 1920}) : null;
+		return rated.length ? getImageUrl(serverUrl, rated[0].f.Id, 'Backdrop', {maxWidth: 1920, quality: 90}) : null;
 	}, [creditsSettled, backdropPath, movies, series, serverUrl]);
 
 	const tabs = useMemo(() => {

@@ -56,11 +56,15 @@ const SeerrPerson = ({personId, personName, onClose, onSelectItem, onBack}) => {
 	// Same idea as the native Person screen: pull a backdrop from whatever this person has
 	// been in, rather than leaving the screen flat. TMDB credits carry their own backdrop
 	// per title, so there is no need to go fetch one separately.
+	//
+	// 'original' rather than the app's usual 'w1280': this is the one backdrop on screen,
+	// not a grid of many, so it can afford it - 'w1280' is under 1080p and the CSS covers
+	// the full screen with it, so anything smaller than the screen gets visibly upscaled.
 	const backdropCandidates = useMemo(() => {
 		const urls = [];
 		for (const item of [...(rawCast || []), ...(rawCrew || [])]) {
 			const backdropPath = item.backdropPath || item.backdrop_path;
-			if (backdropPath) urls.push(seerrApi.getImageUrl(backdropPath, 'w1280'));
+			if (backdropPath) urls.push(seerrApi.getImageUrl(backdropPath, 'original'));
 		}
 		return urls;
 	}, [rawCast, rawCrew]);
@@ -68,7 +72,7 @@ const SeerrPerson = ({personId, personName, onClose, onSelectItem, onBack}) => {
 	// The title they are best known for, or anything with a backdrop when nothing qualifies.
 	const randomBackdrop = useMemo(() => {
 		const popular = popularBackdropPath(rawCast);
-		if (popular) return seerrApi.getImageUrl(popular, 'w1280');
+		if (popular) return seerrApi.getImageUrl(popular, 'original');
 		return backdropCandidates[0] || null;
 	}, [rawCast, backdropCandidates]);
 
