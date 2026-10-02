@@ -271,8 +271,13 @@ describe('per-surface accents', () => {
 		it('keeps the focused fill and the rest of Settings apart, so each takes only its own pick', () => {
 			const focusOnly = rulesFor({settingsFocus: '#ffffff'});
 			expect(focusRule(focusOnly, '.themeCard:focus')).toContain('background: rgb(255, 255, 255)');
-			// The toggles and the icon tints are the rest of the screen, and stay the theme's.
-			expect(withHandRule(focusOnly, '.toggleOn')).toContain('rgb(0, 164, 220)');
+			// The theme's own cyan only reads at 2.86:1 against white, under the 3:1 floor, so
+			// picking white for Settings Focus alone (with no pick of its own for Settings) is
+			// already enough to nudge the toggle just off the theme's blue to stay visible on it -
+			// not snapped to the focus pick itself, which would be a much bigger jump than this.
+			const toggleOnFocusWhite = withHandRule(focusOnly, '.toggleOn');
+			expect(toggleOnFocusWhite).not.toContain('rgb(0, 164, 220)');
+			expect(toggleOnFocusWhite).not.toContain('rgb(255, 255, 255)');
 
 			const restOnly = rulesFor({settings: '#ff0000'});
 			expect(withHandRule(restOnly, '.toggleOn')).toContain('rgb(255, 0, 0)');
