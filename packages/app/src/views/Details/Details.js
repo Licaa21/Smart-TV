@@ -912,12 +912,12 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	const hasPlaybackPosition = item.UserData?.PlaybackPositionTicks > 0;
 	const resumeTimeText = hasPlaybackPosition ? formatDuration(item.UserData.PlaybackPositionTicks) : '';
 
-	// Modern and Classic show one collection and merge the missing titles into its list, so
-	// the first of them is flattened back into the shape those two take.
-	const parentCollection = parentCollections[0]
-		? mergeCollectionWithMissing(parentCollections[0].items, parentCollections[0].missingItems)
-		: [];
-	const parentCollectionName = parentCollections[0]?.name || '';
+	// Modern and Classic list each collection with its missing titles merged in.
+	const collectionSections = parentCollections.map((collection) => ({
+		id: collection.id,
+		name: collection.name,
+		items: mergeCollectionWithMissing(collection.items, collection.missingItems)
+	}));
 
 	// Reordering needs an entry id per track, which only a real playlist carries.
 	const canManagePlaylist = isPlaylist && playlistItems.length > 0 &&
@@ -1046,8 +1046,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					crew={detailCrew}
 					nextUp={nextUp}
 					collectionItems={collectionItems}
-					parentCollection={parentCollection}
-					parentCollectionName={parentCollectionName}
+					collectionSections={collectionSections}
 					albumTracks={albumTracks}
 					artistAlbums={artistAlbums}
 					playlistItems={playlistItems}
@@ -1311,8 +1310,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 				extras={extras}
 				cast={detailCast}
 				crew={detailCrew}
-				parentCollection={parentCollection}
-				parentCollectionName={parentCollectionName}
+				collectionSections={collectionSections}
 				similar={similar}
 				onSeasonSelect={handleSeasonSelect}
 				onEpisodeSelect={handleEpisodeSelect}

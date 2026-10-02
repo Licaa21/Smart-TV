@@ -68,6 +68,31 @@ test('preserves remote Unicode without the local keyboard encoding workaround', 
 	expect(mockApi.search).toHaveBeenCalledWith('Ã© 日本語 🦞', expect.any(Number));
 });
 
+test('opening the receiver keyboard does not end phone typing', async () => {
+	const search = createRemoteSearch('phone');
+	render(<Search remoteSearch={search} />);
+	const input = screen.getByRole('textbox');
+	fireEvent.keyDown(input, {keyCode: 13});
+	fireEvent.click(input);
+	expect(search.active).toBe(true);
+	act(() => search.receive({String: 'alien', MoonfinInputId: 'phone', MoonfinRevision: '1'}));
+	expect(input.value).toBe('alien');
+	await act(async () => { jest.advanceTimersByTime(450); });
+	expect(mockApi.search).toHaveBeenCalledWith('alien', expect.any(Number));
+});
+
+test('a phone edit over the system keyboard hands focus back to the search field', () => {
+	const search = createRemoteSearch('phone');
+	render(<Search remoteSearch={search} />);
+	const input = screen.getByRole('textbox');
+	input.focus();
+	Spotlight.focus.mockClear();
+	act(() => search.receive({String: 'alien', MoonfinInputId: 'phone', MoonfinRevision: '1'}));
+	expect(document.activeElement).not.toBe(input);
+	expect(Spotlight.focus).toHaveBeenCalledWith('search-input');
+	expect(input.value).toBe('alien');
+});
+
 test('clear discards results from a request that completes after the clear', async () => {
 	let finish;
 	mockApi.search.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));

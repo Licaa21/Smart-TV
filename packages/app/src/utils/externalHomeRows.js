@@ -4,6 +4,7 @@ import {fetchCustomRow, constructSourceUrl} from '../services/externalRowsApi';
 import {fetchWithTimeout} from './fetchTimeout';
 
 const HOME_ROW_LIMIT = 20;
+const VALIDATE_TIMEOUT_MS = 45000;
 
 // The 13 TMDB chart presets. `type` is the literal TMDB API path the plugin
 // proxies (source=tmdb_chart).
@@ -388,9 +389,15 @@ export const fetchCalendarRows = async (settings, {radarrEnabled = false, sonarr
 	return rows;
 };
 
-// Validates a configured custom row by fetching it. Returns {ok} or {error}.
+// Validates a configured custom row by fetching it. Returns {ok} or {error}. The first
+// fetch of a large list can take the server a while, so this waits longer than a home
+// row. It doesn't force a refresh either, so a retry gets the copy the server cached
+// after an earlier attempt gave up.
 export const validateCustomRow = async (row) => {
-	const items = await fetchCustomRow({source: row.source, type: row.type, params: row.params}, {forceRefresh: true});
+	const items = await fetchCustomRow(
+		{source: row.source, type: row.type, params: row.params},
+		{timeoutMs: VALIDATE_TIMEOUT_MS}
+	);
 	if (items.length > 0) return {ok: true};
 	return {error: $L('That list returned no items. Check the URL: {url}').replace('{url}', constructSourceUrl(row.source, row.type, row.params))};
 };

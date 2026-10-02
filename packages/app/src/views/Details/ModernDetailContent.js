@@ -59,7 +59,7 @@ const ModernDetailContent = (props) => {
 		isEpisode, isSeries, isSeason, isPerson, isBoxSet, isAlbum, isMusicArtist, isPlaylist,
 		backdropUrl, posterUrl, logoUrl, onLogoError,
 		year, runtime, endsAt, officialRating, seasonCount, genres, tagline,
-		seasons, episodes, similar, extras, cast, crew = [], nextUp, collectionItems, parentCollection = [], parentCollectionName, albumTracks, artistAlbums, playlistItems, personMovies, personSeries, birthDate, birthPlace, episodeRatings,
+		seasons, episodes, similar, extras, cast, crew = [], nextUp, collectionItems, collectionSections = [], albumTracks, artistAlbums, playlistItems, personMovies, personSeries, birthDate, birthPlace, episodeRatings,
 		techBadges = [], techSize, overviewBackRef,
 		mediaSource, supportsMediaSourceSelection, selectedAudioIndex, selectedSubtitleIndex,
 		handleChapterSelect, handleExtraSelect, handleTrackPlay,
@@ -252,6 +252,7 @@ const ModernDetailContent = (props) => {
 		if (name) onSelectStudio?.(name);
 	}, [onSelectStudio]);
 
+	const collectionTabLabel = collectionSections.length > 1 ? $L('Collections') : collectionSections[0]?.name;
 	// Tabs are data-driven, appearing only when their data is present.
 	const tabs = useMemo(() => {
 		const list = [];
@@ -270,11 +271,11 @@ const ModernDetailContent = (props) => {
 		if (item.Chapters?.length) list.push({id: 'chapters', label: $L('Chapters')});
 		if (extras.length) list.push({id: 'extras', label: $L('Extras')});
 		if (supportsMediaSourceSelection && mediaSource?.MediaStreams?.length) list.push({id: 'details', label: $L('Details')});
-		if (parentCollection.length) list.push({id: 'collection', label: parentCollectionName || $L('Collection')});
+		if (collectionSections.length) list.push({id: 'collection', label: collectionTabLabel});
 		if (similar.length) list.push({id: 'similar', label: $L('More Like This')});
 		if (seerr.hasTabContent) list.push({id: 'seerr', label: seerr.displayName});
 		return list;
-	}, [isSeries, seasons.length, isSeason, isEpisode, episodes.length, isPerson, personMovies.length, personSeries.length, isAlbum, isPlaylist, albumTracks.length, playlistItems.length, isMusicArtist, artistAlbums.length, isBoxSet, collectionItems.length, parentCollection.length, parentCollectionName, cast.length, crew.length, item.Studios, item.Chapters, extras.length, supportsMediaSourceSelection, mediaSource, similar.length, seerr.hasTabContent, seerr.displayName]);
+	}, [isSeries, seasons.length, isSeason, isEpisode, episodes.length, isPerson, personMovies.length, personSeries.length, isAlbum, isPlaylist, albumTracks.length, playlistItems.length, isMusicArtist, artistAlbums.length, isBoxSet, collectionItems.length, collectionSections.length, collectionTabLabel, cast.length, crew.length, item.Studios, item.Chapters, extras.length, supportsMediaSourceSelection, mediaSource, similar.length, seerr.hasTabContent, seerr.displayName]);
 
 	const [activeTab, setActiveTab] = useState(null);
 	// Expanded Tabs on keeps the first tab open and lets focus follow selection.
@@ -484,7 +485,7 @@ const ModernDetailContent = (props) => {
 	// heading instead, so the row keeps its name. The page already holds its top padding
 	// clear of the navbar, so the heading is left the same room the first row gets. It animates
 	// because Enact's own scroll is still running here, and a jump would cut it off.
-	const handleSeerrRowFocus = useCallback((ev) => {
+	const handleSectionFocus = useCallback((ev) => {
 		const section = ev.currentTarget;
 		const card = ev.target.closest('.spottable');
 		const heading = section.firstElementChild;
@@ -504,19 +505,19 @@ const ModernDetailContent = (props) => {
 	// Everything Seerr adds to a title, in one tab: where it is filed, the production facts,
 	// what it is like, and the collection it belongs to.
 	const renderSeerrTab = () => (
-		<div className={css.seerrTab}>
+		<div className={css.sectionStack}>
 			<SeerrChips details={seerr.details} mediaType={seerr.mediaType} seerrNav={seerrNav} />
 			<SeerrCollectionBanner collection={seerr.details?.collection} onOpen={seerrNav?.onOpenCollection} />
 			<SeerrFacts details={seerr.details} mediaType={seerr.mediaType} />
 			{seerr.recommendationCards.length > 0 && (
-				<div onFocus={handleSeerrRowFocus}>
-					<h3 className={css.seerrHeading}>{$L('Recommendations')}</h3>
+				<div onFocus={handleSectionFocus}>
+					<h3 className={css.sectionHeading}>{$L('Recommendations')}</h3>
 					{renderGrid(seerr.recommendationCards, 'portrait', onSelectSeerrCard)}
 				</div>
 			)}
 			{seerr.similarCards.length > 0 && (
-				<div onFocus={handleSeerrRowFocus}>
-					<h3 className={css.seerrHeading}>{$L('Similar')}</h3>
+				<div onFocus={handleSectionFocus}>
+					<h3 className={css.sectionHeading}>{$L('Similar')}</h3>
 					{renderGrid(seerr.similarCards, 'portrait', onSelectSeerrCard)}
 				</div>
 			)}
@@ -538,7 +539,17 @@ const ModernDetailContent = (props) => {
 			case 'items':
 				return renderGrid(collectionItems, 'portrait', onSelectItem, collectionMenu);
 			case 'collection':
-				return renderGrid(parentCollection, 'portrait');
+				if (collectionSections.length === 1) return renderGrid(collectionSections[0].items, 'portrait');
+				return (
+					<div className={css.sectionStack}>
+						{collectionSections.map((section) => (
+							<div key={section.id} onFocus={handleSectionFocus}>
+								<h3 className={css.sectionHeading}>{section.name}</h3>
+								{renderGrid(section.items, 'portrait')}
+							</div>
+						))}
+					</div>
+				);
 			case 'similar':
 				return renderGrid(similar, 'portrait');
 			case 'cast':

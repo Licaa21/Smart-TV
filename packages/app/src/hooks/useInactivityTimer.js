@@ -2,6 +2,8 @@ import {useState, useEffect, useCallback, useRef} from 'react';
 
 const useInactivityTimer = (timeoutSeconds = 90, enabled = true) => {
 	const [isInactive, setIsInactive] = useState(false);
+	const inactiveRef = useRef(false);
+	inactiveRef.current = isInactive;
 	const timerRef = useRef(null);
 	const enabledRef = useRef(enabled);
 	const timeoutRef = useRef(timeoutSeconds);
@@ -10,6 +12,8 @@ const useInactivityTimer = (timeoutSeconds = 90, enabled = true) => {
 	timeoutRef.current = timeoutSeconds;
 
 	const dismiss = useCallback(() => {
+		if (timerRef.current) clearTimeout(timerRef.current);
+		inactiveRef.current = false;
 		setIsInactive(false);
 		if (enabledRef.current) {
 			timerRef.current = setTimeout(() => {
@@ -17,6 +21,12 @@ const useInactivityTimer = (timeoutSeconds = 90, enabled = true) => {
 			}, timeoutRef.current * 1000);
 		}
 	}, []);
+
+	const wake = useCallback(() => {
+		if (!inactiveRef.current) return false;
+		dismiss();
+		return true;
+	}, [dismiss]);
 
 	useEffect(() => {
 		if (!enabled) {
@@ -29,6 +39,7 @@ const useInactivityTimer = (timeoutSeconds = 90, enabled = true) => {
 		}
 
 		const handleActivity = () => {
+			inactiveRef.current = false;
 			if (timerRef.current) {
 				clearTimeout(timerRef.current);
 			}
@@ -54,7 +65,7 @@ const useInactivityTimer = (timeoutSeconds = 90, enabled = true) => {
 		};
 	}, [enabled]);
 
-	return {isInactive, dismiss};
+	return {isInactive, dismiss, wake};
 };
 
 export default useInactivityTimer;
