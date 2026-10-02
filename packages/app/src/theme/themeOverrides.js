@@ -182,7 +182,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		const value = picked[id] || c.accent;
 		const rgb = toRgbTriplet(value);
 		const ink = picked[id] ? readableInk(value, c.onAccent) : onAccent;
-		return {css: toCssColor(value), on: ink, a: (alpha) => `rgba(${rgb}, ${alpha})`};
+		return {css: toCssColor(value), hex: value, on: ink, a: (alpha) => `rgba(${rgb}, ${alpha})`};
 	};
 	const navAccent = makeAccent('navigation');
 	const settingsAccent = makeAccent('settings');
@@ -254,13 +254,14 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		const hex = picked[id];
 		if (!hex) {
 			return {
-				fill: toCssColor(tileFocusFill), strong: invertedStrong, soft: invertedSoft, button: buttonFocused, buttonInk,
+				fill: toCssColor(tileFocusFill), fillHex: tileFocusFill, strong: invertedStrong, soft: invertedSoft, button: buttonFocused, buttonInk,
 				active: buttonActive, activeInk: toCssColor(c.onButtonNormal), bar: rangeProgress
 			};
 		}
 		const ink = inkOn(hex);
 		return {
 			fill: toCssColor(hex),
+			fillHex: hex,
 			strong: `rgba(${ink}, 0.96)`,
 			soft: `rgba(${ink}, 0.78)`,
 			button: toCssColor(hex),
@@ -352,14 +353,31 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${achievementsCss.reward}`, `color: ${achievementsAccent.css};`);
 	rule(`.${settingsCss.listItem}:focus .${achievementsCss.points}, .${settingsCss.listItem}:focus .${achievementsCss.progressText}`, `color: ${settingsFocus.soft};`);
 	rule(`.${settingsCss.listItem}:focus .${achievementsCss.boardValue}, .${settingsCss.listItem}:focus .${achievementsCss.rankGutter}, .${settingsCss.listItem}:focus .${achievementsCss.reward}`, `color: ${settingsFocus.strong};`);
+	// The toggle's "on" fill, the toggle's thumb once on, and the radio dot all draw from the
+	// Settings accent - same as any other accent-colored mark - but they sit on this row's own
+	// fill, which is a *different*, separately-pickable accent (Settings Focus). Pick the two
+	// the same, or just close, and the mark reads fine resting but all but disappears once the
+	// row focuses. Only matters once Settings Focus is actually picked away from the theme's
+	// own default fill - that default is the theme author's own choice to balance against the
+	// theme's own accent, not something to second-guess here. Nudged just enough to stay visible
+	// against both the resting list-item fill and the focused one when it is picked, left
+	// untouched otherwise - the same approach every other accent already gets against the
+	// surfaces it is drawn on.
+	const settingsMarkHex = picked.settingsFocus
+		? ensureVisible(settingsAccent.hex, [c.surface, settingsFocus.fillHex])
+		: settingsAccent.hex;
+	const settingsMark = toCssColor(settingsMarkHex);
+	const settingsMarkInk = readableInk(settingsMarkHex, c.onAccent);
 	rule(`.${settingsCss.toggleTrack}`, `background: ${surfaceVariant};`);
-	rule(`.${settingsCss.toggleOn}`, `background: ${settingsAccent.css};`);
+	rule(`.${settingsCss.toggleOn}`, `background: ${settingsMark};`);
 	rule(`.${settingsCss.toggleThumb}`, `background: ${onSurface};`);
-	rule(`.${settingsCss.toggleOn} .${settingsCss.toggleThumb}`, `background: ${settingsAccent.on};`);
+	rule(`.${settingsCss.toggleOn} .${settingsCss.toggleThumb}`, `background: ${settingsMarkInk};`);
 	rule(`.${settingsCss.radioOuter}`, `border-color: ${os(0.35)};`);
-	rule(`.${settingsCss.listItem}:focus .${settingsCss.radioOuter}`, `border-color: rgba(0, 0, 0, 0.35);`);
-	rule(`.${settingsCss.radioSelected}`, `border-color: ${settingsAccent.css};`);
-	rule(`.${settingsCss.radioInner}`, `background: ${settingsAccent.css};`);
+	// Was a flat rgba(0,0,0,0.35) - only reads against a *light* focused fill, and goes
+	// invisible the same way if the picked Settings Focus accent is dark instead.
+	rule(`.${settingsCss.listItem}:focus .${settingsCss.radioOuter}`, `border-color: rgba(${inkOn(settingsFocus.fillHex)}, 0.35);`);
+	rule(`.${settingsCss.radioSelected}`, `border-color: ${settingsMark};`);
+	rule(`.${settingsCss.radioInner}`, `background: ${settingsMark};`);
 	rule(`.${settingsCss.settingsSlider}`, `--slider-active-bg-color: ${settingsAccent.css}; --slider-knob-bg-color: ${onSurface};`);
 	rule(`.${settingsCss.divider}`, `background: ${os(0.12)};`);
 	rule(`.${settingsCss.actionBar}`, `border-top-color: ${os(0.12)};`);
