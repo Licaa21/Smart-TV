@@ -496,8 +496,11 @@ export const ensureVisible = (hex, backgrounds, minContrast = MIN_BUTTON_CONTRAS
 	const target = overDark ? [255, 255, 255] : [0, 0, 0];
 	const start = toRgbTriplet(hex).split(', ').map(Number);
 	let current = toHex6(start);
+	// Capped at 1: MIX_STEP * MIX_STEPS is 1.6, and past 1 this extrapolates beyond the
+	// target instead of stopping there, which can push a channel outside 0-255 and hand
+	// toHex6 a negative number it has no way to render as a hex pair.
 	for (let step = 1; step <= MIX_STEPS && worst(current) < minContrast; step += 1) {
-		current = toHex6(mixToward(start, target, MIX_STEP * step));
+		current = toHex6(mixToward(start, target, Math.min(1, MIX_STEP * step)));
 	}
 	return current;
 };
