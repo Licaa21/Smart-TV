@@ -167,6 +167,30 @@ describe('seerrMissingCollectionItems', () => {
 			})).toEqual([]);
 		});
 
+		test('a set borrowing its TMDB id from a member needs most of its films in that franchise', async () => {
+			seerrApi.getCollection.mockResolvedValue(seerrCollectionResponse);
+			const category = [
+				{Id: 'c1', Name: 'Critters', Type: 'Movie', ProviderIds: {Tmdb: '1001', TmdbCollection: '1000'}},
+				{Id: 'c2', Name: 'Critters 2', Type: 'Movie', ProviderIds: {Tmdb: '1002'}},
+				{Id: 'c3', Name: 'The Matrix', Type: 'Movie', ProviderIds: {Tmdb: '603'}},
+				{Id: 'c4', Name: 'Inception', Type: 'Movie', ProviderIds: {Tmdb: '27205'}},
+				{Id: 'c5', Name: 'Heat', Type: 'Movie', ProviderIds: {Tmdb: '949'}}
+			];
+
+			expect(await fetchMissingCollectionItems({
+				boxSet: {Id: 'category'},
+				members: category,
+				settings: {seerrShowMissingCollectionItems: true}
+			})).toEqual([]);
+
+			const items = await fetchMissingCollectionItems({
+				boxSet: {Id: 'mine'},
+				members: category.slice(0, 3),
+				settings: {seerrShowMissingCollectionItems: true}
+			});
+			expect(items.map((i) => i.Name)).toEqual(['Critters 3', 'Critters 4', 'Critters Attack!']);
+		});
+
 		test('one match carries a single film set, and two are needed past that', async () => {
 			seerrApi.getCollection.mockResolvedValue(seerrCollectionResponse);
 			const oneFilm = [{Id: 'm1', Name: 'Critters', Type: 'Movie', ProviderIds: {Tmdb: '1001'}}];
