@@ -475,7 +475,10 @@ async function main() {
 	if (fs.existsSync(indexPath)) {
 		let html = fs.readFileSync(indexPath, 'utf8');
 		
-		const preBootPatches = `<script>
+		// Samsung asks every app to load this. Newer firmware hands out webapis without it,
+		// but older sets can leave productinfo and avinfo out until the page loads it.
+		const preBootPatches = `<script src="$WEBAPIS/webapis/webapis.js"></script>
+<script>
 // globalThis polyfill
 (function() {
 	if (typeof globalThis === 'undefined') {
@@ -521,7 +524,7 @@ async function main() {
 `;
 		html = html.replace(/<script defer="defer" src="main\.js"><\/script>/, preBootPatches + '<script defer="defer" src="main.js"></script>');
 		fs.writeFileSync(indexPath, html);
-		success('Patched index.html (globalThis polyfill + XHR mock)');
+		success('Patched index.html (webapis + globalThis polyfill + XHR mock)');
 	}
 
 	if (isLegacy) {
