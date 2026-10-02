@@ -9,10 +9,14 @@ export const providerId = (item, name) => {
 	return key ? String(ids[key] ?? '').trim() : '';
 };
 
+const ownCollectionTmdbId = (boxSet) => {
+	const id = parseInt(providerId(boxSet, 'tmdb') || providerId(boxSet, 'tmdbcollection'), 10);
+	return Number.isFinite(id) && id > 0 ? id : null;
+};
+
 export const resolveCollectionTmdbId = async (boxSet, members = []) => {
-	const ownTmdb = providerId(boxSet, 'tmdb') || providerId(boxSet, 'tmdbcollection');
-	const ownId = parseInt(ownTmdb, 10);
-	if (Number.isFinite(ownId) && ownId > 0) return ownId;
+	const ownId = ownCollectionTmdbId(boxSet);
+	if (ownId) return ownId;
 
 	// Check if any member has tmdbcollection
 	for (const m of members) {
@@ -95,6 +99,9 @@ export const fetchMissingCollectionItems = async ({boxSet, members = [], setting
 		// a whole franchise.
 		if (overlap === 0) return [];
 		if (movieCount > 1 && overlap < 2) return [];
+		// A set with no TMDB id of its own only borrowed one from a member, so a category
+		// holding a couple of the films isnt taken for the franchise. Most of it has to be.
+		if (!ownCollectionTmdbId(boxSet) && overlap * 2 < movieCount) return [];
 
 		const missingParts = parts.filter((part) =>
 			!libraryTmdbIds.has(String(part.id)) &&

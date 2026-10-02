@@ -3,13 +3,13 @@
 
 import $L from '@enact/i18n/$L';
 import {scopedGetItems} from '../../services/libraryScope';
-import {withoutBlockedItems} from '../../services/parentalControls';
 import {genericCollectionLabel, mergeRecentRows} from '../../utils/mergeRecentRows';
 import {latestMediaFetchLimitForCollection, normalizeLatestMediaItems} from '../../utils/latestMediaRowNormalizer';
 
 import {HOME_ROW_ITEM_FIELDS} from '../../services/jellyfinApi';
 import {loadSinceYouWatchedRows, loadRewatchItems} from '../../services/homeRecommendations';
 import {FAVORITE_ROW_CONFIGS, getItemGenreNames, parsePluginSpec, stableIndex} from './browseFilters';
+import {loadCollectionRowItems} from './collectionRowItems';
 import {apiSortBy, getGenresIncludeTypes, isPlaylistOrder, resolveSortOrder} from '../../utils/homeRowSorting';
 
 // The sort settings and enabled flags every loader reads, worked out once rather than by each
@@ -58,32 +58,6 @@ export const buildLoaderContext = ({api, settings, homeRowsConfig, eligibleLibra
 			.filter((idx) => idx >= 1)
 			.sort((a, b) => a - b)
 	};
-};
-
-// Replaces each series with its episodes for the collection rows that asked for
-// it, keeping movies and anything else where they were.
-const expandSeriesToEpisodes = async (api, items, limit) => {
-	const expanded = await Promise.all(items.map(async (item) => {
-		if (item?.Type !== 'Series') return [item];
-		try {
-			const result = await api.getItems({
-				ParentId: item.Id,
-				IncludeItemTypes: 'Episode',
-				Recursive: true,
-				SortBy: 'ParentIndexNumber,IndexNumber',
-				SortOrder: 'Ascending',
-				Limit: limit,
-				Fields: HOME_ROW_ITEM_FIELDS
-			});
-			const episodes = result?.Items || [];
-			if (!episodes.length) return [item];
-			// Not a fallback to the series card, or a blocked series would come back as one.
-			return withoutBlockedItems(episodes, item.OfficialRating);
-		} catch (_error) {
-			return [item];
-		}
-	}));
-	return [].concat(...expanded).slice(0, limit);
 };
 
 // A playlist opens into the things it holds. Playlist order comes from the
@@ -557,17 +531,13 @@ const loadPluginsAndRecos = async (ctx) => {
 						items = [];
 						break;
 					}
-					const usesArrangement = isPlaylistOrder(settings.collectionsRowSortBy);
-					const result = await api.getCollectionItems(
-						collectionId,
+					items = await loadCollectionRowItems(api, collectionId, {
 						limit,
-						usesArrangement ? null : collectionsSortBy,
-						collectionsSortOrder
-					);
-					items = result?.Items || [];
-					if (settings.collectionsRowShowEpisodes) {
-						items = await expandSeriesToEpisodes(api, items, limit);
-					}
+						usePlaylistOrder: isPlaylistOrder(settings.collectionsRowSortBy),
+						sortBy: collectionsSortBy,
+						sortOrder: collectionsSortOrder,
+						showEpisodes: settings.collectionsRowShowEpisodes
+					});
 					break;
 				}
 				case 'genre': {

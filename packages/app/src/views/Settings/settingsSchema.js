@@ -127,6 +127,8 @@ const whenScreensaverComponent = (ctx) => ctx.settings.screensaverEnabled && ctx
 const whenScreensaverStatic = (ctx) => whenScreensaverComponent(ctx) && ctx.settings.screensaverMovement === 'staticCorner';
 const whenLoadingAnimation = (ctx) => ctx.settings.loadingAnimationImage !== 'none';
 const whenPassthrough = (ctx) => ctx.settings.audioPassthroughMode === 'manual';
+// Samsung sets decode AC3 and E-AC3 themselves, so these two toggles only do anything on webOS
+const whenWebOSPassthrough = (ctx) => whenPassthrough(ctx) && ctx.isWebOS;
 const whenSyncCorrection = (ctx) => ctx.settings.syncPlayAdvancedCorrectionEnabled !== false;
 
 const countLabel = (count) => $L('{count} selected').replace('{count}', String(count));
@@ -644,8 +646,8 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.TOGGLE, key: 'downmixToStereo', label: () => $L('Downmix to Stereo'), desc: () => $L('Reduce multichannel audio to two channels'), icon: 'speaker'},
 					{kind: KIND.TOGGLE, key: 'stereoUpmixEnabled', label: () => $L('Stereo to Surround Upmix'), desc: () => $L('Upmix stereo audio to 5.1 surround via server transcoding'), icon: 'equalizer', when: (ctx) => !ctx.settings.downmixToStereo},
 					{kind: KIND.SECTION, id: 'passthroughSettings', label: () => $L('Passthrough Settings'), when: whenPassthrough},
-					{kind: KIND.TOGGLE, key: 'ac3Passthrough', label: () => $L('AC3 Passthrough'), desc: () => $L('Allow Dolby Digital passthrough when available'), icon: 'speaker', when: whenPassthrough},
-					{kind: KIND.TOGGLE, key: 'eac3Passthrough', label: () => $L('EAC3 Passthrough'), desc: () => $L('Allow Dolby Digital Plus passthrough when available'), icon: 'surround', when: whenPassthrough},
+					{kind: KIND.TOGGLE, key: 'ac3Passthrough', label: () => $L('AC3 Passthrough'), desc: () => $L('Allow Dolby Digital passthrough when available'), icon: 'speaker', when: whenWebOSPassthrough},
+					{kind: KIND.TOGGLE, key: 'eac3Passthrough', label: () => $L('EAC3 Passthrough'), desc: () => $L('Allow Dolby Digital Plus passthrough when available'), icon: 'surround', when: whenWebOSPassthrough},
 					{kind: KIND.TOGGLE, key: 'dtsPassthrough', label: () => $L('DTS Passthrough'), desc: () => $L('Allow DTS passthrough when available'), icon: 'audiotrack', when: whenPassthrough},
 					{kind: KIND.TOGGLE, key: 'dtshdPassthrough', label: () => $L('DTS-HD MA Passthrough'), desc: () => $L('Allow DTS-HD and DTS:X passthrough when available'), icon: 'quality', when: whenPassthrough},
 					{kind: KIND.TOGGLE, key: 'truehdPassthrough', label: () => $L('TrueHD Passthrough (Experimental)'), desc: () => $L('Allow Dolby TrueHD passthrough when available'), icon: 'graphic_eq', when: whenPassthrough},

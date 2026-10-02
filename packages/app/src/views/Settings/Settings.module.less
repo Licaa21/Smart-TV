@@ -1,5 +1,14 @@
 @import '../../styles/mixins.less';
 
+// Low and mid tier sets redraw every frame of a focus fade, which is most of what
+// makes moving through these lists stutter there.
+.noFocusFade() {
+:global(.perf-low) &,
+:global(.perf-mid) & {
+transition: none;
+}
+}
+
 .page {
 position: fixed;
 top: 0;
@@ -70,6 +79,7 @@ margin-bottom: 4px;
 cursor: pointer;
 transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 border: 2px solid transparent;
+.noFocusFade();
 
 &:focus {
 outline: none;
@@ -224,6 +234,7 @@ border-radius: 12px;
 margin-bottom: 4px;
 border: 2px solid transparent;
 transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+.noFocusFade();
 
 &:focus-within {
 background: var(--theme-surface-variant, #1e1e1e);
@@ -256,6 +267,11 @@ font-weight: 500;
 width: 100%;
 --slider-active-bg-color: var(--accent-color, #00a4dc);
 --slider-knob-bg-color: var(--theme-on-surface, #fff);
+}
+
+// Sandstone grows the knob each time the slider takes focus
+.sliderContainer .sliderKnob::before {
+.noFocusFade();
 }
 
 .divider {
@@ -345,6 +361,7 @@ border-radius: 12px;
 border: 2px solid transparent;
 cursor: pointer;
 transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+.noFocusFade();
 position: relative;
 
 &:focus {
@@ -420,6 +437,7 @@ border: 2px solid var(--theme-border-color, #333);
 border-radius: 10px;
 cursor: pointer;
 transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+.noFocusFade();
 
 &:focus {
 outline: none;
