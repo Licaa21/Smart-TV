@@ -93,6 +93,10 @@ const RELOAD_RETRY_DELAYS = [5000, 10000, 20000];
 // callback - on some Tizen 9 sets that callback never fires at all, so without a
 // bound this hangs forever with no error screen and nothing left to press.
 const RESTORE_TIMEOUT_MS = 6000;
+// Also used to tell this error apart from any other (file-format failures, etc.) so
+// only this one gets the Retry button, defaults focus to it instead of Go Back, and
+// is still a valid $L() key since it's a plain string, just shared instead of inlined.
+const RELOAD_FAILED_MESSAGE = "Playback didn't resume automatically. Select Retry to try again.";
 const RELOAD_RETRY_MAX_DELAY_MS = 30000;
 const reloadRetryDelay = (attempt) => RELOAD_RETRY_DELAYS[attempt] ?? RELOAD_RETRY_MAX_DELAY_MS;
 
@@ -916,7 +920,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				setError(null);
 				return;
 			}
-			setError($L("Playback didn't resume automatically. Press any button to try again."));
+			setError($L(RELOAD_FAILED_MESSAGE));
 			// The reload itself keeps running even after the timeout gives up
 			// waiting on it - a heavy transcode negotiation, or a network stack
 			// still catching up after a long standby, can legitimately take
@@ -3159,10 +3163,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	// The error view has nothing else on screen to hold focus, so without this,
 	// whatever was focused before the error appeared (which may no longer even be
-	// on screen) keeps it, and Go Back never receives the OK press at all.
+	// on screen) keeps it, and neither button ever receives the OK press at all.
+	//
+	// The reload-failed error defaults to Retry, not Go Back - a reload failing is
+	// the one error here with a real "try again" action, and OK is the first thing
+	// most people press. Defaulting to Go Back on this specific error meant most
+	// presses left the title entirely instead of retrying.
 	useEffect(() => {
 		if (!error) return;
-		window.requestAnimationFrame(() => Spotlight.focus('player-error-back-btn'));
+		const target = error === $L(RELOAD_FAILED_MESSAGE) ? 'player-error-retry-btn' : 'player-error-back-btn';
+		window.requestAnimationFrame(() => Spotlight.focus(target));
 	}, [error]);
 
 	// ==============================
@@ -3196,6 +3206,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				<div className={css.error}>
 					<h2>{$L('Playback Error')}</h2>
 					<p>{error}</p>
+					{error === $L(RELOAD_FAILED_MESSAGE) && (
+						<Button onClick={triggerManualRetry} spotlightId="player-error-retry-btn">{$L('Retry')}</Button>
+					)}
 					<Button onClick={onBack} spotlightId="player-error-back-btn">{$L('Go Back')}</Button>
 				</div>
 			</div>
