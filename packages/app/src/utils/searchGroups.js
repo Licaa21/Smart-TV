@@ -61,6 +61,26 @@ export const aspectClassForType = (type) => {
 
 export const isCircleType = (type) => type === 'Person';
 
+// Closer to what was typed ranks first: the exact title, then one that starts with it, then one
+// that contains it, then the rest. The order the results arrive in settles every tie, which for
+// Seerr is its own best first order.
+const titleMatchRank = (title, typed) => {
+	const name = foldForSearch(title || '');
+	if (!typed) return 3;
+	if (name === typed) return 0;
+	if (name.startsWith(typed)) return 1;
+	return name.includes(typed) ? 2 : 3;
+};
+
+export const rankMostRelevant = (items, query, count) => {
+	const typed = foldForSearch((query || '').trim());
+	return (items || [])
+		.map((item, order) => ({item, order, rank: titleMatchRank(item.Name, typed)}))
+		.sort((a, b) => (a.rank - b.rank) || (a.order - b.order))
+		.slice(0, count)
+		.map(({item}) => item);
+};
+
 // Live TV channels are fetched wholesale, so they are matched by name here, with the accent
 // folding the server would have done.
 export const filterByName = (items, query, cap = RESULT_CAP) => {

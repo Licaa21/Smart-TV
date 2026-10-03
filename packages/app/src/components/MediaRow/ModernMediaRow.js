@@ -33,7 +33,8 @@ const ModernMediaRow = ({
 	registerRowRef,
 	loading,
 	titleWidth,
-	cardType
+	cardType,
+	spotlightId: rowSpotlightId
 }) => {
 	const {settings} = useSettings();
 	const scrollerRef = useRef(null);
@@ -188,7 +189,7 @@ const ModernMediaRow = ({
 		<RowContainer
 			ref={rowElementRef}
 			className={rowClassName}
-			spotlightId={`row-${rowIndex}`}
+			spotlightId={rowSpotlightId || `row-${rowIndex}`}
 			data-row-index={rowIndex}
 			onKeyDown={handleKeyDown}
 			onBlur={handleBlur}
@@ -236,6 +237,7 @@ const areRowPropsEqual = (prev, next) => {
 	if (prev.rowSpacing !== next.rowSpacing) return false;
 	if (prev.className !== next.className) return false;
 	if (prev.loading !== next.loading || prev.titleWidth !== next.titleWidth || prev.cardType !== next.cardType) return false;
+	if (prev.spotlightId !== next.spotlightId) return false;
 	if (prev.items === next.items) return true;
 	if (prev.items?.length !== next.items?.length) return false;
 	for (let i = 0; i < prev.items.length; i++) {

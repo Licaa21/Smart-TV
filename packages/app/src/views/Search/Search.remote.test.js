@@ -5,7 +5,7 @@ import {createRemoteSearch} from '../../services/remoteSearch';
 
 const mockApi = {getLibraries: jest.fn(), search: jest.fn()};
 const mockAuth = {api: mockApi, serverUrl: 'http://server', hasMultipleServers: false};
-const mockSettings = {settings: {}};
+let mockSettings = {settings: {}};
 const mockSave = jest.fn();
 
 jest.mock('react/jsx-dev-runtime', () => {
@@ -24,7 +24,9 @@ jest.mock('@enact/spotlight/Spottable', () => (type) => type);
 jest.mock('@enact/spotlight/SpotlightContainerDecorator', () => (config, type) => type);
 jest.mock('../../context/AuthContext', () => ({useAuth: () => mockAuth}));
 jest.mock('../../context/SettingsContext', () => ({useSettings: () => mockSettings}));
-jest.mock('../../context/SeerrContext', () => ({useSeerr: () => ({isEnabled: false})}));
+let mockSeerr = {isEnabled: false};
+jest.mock('../../context/SeerrContext', () => ({useSeerr: () => mockSeerr}));
+jest.mock('../../utils/seerrHomeRows', () => ({normalizeMediaItem: (result) => ({Id: `seerr-${result.id}`, Type: 'Movie', Name: result.title})}));
 jest.mock('../../services/connectionPool', () => ({}));
 jest.mock('../../services/gamesApi', () => ({}));
 jest.mock('../../services/parentalControls', () => ({withoutBlockedItems: (items) => items}));
@@ -34,12 +36,27 @@ jest.mock('../../components/DetailsTabBar', () => () => null);
 jest.mock('../../components/LoadingSpinner', () => () => null);
 jest.mock('../../components/ProxiedImage', () => () => null);
 jest.mock('../../components/GameCard', () => () => null);
+// Stand-ins that show which Home component drew a row and what it was handed.
+jest.mock('../../components/MediaRow', () => {
+	const React = require('react');
+	const row = (style) => (props) => {
+		const {title, items, cardType, loading, rowImageType} = props;
+		global.mockRowProps[title] = props;
+		return React.createElement('div', {
+		'data-testid': 'row', 'data-style': style, 'data-title': title, 'data-card-type': cardType,
+			'data-count': items ? items.length : 0, 'data-loading': loading ? 'yes' : 'no', 'data-image-type': rowImageType
+		});
+	};
+	return {ClassicMediaRow: row('classic'), ModernMediaRow: row('modern')};
+});
+jest.mock('../../components/MediaCard', () => ({ClassicMediaCard: () => null, ModernMediaCard: () => null}));
 jest.mock('../../components/SpottableInput/SpottableInput', () => {
 	const React = require('react');
 	return ({value, onChange, onKeyDown}) => React.createElement('input', {value, onChange, onKeyDown});
 });
 
 beforeEach(() => {
+	global.mockRowProps = {};
 	jest.useFakeTimers();
 	jest.clearAllMocks();
 	mockApi.getLibraries.mockResolvedValue([]);
@@ -121,3 +138,71 @@ test('local input takes over and a new remote search can start on the same scree
 	await act(async () => { jest.advanceTimersByTime(450); });
 	expect(mockApi.search).toHaveBeenLastCalledWith('next', expect.any(Number));
 });
+
+describe('results drawn with the Home rows', () => {
+	const items = [
+		{Id: 'm1', Type: 'Movie', Name: 'Alien'},
+		{Id: 'e1', Type: 'Episode', Name: 'Pilot', SeriesName: 'Show'},
+		{Id: 'p1', Type: 'Person', Name: 'Sigourney'}
+	];
+	const searchFor = async (settings) => {
+		mockSettings = {settings};
+		mockApi.search.mockResolvedValue({Items: items});
+		const search = createRemoteSearch('phone');
+		search.receive({String: 'alien'});
+		render(<Search remoteSearch={search} />);
+		await act(async () => { jest.advanceTimersByTime(450); });
+		await act(async () => { jest.advanceTimersByTime(60); });
+	};
+	afterEach(() => { mockSettings = {settings: {}}; });
+
+	test('each kind of result gets the row shape Home gives it, with the title and count', async () => {
+		await searchFor({});
+		const rows = screen.getAllByTestId('row');
+		expect(rows.map((row) => row.getAttribute('data-title'))).toEqual(['Movies (1)', 'Episodes (1)', 'People (1)']);
+		expect(rows.map((row) => row.getAttribute('data-card-type'))).toEqual(['portrait', 'landscape', 'circle']);
+	});
+
+	test('only the rows around the focused one are built, the rest stand in as placeholders', async () => {
+		await searchFor({});
+		const rows = screen.getAllByTestId('row');
+		expect(rows.map((row) => row.getAttribute('data-loading'))).toEqual(['no', 'no', 'yes']);
+	});
+
+	test('the Home rows setting picks the classic or the modern row, and its artwork type comes along', async () => {
+		await searchFor({homeRowsStyle: 'v1', homeRowsImageType: 'thumb'});
+		const row = screen.getAllByTestId('row')[0];
+		expect(row.getAttribute('data-style')).toBe('classic');
+		expect(row.getAttribute('data-image-type')).toBe('thumb');
+	});
+
+	test('the modern rows are the default', async () => {
+		await searchFor({});
+		expect(screen.getAllByTestId('row')[0].getAttribute('data-style')).toBe('modern');
+	});
+});
+
+test('a row drawn before the Seerr results arrive can still move down onto the Seerr row', async () => {
+	let finishSeerr;
+	mockSeerr = {isEnabled: true, displayName: 'Seerr', api: {search: () => new Promise((resolve) => { finishSeerr = resolve; })}};
+	mockSettings = {settings: {}};
+	mockApi.search.mockResolvedValue({Items: [
+		{Id: 's1', Type: 'Series', Name: 'Show'},
+		{Id: 'p1', Type: 'Person', Name: 'Actor'}
+	]});
+	const search = createRemoteSearch('phone');
+	search.receive({String: 'show'});
+	render(<Search remoteSearch={search} />);
+	await act(async () => { jest.advanceTimersByTime(450); });
+	await act(async () => { jest.advanceTimersByTime(60); });
+	// The handler the People row was given before Seerr had answered, the one a row that
+	// ignores handler changes keeps hold of.
+	const early = global.mockRowProps['People (1)'].onNavigateDown;
+	await act(async () => { finishSeerr({results: [{id: 7, title: 'Requestable', mediaType: 'movie'}]}); });
+	expect(global.mockRowProps['Seerr (1)']).toBeTruthy();
+	Spotlight.focus.mockClear();
+	early(1);
+	expect(Spotlight.focus).toHaveBeenCalledWith('search-row-2');
+	mockSeerr = {isEnabled: false};
+});
+

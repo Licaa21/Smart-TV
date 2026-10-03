@@ -13,29 +13,26 @@ import {useSeerr} from '../../context/SeerrContext';
 import * as connectionPool from '../../services/connectionPool';
 import * as gamesApi from '../../services/gamesApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import ProxiedImage from '../../components/ProxiedImage';
+import {ClassicMediaRow, ModernMediaRow} from '../../components/MediaRow';
+import {ClassicMediaCard, ModernMediaCard} from '../../components/MediaCard';
 import DetailsTabBar from '../../components/DetailsTabBar';
 import GameCard from '../../components/GameCard';
 import {KEYS} from '../../utils/keys';
-import {getImageUrl} from '../../utils/helpers';
-import {showsWatchedCheck} from '../../utils/playedState';
+import {normalizeMediaItem as normalizeSeerrItem} from '../../utils/seerrHomeRows';
 import {isGameLibrary, resolveGameLibraryId} from '../../utils/gameLibrary';
-import {groupSearchResults, aspectClassForType, isCircleType, filterByName, fetchAllGames, filterGames} from '../../utils/searchGroups';
+import {groupSearchResults, aspectClassForType, isCircleType, filterByName, fetchAllGames, filterGames, rankMostRelevant} from '../../utils/searchGroups';
 import {foldForSearch} from '../../utils/accentFolding';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
 import {closeTvKeyboard} from '../../components/TVKeyboard/keyboardBus';
 import useStorage from '../../hooks/useStorage';
-import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {
 	initialCardCount,
 	expandedCardCount,
-	searchArtworkOptions,
 	shouldMountSearchRow
 } from './searchWindow';
 
 import css from './Search.module.less';
 
-const SpottableDiv = Spottable('div');
 const SpottableButton = Spottable('button');
 const ACTIVE_SEARCH_TAB_ID = 'search-active-tab';
 const ACTIVE_SEARCH_TAB_SELECTOR = `[data-spotlight-id="${ACTIVE_SEARCH_TAB_ID}"]`;
@@ -55,6 +52,10 @@ const SEERR_CAP = 24;
 const RECENT_SEARCHES_KEY = 'search_recentQueries';
 const RECENT_SEARCHES_MAX = 10;
 const ROW_SCROLL_MARGIN = 50;
+// The space below each row of results.
+const ROW_SPACING = 16;
+// How far above the bottom edge the last of a focused row has to sit.
+const ROW_BOTTOM_MARGIN = 40;
 
 const SearchIcon = () => (
 	<svg viewBox="0 0 24 24" fill="currentColor" className={css.searchIcon}>
@@ -62,35 +63,35 @@ const SearchIcon = () => (
 	</svg>
 );
 
-const cardSizeClass = (type) => {
+// The shape a Home card takes for each kind of result: stills for video, squares for music and
+// playlists, a circle for people, and a poster for the rest.
+const cardTypeFor = (type) => {
+	if (isCircleType(type)) return 'circle';
 	const aspect = aspectClassForType(type);
-	if (aspect === 'wide') return {aspect, card: css.cardWide, img: css.imgWide};
-	if (aspect === 'square') return {aspect, card: css.cardSquare, img: css.imgSquare};
-	return {aspect, card: css.cardPoster, img: css.imgPoster};
+	if (aspect === 'wide') return 'landscape';
+	return aspect === 'square' ? 'square' : 'portrait';
 };
 
-// An unmounted row still has to hold its height, so it draws one hidden card in
-// the shape that row uses. Games come from GameCard, which sizes itself.
-const placeholderShape = (row) => row.kind === 'game'
-	? {card: css.cardGame, img: css.imgGame}
-	: cardSizeClass(row.kind === 'jellyfin' ? row.items[0]?.Type : 'Movie');
+// How many titles the Most relevant row holds, which is about one row of cards.
+const MOST_RELEVANT_COUNT = 6;
 
-const jellyfinSubtitle = (item) => {
-	switch (item.Type) {
-		case 'Episode':
-			return `${item.SeriesName || ''} S${item.ParentIndexNumber ?? '?'}E${item.IndexNumber ?? '?'}`;
-		case 'Person':
-			return $L('Person');
-		case 'MusicArtist':
-		case 'AlbumArtist':
-			return $L('Artist');
-		case 'MusicAlbum':
-			return item.AlbumArtist || item.ProductionYear || '';
-		case 'Audio':
-			return item.AlbumArtist || item.Artists?.[0] || item.Album || '';
-		default:
-			return item.ProductionYear || '';
-	}
+// A Seerr search mixes films and series, so its tab opens on the titles that best match what was
+// typed, across both, and then sorts the rest under a heading for each.
+const seerrSections = (items, query) => {
+	const byType = [
+		{key: 'movie', title: $L('Movies'), items: items.filter((item) => item._seerrMediaType === 'movie')},
+		{key: 'tv', title: $L('TV Shows'), items: items.filter((item) => item._seerrMediaType !== 'movie')}
+	].filter((section) => section.items.length > 0);
+	// One type with a row's worth of titles would only be said twice.
+	const repeatsItself = byType.length === 1 && items.length <= MOST_RELEVANT_COUNT;
+	// Copies with an id of their own, so the same title shown twice on the tab is focused and
+	// highlighted on its own. The source id is kept for opening it.
+	const top = repeatsItself ? [] : rankMostRelevant(items, query, MOST_RELEVANT_COUNT)
+		.map((item) => ({...item, Id: `top-${item.Id}`, _seerrSourceId: item.Id}));
+	return [
+		...(top.length ? [{key: 'top', title: $L('Most relevant'), items: top}] : []),
+		...byType
+	].map((section) => ({...section, title: `${section.title} (${section.items.length})`}));
 };
 
 const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, onPlayChannel, remoteSearch}) => {
@@ -98,6 +99,13 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	const {settings} = useSettings();
 	const unifiedMode = settings.unifiedLibraryMode && hasMultipleServers;
 	const {isEnabled: seerrEnabled, api: seerrApi, displayName: seerrName} = useSeerr();
+
+	// Results are drawn with the rows and cards Home uses, so they follow the Home settings for
+	// style and artwork. The space between rows is Search's own, since Home's is sized for a
+	// screen of titled rows.
+	const useModernRows = settings.homeRowsStyle !== 'v1';
+	const RowComponent = useModernRows ? ModernMediaRow : ClassicMediaRow;
+	const CardComponent = useModernRows ? ModernMediaCard : ClassicMediaCard;
 
 	const [query, setQuery] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
@@ -108,6 +116,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	const [searchInputFocused, setSearchInputFocused] = useState(false);
 	const [activeRowIndex, setActiveRowIndex] = useState(0);
 	const [visibleCardCounts, setVisibleCardCounts] = useState({});
+	const [focusedGridId, setFocusedGridId] = useState(null);
 	const [recentSearches, saveRecentSearches] = useStorage(RECENT_SEARCHES_KEY, []);
 
 	// doSearch records into this list, so it reads the current value through a
@@ -150,10 +159,12 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 
 	// Focus the All pill itself. Focusing the tab container would land on the
 	// first pill, which is Seerr or Games when either has results.
+	// Handed over as the element itself: a compound selector string is not something Spotlight
+	// resolves, and the fallback to the container lands on whichever pill sits nearest the search
+	// field, which switches the results to that tab.
 	const focusAllTab = useCallback(() => {
-		if (!Spotlight.focus('[data-spotlight-id="search-tabs"] [data-id="all"]')) {
-			Spotlight.focus('search-tabs');
-		}
+		const pill = document.querySelector('[data-spotlight-id="search-tabs"] [data-id="all"]');
+		if (!(pill && Spotlight.focus(pill))) Spotlight.focus('search-tabs');
 	}, []);
 
 	// Recorded once a search actually returns, so the half-typed prefixes that
@@ -338,13 +349,25 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 
 	const handleSelectTab = useCallback((id) => setActiveTab(id), []);
 
+	// Seerr results are shaped like library items so the same cards can draw them. The raw result
+	// is kept beside, since opening one asks for what Seerr sent.
+	const seerrCards = useMemo(() => {
+		const raw = new Map();
+		const items = seerrResults.map((result) => {
+			const item = normalizeSeerrItem(result);
+			raw.set(item.Id, result);
+			return item;
+		});
+		return {items, raw};
+	}, [seerrResults]);
+
 	// Rows shown in the All tab: groups first, then Seerr, then Games.
 	const allRows = useMemo(() => {
-		const rows = groups.map((g) => ({id: g.key, title: g.title, items: g.items, kind: 'jellyfin'}));
-		if (seerrResults.length > 0) rows.push({id: 'seerr', title: seerrLabel, items: seerrResults, kind: 'seerr'});
+		const rows = groups.map((g) => ({id: g.key, title: g.title, items: g.items, kind: 'jellyfin', cardType: cardTypeFor(g.items[0]?.Type)}));
+		if (seerrCards.items.length > 0) rows.push({id: 'seerr', title: seerrLabel, items: seerrCards.items, kind: 'seerr', cardType: 'portrait'});
 		if (gameResults.length > 0) rows.push({id: 'games', title: $L('Games'), items: gameResults, kind: 'game'});
 		return rows;
-	}, [groups, seerrResults, gameResults, seerrLabel]);
+	}, [groups, seerrCards, gameResults, seerrLabel]);
 
 	useEffect(() => {
 		setTimeout(() => Spotlight.focus('search-input'), 100);
@@ -372,9 +395,15 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		return false;
 	}, [hasResults, showRecent, focusAllTab]);
 
+	// Stopped as well as prevented, like the tab and row handlers: Spotlight makes its own move
+	// once the press reaches the top, and from the pill just focused that lands on another tab
+	// and switches to it.
 	const handleInputKeyDown = useCallback((e) => {
 		if (e.keyCode !== KEYS.DOWN) return;
-		if (focusBelowInput()) e.preventDefault();
+		if (focusBelowInput()) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
 	}, [focusBelowInput]);
 
 	const handleSearchInputFocus = useCallback(() => setSearchInputFocused(true), []);
@@ -382,9 +411,20 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		if (!e.currentTarget.contains(e.relatedTarget)) setSearchInputFocused(false);
 	}, []);
 
+	// The first card of the first row, or of the grid. Entering the container and letting Spotlight
+	// choose put focus on whichever card was nearest where it came from, which was off to the right.
+	// Focus coming back up to the tabs or the field only scrolls that one element into view, which
+	// leaves the field, or the tabs, above the edge of the screen. The page goes back to its top.
+	const containerRef = useRef(null);
+	const scrollToTop = useCallback(() => {
+		if (containerRef.current) containerRef.current.scrollTop = 0;
+	}, []);
+
 	const focusContent = useCallback(() => {
 		if (activeTab === 'all') setActiveRowIndex(0);
-		Spotlight.focus(activeTab === 'all' ? 'search-row-0' : 'search-grid');
+		const containerId = activeTab === 'all' ? 'search-row-0' : 'search-grid';
+		const first = document.querySelector(`[data-spotlight-id="${containerId}"] .spottable`);
+		if (!(first && Spotlight.focus(first))) Spotlight.focus(containerId);
 	}, [activeTab]);
 
 	// The press is stopped as well as prevented. Spotlight makes its own move once
@@ -422,6 +462,63 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 			}
 		}
 	}, [allRows.length]);
+
+	// Home rows report their own key presses and focus, so they hand these in by row index.
+	const focusRow = useCallback((rowIndex) => {
+		setActiveRowIndex(rowIndex);
+		Spotlight.focus(`search-row-${rowIndex}`);
+	}, []);
+
+	const handleRowNavigateUp = useCallback((rowIndex) => {
+		if (rowIndex === 0) Spotlight.focus(ACTIVE_SEARCH_TAB_SELECTOR);
+		else focusRow(rowIndex - 1);
+	}, [focusRow]);
+
+	// The Home rows only rebuild when their items change, not when a handler does, so these read
+	// the rows through a ref. Seerr results land after the library rows have drawn, and a row
+	// holding an older handler would think it was the last one.
+	const allRowsRef = useRef([]);
+	allRowsRef.current = allRows;
+
+	const handleRowNavigateDown = useCallback((rowIndex) => {
+		if (rowIndex < allRowsRef.current.length - 1) focusRow(rowIndex + 1);
+	}, [focusRow]);
+
+	// A focused modern card grows to show its details once it has focus, after the page has already
+	// scrolled for the size it had. The whole row is brought into view once it has settled, or the
+	// last row is left with its text running off the bottom of the screen.
+	const keepRowInView = useCallback((rowIndex) => {
+		const reveal = () => {
+			const container = containerRef.current;
+			const row = document.querySelector(`[data-spotlight-id="search-row-${rowIndex}"]`);
+			if (!container || !row) return;
+			const view = container.getBoundingClientRect();
+			const rect = row.getBoundingClientRect();
+			const overflow = rect.bottom - (view.bottom - ROW_BOTTOM_MARGIN);
+			if (overflow > 0) container.scrollTop += Math.min(overflow, Math.max(0, rect.top - view.top));
+		};
+		window.requestAnimationFrame(reveal);
+		window.setTimeout(reveal, 200);
+	}, []);
+
+	const handleHomeRowFocus = useCallback((rowIndex) => {
+		if (pointerHover()) return;
+		setActiveRowIndex((current) => (current === rowIndex ? current : rowIndex));
+		keepRowInView(rowIndex);
+	}, [keepRowInView]);
+
+	// A row opens with about a screen of cards, and the next batch lands as focus nears the end.
+	const growRow = useCallback((item) => {
+		if (pointerHover()) return;
+		const row = allRowsRef.current.find((candidate) => candidate.items.some((entry) => entry.Id === item.Id));
+		if (!row) return;
+		const focusedIndex = row.items.findIndex((candidate) => candidate.Id === item.Id);
+		setVisibleCardCounts((current) => {
+			const visible = current[row.id] || initialCardCount(row.items.length);
+			const expanded = expandedCardCount(visible, focusedIndex, row.items.length);
+			return expanded === visible ? current : {...current, [row.id]: expanded};
+		});
+	}, []);
 
 	const handleRowFocus = useCallback((rowId, rowIndex, itemCount) => (e) => {
 		if (pointerHover()) return;
@@ -462,104 +559,14 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		}
 	}, [onSelectItem, onSelectPerson, onPlayChannel]);
 
-	const jellyfinItemById = useCallback((id) => {
-		for (const group of groups) {
-			const item = group.items.find((i) => i.Id === id);
-			if (item) return item;
-		}
-		return null;
-	}, [groups]);
-
-	// One click handler for every card keeps a stable reference across the grid
-	// instead of a closure per card.
-	const handleCardClick = useCallback((e) => {
-		const {kind, id} = e.currentTarget.dataset;
-		if (kind === 'seerr') {
-			// The route the discover and browse rows take. It opens the real library
-			// item when Seerr already has one for the title, and the screen that can
-			// request it when it does not.
-			const item = seerrResults.find((i) => String(i.id) === id);
-			if (item) onSelectSeerrItem?.(item);
-			return;
-		}
-		const libraryItem = jellyfinItemById(id);
-		if (libraryItem) handleSelectJellyfin(libraryItem);
-	}, [jellyfinItemById, seerrResults, onSelectSeerrItem, handleSelectJellyfin]);
+	const seerrCardsRef = useRef(seerrCards);
+	seerrCardsRef.current = seerrCards;
+	const handleSelectSeerr = useCallback((item) => {
+		const raw = seerrCardsRef.current.raw.get(item._seerrSourceId || item.Id);
+		if (raw) onSelectSeerrItem?.(raw);
+	}, [onSelectSeerrItem]);
 
 	const handleGameSelect = useCallback((game) => onSelectGame?.(game._library, game), [onSelectGame]);
-
-	// Holding OK on a library result opens its menu. A Seerr or game result has none.
-	const itemAtCard = useCallback((target) => {
-		const card = target.closest('[data-kind]');
-		return card && card.getAttribute('data-kind') === 'jellyfin' ? jellyfinItemById(card.getAttribute('data-id')) : null;
-	}, [jellyfinItemById]);
-	const menuHold = useItemMenuHold(itemAtCard);
-
-	const renderJellyfinCard = useCallback((item, spotlightId) => {
-		const {aspect, card, img} = cardSizeClass(item.Type);
-		const circle = isCircleType(item.Type);
-		const itemServerUrl = item._serverUrl || serverUrl;
-		const primaryTag = item.ImageTags?.Primary || item.PrimaryImageTag;
-		let imageUrl = primaryTag
-			? getImageUrl(itemServerUrl, item.Id, 'Primary', searchArtworkOptions(aspect, primaryTag))
-			: null;
-		if (!imageUrl && item.Type === 'Audio' && item.AlbumId && item.AlbumPrimaryImageTag) {
-			imageUrl = getImageUrl(
-				itemServerUrl,
-				item.AlbumId,
-				'Primary',
-				searchArtworkOptions(aspect, item.AlbumPrimaryImageTag)
-			);
-		}
-		return (
-			<SpottableDiv
-				key={item.Id}
-				className={`${css.card} ${card}`}
-				onClick={handleCardClick}
-				data-kind="jellyfin"
-				data-id={item.Id}
-				spotlightId={spotlightId}
-			>
-				<div className={`${css.cardImg} ${img} ${circle ? css.imgCircle : ''}`}>
-					{unifiedMode && item._serverName && <div className={css.serverBadge}>{item._serverName}</div>}
-					{imageUrl
-						? <img className={css.cardImage} src={imageUrl} alt={item.Name} loading="lazy" />
-						: <div className={css.cardPlaceholder}>{circle ? '👤' : '🎬'}</div>}
-					{showsWatchedCheck(item) && (
-						<div className={css.watchedBadge}>
-							<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-						</div>
-					)}
-				</div>
-				<div className={css.cardTitle}>{item.Name}</div>
-				<div className={css.cardSubtitle}>{jellyfinSubtitle(item)}</div>
-			</SpottableDiv>
-		);
-	}, [serverUrl, unifiedMode, handleCardClick]);
-
-	const renderSeerrCard = useCallback((item, spotlightId) => {
-		const imageUrl = item.posterPath ? seerrApi.getImageUrl(item.posterPath, 'w300') : null;
-		const year = item.releaseDate ? new Date(item.releaseDate).getFullYear()
-			: item.firstAirDate ? new Date(item.firstAirDate).getFullYear() : '';
-		return (
-			<SpottableDiv
-				key={`seerr-${item.id}`}
-				className={`${css.card} ${css.cardPoster}`}
-				onClick={handleCardClick}
-				data-kind="seerr"
-				data-id={String(item.id)}
-				spotlightId={spotlightId}
-			>
-				<div className={`${css.cardImg} ${css.imgPoster}`}>
-					{imageUrl
-						? <ProxiedImage className={css.cardImage} src={imageUrl} alt={item.title || item.name} />
-						: <div className={css.cardPlaceholder}>{item.mediaType === 'movie' ? '🎬' : '📺'}</div>}
-				</div>
-				<div className={css.cardTitle}>{item.title || item.name}</div>
-				<div className={css.cardSubtitle}>{year}</div>
-			</SpottableDiv>
-		);
-	}, [seerrApi, handleCardClick]);
 
 	const renderGameCard = useCallback((game, spotlightId) => (
 		<GameCard
@@ -572,76 +579,120 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		/>
 	), [handleGameSelect]);
 
-	const renderCard = useCallback((kind, item, spotlightId) => {
-		if (kind === 'seerr') return renderSeerrCard(item, spotlightId);
-		if (kind === 'game') return renderGameCard(item, spotlightId);
-		return renderJellyfinCard(item, spotlightId);
-	}, [renderSeerrCard, renderGameCard, renderJellyfinCard]);
-
 	// The active grid tab (a type group, Seerr, or Games).
 	const gridConfig = useMemo(() => {
-		if (activeTab === 'seerr') return {items: seerrResults, kind: 'seerr'};
+		if (activeTab === 'seerr') return {items: seerrCards.items, kind: 'seerr'};
 		if (activeTab === 'games') return {items: gameResults, kind: 'game'};
 		const group = groups.find((g) => g.key === activeTab);
 		if (!group) return null;
 		return {items: group.items, kind: 'jellyfin'};
-	}, [activeTab, groups, seerrResults, gameResults]);
+	}, [activeTab, groups, seerrCards, gameResults]);
+
+	const clearGridFocus = useCallback(() => setFocusedGridId(null), []);
+
+	const renderGridCard = (kind, item, index) => {
+		if (kind === 'game') return renderGameCard(item, `grid-item-${index}`);
+		return (
+			<CardComponent
+				key={`${kind}-${item.Id}`}
+				item={item}
+				serverUrl={serverUrl}
+				cardType={cardTypeFor(item.Type)}
+				rowImageType={settings.homeRowsImageType}
+				onSelect={kind === 'seerr' ? handleSelectSeerr : handleSelectJellyfin}
+				showServerBadge={unifiedMode}
+				spotlightId={`grid-item-${index}`}
+				isFocused={focusedGridId === item.Id}
+				onFocused={setFocusedGridId}
+			/>
+		);
+	};
 
 	const renderContent = () => {
 		if (activeTab === 'all') {
 			return (
-				<div className={css.resultsContainer} {...menuHold}>
+				<div className={css.resultsContainer}>
 					{allRows.map((row, rowIndex) => {
 						const mounted = shouldMountSearchRow(rowIndex, activeRowIndex);
 						const visibleCount = mounted ? visibleCardCounts[row.id] || initialCardCount(row.items.length) : 0;
-						const placeholderSize = mounted ? null : placeholderShape(row);
-						return (
-							<RowContainer
-								key={row.id}
-								className={css.resultRow}
-								spotlightId={`search-row-${rowIndex}`}
-								data-row-index={rowIndex}
-								onKeyDown={handleRowKeyDown}
-							>
-								<h2 className={css.rowTitle}>{row.title}<span className={css.rowCount}> ({row.items.length})</span></h2>
-								<div
-									className={css.rowScroller}
-									ref={(el) => { scrollerRefs.current[row.id] = el; }}
-									onFocus={handleRowFocus(row.id, rowIndex, row.items.length)}
+						if (row.kind === 'game') {
+							return (
+								<RowContainer
+									key={row.id}
+									className={css.resultRow}
+									spotlightId={`search-row-${rowIndex}`}
+									data-row-index={rowIndex}
+									onKeyDown={handleRowKeyDown}
 								>
-									{mounted ? (
-										<div className={css.resultItems}>
-											{row.items.slice(0, visibleCount).map((item, idx) => renderCard(row.kind, item, `${row.id}-item-${idx}`))}
+									<h2 className={css.rowTitle}>{row.title}<span className={css.rowCount}> ({row.items.length})</span></h2>
+									<div
+										className={css.rowScroller}
+										ref={(el) => { scrollerRefs.current[row.id] = el; }}
+										onFocus={handleRowFocus(row.id, rowIndex, row.items.length)}
+									>
+										<div className={css.resultItems} aria-hidden={mounted ? undefined : 'true'}>
+											{mounted
+												? row.items.slice(0, visibleCount).map((item, idx) => renderGameCard(item, `${row.id}-item-${idx}`))
+												: <div className={`${css.card} ${css.cardGame} ${css.windowPlaceholder}`}>
+													<div className={`${css.cardImg} ${css.imgGame}`} />
+													<div className={css.cardTitle}>&nbsp;</div>
+												</div>}
 										</div>
-									) : (
-										<div className={css.resultItems} aria-hidden="true">
-											<div className={`${css.card} ${placeholderSize.card} ${css.windowPlaceholder}`}>
-												<div className={`${css.cardImg} ${placeholderSize.img}`} />
-												<div className={css.cardTitle}>&nbsp;</div>
-												<div className={css.cardSubtitle}>&nbsp;</div>
-											</div>
-										</div>
-									)}
-								</div>
-							</RowContainer>
+									</div>
+								</RowContainer>
+							);
+						}
+						const title = `${row.title} (${row.items.length})`;
+						if (!mounted) {
+							return <RowComponent key={row.id} loading title={title} cardType={row.cardType} rowSpacing={ROW_SPACING} />;
+						}
+						return (
+							<RowComponent
+								key={row.id}
+								rowId={row.id}
+								rowIndex={rowIndex}
+								spotlightId={`search-row-${rowIndex}`}
+								title={title}
+								items={row.items.slice(0, visibleCount)}
+								serverUrl={serverUrl}
+								cardType={row.cardType}
+								rowImageType={settings.homeRowsImageType}
+								onSelectItem={row.kind === 'seerr' ? handleSelectSeerr : handleSelectJellyfin}
+								onFocus={handleHomeRowFocus}
+								onFocusItem={growRow}
+								onNavigateUp={handleRowNavigateUp}
+								onNavigateDown={handleRowNavigateDown}
+								showServerBadge={unifiedMode}
+								rowSpacing={ROW_SPACING}
+							/>
 						);
 					})}
 				</div>
 			);
 		}
 		if (!gridConfig) return null;
+		let cardsBefore = 0;
 		return (
-			<GridContainer className={css.gridWrapper} spotlightId="search-grid" {...menuHold}>
-				<div className={css.grid}>
-					{gridConfig.items.map((item, idx) => renderCard(gridConfig.kind, item, `grid-item-${idx}`))}
-				</div>
+			<GridContainer className={css.gridWrapper} spotlightId="search-grid" onBlur={clearGridFocus}>
+				{(gridConfig.kind === 'seerr' ? seerrSections(gridConfig.items, query) : [{key: 'all', items: gridConfig.items}]).map((section) => {
+					const start = cardsBefore;
+					cardsBefore += section.items.length;
+					return (
+						<div key={section.key} className={css.gridSection}>
+							{section.title && <h2 className={css.gridTitle}>{section.title}</h2>}
+							<div className={css.grid}>
+								{section.items.map((item, idx) => renderGridCard(gridConfig.kind, item, start + idx))}
+							</div>
+						</div>
+					);
+				})}
 			</GridContainer>
 		);
 	};
 
 	return (
-		<div className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>
-			<div className={css.searchInputSection}>
+		<div ref={containerRef} className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>
+			<div className={css.searchInputSection} onFocus={scrollToTop}>
 				<div
 					className={`${css.searchInputWrapper} ${searchInputFocused ? css.searchInputFocused : ''}`}
 					ref={inputWrapperRef}
@@ -660,6 +711,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 						onChange={handleInputChange}
 						onKeyDown={handleInputKeyDown}
 						onExitTop={focusBelowInput}
+						onExitBottom={focusBelowInput}
 						spotlightId="search-input"
 						autoComplete="off"
 					/>
@@ -669,7 +721,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 
 			<div className={css.searchResults}>
 				{hasResults && (
-					<div className={css.tabsRow} onKeyDown={handleTabsKeyDown}>
+					<div className={css.tabsRow} onKeyDown={handleTabsKeyDown} onFocus={scrollToTop}>
 						<DetailsTabBar
 							tabs={tabs}
 							activeId={activeTab}
