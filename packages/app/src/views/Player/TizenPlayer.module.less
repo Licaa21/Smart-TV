@@ -460,9 +460,16 @@
 	z-index: 2;
 }
 
-/* The only focus affordance on the bar is the thumb turning white, like core */
+/* Focus: white thumb, as in core, plus a scale-up and halo — the white swap alone was too easy to miss.
+   The white fill matches the controlBtn:focus border, the scale matches the other focused rows here. */
+.seekIndicator {
+	transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
 .progressBar:focus .seekIndicator {
 	background: #ffffff;
+	transform: translate(-50%, -50%) scale(1.4);
+	box-shadow: 0 0 0 4px rgba(var(--theme-accent-rgb, 0, 164, 220), 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 // A mark where each chapter starts, taller than the track so it reads as a mark and not a gap.

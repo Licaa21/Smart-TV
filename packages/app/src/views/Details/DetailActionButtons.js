@@ -52,6 +52,7 @@ const DetailActionButtons = ({
 	selectedSubtitleIndex,
 	currentAudioStream,
 	currentSubtitleStream,
+	tracksPending,
 	canAddToCollection,
 	canIdentify,
 	playLongPress,
@@ -147,7 +148,7 @@ const DetailActionButtons = ({
 					<BtnIcon path={DETAIL_ICON_PATHS.audio}/>
 				</div>
 				<span className={css.btnLabel}>{$L('Audio')}</span>
-				{currentAudioStream && (
+				{currentAudioStream && !tracksPending && (
 					<span className={css.btnDetail}>
 						{currentAudioStream.DisplayTitle || currentAudioStream.Language || `${$L('Track')} ${selectedAudioIndex + 1}`}
 					</span>
@@ -160,7 +161,7 @@ const DetailActionButtons = ({
 					<BtnIcon path={DETAIL_ICON_PATHS.subtitle}/>
 				</div>
 				<span className={css.btnLabel}>{$L('Subtitle')}</span>
-				{currentSubtitleStream ? (
+				{tracksPending ? null : currentSubtitleStream ? (
 					<span className={css.btnDetail}>
 						{currentSubtitleStream.DisplayTitle || currentSubtitleStream.Language || `${$L('Track')} ${selectedSubtitleIndex + 1}`}
 					</span>

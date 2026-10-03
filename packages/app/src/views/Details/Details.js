@@ -1249,6 +1249,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 			selectedSubtitleIndex={selectedSubtitleIndex}
 			currentAudioStream={currentAudioStream}
 			currentSubtitleStream={currentSubtitleStream}
+			tracksPending={isSeed}
 			canAddToCollection={canAddToCollection}
 			canIdentify={canIdentify}
 			playLongPress={playLongPress}

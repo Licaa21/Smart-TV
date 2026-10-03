@@ -138,12 +138,14 @@
 	border: 2px solid transparent;
 	border-radius: 17px;
 	background: @accent;
-	color: #fff;
+	// Ink on the accent fill. A theme with a bright accent (8-bit Hero) names a dark
+	// onAccent, and a hardcoded white here is unreadable against it.
+	color: var(--theme-on-accent, #fff);
 	font-size: 22px;
 	font-weight: 600;
 
 	&:focus {
-		border-color: #fff;
+		border-color: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 1);
 		outline: none;
 	}
 }
@@ -174,11 +176,12 @@
 }
 
 .ringTrack {
-	stroke: rgba(255, 255, 255, 0.24);
+	stroke: currentColor;
+	stroke-opacity: 0.28;
 }
 
 .ringValue {
-	stroke: #fff;
+	stroke: currentColor;
 	stroke-linecap: round;
 	transition: stroke-dashoffset 0.3s linear;
 }
