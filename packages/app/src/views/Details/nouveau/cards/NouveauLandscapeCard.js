@@ -1,5 +1,6 @@
 import $L from '@enact/i18n/$L';
 
+import {AnimeCardPill} from '../../../../components/AnimeMarkerPills';
 import {SpottableDiv} from '../../detailsSpottables';
 
 import css from './NouveauCards.module.less';
@@ -8,7 +9,7 @@ import css from './NouveauCards.module.less';
 // it, so the remote can do either without a menu in between. Both halves carry the same key, so one
 // handler on each side serves the whole rail.
 const NouveauLandscapeCard = ({
-	imageUrl, title, overview, width, imageHeight, isNextUp = false, progress = 0,
+	imageUrl, title, overview, width, imageHeight, isNextUp = false, progress = 0, episode, serverUrl,
 	selectKey, onArtworkSelect, onDetailsSelect
 }) => {
 	const shown = progress > 0 && progress < 1;
@@ -25,6 +26,7 @@ const NouveauLandscapeCard = ({
 					? <img className={css.artworkImage} src={imageUrl} alt="" />
 					: <div className={css.placeholder}>{title}</div>}
 				{isNextUp && <div className={css.nextUp}>{$L('Up Next')}</div>}
+				{episode && <AnimeCardPill item={episode} serverUrl={serverUrl} hasProgressBar={shown} />}
 				{shown && (
 					<div className={css.progressTrack}>
 						<div className={css.progressFill} style={{width: `${Math.round(progress * 100)}%`}} />

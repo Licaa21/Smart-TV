@@ -22,7 +22,7 @@ export const AnimeItemPills = ({item, serverUrl, compact, large, className}) => 
 };
 
 // The pill drawn over a home row card's artwork.
-export const AnimeCardPill = ({item, serverUrl, hasProgressBar}) => {
+export const AnimeCardPill = ({item, serverUrl, hasProgressBar, className = ''}) => {
 	const isEpisode = item?.Type === 'Episode';
 	const marker = useEpisodeMarker(isEpisode ? item : null, {serverUrl, delayMs: CARD_DELAY_MS});
 	const audio = useItemAudio(item?.Type === 'Movie' ? item : null, {serverUrl, delayMs: CARD_DELAY_MS});
@@ -33,7 +33,7 @@ export const AnimeCardPill = ({item, serverUrl, hasProgressBar}) => {
 			audio={audio}
 			compact
 			max={1}
-			className={`${css.cardOverlay} ${hasProgressBar ? css.aboveProgress : ''}`}
+			className={`${css.cardOverlay} ${hasProgressBar ? css.aboveProgress : ''} ${className}`.trim()}
 		/>
 	);
 };

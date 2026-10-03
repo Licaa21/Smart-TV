@@ -1,6 +1,7 @@
 import {useEffect, useRef} from 'react';
 import {isKidsMode} from '../../../utils/kidsMode';
 
+import {AnimeItemPills} from '../../../components/AnimeMarkerPills';
 import ModernActionButtons from '../ModernActionButtons';
 import SpotlightDetailContent from '../spotlight/SpotlightDetailContent';
 import MinimalistEpisodes, {EPISODES_ID} from './MinimalistEpisodes';
@@ -65,6 +66,7 @@ const MinimalistDetailContent = (props) => {
 							? <img className={css.logo} src={logoUrl} onError={onLogoError} alt="" />
 							: <h1 className={css.title}>{title}</h1>}
 						{episodeName && <div className={css.episodeName}>{episodeName}</div>}
+						<AnimeItemPills item={item} serverUrl={effectiveServerUrl} large className={css.markers} />
 						<div className={css.actions}>
 							<ModernActionButtons
 								{...props}
