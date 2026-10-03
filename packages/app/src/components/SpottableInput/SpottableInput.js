@@ -19,6 +19,7 @@ const SpottableInput = ({
 	recents,
 	suggestionsBuilder,
 	onExitTop,
+	onExitBottom,
 	...inputProps
 }) => {
 	const inputRef = useRef(null);
@@ -62,6 +63,8 @@ const SpottableInput = ({
 
 	const onExitTopRef = useRef(onExitTop);
 	onExitTopRef.current = onExitTop;
+	const onExitBottomRef = useRef(onExitBottom);
+	onExitBottomRef.current = onExitBottom;
 
 	const openKeyboard = useCallback(() => {
 		if (disabled || kbActiveRef.current) return;
@@ -171,6 +174,9 @@ const SpottableInput = ({
 			if (id) {
 				Spotlight.focus(`[data-spotlight-id="${id}"]`);
 			}
+			// A screen that knows where down should go says so, rather than leaving it to the
+			// nearest thing on screen.
+			if (direction === 'down' && onExitBottomRef.current && onExitBottomRef.current()) return;
 			setTimeout(() => Spotlight.move(direction), 0);
 			return;
 		}
