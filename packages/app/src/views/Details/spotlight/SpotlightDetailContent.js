@@ -20,6 +20,7 @@ import {loadSeerrPersonCredits} from '../seerrPersonCredits';
 import {spotlightMetaPieces} from './spotlightMeta';
 import {spotlightCardFallbackUrl} from './spotlightImages';
 import {fetchUpcomingEpisode, formatUpcomingEpisode} from '../../../utils/upcomingEpisode';
+import {AnimeItemPills} from '../../../components/AnimeMarkerPills';
 import {summaryCardHeight, summaryCardWidth, heroWidth} from './summaryCardLayout';
 import SpotlightSummaryCard from './SpotlightSummaryCard';
 import SpotlightSectionModal from './SpotlightSectionModal';
@@ -322,6 +323,7 @@ const SpotlightDetailContent = (props) => {
 							})}
 						</div>
 					)}
+					{!isPerson && <AnimeItemPills item={item} serverUrl={effectiveServerUrl} large />}
 					{hasTech && !isPerson && (
 						<div className={css.techRow}>
 							{techSize && <span className={css.techSize}>{techSize}</span>}

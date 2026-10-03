@@ -212,7 +212,9 @@ const ClassicDetailScreen = ({
 							</div>
 						)}
 					</div>
-					<AnimeItemPills item={item} serverUrl={serverUrl} className={css.detailMarkers} />
+					<div className={css.detailMarkers}>
+						<AnimeItemPills item={item} serverUrl={serverUrl} />
+					</div>
 
 				<RatingsRow item={item} serverUrl={serverUrl} pluginEnabled={isMdblistEnabled(settings)} />
 

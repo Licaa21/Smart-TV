@@ -2,6 +2,7 @@ import {Fragment, useEffect, useMemo, useState} from 'react';
 import $L from '@enact/i18n/$L';
 
 import RatingsRow from '../../../../components/RatingsRow';
+import {AnimeItemPills} from '../../../../components/AnimeMarkerPills';
 import {SeerrStatusBadge} from '../../../../components/seerr/SeerrStatusBadge';
 import {isMdblistEnabled} from '../../../../services/mdblistApi';
 import {formatPlaybackEndsAt} from '../../../../utils/playbackTimeLabels';
@@ -122,6 +123,7 @@ const NouveauHero = (props) => {
 					))}
 				</div>
 			)}
+			{!isPerson && <AnimeItemPills item={item} serverUrl={effectiveServerUrl} large className={css.markers} />}
 			{(techBadges.length > 0 || techSize) && (
 				<div className={css.tech}>
 					{techBadges.map((badge, i) => <span key={i} className={css.techChip}>{badge.label}</span>)}

@@ -1,3 +1,4 @@
+import {AnimeCardPill} from '../../../components/AnimeMarkerPills';
 import {SpottableDiv} from '../detailsSpottables';
 
 import css from './MinimalistCards.module.less';
@@ -6,7 +7,7 @@ import css from './MinimalistCards.module.less';
 //
 // The number sits on the artwork rather than in front of the title, so anyone who cannot read the
 // title still has something to count along by.
-const MinimalistEpisodeCard = ({imageUrl, title, number, watched, width, imageHeight, selectKey, onSelect}) => (
+const MinimalistEpisodeCard = ({imageUrl, title, number, watched, width, imageHeight, selectKey, onSelect, episode, serverUrl}) => (
 	<SpottableDiv
 		className={css.card}
 		style={{width: `${width}px`}}
@@ -16,6 +17,7 @@ const MinimalistEpisodeCard = ({imageUrl, title, number, watched, width, imageHe
 		<div className={css.artwork} style={{height: `${imageHeight}px`}}>
 			{imageUrl && <img className={css.artworkImage} src={imageUrl} alt="" />}
 			{number != null && <div className={css.number}>{number}</div>}
+			{episode && <AnimeCardPill item={episode} serverUrl={serverUrl} className={css.marker} />}
 			{watched && (
 				<div className={css.watchedBadge}>
 					<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
