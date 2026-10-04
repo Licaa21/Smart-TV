@@ -2886,13 +2886,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			if (handlePopupKeyDown(e)) return;
 
-			// Channel keys seek far on the bar, and do nothing anywhere else.
+			// Channel keys seek far, with the controls showing or not and wherever focus is, the way
+			// left and right seek with the controls hidden. Live TV and open panels leave them alone.
 			const channelStep = channelKeyStep(e);
 			if (channelStep && !activeModal) {
 				e.preventDefault();
 				e.stopPropagation();
-				if (controlsVisible && focusRow === 'progress' && !isLiveTV) {
+				if (!isLiveTV && !(isAudioMode && focusRow === 'panel')) {
 					showControls();
+					setFocusRow('progress');
 					scrubBy(channelStep * channelSeekSeconds(settings.seekStep, duration));
 				}
 				return;
