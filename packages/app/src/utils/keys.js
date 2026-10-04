@@ -41,12 +41,23 @@ const TIZEN_KEYS = {
 
 const WEBOS_KEYS = {
 	BACK: 461,
+	// The remote's channel keys arrive as page up and page down.
+	CHANNEL_UP: 33,
+	CHANNEL_DOWN: 34,
 };
 
 export const KEYS = {
 	...STANDARD_KEYS,
 	...(getPlatform() === 'tizen' ? TIZEN_KEYS : WEBOS_KEYS),
 	BACK: getPlatform() === 'tizen' ? 10009 : 461,
+};
+
+// 1 for channel up, -1 for channel down, 0 for any other key.
+export const channelKeyStep = (e) => {
+	const code = e.keyCode || e.which;
+	if (e.key === 'ChannelUp' || code === KEYS.CHANNEL_UP) return 1;
+	if (e.key === 'ChannelDown' || code === KEYS.CHANNEL_DOWN) return -1;
+	return 0;
 };
 
 export const isBackKey = (e) => {
