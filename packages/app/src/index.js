@@ -8,7 +8,7 @@ import {createRoot, hydrateRoot} from 'react-dom/client';
 
 import App, {localeStringsReady} from './App';
 import {isTizen} from './platform';
-import {registerKeys, ESSENTIAL_KEY_NAMES} from './utils/keys';
+import {registerKeys, registerBlockedKeys, ESSENTIAL_KEY_NAMES} from './utils/keys';
 
 const enforceTizenViewport = () => {
 	if (typeof document === 'undefined' || !isTizen()) return;
@@ -88,6 +88,7 @@ if (typeof Element !== 'undefined' && !Element.prototype.scrollTo) {
 if (isTizen()) {
 	enforceTizenViewport();
 	registerKeys(ESSENTIAL_KEY_NAMES);
+	registerBlockedKeys();
 }
 
 const appElement = (<App />);

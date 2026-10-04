@@ -36,3 +36,26 @@ export const findNextSeason = (seasons, currentSeasonId, currentSeasonNumber) =>
 };
 
 export const firstPlayableEpisode = (episodes) => (episodes || []).find(isPlayableEpisode) || null;
+
+// The mirror of the lookups above, for going back. A show's Specials sit in season 0, and stepping
+// back out of season 1 into them would be a surprise, so only numbered seasons are walked.
+export const findPreviousInSeason = (episodes, currentId) => {
+	const list = episodes || [];
+	const current = list.findIndex((ep) => String(ep?.Id) === String(currentId));
+	if (current < 0) return null;
+	return list.slice(0, current).reverse().find(isPlayableEpisode) || null;
+};
+
+export const findPreviousSeason = (seasons, currentSeasonId, currentSeasonNumber) => {
+	const list = seasons || [];
+	const currentEntry = list.find((s) => String(s.Id) === String(currentSeasonId));
+	const current = toNumber(currentSeasonNumber) ?? indexOf(currentEntry);
+	if (current == null) return null;
+	return list.reduce((best, season) => {
+		const number = indexOf(season);
+		if (number == null || number < 1 || number >= current) return best;
+		return best == null || number > indexOf(best) ? season : best;
+	}, null);
+};
+
+export const lastPlayableEpisode = (episodes) => [...(episodes || [])].reverse().find(isPlayableEpisode) || null;

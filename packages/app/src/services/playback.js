@@ -6,7 +6,7 @@ import {selectCompatibleAlternateAudio} from '../utils/alternateAudio';
 import {serverLogger} from './serverLogger';
 import {TEXT_SUBTITLE_CODECS, isAssSubtitleCodec, isPgsSubtitleCodec, isBurnInSubtitleCodec, isInBandSubtitleTrack} from '../utils/subtitleCodecs';
 import {applyProfileTuning} from '../utils/deviceProfileTuning';
-import {findNextInSeason, findNextSeason, firstPlayableEpisode} from '../utils/nextEpisode';
+import {findNextInSeason, findNextSeason, findPreviousInSeason, findPreviousSeason, firstPlayableEpisode, lastPlayableEpisode} from '../utils/nextEpisode';
 import {videoRangeTypeOf} from '../utils/videoRange';
 import {getVolumeState, lastVolumeState} from './systemVolume';
 
@@ -1063,6 +1063,30 @@ export const getNextEpisode = async (item) => {
 	}
 };
 
+// The episode before this one in air order, rolling back into the last of the previous season.
+export const getPreviousEpisode = async (item) => {
+	if (item.Type !== 'Episode' || !item.SeriesId) return null;
+	try {
+		const seasonId = item.SeasonId || item.ParentId;
+		if (!seasonId) return null;
+
+		const api = getApiForItem(item);
+		const episodesResult = await api.getEpisodes(item.SeriesId, seasonId);
+		const previous = findPreviousInSeason(episodesResult.Items, item.Id);
+		if (previous) return previous;
+
+		const seasonsResult = await api.getSeasons(item.SeriesId);
+		const previousSeason = findPreviousSeason(seasonsResult.Items, seasonId, item.ParentIndexNumber);
+		if (!previousSeason) return null;
+
+		const previousSeasonEpisodes = await api.getEpisodes(item.SeriesId, previousSeason.Id);
+		return lastPlayableEpisode(previousSeasonEpisodes.Items);
+	} catch (e) {
+		console.warn('[playback] Failed to get previous episode:', e.message);
+		return null;
+	}
+};
+
 export const changeAudioStream = async (streamIndex, currentPositionTicks) => {
 	if (!currentSession) return null;
 
@@ -1443,6 +1467,7 @@ export default {
 	getMediaSegments,
 	getIntroMarkers,
 	getNextEpisode,
+	getPreviousEpisode,
 	changeAudioStream,
 	changeSubtitleStream,
 	updateCurrentSession,

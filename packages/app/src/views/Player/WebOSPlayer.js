@@ -5,6 +5,8 @@ import $L from '@enact/i18n/$L';
 import Hls from 'hls.js';
 import * as playback from '../../services/playback';
 import {getImageUrl, getLogoUrl} from '../../utils/helpers';
+import {channelKeyStep} from '../../utils/keys';
+import {channelSeekSeconds} from '../../utils/channelSeek';
 import {api as jellyfinApi, createApiForServer, getServerUrl} from '../../services/jellyfinApi';
 import AudioMode from './audio/AudioMode';
 import useAudioTransport from './audio/useAudioTransport';
@@ -183,6 +185,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const [remoteSubtitleError, setRemoteSubtitleError] = useState(null);
 	const [mediaSegments, setMediaSegments] = useState(null);
 	const [nextEpisode, setNextEpisode] = useState(null);
+	const [previousEpisode, setPreviousEpisode] = useState(null);
 	const [isSeeking, setIsSeeking] = useState(false);
 	const [seekPosition, setSeekPosition] = useState(0);
 	const [mediaSourceId, setMediaSourceId] = useState(null);
@@ -813,6 +816,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			resetPopups(); // eslint-disable-line no-use-before-define
 			setNextEpisode(null);
+			setPreviousEpisode(null);
 
 			await waitForDecoderRelease();
 
@@ -1071,6 +1075,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						setNextEpisode(queued);
 					} else if (item.Type === 'Episode') {
 						playback.getNextEpisode(item).then(setNextEpisode);
+					}
+					if (item.Type === 'Episode') {
+						playback.getPreviousEpisode(item).then(setPreviousEpisode);
 					}
 				}
 
@@ -1669,6 +1676,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		await playback.reportStop(positionRef.current);
 		onPlayNext(episode);
 	}, [onPlayNext, item.Id]);
+
+	// Previous steps back to the episode before this one, the way Next steps on. A movie, a first
+	// episode, or a lookup that found nothing restarts it, as before.
+	const handlePrevious = useCallback(() => {
+		if (!isAudioMode && previousEpisode) {
+			onPlayNextWithCleanup(previousEpisode);
+			return;
+		}
+		handlePrevTrack();
+	}, [isAudioMode, previousEpisode, onPlayNextWithCleanup, handlePrevTrack]);
 
 	const {carouselOpenRef, openCarousel, markChannelPlaying, carouselProps} = useChannelCarousel({
 		item, isLiveTV, liveTvChannels, sortBy: settings.liveTvChannelSortBy,
@@ -2504,7 +2521,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			if (!groupSeekTo(ticks)) seekToTicks(ticks);
 		},
 		next: () => (isAudioMode ? handleNextTrack() : handlePlayNextNow()),
-		previous: handlePrevTrack,
+		previous: handlePrevious,
 		rewind: handleRewind,
 		fastForward: handleForward,
 		setAudioStream: (index) => {
@@ -2651,13 +2668,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			case 'guide': handleOpenGuide(); break;
 			case 'next': handlePlayNextNow(); break;
 			case 'nextTrack': handleNextTrack(); break;
-			case 'prevTrack': handlePrevTrack(); break;
+			case 'prevTrack': handlePrevious(); break;
 			case 'shuffle': handleToggleShuffle(); break;
 			case 'repeat': handleToggleRepeat(); break;
 			case 'favorite': handleToggleFavorite(); break;
 			default: break;
 		}
-	}, [showControls, handlePlayPause, handleRewind, handleForward, openModal, handleOpenCast, handleToggleZoom, handleOpenGuide, openCarousel, handlePlayNextNow, handleNextTrack, handlePrevTrack, handleToggleShuffle, handleToggleRepeat, handleToggleFavorite]);
+	}, [showControls, handlePlayPause, handleRewind, handleForward, openModal, handleOpenCast, handleToggleZoom, handleOpenGuide, openCarousel, handlePlayNextNow, handleNextTrack, handlePrevious, handleToggleShuffle, handleToggleRepeat, handleToggleFavorite]);
 
 	const handleControlButtonClick = useCallback((e) => {
 		const action = e.currentTarget.dataset.action;
@@ -2868,6 +2885,18 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			if (carouselOpenRef.current) return;
 
 			if (handlePopupKeyDown(e)) return;
+
+			// Channel keys seek far on the bar, and do nothing anywhere else.
+			const channelStep = channelKeyStep(e);
+			if (channelStep && !activeModal) {
+				e.preventDefault();
+				e.stopPropagation();
+				if (controlsVisible && focusRow === 'progress' && !isLiveTV) {
+					showControls();
+					scrubBy(channelStep * channelSeekSeconds(settings.seekStep, duration));
+				}
+				return;
+			}
 
 			// Media playback keys (webOS remote)
 			// Play: 415, Pause: 19, Fast-forward: 417, Rewind: 412, Stop: 413
