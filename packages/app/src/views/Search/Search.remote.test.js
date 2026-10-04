@@ -227,3 +227,42 @@ test('on the Seerr tab each section is a row, and down moves between them by the
 	expect(Spotlight.focus).toHaveBeenCalledWith('search-row-movie');
 	mockSeerr = {isEnabled: false};
 });
+
+describe('the tab a search opens on', () => {
+	const searchWithSeerr = async (settings) => {
+		mockSeerr = {isEnabled: true, displayName: 'Seerr', api: {search: async () => ({results: [{id: 1, title: 'The Last A', mediaType: 'movie'}]})}};
+		mockSettings = {settings};
+		mockApi.search.mockResolvedValue({Items: [{Id: 'm1', Type: 'Movie', Name: 'The Last Movie'}]});
+		const search = createRemoteSearch('phone');
+		search.receive({String: 'the last'});
+		render(<Search remoteSearch={search} />);
+		await act(async () => { jest.advanceTimersByTime(450); });
+		await act(async () => { jest.advanceTimersByTime(60); });
+	};
+	afterEach(() => { mockSeerr = {isEnabled: false}; mockSettings = {settings: {}}; });
+
+	test('opens on All unless set otherwise', async () => {
+		await searchWithSeerr({});
+		expect(global.mockTabs.activeId).toBe('all');
+	});
+
+	test('opens on Seerr once it has results when set to', async () => {
+		await searchWithSeerr({searchDefaultTab: 'seerr'});
+		expect(global.mockTabs.activeId).toBe('seerr');
+	});
+
+	test('leaves the viewer where they went if they moved to another tab before Seerr answered', async () => {
+		let finishSeerr;
+		mockSeerr = {isEnabled: true, displayName: 'Seerr', api: {search: () => new Promise((resolve) => { finishSeerr = resolve; })}};
+		mockSettings = {settings: {searchDefaultTab: 'seerr'}};
+		mockApi.search.mockResolvedValue({Items: [{Id: 'm1', Type: 'Movie', Name: 'The Last Movie'}]});
+		const search = createRemoteSearch('phone');
+		search.receive({String: 'the last'});
+		render(<Search remoteSearch={search} />);
+		await act(async () => { jest.advanceTimersByTime(450); });
+		await act(async () => { jest.advanceTimersByTime(60); });
+		act(() => global.mockTabs.onSelect('movies'));
+		await act(async () => { finishSeerr({results: [{id: 1, title: 'The Last A', mediaType: 'movie'}]}); });
+		expect(global.mockTabs.activeId).toBe('movies');
+	});
+});

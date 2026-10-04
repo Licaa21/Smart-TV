@@ -113,6 +113,8 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	const [seerrResults, setSeerrResults] = useState([]);
 	const [gameResults, setGameResults] = useState([]);
 	const [activeTab, setActiveTab] = useState('all');
+	const activeTabRef = useRef('all');
+	activeTabRef.current = activeTab;
 	const [searchInputFocused, setSearchInputFocused] = useState(false);
 	const [activeRowIndex, setActiveRowIndex] = useState(0);
 	const [visibleCardCounts, setVisibleCardCounts] = useState({});
@@ -156,13 +158,15 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 
 	const seerrLabel = seerrName || $L('Seerr');
 
-	// Focus the All pill itself. Focusing the tab container would land on the
-	// first pill, which is Seerr or Games when either has results.
+	// Focus the pill of the tab that is open, which is All unless a search was set to open on Seerr.
+	// Focusing the tab container would land on the first pill, which is Seerr or Games when either
+	// has results.
 	// Handed over as the element itself: a compound selector string is not something Spotlight
 	// resolves, and the fallback to the container lands on whichever pill sits nearest the search
 	// field, which switches the results to that tab.
 	const focusAllTab = useCallback(() => {
-		const pill = document.querySelector('[data-spotlight-id="search-tabs"] [data-id="all"]');
+		const pill = document.querySelector(ACTIVE_SEARCH_TAB_SELECTOR) ||
+			document.querySelector('[data-spotlight-id="search-tabs"] [data-id="all"]');
 		if (!(pill && Spotlight.focus(pill))) Spotlight.focus('search-tabs');
 	}, []);
 
@@ -177,6 +181,23 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		recentSearchesRef.current = next;
 		saveRecentSearches(next);
 	}, [saveRecentSearches]);
+
+	// Seerr answers after the library does, so a search set to open on Seerr starts on All and moves
+	// over once there is something to show. It stays put when the viewer has already gone to another
+	// tab or into the results, and carries focus along only if that sat on a tab pill.
+	const openOnSeerr = useCallback((count) => {
+		if (!count || settings.searchDefaultTab !== 'seerr' || activeTabRef.current !== 'all') return;
+		const focused = document.activeElement;
+		if (focused && focused.closest && focused.closest('[data-spotlight-id^="search-row-"], [data-spotlight-id="search-grid"]')) return;
+		const onTabs = Boolean(focused && focused.closest && focused.closest('[data-spotlight-id="search-tabs"]'));
+		setActiveTab('seerr');
+		if (onTabs) {
+			setTimeout(() => {
+				const pill = document.querySelector('[data-spotlight-id="search-tabs"] [data-id="seerr"]');
+				if (pill) Spotlight.focus(pill);
+			}, 50);
+		}
+	}, [settings.searchDefaultTab]);
 
 	const doSearch = useCallback(async (searchQuery) => {
 		const requestId = ++requestIdRef.current;
@@ -231,6 +252,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 					if (requestId !== requestIdRef.current) return;
 					const filtered = (res.results || []).filter((r) => r.mediaType !== 'person').slice(0, SEERR_CAP);
 					setSeerrResults(filtered);
+					openOnSeerr(filtered.length);
 				}).catch((err) => console.error('Seerr search failed:', err));
 			} else {
 				setSeerrResults([]);
@@ -253,7 +275,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 			setGameResults([]);
 			setIsLoading(false);
 		}
-	}, [api, seerrEnabled, seerrApi, unifiedMode, focusAllTab, rememberSearch, settings]);
+	}, [api, seerrEnabled, seerrApi, unifiedMode, focusAllTab, rememberSearch, openOnSeerr, settings]);
 
 	const applyQuery = useCallback((value) => {
 		// Even a clear or a query waiting for debounce supersedes older results.

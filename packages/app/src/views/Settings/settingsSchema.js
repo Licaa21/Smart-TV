@@ -50,6 +50,7 @@ import {
 	getScreensaverSizeOptions,
 	getScreensaverTimeoutOptions,
 	getSeasonalThemeOptions,
+	getSearchDefaultTabOptions,
 	getSeekStepOptions,
 	getServerSortOptions,
 	getSkipLengthOptions,
@@ -846,6 +847,7 @@ export const SETTINGS_SCHEMA = [
 				rows: [
 					{kind: KIND.CUSTOM, render: 'seerrPanel'},
 					{kind: KIND.SECTION, id: 'seerrPreferences', label: () => $L('Preferences'), when: whenSeerr},
+					{kind: KIND.OPTION, key: 'searchDefaultTab', label: () => $L('Search Opens On'), desc: () => $L('Choose which tab a search opens on when Seerr has results'), options: getSearchDefaultTabOptions, fallback: () => $L('All'), icon: 'search', when: whenSeerr},
 					{
 						kind: KIND.TOGGLE,
 						key: 'seerrShowMissingCollectionItems',

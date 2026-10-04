@@ -277,6 +277,8 @@ export const defaultSettings = {
 	showSeerrButton: true,
 	seerrShowMissingCollectionItems: true,
 	showSeerrAvailabilityBadges: true,
+	// The tab a search opens on once Seerr has results: 'all' or 'seerr'.
+	searchDefaultTab: 'all',
 	// Off until asked for. An admin who wants it on for everyone can set it in the
 	// plugin's default settings.
 	showServerMessagesButton: false,

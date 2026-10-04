@@ -97,6 +97,11 @@ export const getSubtitlePositionOptions = () => [
 
 export {getSubtitleColorOptions, getSubtitleShadowColorOptions, getSubtitleBackgroundColorOptions} from '../../utils/subtitleConstants';
 
+export const getSearchDefaultTabOptions = () => [
+	{ value: 'all', label: $L('All') },
+	{ value: 'seerr', label: $L('Seerr') }
+];
+
 export const getSeekStepOptions = () => [
 	{ value: 5, label: $L('5 seconds') },
 	{ value: 10, label: $L('10 seconds') },
