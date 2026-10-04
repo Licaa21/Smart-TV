@@ -26,13 +26,13 @@ jest.mock('../../context/AuthContext', () => ({useAuth: () => mockAuth}));
 jest.mock('../../context/SettingsContext', () => ({useSettings: () => mockSettings}));
 let mockSeerr = {isEnabled: false};
 jest.mock('../../context/SeerrContext', () => ({useSeerr: () => mockSeerr}));
-jest.mock('../../utils/seerrHomeRows', () => ({normalizeMediaItem: (result) => ({Id: `seerr-${result.id}`, Type: 'Movie', Name: result.title})}));
+jest.mock('../../utils/seerrHomeRows', () => ({normalizeMediaItem: (result) => ({Id: `seerr-${result.id}`, Type: 'Movie', Name: result.title, _seerrMediaType: result.mediaType})}));
 jest.mock('../../services/connectionPool', () => ({}));
 jest.mock('../../services/gamesApi', () => ({}));
 jest.mock('../../services/parentalControls', () => ({withoutBlockedItems: (items) => items}));
 jest.mock('../../hooks/useStorage', () => () => [[], mockSave]);
 jest.mock('../../hooks/useItemMenuHold', () => () => ({}));
-jest.mock('../../components/DetailsTabBar', () => () => null);
+jest.mock('../../components/DetailsTabBar', () => (props) => { global.mockTabs = props; return null; });
 jest.mock('../../components/LoadingSpinner', () => () => null);
 jest.mock('../../components/ProxiedImage', () => () => null);
 jest.mock('../../components/GameCard', () => () => null);
@@ -202,7 +202,28 @@ test('a row drawn before the Seerr results arrive can still move down onto the S
 	expect(global.mockRowProps['Seerr (1)']).toBeTruthy();
 	Spotlight.focus.mockClear();
 	early(1);
-	expect(Spotlight.focus).toHaveBeenCalledWith('search-row-2');
+	expect(Spotlight.focus).toHaveBeenCalledWith('search-row-seerr');
 	mockSeerr = {isEnabled: false};
 });
 
+
+test('on the Seerr tab each section is a row, and down moves between them by the rows own id', async () => {
+	mockSeerr = {isEnabled: true, displayName: 'Seerr', api: {search: async () => ({results: [
+		{id: 1, title: 'The Last A', mediaType: 'movie'}, {id: 2, title: 'The Last B', mediaType: 'tv'},
+		{id: 3, title: 'Other C', mediaType: 'movie'}, {id: 4, title: 'Other D', mediaType: 'tv'}
+	]})}};
+	mockSettings = {settings: {}};
+	mockApi.search.mockResolvedValue({Items: []});
+	const search = createRemoteSearch('phone');
+	search.receive({String: 'the last'});
+	render(<Search remoteSearch={search} />);
+	await act(async () => { jest.advanceTimersByTime(450); });
+	await act(async () => { jest.advanceTimersByTime(60); });
+	act(() => global.mockTabs.onSelect('seerr'));
+	expect(screen.getAllByTestId('row').map((row) => row.getAttribute('data-title'))).toEqual(['Most relevant (4)', 'Movies (2)', 'TV Shows (2)']);
+	Spotlight.focus.mockClear();
+	global.mockRowProps['Most relevant (4)'].onNavigateDown(0);
+	// By position, a row mounted for the tab before it was left could not be found by Spotlight.
+	expect(Spotlight.focus).toHaveBeenCalledWith('search-row-movie');
+	mockSeerr = {isEnabled: false};
+});

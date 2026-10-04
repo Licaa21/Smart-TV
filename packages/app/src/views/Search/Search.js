@@ -55,6 +55,8 @@ const ROW_SCROLL_MARGIN = 50;
 const ROW_SPACING = 16;
 // How far above the bottom edge the last of a focused row has to sit.
 const ROW_BOTTOM_MARGIN = 40;
+// How far below the top edge the title of a focused row has to sit, clear of a top navigation bar.
+const ROW_TOP_MARGIN = 100;
 
 const SearchIcon = () => (
 	<svg viewBox="0 0 24 24" fill="currentColor" className={css.searchIcon}>
@@ -381,6 +383,13 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		return [{id: group.key, title: group.title, items: group.items, kind: 'jellyfin', cardType: cardTypeFor(group.items[0]?.Type)}];
 	}, [activeTab, groups, seerrCards, query]);
 	const rows = activeTab === 'all' ? allRows : tabRows;
+	const rowsRef = useRef([]);
+	rowsRef.current = rows;
+	// A row is known to Spotlight by what it is, not by where it sits. Spotlight forgets a container
+	// when the component that registered the id unmounts, and moving to another tab mounts the new
+	// rows before the old ones leave. Rows that shared an id by position came out of that
+	// unregistered, so focus could not be sent to them by id and down stopped at the first row.
+	const rowSpotlightId = useCallback((rowIndex) => `search-row-${rowsRef.current[rowIndex]?.id}`, []);
 
 	useEffect(() => {
 		setTimeout(() => Spotlight.focus('search-input'), 100);
@@ -435,10 +444,10 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 
 	const focusContent = useCallback(() => {
 		if (activeTab !== 'games') setActiveRowIndex(0);
-		const containerId = activeTab === 'games' ? 'search-grid' : 'search-row-0';
+		const containerId = activeTab === 'games' ? 'search-grid' : rowSpotlightId(0);
 		const first = document.querySelector(`[data-spotlight-id="${containerId}"] .spottable`);
 		if (!(first && Spotlight.focus(first))) Spotlight.focus(containerId);
-	}, [activeTab]);
+	}, [activeTab, rowSpotlightId]);
 
 	// The press is stopped as well as prevented. Spotlight makes its own move once
 	// the event reaches the top, and it would make that move out of whatever was
@@ -464,23 +473,23 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 				Spotlight.focus(ACTIVE_SEARCH_TAB_SELECTOR);
 			} else {
 				setActiveRowIndex(rowIndex - 1);
-				Spotlight.focus(`search-row-${rowIndex - 1}`);
+				Spotlight.focus(rowSpotlightId(rowIndex - 1));
 			}
 		} else if (e.keyCode === KEYS.DOWN) {
 			e.preventDefault();
 			e.stopPropagation();
 			if (rowIndex < rows.length - 1) {
 				setActiveRowIndex(rowIndex + 1);
-				Spotlight.focus(`search-row-${rowIndex + 1}`);
+				Spotlight.focus(rowSpotlightId(rowIndex + 1));
 			}
 		}
-	}, [rows.length]);
+	}, [rows.length, rowSpotlightId]);
 
 	// Home rows report their own key presses and focus, so they hand these in by row index.
 	const focusRow = useCallback((rowIndex) => {
 		setActiveRowIndex(rowIndex);
-		Spotlight.focus(`search-row-${rowIndex}`);
-	}, []);
+		Spotlight.focus(rowSpotlightId(rowIndex));
+	}, [rowSpotlightId]);
 
 	const handleRowNavigateUp = useCallback((rowIndex) => {
 		if (rowIndex === 0) Spotlight.focus(ACTIVE_SEARCH_TAB_SELECTOR);
@@ -490,8 +499,6 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// The Home rows only rebuild when their items change, not when a handler does, so these read
 	// the rows through a ref. Seerr results land after the library rows have drawn, and a row
 	// holding an older handler would think it was the last one.
-	const rowsRef = useRef([]);
-	rowsRef.current = rows;
 
 	const handleRowNavigateDown = useCallback((rowIndex) => {
 		if (rowIndex < rowsRef.current.length - 1) focusRow(rowIndex + 1);
@@ -503,16 +510,22 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	const keepRowInView = useCallback((rowIndex) => {
 		const reveal = () => {
 			const container = containerRef.current;
-			const row = document.querySelector(`[data-spotlight-id="search-row-${rowIndex}"]`);
+			const row = document.querySelector(`[data-spotlight-id="${rowSpotlightId(rowIndex)}"]`);
 			if (!container || !row) return;
 			const view = container.getBoundingClientRect();
 			const rect = row.getBoundingClientRect();
+			// Coming up from the row below leaves this row's title above the top edge.
+			const hidden = view.top + ROW_TOP_MARGIN - rect.top;
+			if (hidden > 0) {
+				container.scrollTop -= hidden;
+				return;
+			}
 			const overflow = rect.bottom - (view.bottom - ROW_BOTTOM_MARGIN);
 			if (overflow > 0) container.scrollTop += Math.min(overflow, Math.max(0, rect.top - view.top));
 		};
 		window.requestAnimationFrame(reveal);
 		window.setTimeout(reveal, 200);
-	}, []);
+	}, [rowSpotlightId]);
 
 	const handleHomeRowFocus = useCallback((rowIndex) => {
 		if (pointerHover()) return;
@@ -604,7 +617,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 								<RowContainer
 									key={row.id}
 									className={css.resultRow}
-									spotlightId={`search-row-${rowIndex}`}
+									spotlightId={`search-row-${row.id}`}
 									data-row-index={rowIndex}
 									onKeyDown={handleRowKeyDown}
 								>
@@ -635,7 +648,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 								key={row.id}
 								rowId={row.id}
 								rowIndex={rowIndex}
-								spotlightId={`search-row-${rowIndex}`}
+								spotlightId={`search-row-${row.id}`}
 								title={title}
 								items={row.items.slice(0, visibleCount)}
 								serverUrl={serverUrl}
