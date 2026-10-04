@@ -14,7 +14,6 @@ import * as connectionPool from '../../services/connectionPool';
 import * as gamesApi from '../../services/gamesApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import {ClassicMediaRow, ModernMediaRow} from '../../components/MediaRow';
-import {ClassicMediaCard, ModernMediaCard} from '../../components/MediaCard';
 import DetailsTabBar from '../../components/DetailsTabBar';
 import GameCard from '../../components/GameCard';
 import {KEYS} from '../../utils/keys';
@@ -91,7 +90,7 @@ const seerrSections = (items, query) => {
 	return [
 		...(top.length ? [{key: 'top', title: $L('Most relevant'), items: top}] : []),
 		...byType
-	].map((section) => ({...section, title: `${section.title} (${section.items.length})`}));
+	];
 };
 
 const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, onPlayChannel, remoteSearch}) => {
@@ -105,7 +104,6 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// screen of titled rows.
 	const useModernRows = settings.homeRowsStyle !== 'v1';
 	const RowComponent = useModernRows ? ModernMediaRow : ClassicMediaRow;
-	const CardComponent = useModernRows ? ModernMediaCard : ClassicMediaCard;
 
 	const [query, setQuery] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
@@ -116,7 +114,6 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	const [searchInputFocused, setSearchInputFocused] = useState(false);
 	const [activeRowIndex, setActiveRowIndex] = useState(0);
 	const [visibleCardCounts, setVisibleCardCounts] = useState({});
-	const [focusedGridId, setFocusedGridId] = useState(null);
 	const [recentSearches, saveRecentSearches] = useStorage(RECENT_SEARCHES_KEY, []);
 
 	// doSearch records into this list, so it reads the current value through a
@@ -347,7 +344,10 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		if (!tabs.find((t) => t.id === activeTab)) setActiveTab('all');
 	}, [tabs, activeTab]);
 
-	const handleSelectTab = useCallback((id) => setActiveTab(id), []);
+	const handleSelectTab = useCallback((id) => {
+		setActiveTab(id);
+		setActiveRowIndex(0);
+	}, []);
 
 	// Seerr results are shaped like library items so the same cards can draw them. The raw result
 	// is kept beside, since opening one asks for what Seerr sent.
@@ -363,11 +363,24 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 
 	// Rows shown in the All tab: groups first, then Seerr, then Games.
 	const allRows = useMemo(() => {
-		const rows = groups.map((g) => ({id: g.key, title: g.title, items: g.items, kind: 'jellyfin', cardType: cardTypeFor(g.items[0]?.Type)}));
-		if (seerrCards.items.length > 0) rows.push({id: 'seerr', title: seerrLabel, items: seerrCards.items, kind: 'seerr', cardType: 'portrait'});
-		if (gameResults.length > 0) rows.push({id: 'games', title: $L('Games'), items: gameResults, kind: 'game'});
-		return rows;
+		const list = groups.map((g) => ({id: g.key, title: g.title, items: g.items, kind: 'jellyfin', cardType: cardTypeFor(g.items[0]?.Type)}));
+		if (seerrCards.items.length > 0) list.push({id: 'seerr', title: seerrLabel, items: seerrCards.items, kind: 'seerr', cardType: 'portrait'});
+		if (gameResults.length > 0) list.push({id: 'games', title: $L('Games'), items: gameResults, kind: 'game'});
+		return list;
 	}, [groups, seerrCards, gameResults, seerrLabel]);
+
+	// Every tab but Games is a stack of Home rows, like All. A row scrolls sideways, so a focused card
+	// growing to show its details cannot push the last card of a wrapped line onto a line of its own,
+	// and every section ends on the same edge instead of a short last line.
+	const tabRows = useMemo(() => {
+		if (activeTab === 'seerr') {
+			return seerrSections(seerrCards.items, query).map((section) => ({...section, id: section.key, kind: 'seerr', cardType: 'portrait'}));
+		}
+		const group = groups.find((g) => g.key === activeTab);
+		if (!group) return [];
+		return [{id: group.key, title: group.title, items: group.items, kind: 'jellyfin', cardType: cardTypeFor(group.items[0]?.Type)}];
+	}, [activeTab, groups, seerrCards, query]);
+	const rows = activeTab === 'all' ? allRows : tabRows;
 
 	useEffect(() => {
 		setTimeout(() => Spotlight.focus('search-input'), 100);
@@ -421,8 +434,8 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	}, []);
 
 	const focusContent = useCallback(() => {
-		if (activeTab === 'all') setActiveRowIndex(0);
-		const containerId = activeTab === 'all' ? 'search-row-0' : 'search-grid';
+		if (activeTab !== 'games') setActiveRowIndex(0);
+		const containerId = activeTab === 'games' ? 'search-grid' : 'search-row-0';
 		const first = document.querySelector(`[data-spotlight-id="${containerId}"] .spottable`);
 		if (!(first && Spotlight.focus(first))) Spotlight.focus(containerId);
 	}, [activeTab]);
@@ -456,12 +469,12 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		} else if (e.keyCode === KEYS.DOWN) {
 			e.preventDefault();
 			e.stopPropagation();
-			if (rowIndex < allRows.length - 1) {
+			if (rowIndex < rows.length - 1) {
 				setActiveRowIndex(rowIndex + 1);
 				Spotlight.focus(`search-row-${rowIndex + 1}`);
 			}
 		}
-	}, [allRows.length]);
+	}, [rows.length]);
 
 	// Home rows report their own key presses and focus, so they hand these in by row index.
 	const focusRow = useCallback((rowIndex) => {
@@ -477,11 +490,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// The Home rows only rebuild when their items change, not when a handler does, so these read
 	// the rows through a ref. Seerr results land after the library rows have drawn, and a row
 	// holding an older handler would think it was the last one.
-	const allRowsRef = useRef([]);
-	allRowsRef.current = allRows;
+	const rowsRef = useRef([]);
+	rowsRef.current = rows;
 
 	const handleRowNavigateDown = useCallback((rowIndex) => {
-		if (rowIndex < allRowsRef.current.length - 1) focusRow(rowIndex + 1);
+		if (rowIndex < rowsRef.current.length - 1) focusRow(rowIndex + 1);
 	}, [focusRow]);
 
 	// A focused modern card grows to show its details once it has focus, after the page has already
@@ -510,7 +523,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// A row opens with about a screen of cards, and the next batch lands as focus nears the end.
 	const growRow = useCallback((item) => {
 		if (pointerHover()) return;
-		const row = allRowsRef.current.find((candidate) => candidate.items.some((entry) => entry.Id === item.Id));
+		const row = rowsRef.current.find((candidate) => candidate.items.some((entry) => entry.Id === item.Id));
 		if (!row) return;
 		const focusedIndex = row.items.findIndex((candidate) => candidate.Id === item.Id);
 		setVisibleCardCounts((current) => {
@@ -579,40 +592,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		/>
 	), [handleGameSelect]);
 
-	// The active grid tab (a type group, Seerr, or Games).
-	const gridConfig = useMemo(() => {
-		if (activeTab === 'seerr') return {items: seerrCards.items, kind: 'seerr'};
-		if (activeTab === 'games') return {items: gameResults, kind: 'game'};
-		const group = groups.find((g) => g.key === activeTab);
-		if (!group) return null;
-		return {items: group.items, kind: 'jellyfin'};
-	}, [activeTab, groups, seerrCards, gameResults]);
-
-	const clearGridFocus = useCallback(() => setFocusedGridId(null), []);
-
-	const renderGridCard = (kind, item, index) => {
-		if (kind === 'game') return renderGameCard(item, `grid-item-${index}`);
-		return (
-			<CardComponent
-				key={`${kind}-${item.Id}`}
-				item={item}
-				serverUrl={serverUrl}
-				cardType={cardTypeFor(item.Type)}
-				rowImageType={settings.homeRowsImageType}
-				onSelect={kind === 'seerr' ? handleSelectSeerr : handleSelectJellyfin}
-				showServerBadge={unifiedMode}
-				spotlightId={`grid-item-${index}`}
-				isFocused={focusedGridId === item.Id}
-				onFocused={setFocusedGridId}
-			/>
-		);
-	};
-
 	const renderContent = () => {
-		if (activeTab === 'all') {
+		if (activeTab !== 'games') {
 			return (
 				<div className={css.resultsContainer}>
-					{allRows.map((row, rowIndex) => {
+					{rows.map((row, rowIndex) => {
 						const mounted = shouldMountSearchRow(rowIndex, activeRowIndex);
 						const visibleCount = mounted ? visibleCardCounts[row.id] || initialCardCount(row.items.length) : 0;
 						if (row.kind === 'game') {
@@ -670,22 +654,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 				</div>
 			);
 		}
-		if (!gridConfig) return null;
-		let cardsBefore = 0;
 		return (
-			<GridContainer className={css.gridWrapper} spotlightId="search-grid" onBlur={clearGridFocus}>
-				{(gridConfig.kind === 'seerr' ? seerrSections(gridConfig.items, query) : [{key: 'all', items: gridConfig.items}]).map((section) => {
-					const start = cardsBefore;
-					cardsBefore += section.items.length;
-					return (
-						<div key={section.key} className={css.gridSection}>
-							{section.title && <h2 className={css.gridTitle}>{section.title}</h2>}
-							<div className={css.grid}>
-								{section.items.map((item, idx) => renderGridCard(gridConfig.kind, item, start + idx))}
-							</div>
-						</div>
-					);
-				})}
+			<GridContainer className={css.gridWrapper} spotlightId="search-grid">
+				<div className={css.grid}>
+					{gameResults.map((game, idx) => renderGameCard(game, `grid-item-${idx}`))}
+				</div>
 			</GridContainer>
 		);
 	};
