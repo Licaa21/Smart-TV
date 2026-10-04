@@ -42,7 +42,7 @@ import useAudioTransport from './audio/useAudioTransport';
 import useLyrics from './audio/useLyrics';
 import {handleAudioFocusKey, exitAudioPanel, nextAudioFocusRow, AUDIO_FOCUS_IDS} from './audio/audioFocus';
 import useSegmentPopups from './useSegmentPopups';
-import {NextEpisodeContainer, CONTROLS_HIDE_DELAY, withTimeout, SEGMENT_FETCH_TIMEOUT} from './PlayerConstants';
+import {NextEpisodeContainer, CONTROLS_HIDE_DELAY, SCRUB_COMMIT_DELAY, withTimeout, SEGMENT_FETCH_TIMEOUT} from './PlayerConstants';
 import NextUpOverlay from './NextUpOverlay';
 import SkipSegmentOverlay from './SkipSegmentOverlay';
 import StillWatchingDialog from './StillWatchingDialog';
@@ -239,6 +239,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const timeUpdateLogicRef = useRef(null);
 	// Deferred seek: only execute actual avplaySeek after user stops pressing arrows
 	const seekDebounceRef = useRef(null);
+	const holdCommitTimerRef = useRef(null);
 	const pendingSeekMsRef = useRef(null);
 	// The committed scrub whose seek is still landing, so only the newest one ends the scrub.
 	const landingScrubRef = useRef(null);
@@ -1576,6 +1577,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				clearTimeout(seekDebounceRef.current);
 				seekDebounceRef.current = null;
 			}
+			clearTimeout(holdCommitTimerRef.current);
 			if (subtitleTimeoutRef.current) {
 				clearTimeout(subtitleTimeoutRef.current);
 				subtitleTimeoutRef.current = null;
@@ -1955,6 +1957,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// from there.
 	const resumeHeldScrub = useCallback(() => {
 		if (!scrubHoldRef.current.active) return false;
+		clearTimeout(holdCommitTimerRef.current);
 		scrubHoldRef.current = {active: false, wasPlaying: false};
 		noteViewerActivity();
 		executeDeferredSeek();
@@ -1966,9 +1969,24 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		return true;
 	}, [noteViewerActivity, executeDeferredSeek, verifyResumeHealthy]);
 
+	// A held scrub lands by itself once the presses stop, so there is no waiting on OK. Playback
+	// carries on if it was playing, and a video that was paused to begin with stays paused.
+	const commitHeldScrub = useCallback(() => {
+		holdCommitTimerRef.current = null;
+		const held = scrubHoldRef.current;
+		if (!held.active) return;
+		if (held.wasPlaying) {
+			resumeHeldScrub();
+			return;
+		}
+		scrubHoldRef.current = {active: false, wasPlaying: false};
+		executeDeferredSeek();
+	}, [resumeHeldScrub, executeDeferredSeek]);
+
 	// A skip or a chapter jump lands somewhere the scrub knows nothing about, so a pending scrub is
 	// dropped rather than committed over it later, and a held one lets playback carry on.
 	const dropScrub = useCallback(() => {
+		clearTimeout(holdCommitTimerRef.current);
 		if (seekDebounceRef.current) {
 			clearTimeout(seekDebounceRef.current);
 			seekDebounceRef.current = null;
@@ -2361,9 +2379,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const baseMs = pendingSeekMsRef.current != null ? pendingSeekMsRef.current : avplayGetCurrentTime();
 		const newMs = Math.min(avplayGetDuration(), Math.max(0, baseMs + deltaSeconds * 1000));
 		setSeekPosition(Math.floor(newMs * 10000));
-		if (scrubHoldRef.current.active) pendingSeekMsRef.current = newMs;
-		else scheduleDeferredSeek(newMs);
-	}, [noteViewerActivity, beginScrub, scheduleDeferredSeek]);
+		if (scrubHoldRef.current.active) {
+			pendingSeekMsRef.current = newMs;
+			clearTimeout(holdCommitTimerRef.current);
+			holdCommitTimerRef.current = setTimeout(commitHeldScrub, SCRUB_COMMIT_DELAY);
+		} else {
+			scheduleDeferredSeek(newMs);
+		}
+	}, [noteViewerActivity, beginScrub, scheduleDeferredSeek, commitHeldScrub]);
 
 	// Progress bar keyboard control - deferred seeking
 	const handleProgressKeyDown = useCallback((e) => {

@@ -55,7 +55,7 @@ import {createReadyGate} from '../../utils/syncReady';
 import {createSkipGovernor, chooseCorrection, STALL_DEBOUNCE_MS} from '../../utils/syncCorrection';
 import {syncLog} from '../../utils/syncLog';
 import {
-	NextEpisodeContainer, CONTROLS_HIDE_DELAY,
+	NextEpisodeContainer, CONTROLS_HIDE_DELAY, SCRUB_COMMIT_DELAY,
 	withTimeout, SEGMENT_FETCH_TIMEOUT, ASS_READY_WAIT
 } from './PlayerConstants';
 import {
@@ -285,6 +285,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const seekingTranscodeRef = useRef(false);
 	const seekDebounceTimerRef = useRef(null);
 	const scrubSettleTimerRef = useRef(null);
+	const holdCommitTimerRef = useRef(null);
 	const isCleaningUpRef = useRef(false);
 	const isHandlingErrorRef = useRef(false);
 	const sourceTransitionRef = useRef(false);
@@ -1104,6 +1105,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
 				if (seekDebounceTimerRef.current) clearTimeout(seekDebounceTimerRef.current);
 				clearTimeout(scrubSettleTimerRef.current);
+				clearTimeout(holdCommitTimerRef.current);
 				pgsInitGenRef.current++; // eslint-disable-line react-hooks/exhaustive-deps
 				disposePgsRenderer(pgsRendererRef.current);
 				pgsInitRef.current = null;
@@ -1134,6 +1136,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				clearTimeout(seekDebounceTimerRef.current);
 			}
 			clearTimeout(scrubSettleTimerRef.current);
+			clearTimeout(holdCommitTimerRef.current);
 
 			isCleaningUpRef.current = true;
 			destroyHlsPlayer();
@@ -2059,6 +2062,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const resumeHeldScrub = useCallback(() => {
 		const held = scrubHoldRef.current;
 		if (!held.active) return false;
+		clearTimeout(holdCommitTimerRef.current);
 		scrubHoldRef.current = {active: false, wasPlaying: false, ticks: null};
 		noteViewerActivity();
 		if (held.ticks != null) {
@@ -2081,9 +2085,28 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		scrubHoldRef.current = {...held, ticks: null};
 	}, [seekToTicks, noteSeek]);
 
+	// A held scrub lands by itself once the presses stop, so there is no waiting on OK. Playback
+	// carries on if it was playing, and a video that was paused to begin with stays paused.
+	const commitHeldScrub = useCallback(() => {
+		holdCommitTimerRef.current = null;
+		const held = scrubHoldRef.current;
+		if (!held.active) return;
+		if (held.wasPlaying) {
+			resumeHeldScrub();
+			return;
+		}
+		scrubHoldRef.current = {active: false, wasPlaying: false, ticks: null};
+		if (held.ticks != null) {
+			noteSeek();
+			seekToTicks(held.ticks);
+		}
+		setIsSeeking(false);
+	}, [resumeHeldScrub, seekToTicks, noteSeek]);
+
 	// A skip or a chapter jump lands somewhere the scrub knows nothing about, so a held scrub is
 	// dropped and playback carries on as it was.
 	const dropScrub = useCallback(() => {
+		clearTimeout(holdCommitTimerRef.current);
 		const held = scrubHoldRef.current;
 		if (!held.active) return;
 		scrubHoldRef.current = {active: false, wasPlaying: false, ticks: null};
@@ -2129,7 +2152,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const ticks = Math.max(0, Math.min(maxTicks, base + Math.floor(deltaSeconds * 10000000)));
 		scrubHoldRef.current = {...held, ticks};
 		setSeekPosition(ticks);
-	}, [noteViewerActivity, beginScrub, seekByOffset, duration, noteSeek]);
+		clearTimeout(holdCommitTimerRef.current);
+		holdCommitTimerRef.current = setTimeout(commitHeldScrub, SCRUB_COMMIT_DELAY);
+	}, [noteViewerActivity, beginScrub, seekByOffset, duration, noteSeek, commitHeldScrub]);
 
 	const handlePlayPause = useCallback(() => {
 		if (resumeHeldScrub()) {
