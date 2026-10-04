@@ -9,30 +9,35 @@ import SettingsView from './SettingsView';
 
 import css from './Settings.module.less';
 
-const ButtonLayoutView = ({kind, tempButtons, onToggleButton, onMoveButton, onReset, onSave}) => (
+const ButtonLayoutView = ({kind, tempButtons, onToggleButton, onMoveButton, onReset, onSave}) => {
+	// The codec ranking has nothing to switch off, so the rows show their place in the order.
+	const isCodecOrder = kind === 'audioCodec';
+	return (
 	<SettingsView spotlightId='button-layout-view'>
 		<SectionTitle>
-			{kind === 'osd' ? $L('Player Buttons') : (kind === 'metadata' ? $L('Metadata Row') : $L('Details Buttons'))}
+			{isCodecOrder ? $L('Audio Codec Priority') : (kind === 'osd' ? $L('Player Buttons') : (kind === 'metadata' ? $L('Metadata Row') : $L('Details Buttons')))}
 		</SectionTitle>
 		<div className={css.viewDescription}>
-			{kind === 'osd'
+			{isCodecOrder
+				? $L('Move the codecs up or down to rank them, best first. Your audio language is applied before this, so the ranking only decides between tracks in the same language.')
+				: (kind === 'osd'
 				? $L('Enable/disable and reorder the buttons around the playback controls.')
 				: (kind === 'metadata'
 				? $L('Enable/disable and reorder the metadata items displayed on the details screen.')
-				: $L('Enable/disable and reorder the buttons on the details screen action row.'))}
+				: $L('Enable/disable and reorder the buttons on the details screen action row.')))}
 		</div>
 		{tempButtons.map((btn, index) => (
 			<div key={btn.id} className={css.homeRowItem}>
 				<SpottableDiv
 					className={css.listItem}
-					onClick={() => onToggleButton(btn.id)}
+					onClick={isCodecOrder ? undefined : () => onToggleButton(btn.id)}
 					spotlightId={`layoutbtn-${btn.id}`}
 				>
 					<div className={css.listItemBody}>
 						<div className={css.listItemHeading}>{$L(btn.label)}</div>
 						{btn.subtitle && <div className={css.listItemCaption}>{$L(btn.subtitle)}</div>}
 					</div>
-					<div className={css.listItemTrailing}>{renderToggle(btn.enabled)}</div>
+					<div className={css.listItemTrailing}>{isCodecOrder ? index + 1 : renderToggle(btn.enabled)}</div>
 				</SpottableDiv>
 				<div className={css.homeRowControls}>
 					<Button
@@ -65,6 +70,7 @@ const ButtonLayoutView = ({kind, tempButtons, onToggleButton, onMoveButton, onRe
 			</Button>
 		</div>
 	</SettingsView>
-);
+	);
+};
 
 export default ButtonLayoutView;

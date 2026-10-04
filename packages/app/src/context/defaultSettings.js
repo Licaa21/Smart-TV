@@ -1,5 +1,6 @@
 // Split out from SettingsContext so it can be imported without dragging in the
 // platform storage layer, which a plain unit test cannot load.
+import {AUDIO_CODECS} from '../utils/audioCodecs';
 import {DEFAULT_HOME_ROWS} from '../utils/homeLayout';
 
 export const defaultSettings = {
@@ -37,6 +38,7 @@ export const defaultSettings = {
 	fallbackAudioLanguage: '',
 	preferDefaultAudioTrack: false,
 	preferAudioDescription: false,
+	audioCodecOrder: AUDIO_CODECS.map((codec) => codec.id),
 	fallbackSubtitleLanguage: '',
 	preferSdhSubtitles: false,
 	// Seconds as a string, the shape the other clients sync for it.
