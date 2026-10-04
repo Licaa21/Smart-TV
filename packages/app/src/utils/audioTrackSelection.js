@@ -10,6 +10,20 @@ import {streamTitleText} from './streamTitle';
 const COMMENTARY = /\b(commentary|director\s*commentary|commentaries|directors\s*commentary)\b/;
 const AUDIO_DESCRIPTION = /\b(audio\s+description|descriptive\s+audio|visual\s+description|descriptive|description|ad)\b/;
 
+// A raw server record in the shape the player holds, so the details screen can ask
+// selectPreferredAudioStream the same question the player will and show the same answer.
+export const fromServerAudio = (stream) => ({
+	index: stream?.Index,
+	codec: stream?.Codec,
+	profile: stream?.Profile,
+	language: stream?.Language || 'Unknown',
+	title: stream?.Title,
+	displayTitle: stream?.DisplayTitle || stream?.Title || stream?.Language,
+	channels: stream?.Channels,
+	isDefault: stream?.IsDefault,
+	isAudioDescription: stream?.IsAudioDescription
+});
+
 export const isCommentaryAudioStream = (stream) =>
 	stream?.isCommentary === true || COMMENTARY.test(streamTitleText(stream));
 
