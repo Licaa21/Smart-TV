@@ -1,6 +1,5 @@
 // Split out from SettingsContext so it can be imported without dragging in the
 // platform storage layer, which a plain unit test cannot load.
-import {AUDIO_CODECS} from '../utils/audioCodecs';
 import {DEFAULT_HOME_ROWS} from '../utils/homeLayout';
 
 export const defaultSettings = {
@@ -38,7 +37,8 @@ export const defaultSettings = {
 	fallbackAudioLanguage: '',
 	preferDefaultAudioTrack: false,
 	preferAudioDescription: false,
-	audioCodecOrder: AUDIO_CODECS.map((codec) => codec.id),
+	// No audioCodecOrder until one is saved. Tracks then rank as they always did, by language and flags
+	// and channel count, and the codec page lists the codecs in their usual order to start from.
 	fallbackSubtitleLanguage: '',
 	preferSdhSubtitles: false,
 	// Seconds as a string, the shape the other clients sync for it.

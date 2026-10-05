@@ -136,3 +136,13 @@ describe('audioCodecOrder', () => {
 		expect(selectPreferredAudioStream([aac, ac3, eac3], {audioLanguage: 'eng'})).toBe(eac3);
 	});
 });
+
+describe('without a saved codec order', () => {
+	test('tracks rank by channel count alone, as before the setting existed', () => {
+		const tracks = [
+			{index: 0, language: 'eng', codec: 'ac3', channels: 6},
+			{index: 1, language: 'eng', codec: 'truehd', channels: 6}
+		];
+		expect(selectPreferredAudioStream(tracks, {audioLanguage: 'eng'})).toBe(tracks[0]);
+	});
+});
