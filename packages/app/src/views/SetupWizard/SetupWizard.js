@@ -17,6 +17,9 @@ import {toCssColor, toRgbTriplet} from '../../theme/themeSpec';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import {rootScale} from '../../utils/rootScale';
 import {remainingSteps, markComplete, deferThisLaunch, SETUP_QUESTION_STEPS} from '../../utils/setupWizardGate';
+import {ModalContainer} from '../../utils/spotlightContainers';
+import {keepFocusInView} from '../../utils/focusScroll';
+import {getAudioLanguageOptions, getSubtitleLanguageOptions, getSubtitleModeOptions, getLabel} from '../Settings/settingsOptions';
 import {ensurePreviewItemsLoaded} from './setupPreviewData';
 import {MediaBarPreview, NavbarPreview, HomeRowsPreview, DetailStylePreview, SetupIcon, usePreviewPalette} from './SetupPreviews';
 import css from './SetupWizard.module.less';
@@ -47,6 +50,16 @@ const mediaBarLabel = (mode) => {
 		case 'aya': return $L('Aya');
 		case 'off': return $L('Off');
 		default: return $L('Moonfin');
+	}
+};
+
+const subtitleModeDescription = (mode) => {
+	switch (mode) {
+		case 'always': return $L('Automatically loads and displays subtitles every time a video starts.');
+		case 'foreign': return $L('Automatically turns on subtitles if the default audio track is in a foreign language.');
+		case 'forced': return $L('Only loads subtitles explicitly tagged with the forced metadata flag.');
+		case 'none': return $L('Completely disables automatic subtitle loading.');
+		default: return $L("Plays tracks internally flagged in the media file's metadata as \"default\" or \"forced\".");
 	}
 };
 
@@ -204,9 +217,140 @@ const ThemeSwatch = ({theme, selected, onSelect, t}) => {
 	);
 };
 
-// The closing screen. Pick a look, then a list of what else lives in
-// Settings. Only the theme writes anything.
-const TourStep = ({t}) => {
+// The box a playback row sits in, lit up while focused.
+const panelStyle = (t, focused, radius) => ({
+	borderRadius: radius,
+	backgroundColor: t.onSurfaceA(focused ? 0.1 : 0.04),
+	border: `2px solid ${focused ? t.onSurface : t.onSurfaceA(0.14)}`
+});
+
+// The answer on a row that opens a list.
+const ChosenValue = ({label, t}) => (
+	<div className={css.chosenValue}>
+		<div className={css.chosenLabel} style={{color: t.onSurface}}>{label}</div>
+		<SetupIcon name='chevron_right' size={32} color={t.onSurfaceA(0.55)} />
+	</div>
+);
+
+// The row takes the press and the focus, the switch only shows the state.
+const SwitchValue = ({on, t}) => (
+	<div className={css.switchTrack} style={{backgroundColor: on ? t.accent : t.onSurfaceA(0.25)}}>
+		<div className={css.switchKnob} style={{backgroundColor: on ? t.onAccent : t.onSurface, transform: on ? 'translateX(28px)' : 'translateX(0)'}} />
+	</div>
+);
+
+// One playback setting: its name, an optional line under it, and its current
+// answer on the right.
+const SettingRow = ({spotlightId, label, hint, trailing, onSelect, t}) => {
+	const [focused, setFocused] = useState(false);
+	const handleFocus = useCallback(() => setFocused(true), []);
+	const handleBlur = useCallback(() => setFocused(false), []);
+	return (
+		<SpottableDiv
+			spotlightId={spotlightId}
+			className={css.settingRow}
+			style={panelStyle(t, focused, 16)}
+			onClick={onSelect}
+			onFocus={handleFocus}
+			onBlur={handleBlur}
+		>
+			<div className={css.settingRowText}>
+				<div className={css.settingRowLabel} style={{color: t.onSurfaceA(0.7)}}>{label}</div>
+				{hint && <div className={css.settingRowHint} style={{color: t.onSurfaceA(0.5)}}>{hint}</div>}
+			</div>
+			{trailing}
+		</SpottableDiv>
+	);
+};
+
+// A header that shows the current answers while folded, opening downwards
+// into its children when pressed.
+const CollapsibleSection = ({spotlightId, expanded, icon, title, badge, summary, onToggle, t, children}) => {
+	const [focused, setFocused] = useState(false);
+	const handleFocus = useCallback(() => setFocused(true), []);
+	const handleBlur = useCallback(() => setFocused(false), []);
+	return (
+		<div className={css.collapsible}>
+			<SpottableDiv
+				spotlightId={spotlightId}
+				className={css.collapsibleHeader}
+				style={panelStyle(t, focused, 20)}
+				onClick={onToggle}
+				onFocus={handleFocus}
+				onBlur={handleBlur}
+			>
+				<SetupIcon name={icon} size={30} color={t.onSurface} style={{marginRight: 16, flexShrink: 0}} />
+				<div className={css.collapsibleText}>
+					<div className={css.collapsibleTitle} style={{color: t.onSurface}}>
+						{title}
+						<span className={css.collapsibleBadge} style={{color: t.onSurfaceA(0.55)}}>{badge}</span>
+					</div>
+					{!expanded && <div className={css.collapsibleSummary} style={{color: t.onSurfaceA(0.65)}}>{summary}</div>}
+				</div>
+				<SetupIcon name='keyboard_arrow_down' size={40} color={t.onSurfaceA(0.7)} style={{flexShrink: 0, transition: 'transform 180ms', transform: expanded ? 'rotate(180deg)' : 'none'}} />
+			</SpottableDiv>
+			{expanded && children}
+		</div>
+	);
+};
+
+const PickerOption = ({option, selected, description, onPick, t}) => {
+	const [focused, setFocused] = useState(false);
+	const handleFocus = useCallback(() => setFocused(true), []);
+	const handleBlur = useCallback(() => setFocused(false), []);
+	const handleClick = useCallback(() => onPick(option.value), [onPick, option.value]);
+	return (
+		<SpottableDiv
+			className={css.pickerOption}
+			style={{backgroundColor: focused ? t.onSurfaceA(0.12) : 'transparent'}}
+			data-selected={selected ? 'true' : undefined}
+			onClick={handleClick}
+			onFocus={handleFocus}
+			onBlur={handleBlur}
+		>
+			<div className={css.pickerOptionText}>
+				<div className={css.pickerOptionLabel} style={{color: t.onSurface}}>{option.label}</div>
+				{description && <div className={css.pickerOptionHint} style={{color: t.onSurfaceA(0.6)}}>{description}</div>}
+			</div>
+			{selected && <SetupIcon name='check' size={36} color={t.accent} />}
+		</SpottableDiv>
+	);
+};
+
+// The list a row opens: every value, the current one ticked, and an optional
+// line under each. Opens on the current value and hands focus back on close.
+const OptionPicker = ({title, options, current, descriptionOf, onPick, onClose, t}) => {
+	const stopPropagation = useCallback((ev) => ev.stopPropagation(), []);
+	return (
+		<div className={css.pickerOverlay} style={{backgroundColor: t.scrimA(0.6)}} onClick={onClose}>
+			<ModalContainer
+				className={css.pickerPanel}
+				style={{backgroundColor: t.surface, border: `2px solid ${t.onSurfaceA(0.22)}`, boxShadow: `0px 0px 60px 2px ${t.scrimA(0.4)}`}}
+				onClick={stopPropagation}
+				spotlightId='setup-wizard-picker'
+			>
+				<div className={css.pickerTitle} style={{color: t.onSurface}}>{title}</div>
+				<div className={css.pickerList} onFocus={keepFocusInView}>
+					{options.map((option) => (
+						<PickerOption
+							key={String(option.value)}
+							option={option}
+							selected={option.value === current}
+							description={descriptionOf ? descriptionOf(option.value) : null}
+							onPick={onPick}
+							t={t}
+						/>
+					))}
+				</div>
+			</ModalContainer>
+		</div>
+	);
+};
+
+// The closing screen. Pick a look, the optional playback languages, then a
+// list of what else lives in Settings. Only the theme writes anything here,
+// the languages go out with the rest of the answers.
+const TourStep = ({t, playback}) => {
 	const {availableThemes, activeThemeId, selectThemeById} = useSettings();
 	const builtIns = availableThemes.filter((theme) => isBuiltInThemeId(theme.id));
 	const bullets = [
@@ -217,7 +361,7 @@ const TourStep = ({t}) => {
 		$L('And plenty more')
 	];
 	return (
-		<div className={css.tourScroll}>
+		<div className={css.tourScroll} onFocus={keepFocusInView}>
 			<div className={css.tourLabel} style={{color: t.onSurfaceA(0.62)}}>{$L('Pick a look')}</div>
 			<div className={css.swatchRow}>
 				{builtIns.map((theme) => (
@@ -233,6 +377,7 @@ const TourStep = ({t}) => {
 					/>
 				))}
 			</div>
+			{playback}
 			<div className={css.tourMoreBox} style={{backgroundColor: t.onSurfaceA(0.04), border: `2px solid ${t.onSurfaceA(0.14)}`}}>
 				<div className={css.tourMoreHeader} style={{color: t.onSurface}}>
 					<SetupIcon name='settings' size={36} color={t.onSurface} style={{marginRight: 16}} />
@@ -259,6 +404,8 @@ const SetupWizard = ({onDone, backHandlerRef}) => {
 	const [ready, setReady] = useState(false);
 	const [advancing, setAdvancing] = useState(true);
 	const [answers, setAnswers] = useState({});
+	const [playbackExpanded, setPlaybackExpanded] = useState(false);
+	const [picker, setPicker] = useState(null);
 
 	const syncSettledRef = useRef(initialSyncSettled);
 	syncSettledRef.current = initialSyncSettled;
@@ -266,6 +413,9 @@ const SetupWizard = ({onDone, backHandlerRef}) => {
 	settingsRef.current = settings;
 	const skipFocusedRef = useRef(false);
 	const leavingRef = useRef(false);
+	const pickerRef = useRef(picker);
+	pickerRef.current = picker;
+	const pickerOpenerRef = useRef(null);
 	const answersRef = useRef(answers);
 	answersRef.current = answers;
 	const stepsRef = useRef(steps);
@@ -291,6 +441,9 @@ const SetupWizard = ({onDone, backHandlerRef}) => {
 		for (const key of Object.keys(held)) {
 			if (held[key] != null) batch[key] = held[key];
 		}
+		// With subtitles off the language stays as it was.
+		const subtitleMode = held.subtitleMode != null ? held.subtitleMode : settingsRef.current.subtitleMode;
+		if (subtitleMode === 'none') delete batch.subtitleLanguage;
 		// Held rather than written as they are chosen. Each write kicks off a
 		// profile push that the plugin then echoes back, so the answers across
 		// the steps land as one batch at the end.
@@ -321,11 +474,22 @@ const SetupWizard = ({onDone, backHandlerRef}) => {
 		setIndex((value) => value - 1);
 	}, []);
 
+	const closePicker = useCallback(() => {
+		setPicker(null);
+		window.requestAnimationFrame(() => {
+			if (pickerOpenerRef.current) Spotlight.focus(pickerOpenerRef.current);
+		});
+	}, []);
+
 	// BACK never leaves the wizard on the first press. It moves to Skip, so
 	// the way out is always something the user chose to press twice.
 	useEffect(() => {
 		if (!backHandlerRef) return undefined;
 		backHandlerRef.current = () => {
+			if (pickerRef.current) {
+				closePicker();
+				return;
+			}
 			if (skipFocusedRef.current) {
 				skip();
 				return;
@@ -335,7 +499,7 @@ const SetupWizard = ({onDone, backHandlerRef}) => {
 		return () => {
 			backHandlerRef.current = null;
 		};
-	}, [backHandlerRef, skip]);
+	}, [backHandlerRef, skip, closePicker]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -426,6 +590,87 @@ const SetupWizard = ({onDone, backHandlerRef}) => {
 		setAnswers((prev) => ({...prev, [settingKey]: value}));
 	}, []);
 
+	const openPicker = useCallback((next) => {
+		pickerOpenerRef.current = document.activeElement;
+		setPicker(next);
+		window.requestAnimationFrame(() => Spotlight.focus('setup-wizard-picker'));
+	}, []);
+
+	const handlePicked = useCallback((value) => {
+		const open = pickerRef.current;
+		if (open && value !== open.current) pick(open.settingKey, value);
+		closePicker();
+	}, [pick, closePicker]);
+
+	const togglePlayback = useCallback(() => setPlaybackExpanded((value) => !value), []);
+	const togglePreferDefaultAudio = useCallback(() => {
+		pick('preferDefaultAudioTrack', !selectedFor('preferDefaultAudioTrack'));
+	}, [pick, selectedFor]);
+
+	// The optional playback languages under the themes. Sign-in has already
+	// filled these in from the server or the device, so it starts folded up
+	// with those answers showing. The same lists the audio and subtitle
+	// settings offer, and a language the server brought in that isnt in them
+	// shows as its code, the way the settings show it.
+	const playbackSection = useMemo(() => {
+		if (step !== 'tour') return null;
+		const audioOptions = getAudioLanguageOptions();
+		const subtitleOptions = getSubtitleLanguageOptions();
+		const modeOptions = getSubtitleModeOptions();
+		const audio = selectedFor('audioLanguage');
+		const subtitle = selectedFor('subtitleLanguage');
+		const mode = selectedFor('subtitleMode');
+		const audioLabel = getLabel(audioOptions, audio, audio);
+		const subtitleLabel = getLabel(subtitleOptions, subtitle, subtitle);
+		const modeLabel = getLabel(modeOptions, mode, $L('Flagged'));
+		const subtitlesOn = mode !== 'none';
+		return (
+			<CollapsibleSection
+				spotlightId='setup-wizard-playback'
+				expanded={playbackExpanded}
+				icon='translate'
+				title={$L('Playback languages')}
+				badge={$L('Optional')}
+				summary={[audioLabel, subtitlesOn ? subtitleLabel : null, modeLabel].filter(Boolean).join(' · ')}
+				onToggle={togglePlayback}
+				t={t}
+			>
+				<SettingRow
+					spotlightId='setup-wizard-audioLanguage'
+					label={$L('Default Audio Language')}
+					trailing={<ChosenValue label={audioLabel} t={t} />}
+					onSelect={() => openPicker({settingKey: 'audioLanguage', title: $L('Default Audio Language'), options: audioOptions, current: audio})} // eslint-disable-line react/jsx-no-bind
+					t={t}
+				/>
+				<SettingRow
+					spotlightId='setup-wizard-preferDefaultAudioTrack'
+					label={$L('Prefer Default Audio Track')}
+					hint={$L('Pick the track the file marks as default before matching languages')}
+					trailing={<SwitchValue on={Boolean(selectedFor('preferDefaultAudioTrack'))} t={t} />}
+					onSelect={togglePreferDefaultAudio}
+					t={t}
+				/>
+				{/* Mode stays above the language so hiding the language doesnt move the focused row. */}
+				<SettingRow
+					spotlightId='setup-wizard-subtitleMode'
+					label={$L('Subtitle Mode')}
+					trailing={<ChosenValue label={modeLabel} t={t} />}
+					onSelect={() => openPicker({settingKey: 'subtitleMode', title: $L('Subtitle Mode'), options: modeOptions, current: mode, descriptionOf: subtitleModeDescription})} // eslint-disable-line react/jsx-no-bind
+					t={t}
+				/>
+				{subtitlesOn && (
+					<SettingRow
+						spotlightId='setup-wizard-subtitleLanguage'
+						label={$L('Default Subtitle Language')}
+						trailing={<ChosenValue label={subtitleLabel} t={t} />}
+						onSelect={() => openPicker({settingKey: 'subtitleLanguage', title: $L('Default Subtitle Language'), options: subtitleOptions, current: subtitle})} // eslint-disable-line react/jsx-no-bind
+						t={t}
+					/>
+				)}
+			</CollapsibleSection>
+		);
+	}, [step, selectedFor, playbackExpanded, togglePlayback, togglePreferDefaultAudio, openPicker, t]);
+
 	const handleSkipFocusChange = useCallback((focused) => {
 		skipFocusedRef.current = focused;
 	}, []);
@@ -494,8 +739,8 @@ const SetupWizard = ({onDone, backHandlerRef}) => {
 				</div>
 			);
 		}
-		return <TourStep t={t} />;
-	}, [step, selectedFor, cardWidthFor, pick, t]);
+		return <TourStep t={t} playback={playbackSection} />;
+	}, [step, selectedFor, cardWidthFor, pick, playbackSection, t]);
 
 	const isLast = ready && index >= steps.length - 1;
 
@@ -534,7 +779,7 @@ const SetupWizard = ({onDone, backHandlerRef}) => {
 							{questionFor(step)}
 						</div>
 						<div className={css.stepBody} ref={bodyRef}>
-							<div key={step} className={`${css.stepInner} ${advancing ? css.stepEnterForward : css.stepEnterBackward}`}>
+							<div key={step} className={`${css.stepInner} ${step === 'tour' ? css.stepInnerTour : ''} ${advancing ? css.stepEnterForward : css.stepEnterBackward}`}>
 								{stepContent}
 							</div>
 						</div>
@@ -554,6 +799,17 @@ const SetupWizard = ({onDone, backHandlerRef}) => {
 					</>
 				)}
 			</div>
+			{picker && (
+				<OptionPicker
+					title={picker.title}
+					options={picker.options}
+					current={picker.current}
+					descriptionOf={picker.descriptionOf}
+					onPick={handlePicked}
+					onClose={closePicker}
+					t={t}
+				/>
+			)}
 		</div>
 	);
 };

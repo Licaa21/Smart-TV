@@ -302,6 +302,14 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 		};
 	}, [item, supportsStreamSelection, selectedVersionIndex, selectedAudioIndex, selectedSubtitleIndex]);
 
+	// A list plays on from the pressed row. Songs and videos go to different players, so the
+	// queue only carries the rows the same player can take.
+	const playListFrom = useCallback((list, entry) => {
+		const audio = entry.MediaType === 'Audio';
+		const queue = list.filter((candidate) => (candidate.MediaType === 'Audio') === audio);
+		onPlay?.(entry, false, {[audio ? 'audioPlaylist' : 'videoQueue']: queue});
+	}, [onPlay]);
+
 	const handlePlay = useCallback(async () => {
 		if (!item) return;
 
@@ -336,14 +344,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 				onPlay?.(albumTracks[0], false, {audioPlaylist: albumTracks});
 			}
 		} else if (item.Type === 'Playlist') {
-			if (playlistItems.length > 0) {
-				const firstItem = playlistItems[0];
-				if (firstItem.MediaType === 'Audio') {
-					onPlay?.(firstItem, false, {audioPlaylist: playlistItems});
-				} else {
-					onPlay?.(firstItem, false, {});
-				}
-			}
+			if (playlistItems.length > 0) playListFrom(playlistItems, playlistItems[0]);
 		} else {
 			// A SyncPlay group queues the pressed item for everyone, so intros stay out of it.
 			const prerolls = isSyncPlayInGroup
@@ -357,7 +358,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 				onPlay?.(item, false, playbackOptions);
 			}
 		}
-	}, [item, episodes, nextUp, seasons, collectionItems, albumTracks, playlistItems, onPlay, onSelectItem, buildPlaybackOptions, effectiveApi, settings, tagWithServerInfo, isSyncPlayInGroup]);
+	}, [item, episodes, nextUp, seasons, collectionItems, albumTracks, playlistItems, onPlay, onSelectItem, buildPlaybackOptions, effectiveApi, settings, tagWithServerInfo, isSyncPlayInGroup, playListFrom]);
 
 	const handleResume = useCallback(() => {
 		if (!item) return;
@@ -643,13 +644,17 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 		if (extra) onPlay?.(extra, false, {});
 	}, [extras, onPlay]);
 
+	// A track row's press: an album's songs, a playlist from that row on, or a collection's
+	// play order.
+	const playTrack = useCallback((track) => {
+		playListFrom(item.Type === 'MusicAlbum' ? albumTracks : playlistItems, track);
+	}, [item, albumTracks, playlistItems, playListFrom]);
+
 	const handleTrackPlay = useCallback((ev) => {
 		const trackId = ev.currentTarget.dataset.trackId;
 		const track = albumTracks.find(t => t.Id === trackId);
-		if (track) {
-			onPlay?.(track, false, {audioPlaylist: albumTracks});
-		}
-	}, [albumTracks, onPlay]);
+		if (track) playTrack(track);
+	}, [albumTracks, playTrack]);
 
 	const handleArtistPlay = useCallback(async () => {
 		if (!item || item.Type !== 'MusicArtist') return;
@@ -697,28 +702,17 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 		openPerson(item?.People?.find((p) => p.Id === personId) || {Id: personId});
 	}, [openPerson, item]);
 
+	// Opening the row's item moved into the long press menu, so a press plays from that row.
 	const handlePlaylistItemSelect = useCallback((ev) => {
-		const plItemId = ev.currentTarget.dataset.playlistItemId;
-		const plItem = playlistItems.find(t => t.Id === plItemId);
-		if (plItem) {
-			if (plItem.MediaType === 'Audio') {
-				onPlay?.(plItem, false, {audioPlaylist: playlistItems});
-			} else {
-				onSelectItem?.(plItem);
-			}
-		}
-	}, [playlistItems, onPlay, onSelectItem]);
+		const plItem = playlistItems.find(t => t.Id === ev.currentTarget.dataset.playlistItemId);
+		if (plItem) playTrack(plItem);
+	}, [playlistItems, playTrack]);
 
 	const handlePlaylistShuffle = useCallback(() => {
 		if (playlistItems.length < 2) return;
 		const shuffled = shuffleArray(playlistItems);
-		const firstItem = shuffled[0];
-		if (firstItem.MediaType === 'Audio') {
-			onPlay?.(firstItem, false, {audioPlaylist: shuffled});
-		} else {
-			onPlay?.(firstItem, false, {});
-		}
-	}, [playlistItems, onPlay]);
+		playListFrom(shuffled, shuffled[0]);
+	}, [playlistItems, playListFrom]);
 
 	const handlePlaylistItemReorder = useCallback(async (itemIndex, direction) => {
 		const newIndex = itemIndex + direction;
@@ -754,7 +748,13 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	const handleRemoveFromPlaylist = useCallback(async (entryId) => {
 		if (!entryId || !item) return;
 		const prevItems = [...playlistItems];
+		// The focused row is about to go, so its neighbour takes the focus.
+		const row = document.activeElement;
+		const neighbour = row?.nextElementSibling || row?.previousElementSibling;
 		setPlaylistItems(prev => prev.filter(p => p.PlaylistItemId !== entryId));
+		window.requestAnimationFrame(() => {
+			if (neighbour && !document.body.contains(row)) Spotlight.focus(neighbour);
+		});
 		try {
 			await effectiveApi.removeFromPlaylist(item.Id, [entryId]);
 			showToast($L('Removed from playlist'));
@@ -819,6 +819,31 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	const collectionMenu = useMemo(() => (item?.Type === 'BoxSet' ? {
 		collectionRemoval: {collectionName: item.Name || '', remove: removeFromCollection}
 	} : null), [item?.Type, item?.Name, removeFromCollection]);
+
+	// Reordering needs an entry id per track, which only a real playlist carries.
+	const canManagePlaylist = item?.Type === 'Playlist' && playlistItems.length > 0 &&
+		playlistItems.every((track) => track.PlaylistItemId);
+
+	// What the long press menu on a playlist row can do. The same title can sit in a playlist
+	// twice, so a row is found by its entry id when it has one.
+	const playlistMenu = useMemo(() => {
+		if (item?.Type !== 'Playlist') return null;
+		const indexOf = (entry) => playlistItems.findIndex((candidate) => (entry.PlaylistItemId
+			? candidate.PlaylistItemId === entry.PlaylistItemId
+			: candidate.Id === entry.Id));
+		return {
+			playlist: {
+				canManage: canManagePlaylist,
+				positionOf: (entry) => {
+					const at = indexOf(entry);
+					return {first: at <= 0, last: at >= playlistItems.length - 1};
+				},
+				play: playTrack,
+				remove: (entry) => handleRemoveFromPlaylist(entry.PlaylistItemId),
+				move: (entry, direction) => handlePlaylistItemReorder(indexOf(entry), direction)
+			}
+		};
+	}, [item?.Type, playlistItems, canManagePlaylist, playTrack, handleRemoveFromPlaylist, handlePlaylistItemReorder]);
 
 	// No artwork, name or retry on purpose, since a retry would read as an invitation.
 	if (!seerrOnly && blockedByRating) {
@@ -941,10 +966,6 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 		name: collection.name,
 		items: mergeCollectionWithMissing(collection.items, collection.missingItems)
 	}));
-
-	// Reordering needs an entry id per track, which only a real playlist carries.
-	const canManagePlaylist = isPlaylist && playlistItems.length > 0 &&
-		playlistItems.every((track) => track.PlaylistItemId);
 
 	const filmography = isPerson ? splitFilmography(similar, showsSection) : null;
 	const personMovies = filmography?.movies || [];
@@ -1105,7 +1126,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					handleChapterSelect={handleChapterSelect}
 					handleEpisodePlay={handleEpisodePlay}
 					handleExtraSelect={handleExtraSelect}
-					handleTrackPlay={handleTrackPlay}
+					playTrack={playTrack}
+					playlistMenu={playlistMenu}
 					onSelectItem={onSelectItem}
 					onSelectPerson={openPerson}
 					onSelectStudio={onSelectStudio}
@@ -1183,6 +1205,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					onShuffle={handlePlaylistShuffle}
 					onToggleFavorite={handleToggleFavorite}
 					onItemSelect={handlePlaylistItemSelect}
+					playlistMenu={playlistMenu}
 					onItemKeyDown={handlePlaylistItemKeyDown}
 					onFocusRow={handleButtonRowFocus}
 				/>

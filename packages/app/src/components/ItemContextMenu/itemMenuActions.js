@@ -18,6 +18,9 @@ export const MENU_ICON_PATHS = {
 	visibilityOff: 'm644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z',
 	favoriteBorder: 'm480-120-58-52q-101-91-167-157T150-447.5Q111-500 95.5-544T80-634q0-94 63-157t157-63q52 0 99 22t81 62q34-40 81-62t99-22q94 0 157 63t63 157q0 46-15.5 90T810-447.5Q771-395 705-329T538-172l-58 52Zm0-108q96-86 158-147.5t98-107q36-45.5 50-81t14-70.5q0-60-40-100t-100-40q-47 0-87 26.5T518-680h-76q-15-41-55-67.5T300-774q-60 0-100 40t-40 100q0 35 14 70.5t50 81q36 45.5 98 107T480-228Zm0-273Z',
 	playlistRemove: 'M576-280l-56-56 104-104-104-104 56-56 104 104 104-104 56 56-104 104 104 104-56 56-104-104-104 104ZM120-360v-80h320v80H120Zm0-160v-80h480v80H120Zm0-160v-80h480v80H120Z',
+	info: 'M453-280h60v-240h-60v240Zm50.5-323.2q9.5-9.2 9.5-22.8 0-14.45-9.48-24.22-9.48-9.78-23.5-9.78t-23.52 9.78Q447-640.45 447-626q0 13.6 9.48 22.8 9.48 9.2 23.5 9.2t23.52-9.2ZM480.27-80q-82.74 0-155.5-31.5Q252-143 197.5-197.5t-86-127.34Q80-397.68 80-480.5t31.5-155.66Q143-709 197.5-763t127.34-85.5Q397.68-880 480.5-880t155.66 31.5Q709-817 763-763t85.5 127Q880-563 880-480.27q0 82.74-31.5 155.5Q817-252 763-197.68q-54 54.31-127 86Q563-80 480.27-80Zm.23-60Q622-140 721-239.5t99-241Q820-622 721.19-721T480-820q-141 0-240.5 98.81T140-480q0 141 99.5 240.5t241 99.5Zm-.5-340Z',
+	arrowUpward: 'M450-160v-526L202-438l-42-42 320-320 320 320-42 42-248-248v526h-60Z',
+	arrowDownward: 'M450-800v526L202-522l-42 42 320 320 320-320-42-42-248 248v-526h-60Z',
 	refresh: 'M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z',
 	search: 'M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T220-580q0 75 52.5 127.5T380-400Z'
 };
@@ -34,7 +37,9 @@ const hasProgress = (item) => {
 	return (userData.PlayedPercentage || 0) > 0 || (userData.PlaybackPositionTicks || 0) > 0;
 };
 
-export const itemMenuActions = (item, {isAdmin = false, isJellyfin = true, canManageCollections = false, inCollection = false} = {}) => {
+// `playlist` is set when the menu opened on a row of a playlist: `canManage` adds the entries
+// that change the playlist, and `first` and `last` say which way the row can still move.
+export const itemMenuActions = (item, {isAdmin = false, isJellyfin = true, canManageCollections = false, inCollection = false, playlist = null} = {}) => {
 	if (!item) return [];
 	const type = item.Type;
 	const userData = item.UserData || {};
@@ -44,6 +49,11 @@ export const itemMenuActions = (item, {isAdmin = false, isJellyfin = true, canMa
 
 	if (MEDIA_TYPES.indexOf(type) !== -1) {
 		actions.push({id: 'play', icon: DETAIL_ICON_PATHS.play, label: hasProgress(item) ? $L('Resume') : $L('Play')});
+		// A press on a playlist row plays from there, so opening the item moves in here. A song
+		// has no page of its own to open.
+		if (playlist && type !== 'Audio') {
+			actions.push({id: 'viewDetails', icon: MENU_ICON_PATHS.info, label: $L('View Details')});
+		}
 		actions.push({
 			id: 'watched',
 			icon: played ? MENU_ICON_PATHS.visibilityOff : MENU_ICON_PATHS.visibility,
@@ -69,6 +79,11 @@ export const itemMenuActions = (item, {isAdmin = false, isJellyfin = true, canMa
 			}
 		}
 		actions.push({id: 'addToPlaylist', icon: DETAIL_ICON_PATHS.playlist, label: $L('Add to Playlist')});
+		if (playlist?.canManage) {
+			actions.push({id: 'removeFromPlaylist', icon: MENU_ICON_PATHS.playlistRemove, label: $L('Delete from Playlist')});
+			if (!playlist.first) actions.push({id: 'moveUp', icon: MENU_ICON_PATHS.arrowUpward, label: $L('Move Up')});
+			if (!playlist.last) actions.push({id: 'moveDown', icon: MENU_ICON_PATHS.arrowDownward, label: $L('Move Down')});
+		}
 		if (isJellyfin && isAdmin) {
 			actions.push({id: 'refreshMetadata', icon: MENU_ICON_PATHS.refresh, label: $L('Refresh Metadata')});
 			if (IDENTIFIABLE_TYPES.indexOf(type) !== -1) {

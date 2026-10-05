@@ -62,13 +62,21 @@ const ModernDetailContent = (props) => {
 		seasons, episodes, similar, extras, cast, crew = [], nextUp, collectionItems, collectionSections = [], albumTracks, artistAlbums, playlistItems, personMovies, personSeries, birthDate, birthPlace, episodeRatings,
 		techBadges = [], techSize, overviewBackRef,
 		mediaSource, supportsMediaSourceSelection, selectedAudioIndex, selectedSubtitleIndex,
-		handleChapterSelect, handleExtraSelect, handleTrackPlay,
+		handleChapterSelect, handleExtraSelect, playTrack, playlistMenu,
 		onSelectItem, onSelectPerson, onSelectStudio,
 		seerr, seerrNav, onSelectSeerrCard, spotlightBackRef, collectionMenu
 	} = props;
 
 	const episodeAt = useCallback((target) => itemWithIdAt(episodes, 'data-episode-id', target), [episodes]);
 	const episodeMenuHold = useItemMenuHold(episodeAt);
+
+	const tracks = isPlaylist ? playlistItems : albumTracks;
+	const trackAt = useCallback((target) => itemWithIdAt(tracks, 'data-track-id', target), [tracks]);
+	const trackMenuHold = useItemMenuHold(trackAt, playlistMenu);
+	const handleTrackClick = useCallback((ev) => {
+		const track = trackAt(ev.currentTarget);
+		if (track) playTrack(track);
+	}, [trackAt, playTrack]);
 
 	// Blur and opacity share one stored value, and the blur options reach 40 while
 	// this scale stops at 25, so a setting carried over from the classic layout is
@@ -444,11 +452,10 @@ const ModernDetailContent = (props) => {
 	);
 
 	const renderTracksTab = () => {
-		const tracks = isPlaylist ? playlistItems : albumTracks;
 		return (
-			<RowContainer className={css.trackList}>
+			<RowContainer className={css.trackList} {...(isPlaylist ? trackMenuHold : {})}>
 				{tracks.map((track, i) => (
-					<SpottableDiv key={track.Id} className={css.trackRow} data-track-id={track.Id} onClick={handleTrackPlay}>
+					<SpottableDiv key={track.PlaylistItemId || track.Id} className={css.trackRow} data-track-id={track.Id} onClick={handleTrackClick}>
 						<span className={css.trackIndex}>{track.IndexNumber || i + 1}</span>
 						<span className={css.trackTitle}>{track.Name}</span>
 						{track.RunTimeTicks && <span className={css.trackDuration}>{formatDuration(track.RunTimeTicks)}</span>}

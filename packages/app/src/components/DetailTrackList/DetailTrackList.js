@@ -1,6 +1,7 @@
 import {useCallback} from 'react';
 import $L from '@enact/i18n/$L';
 
+import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {KEYS} from '../../utils/keys';
 import {SpottableDiv, RowContainer} from '../../views/Details/detailsSpottables';
 import {trackRowsFor, trackTitle, trackSecondLine, trackNumber} from './trackRows';
@@ -10,7 +11,8 @@ import css from './DetailTrackList.module.less';
 // The delete key on a keyboard and the red button on a remote both remove a playlist entry.
 const REMOVE_KEYS = [46, KEYS.RED];
 
-// A list of tracks, used by the album, playlist and collection order cards.
+// A list of tracks, used by the album, playlist and collection order cards. With `menuOptions`
+// set, holding OK on a row opens the item menu with those options.
 const DetailTrackList = ({
 	tracks = [],
 	isAudiobook = false,
@@ -18,15 +20,22 @@ const DetailTrackList = ({
 	isPlaylist = false,
 	showAlbum = false,
 	manage = false,
+	menuOptions = null,
 	onPlayTrack,
 	onReorder,
 	onRemove,
 	firstSpotlightId
 }) => {
+	const trackAt = useCallback((target) => {
+		const row = target.closest('[data-index]');
+		return (row && tracks[parseInt(row.dataset.index, 10)]) || null;
+	}, [tracks]);
+	const menuHold = useItemMenuHold(trackAt, menuOptions);
+
 	const handleClick = useCallback((ev) => {
-		const index = parseInt(ev.currentTarget.dataset.index, 10);
-		if (!isNaN(index)) onPlayTrack?.(index);
-	}, [onPlayTrack]);
+		const track = trackAt(ev.currentTarget);
+		if (track) onPlayTrack?.(track);
+	}, [trackAt, onPlayTrack]);
 
 	const handleKeyDown = useCallback((ev) => {
 		if (!manage) return;
@@ -52,7 +61,7 @@ const DetailTrackList = ({
 	if (!tracks.length) return null;
 
 	return (
-		<RowContainer className={css.trackList} onKeyDown={handleKeyDown}>
+		<RowContainer className={css.trackList} onKeyDown={handleKeyDown} {...(menuOptions ? menuHold : {})}>
 			{trackRowsFor(tracks, groupByDisc).map((row) => {
 				if (row.kind === 'disc') {
 					return <div key={row.key} className={css.discHeading}>{$L('Disc {number}').replace('{number}', row.disc)}</div>;

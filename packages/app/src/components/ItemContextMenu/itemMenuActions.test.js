@@ -32,6 +32,19 @@ describe('itemMenuActions', () => {
 		expect(ids(episode())).toEqual(['play', 'watched', 'hideNextUp', 'favorite', 'addToPlaylist', 'goToSeries']);
 	});
 
+	test('gives a playlist row its own entries, View Details right after Play', () => {
+		const playlist = {canManage: true, first: false, last: false};
+		expect(ids(movie(), {playlist})).toEqual(['play', 'viewDetails', 'watched', 'favorite', 'addToPlaylist', 'removeFromPlaylist', 'moveUp', 'moveDown']);
+		expect(ids(movie(), {playlist: {canManage: true, first: true, last: false}})).not.toContain('moveUp');
+		expect(ids(movie(), {playlist: {canManage: true, first: false, last: true}})).not.toContain('moveDown');
+		expect(ids(movie(), {playlist: {canManage: false}})).toEqual(['play', 'viewDetails', 'watched', 'favorite', 'addToPlaylist']);
+	});
+
+	test('leaves View Details off a song, which has no page to open', () => {
+		const song = {Id: 'a1', Type: 'Audio', Name: 'A song', UserData: {}};
+		expect(ids(song, {playlist: {canManage: true, first: true, last: true}})).toEqual(['play', 'watched', 'favorite', 'addToPlaylist', 'removeFromPlaylist']);
+	});
+
 	test('adds the collection entries only for someone who can manage collections', () => {
 		expect(ids(movie(), {canManageCollections: true})).toContain('addToCollection');
 		expect(ids(movie(), {canManageCollections: true})).not.toContain('removeFromCollection');
