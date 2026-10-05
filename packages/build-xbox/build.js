@@ -221,9 +221,10 @@ const buildProbe = () => {
 
 // A console only takes a package over one it already has when the version went up,
 // and removing the old one first throws away the sign in and every setting. So each
-// Debug build counts the last part of its version one higher. The count is kept
-// beside the certificate, outside the repo.
-const nextDebugRevision = () => {
+// Debug build, and any build sent to a console, counts the last part of its version
+// one higher. The count is kept beside the certificate, outside the repo.
+const countsVersionUp = () => flag('--debug') || flag('--install');
+const nextRevision = () => {
 	const file = path.join(CERT_DIR, 'debug-revision.txt');
 	const last = fs.existsSync(file) ? Number(fs.readFileSync(file, 'utf8')) || 0 : 0;
 	const next = last >= 65535 ? 1 : last + 1;
@@ -232,15 +233,14 @@ const nextDebugRevision = () => {
 	return next;
 };
 
-// The manifest a Debug or a probe build is made from: the app's own, with the probe
-// under another name and a Debug build under a higher version. It is written fresh
-// each build and never committed. Null for a Release build of the app, which uses
-// the manifest as it is.
+// A probe build needs another name and a build that counts its version up needs that
+// version, so those are made from a copy of the manifest, written fresh each build
+// and never committed. Null when the app's own manifest will do.
 const writeBuildManifest = (version) => {
-	if (!flag('--probe') && !flag('--debug')) return null;
+	if (!flag('--probe') && !countsVersionUp()) return null;
 	let manifest = fs.readFileSync(MANIFEST_PATH, 'utf8');
-	if (flag('--debug')) {
-		manifest = manifest.replace(/(<Identity[^>]*?Version=")[^"]*(")/, `$1${version}.${nextDebugRevision()}$2`);
+	if (countsVersionUp()) {
+		manifest = manifest.replace(/(<Identity[^>]*?Version=")[^"]*(")/, `$1${version}.${nextRevision()}$2`);
 	}
 	if (flag('--probe')) {
 		manifest = manifest
