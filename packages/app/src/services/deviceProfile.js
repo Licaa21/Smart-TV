@@ -1,15 +1,12 @@
 import {getPlatform} from '../platform';
+import {resolvePlatformModule} from './platformModule';
 import {profileForServer} from './profileForServer';
 
 let impl;
 
 const loadImpl = async () => {
 	if (impl) return impl;
-	if (getPlatform() === 'tizen') {
-		impl = await import('@moonfin/platform-tizen/deviceProfile');
-	} else {
-		impl = await import('@moonfin/platform-webos/deviceProfile');
-	}
+	impl = await resolvePlatformModule('deviceProfile');
 	return impl;
 };
 
@@ -51,10 +48,9 @@ export const clearCapabilitiesCache = () => {
 	impl?.clearCapabilitiesCache?.();
 };
 
+const VERSION_DETECTOR = {tizen: 'detectTizenVersion', webos: 'detectWebOSVersion', vega: 'detectVegaVersion'};
+
 export const detectPlatformVersion = async (...args) => {
 	await loadImpl();
-	if (getPlatform() === 'tizen') {
-		return impl.detectTizenVersion?.(...args);
-	}
-	return impl.detectWebOSVersion?.(...args);
+	return impl[VERSION_DETECTOR[getPlatform()] || 'detectWebOSVersion']?.(...args);
 };

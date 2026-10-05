@@ -6,7 +6,19 @@ import {useEffect, useMemo, useState} from 'react';
 import $L from '@enact/i18n/$L';
 
 import seerrApi from '../../services/seerrApi';
-import {getMediaDownloadSummary} from '../../utils/seerrStatus';
+import {getMediaDownloadSummary, isMediaInFlight} from '../../utils/seerrStatus';
+
+const DOWNLOAD_POLL_MS = 15000;
+const WAITING_POLL_MS = 30000;
+
+// How often the open page refetches the title, or null once nothing is on its way. A download
+// moves every few seconds, while a request waiting on approval or on the library scan changes
+// far less often.
+export const statusPollInterval = (media) => {
+	if (getMediaDownloadSummary(media, false) || getMediaDownloadSummary(media, true)) return DOWNLOAD_POLL_MS;
+	if (isMediaInFlight(media, false) || isMediaInFlight(media, true)) return WAITING_POLL_MS;
+	return null;
+};
 
 const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 	const [details, setDetails] = useState(null);
@@ -140,20 +152,29 @@ const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 	[details]
 	);
 
-	// Poll while a download is running so the progress bars advance. Only the details payload
-	// is swapped and a failed tick is ignored, so a blip never replaces the screen with an error.
+	const pollInterval = useMemo(() => statusPollInterval(details?.mediaInfo), [details]);
+
+	// Keeps the refresh running from the request until the title lands, so the progress and
+	// the Play button show up without leaving the page. Only the details payload is swapped
+	// and a failed tick is ignored, so a blip never replaces the screen with an error.
 	useEffect(() => {
-		if (loading || !mediaId || !mediaType || (!hdDownload && !download4k)) return;
+		if (loading || !mediaId || !mediaType || !pollInterval) return;
+		let closed = false;
 		const id = setInterval(() => {
+			// Nobody is looking at the page while the app is in the background.
+			if (document.hidden) return;
 			(mediaType === 'movie'
 				? seerrApi.getMovie(mediaId)
 				: seerrApi.getTv(mediaId)
 			).then((data) => {
-				if (data) setDetails(data);
+				if (data && !closed) setDetails(data);
 			}).catch(() => {});
-		}, 30000);
-		return () => clearInterval(id);
-	}, [loading, hdDownload, download4k, mediaId, mediaType]);
+		}, pollInterval);
+		return () => {
+			closed = true;
+			clearInterval(id);
+		};
+	}, [loading, pollInterval, mediaId, mediaType]);
 
 	return {
 		details,

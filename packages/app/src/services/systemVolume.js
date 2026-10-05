@@ -1,4 +1,4 @@
-import {getPlatform} from '../platform';
+import {resolvePlatformModule} from './platformModule';
 
 // The TV's own volume, through whichever platform this is running on.
 
@@ -6,11 +6,7 @@ let impl = null;
 let lastState = null;
 
 const load = async () => {
-	if (!impl) {
-		impl = getPlatform() === 'tizen'
-			? await import('@moonfin/platform-tizen/volume')
-			: await import('@moonfin/platform-webos/volume');
-	}
+	if (!impl) impl = await resolvePlatformModule('volume');
 	return impl;
 };
 

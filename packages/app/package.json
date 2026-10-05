@@ -112,11 +112,12 @@
 			}
 		]
 	},
-	"//jest": "npm workspaces hoists ilib to the repo root, where enact's own jest config doesn't look for it. Any test that reaches $L fails to resolve ilib without this.",
+	"//jest": "npm workspaces hoists ilib to the repo root, where enact's own jest config doesn't look for it. Any test that reaches $L fails to resolve ilib without this. The babel preset also points a dynamic import's helper at the ESM copy, which jest wont transform under node_modules, so it is sent to the CommonJS one.",
 	"jest": {
 		"moduleNameMapper": {
 			"^ilib[/](.*)$": "<rootDir>/../../node_modules/ilib/$1",
-			"^@enact[/]i18n[/]ilib[/](.*)$": "<rootDir>/../../node_modules/ilib/$1"
+			"^@enact[/]i18n[/]ilib[/](.*)$": "<rootDir>/../../node_modules/ilib/$1",
+			"^(.*[/]@babel[/]runtime[/]helpers)[/]esm[/](.*)$": "$1/$2"
 		}
 	},
 	"eslintIgnore": [

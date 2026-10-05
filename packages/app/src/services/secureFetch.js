@@ -20,7 +20,7 @@
 import {fetchWithTimeout} from '../utils/fetchTimeout';
 import {classifyError, INSECURE_CERT, DNS_OR_NETWORK} from '../utils/connectionErrors';
 import {traceRequest} from '../utils/networkLogSink';
-import {isWebOS} from '../platform';
+import {isVega, isWebOS} from '../platform';
 import {getFromStorage} from './storage';
 
 const SERVICE_URI = 'luna://org.moonfin.webos.service/fetch';
@@ -61,6 +61,22 @@ const readSettings = async () => {
 		// keep last known settings
 	}
 	return lastSettings;
+};
+
+// The Vega WebView refuses a certificate it cant verify and the page only sees a
+// network error. With the setting on, the shell is told to accept the host and
+// the request is tried once more.
+const vegaAllowedHosts = new Set();
+
+const allowVegaHost = async (url) => {
+	const host = (/^https:\/\/([^/?#]+)/i.exec(url || '') || [])[1];
+	if (!host || vegaAllowedHosts.has(host)) return false;
+	const settings = await readSettings();
+	if (!settings.allowInsecureCerts) return false;
+	const {allowInsecureHost} = await import('@moonfin/platform-vega/bridge');
+	allowInsecureHost(host);
+	vegaAllowedHosts.add(host);
+	return true;
 };
 
 /**
@@ -156,7 +172,13 @@ export const platformFetch = async (url, options = {}, timeoutMs) => {
 	} catch (err) {
 		// Only a genuine network-class failure (TypeError) is a cert-rejection
 		// candidate. Timeouts/aborts are rethrown unchanged.
-		if (!canProxy || classifyError(err) !== DNS_OR_NETWORK) {
+		if (classifyError(err) !== DNS_OR_NETWORK) {
+			throw err;
+		}
+		if (isVega() && isHttps(url) && await allowVegaHost(url)) {
+			return fetchWithTimeout(url, options, timeoutMs);
+		}
+		if (!canProxy) {
 			throw err;
 		}
 		// Retry through the proxy. If it succeeds, remember this host so future

@@ -22,7 +22,7 @@ import serverLogger from '../services/serverLogger';
 import * as remoteControl from '../services/remoteControl';
 import {isBackKey, KEYS} from '../utils/keys';
 import {applyPerfTier} from '../utils/perfTier';
-import {isLiveTvLibrary} from '../utils/liveTvLibrary';
+import {isLiveTvChannel, isLiveTvLibrary} from '../utils/liveTvLibrary';
 import {OLED_TUNING} from '../utils/oledMode';
 import {isTizen} from '../platform';
 import {initVideo, cleanupVideoElement, setupVisibilityHandler, setupPlatformLifecycle} from '../services/video';
@@ -781,8 +781,21 @@ const AppContent = (props) => {
 		setShowShuffleOverlay(true);
 	}, []);
 
+	// The guide hands over its lineup, in its own order, for the player's channel carousel.
+	const handlePlayChannel = useCallback((channel, lineup) => {
+		setPlayingItem(channel);
+		setPlaybackOptions(lineup?.length ? {liveTvChannels: lineup} : null);
+		setIsResume(false);
+		navigateTo(PANELS.PLAYER);
+	}, [navigateTo]);
+
 	const handleSelectItem = useCallback((item) => {
 		setDetailsAutoPlay(false);
+		// A channel has no details worth landing on, so it tunes straight away.
+		if (isLiveTvChannel(item)) {
+			handlePlayChannel(item);
+			return;
+		}
 		if (item.Type === 'Photo') {
 			setPhotoViewerItem(item);
 			return;
@@ -807,12 +820,12 @@ const AppContent = (props) => {
 			setSelectedItem(item);
 			navigateTo(PANELS.DETAILS);
 		}
-	}, [navigateTo, panelIndex, selectedItem]);
+	}, [navigateTo, panelIndex, selectedItem, handlePlayChannel]);
 
-	// A song plays as soon as it's picked, so only the rest wait for their screen to start them.
+	// A song or a channel plays as soon as it's picked, so only the rest wait for their screen to start them.
 	const handlePlayFromMenu = useCallback((item) => {
 		handleSelectItem(item);
-		if (item.Type !== 'Audio') setDetailsAutoPlay(true);
+		if (item.Type !== 'Audio' && !isLiveTvChannel(item)) setDetailsAutoPlay(true);
 	}, [handleSelectItem]);
 
 	const handleAutoPlayed = useCallback(() => setDetailsAutoPlay(false), []);
@@ -1110,14 +1123,6 @@ const AppContent = (props) => {
 		setSelectedPerson(person);
 		navigateTo(PANELS.PERSON, false);
 	}, [navigateTo, settings.detailScreenStyle]);
-
-	// The guide hands over its lineup, in its own order, for the player's channel carousel.
-	const handlePlayChannel = useCallback((channel, lineup) => {
-		setPlayingItem(channel);
-		setPlaybackOptions(lineup?.length ? {liveTvChannels: lineup} : null);
-		setIsResume(false);
-		navigateTo(PANELS.PLAYER);
-	}, [navigateTo]);
 
 	const handleOpenRecordings = useCallback(() => {
 		navigateTo(PANELS.RECORDINGS);
@@ -1854,7 +1859,12 @@ const AppContent = (props) => {
 				onDismiss={dismissScreensaver}
 				serverUrl={serverUrl}
 			/>
-			<SeasonalTheme theme={settings.seasonalTheme} />
+			{/* Home only, and unmounted under the screensaver and the full screen overlays so it
+			never keeps animating behind them. */}
+			{panelIndex === PANELS.BROWSE && !showScreensaver && !showShuffleOverlay &&
+				!photoViewerItem && !comicViewerItem && (
+				<SeasonalTheme theme={settings.seasonalTheme} density={settings.seasonalDensity} />
+			)}
 			<NoConnection />
 			<DebugOverlay />
 			{connectionState !== 'connected' && isAuthenticated && (

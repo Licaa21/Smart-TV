@@ -5,6 +5,7 @@ import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDeco
 import $L from '@enact/i18n/$L';
 import {isBackKey, KEYS} from '../../utils/keys';
 import {exitApp} from '../../utils/appLifecycle';
+import {isVega} from '../../platform';
 
 import css from './ExitDialog.module.less';
 
@@ -24,13 +25,22 @@ const ExitDialog = ({open, onCancel, onExit}) => {
 		}
 	}, [open]);
 
+	const handleExit = useCallback(() => {
+		onExit?.();
+		exitApp();
+	}, [onExit]);
+
 	useEffect(() => {
 		if (!open) return;
 		const handleKey = (e) => {
 			if (isBackKey(e)) {
 				e.preventDefault();
 				e.stopPropagation();
-				onCancel?.();
+				// Amazon's review presses Back until the launcher shows and
+				// fails an app that keeps closing and reopening this dialog, so
+				// on Fire TV a second Back is the exit.
+				if (isVega()) handleExit();
+				else onCancel?.();
 				return;
 			}
 			const code = e.keyCode || e.which;
@@ -51,12 +61,7 @@ const ExitDialog = ({open, onCancel, onExit}) => {
 		};
 		window.addEventListener('keydown', handleKey, true);
 		return () => window.removeEventListener('keydown', handleKey, true);
-	}, [open, onCancel]);
-
-	const handleExit = useCallback(() => {
-		onExit?.();
-		exitApp();
-	}, [onExit]);
+	}, [open, onCancel, handleExit]);
 
 	if (!open) return null;
 

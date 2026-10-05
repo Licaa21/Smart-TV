@@ -1,14 +1,10 @@
-import {getPlatform} from '../platform';
+import {resolvePlatformModule} from './platformModule';
 
 let impl;
 
 const loadImpl = async () => {
 	if (impl) return impl;
-	if (getPlatform() === 'tizen') {
-		impl = await import('@moonfin/platform-tizen/storage');
-	} else {
-		impl = await import('@moonfin/platform-webos/storage');
-	}
+	impl = await resolvePlatformModule('storage');
 	return impl;
 };
 

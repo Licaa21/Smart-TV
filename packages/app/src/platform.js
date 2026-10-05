@@ -13,10 +13,19 @@ export const isTizen = () => {
 		navigator.userAgent.toLowerCase().includes('tizen');
 };
 
+// The React Native shell that hosts the app on Fire TV puts this on the window
+// before any page code runs.
+export const isVega = () => {
+	if (process.env.REACT_APP_PLATFORM === 'vega') return true;
+	if (typeof window === 'undefined') return false;
+	return typeof window.__MOONFIN_VEGA__ !== 'undefined';
+};
+
 export const getPlatform = () => {
 	if (process.env.REACT_APP_PLATFORM) return process.env.REACT_APP_PLATFORM;
 	if (isWebOS()) return 'webos';
 	if (isTizen()) return 'tizen';
+	if (isVega()) return 'vega';
 	return 'unknown';
 };
 

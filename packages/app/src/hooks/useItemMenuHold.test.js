@@ -11,10 +11,12 @@ jest.mock('react/jsx-dev-runtime', () => {
 });
 
 jest.mock('../components/ItemContextMenu', () => ({useItemMenu: () => mockMenu}));
+jest.mock('../platform', () => ({getPlatform: () => 'vega'}));
 
 const ITEM = {Id: 'm1', Type: 'Movie'};
 const OK = 13;
 const LEFT = 37;
+const MENU = 93;
 
 const card = document.createElement('div');
 
@@ -62,6 +64,28 @@ describe('useItemMenuHold', () => {
 
 		expect(mockMenu.open).toHaveBeenCalledWith(ITEM, undefined);
 		expect(release('keyup').defaultPrevented).toBe(true);
+	});
+
+	test('the menu key opens the menu at once and is marked handled', () => {
+		const hold = setup();
+		const event = {...press(MENU), preventDefault: jest.fn(), stopPropagation: jest.fn()};
+
+		hold.onKeyDownCapture(event);
+
+		expect(mockMenu.open).toHaveBeenCalledWith(ITEM, undefined);
+		expect(event.preventDefault).toHaveBeenCalled();
+		expect(event.stopPropagation).toHaveBeenCalled();
+	});
+
+	test('the menu key leaves a card the menu cant open for alone', () => {
+		mockMenu.canOpen.mockReturnValue(false);
+		const hold = setup();
+		const event = {...press(MENU), preventDefault: jest.fn(), stopPropagation: jest.fn()};
+
+		hold.onKeyDownCapture(event);
+
+		expect(mockMenu.open).not.toHaveBeenCalled();
+		expect(event.preventDefault).not.toHaveBeenCalled();
 	});
 
 	test('the keydowns a remote repeats while OK is held start nothing new', () => {

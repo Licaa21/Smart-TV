@@ -8,7 +8,9 @@ import {
 	homeRowsFromRowOrder,
 	homeRowsFromSections,
 	homeRowsToRowOrder,
-	homeRowsToSections
+	homeRowsToSections,
+	mergeHomeRows,
+	withSeasonalRow
 } from './homeLayout';
 
 const enabledIds = (rows) => rows.filter((row) => row.enabled).map((row) => row.id);
@@ -196,5 +198,48 @@ describe('serverPluginSections', () => {
 			]
 		});
 		expect(serverPluginSections()).toEqual([pluginRow]);
+	});
+});
+
+describe('the seasonal row in a saved layout', () => {
+	test('a layout that lacks it gets it switched off unless its toggle says on', () => {
+		const saved = [{id: 'resume', enabled: true, order: 0}];
+		expect(rowById(mergeHomeRows(saved), 'seasonal').enabled).toBe(false);
+		expect(rowById(mergeHomeRows(saved, {seasonal: true}), 'seasonal').enabled).toBe(true);
+	});
+
+	test('a layout that names it keeps its own flag whatever the toggle says', () => {
+		const saved = [{id: 'seasonal', enabled: false, order: 0}];
+		expect(rowById(mergeHomeRows(saved, {seasonal: true}), 'seasonal').enabled).toBe(false);
+	});
+
+	test('a profile layout from a client that predates the row re-adds it from the toggle', () => {
+		const rows = homeRowsFromProfile({homeSections: [{kind: 'builtin', type: 'resume', enabled: true, order: 0}]}, {seasonal: true});
+		expect(rowById(rows, 'seasonal').enabled).toBe(true);
+	});
+
+	const layout = () => [
+		{id: 'resume', enabled: true, order: 0},
+		{id: 'nextup', enabled: true, order: 1},
+		{id: 'latest-media', enabled: true, order: 2},
+		{id: 'seasonal', enabled: false, order: 3}
+	];
+
+	test('switching it on puts it right after Continue Watching and Next Up', () => {
+		const rows = withSeasonalRow(layout(), true);
+		expect(rows.map((row) => row.id)).toEqual(['resume', 'nextup', 'seasonal', 'latest-media']);
+		expect(rowById(rows, 'seasonal').enabled).toBe(true);
+		expect(rows.map((row) => row.order)).toEqual([0, 1, 2, 3]);
+	});
+
+	test('switching it off leaves it where it is', () => {
+		const rows = withSeasonalRow(withSeasonalRow(layout(), true), false);
+		expect(rows.map((row) => row.id)).toEqual(['resume', 'nextup', 'seasonal', 'latest-media']);
+		expect(rowById(rows, 'seasonal').enabled).toBe(false);
+	});
+
+	test('a layout without the row gets one when it is switched on', () => {
+		const rows = withSeasonalRow([{id: 'resume', enabled: true, order: 0}], true);
+		expect(rows.map((row) => row.id)).toEqual(['resume', 'seasonal']);
 	});
 });

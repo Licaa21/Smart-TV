@@ -1,4 +1,5 @@
 import {getPlatform} from '../platform';
+import {resolvePlatformModule} from './platformModule';
 import {setNetworkLogSink} from '../utils/networkLogSink';
 import {redact, redactContext} from '../utils/logRedaction';
 import {setSyncLogSink} from '../utils/syncLog';
@@ -54,13 +55,7 @@ const getTimestamp = () => {
 const loadDeviceInfo = async () => {
 	if (deviceInfoCache) return deviceInfoCache;
 
-	if (!deviceInfoLoader) {
-		if (getPlatform() === 'tizen') {
-			deviceInfoLoader = import('@moonfin/platform-tizen/deviceInfo');
-		} else {
-			deviceInfoLoader = import('@moonfin/platform-webos/deviceInfo');
-		}
-	}
+	if (!deviceInfoLoader) deviceInfoLoader = resolvePlatformModule('deviceInfo');
 
 	try {
 		const mod = await deviceInfoLoader;
@@ -79,7 +74,7 @@ const loadDeviceInfo = async () => {
 	return deviceInfoCache;
 };
 
-const platformName = getPlatform() === 'tizen' ? 'Tizen' : 'webOS';
+const platformName = {tizen: 'Tizen', vega: 'Fire TV'}[getPlatform()] || 'webOS';
 const logEndpointName = `moonfin-${getPlatform()}-log`;
 
 const formatLogAsText = (entry) => {

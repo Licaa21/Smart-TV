@@ -192,13 +192,15 @@ const Browse = ({
 		imdbMostPopularTvShowsEnabled: settings.imdbMostPopularTvShowsEnabled,
 		imdbLowestRatedMoviesEnabled: settings.imdbLowestRatedMoviesEnabled,
 		imdbTopEnglishMoviesEnabled: settings.imdbTopEnglishMoviesEnabled,
+		seasonalRowEnabled: settings.seasonalRowEnabled,
 		parentalFilter,
 		kidsModeEnabled: settings.kidsModeEnabled
 	}), [settings.kidsModeEnabled, parentalFilter, mergeContinueWatchingNextUp, settings.hiddenContinueWatchingItems, settings.hiddenNextUpSeries,
 		settings.displayFavoritesRows, settings.displayCollectionsRows, settings.displayGenresRows, settings.displayPlaylistsRows,
 		settings.displayAudioRows, settings.displayStudiosRows, settings.displayRewatchRow,
 		settings.imdbTop250MoviesEnabled, settings.imdbTop250TvShowsEnabled, settings.imdbMostPopularMoviesEnabled,
-		settings.imdbMostPopularTvShowsEnabled, settings.imdbLowestRatedMoviesEnabled, settings.imdbTopEnglishMoviesEnabled]);
+		settings.imdbMostPopularTvShowsEnabled, settings.imdbLowestRatedMoviesEnabled, settings.imdbTopEnglishMoviesEnabled,
+		settings.seasonalRowEnabled]);
 
 	const builtRows = useMemo(() => {
 		const result = buildBrowseRows({

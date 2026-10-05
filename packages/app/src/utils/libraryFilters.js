@@ -1,3 +1,5 @@
+import {foldForSearch} from './accentFolding';
+
 // The library filter panel keeps its choices as plain lists, and the server
 // wants a query parameter per kind. Genres, ratings and tags are pipe
 // delimited so a value holding a comma still arrives whole.
@@ -50,6 +52,41 @@ const buildFilterParams = ({
 		if (params[key] === undefined) delete params[key];
 	});
 	return params;
+};
+
+// Shorter lists are quicker to scroll through than to search.
+const FACET_SEARCH_MIN = 10;
+
+/**
+ * What one facet in the panel shows: its values narrowed to the search, then cut to the page
+ * limit. Anything already picked stays on screen however far down the list it sits, otherwise
+ * a page limit could hide the only way to clear it.
+ *
+ * @param {Array<string|{name: string, value: string}>} values - languages carry a display
+ *   name beside the code the query takes, everything else is its own label
+ * @param {string[]} selected
+ * @param {string} query
+ * @param {number} limit
+ */
+export const facetRows = (values, selected, query, limit) => {
+	const options = values.map((v) => (typeof v === 'string' ? {name: v, value: v} : v));
+	const searchable = options.length >= FACET_SEARCH_MIN;
+	const folded = searchable ? foldForSearch(query.trim()) : '';
+	const matching = folded ? options.filter((option) => foldForSearch(option.name).includes(folded)) : options;
+	let room = limit;
+	const visible = matching.filter((option) => {
+		if (selected.includes(option.value)) return true;
+		if (room <= 0) return false;
+		room -= 1;
+		return true;
+	});
+	return {
+		chosen: options.filter((option) => selected.includes(option.value)).length,
+		searchable,
+		noMatches: matching.length === 0,
+		visible,
+		remaining: matching.length - visible.length
+	};
 };
 
 export {buildFilterParams};

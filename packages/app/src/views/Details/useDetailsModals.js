@@ -4,7 +4,7 @@ import Spotlight from '@enact/spotlight';
 // Every overlay the detail screen can raise, and the BACK handling that closes them in the
 // right order. The track pickers share one activeModal slot because only one of them is ever
 // up at a time, while the dialogs that own their own component get a flag each.
-const useDetailsModals = ({backHandlerRef, onArtworkClosed, seerrBackRef, overviewBackRef, spotlightBackRef}) => {
+const useDetailsModals = ({backHandlerRef, onArtworkClosed, seerrBackRef, overviewBackRef, spotlightBackRef, trailerBackRef}) => {
 	const [activeModal, setActiveModal] = useState(null);
 	const [showPlaylistModal, setShowPlaylistModal] = useState(false);
 	const [showCollectionModal, setShowCollectionModal] = useState(false);
@@ -120,10 +120,11 @@ const useDetailsModals = ({backHandlerRef, onArtworkClosed, seerrBackRef, overvi
 	// first refusal before the whole thing is dismissed. The Seerr popups and the expanded
 	// overview run off their own state, so they answer through refs rather than flags of ours.
 	// A Seerr popup floats over everything the detail styles draw, their own menus and section
-	// modals included, so it answers before them.
+	// modals included, so it answers before them, and a playing trailer covers the lot.
 	useEffect(() => {
 		if (!backHandlerRef) return;
 		const handler = () => {
+			if (trailerBackRef?.current?.()) return true;
 			if (seerrBackRef?.current?.()) return true;
 			if (spotlightBackRef?.current?.()) return true;
 			if (showArtworkModal) {
@@ -142,7 +143,7 @@ const useDetailsModals = ({backHandlerRef, onArtworkClosed, seerrBackRef, overvi
 		};
 		backHandlerRef.current = handler;
 		return () => { if (backHandlerRef.current === handler) backHandlerRef.current = null; };
-	}, [backHandlerRef, seerrBackRef, overviewBackRef, spotlightBackRef, activeModal, showPlaylistModal, showCollectionModal, showDeleteDialog, showRatingDialog, showArtworkModal, showIdentifyModal, closeModal, handleClosePlaylistModal, handleCloseCollectionModal, handleCloseDeleteDialog, handleCloseRatingDialog, handleCloseArtworkModal, handleCloseIdentifyModal]);
+	}, [backHandlerRef, seerrBackRef, overviewBackRef, spotlightBackRef, trailerBackRef, activeModal, showPlaylistModal, showCollectionModal, showDeleteDialog, showRatingDialog, showArtworkModal, showIdentifyModal, closeModal, handleClosePlaylistModal, handleCloseCollectionModal, handleCloseDeleteDialog, handleCloseRatingDialog, handleCloseArtworkModal, handleCloseIdentifyModal]);
 
 	return {
 		activeModal,

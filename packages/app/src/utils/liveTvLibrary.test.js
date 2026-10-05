@@ -1,4 +1,4 @@
-import {isLiveTvLibrary, librariesForNav} from './liveTvLibrary';
+import {isLiveTvChannel, isLiveTvLibrary, librariesForNav} from './liveTvLibrary';
 
 const movies = {Id: 'm', CollectionType: 'movies'};
 const liveTv = {Id: 'l', CollectionType: 'livetv'};
@@ -54,5 +54,15 @@ describe('librariesForNav in Kids Mode', () => {
 
 	test('keeps the library when neither the button nor the mode takes it', () => {
 		expect(librariesForNav(libs, false)).toEqual(libs);
+	});
+});
+
+describe('isLiveTvChannel', () => {
+	test('takes either spelling of a channel and nothing else', () => {
+		expect(isLiveTvChannel({Type: 'TvChannel'})).toBe(true);
+		expect(isLiveTvChannel({Type: 'LiveTvChannel'})).toBe(true);
+		expect(isLiveTvChannel({Type: 'Program'})).toBe(false);
+		expect(isLiveTvChannel({Type: 'Movie'})).toBe(false);
+		expect(isLiveTvChannel(null)).toBe(false);
 	});
 });
