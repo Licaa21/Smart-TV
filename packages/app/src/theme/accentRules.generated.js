@@ -276,6 +276,7 @@ export const ACCENT_RULES = {
 		["views/Library/Library.module.less","",".{sectionSummary}","color","{accent}"],
 		["views/Library/Library.module.less","",".{sectionChevronOpen}","fill","{accent}"],
 		["views/Library/Library.module.less","",".{sortOption}:focus","border-color","{accent}"],
+		["views/Library/Library.module.less","",".{clearGroup}","color","{accent}"],
 		["views/Library/Library.module.less","",".{sortOptionActive} .{radioCircle}","border-color","{accent}"],
 		["views/Library/Library.module.less","",".{radioFill}","background","{accent}"],
 		["views/Library/Library.module.less","",".{sortOptionActive} .{checkboxSquare}","border-color","{accent}"],
