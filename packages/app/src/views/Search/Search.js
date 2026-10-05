@@ -131,6 +131,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	const [activeTab, setActiveTab] = useState('all');
 	const activeTabRef = useRef('all');
 	activeTabRef.current = activeTab;
+	// Whether the viewer chose a tab themselves since this search began. The focus the screen moves
+	// to a pill on its own reaches the tab bar's select handler the same way, so it is set aside
+	// while that happens.
+	const tabPickedRef = useRef(false);
+	const programmaticTabFocusRef = useRef(false);
 	const [searchInputFocused, setSearchInputFocused] = useState(false);
 	const searchInputRef = useRef(null);
 	// The row in focus goes by id rather than position, so a row that arrives late
@@ -184,9 +189,14 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// resolves, and the fallback to the container lands on whichever pill sits nearest the search
 	// field, which switches the results to that tab.
 	const focusAllTab = useCallback(() => {
-		const pill = document.querySelector(ACTIVE_SEARCH_TAB_SELECTOR) ||
-			document.querySelector('[data-spotlight-id="search-tabs"] [data-id="all"]');
-		if (!(pill && Spotlight.focus(pill))) Spotlight.focus('search-tabs');
+		programmaticTabFocusRef.current = true;
+		try {
+			const pill = document.querySelector(ACTIVE_SEARCH_TAB_SELECTOR) ||
+				document.querySelector('[data-spotlight-id="search-tabs"] [data-id="all"]');
+			if (!(pill && Spotlight.focus(pill))) Spotlight.focus('search-tabs');
+		} finally {
+			programmaticTabFocusRef.current = false;
+		}
 	}, []);
 
 	// Recorded once a search actually returns, so the half-typed prefixes that
@@ -205,21 +215,31 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// over once there is something to show. It stays put when the viewer has already gone to another
 	// tab or into the results, and carries focus along only if that sat on a tab pill.
 	const openOnSeerr = useCallback((count) => {
-		if (!count || settings.searchDefaultTab !== 'seerr' || activeTabRef.current !== 'all') return;
+		if (!count || settings.searchDefaultTab !== 'seerr' || activeTabRef.current !== 'all' || tabPickedRef.current) return;
 		const focused = document.activeElement;
 		if (focused && focused.closest && focused.closest('[data-spotlight-id^="search-row-"], [data-spotlight-id="search-grid"]')) return;
 		const onTabs = Boolean(focused && focused.closest && focused.closest('[data-spotlight-id="search-tabs"]'));
 		setActiveTab('seerr');
 		if (onTabs) {
 			setTimeout(() => {
+				// Only while the focus is still in the tab bar, so a viewer who has gone on into the
+				// results or back to the field in the meantime is not pulled back.
+				const stillOnTabs = document.activeElement?.closest?.('[data-spotlight-id="search-tabs"]');
 				const pill = document.querySelector('[data-spotlight-id="search-tabs"] [data-id="seerr"]');
-				if (pill) Spotlight.focus(pill);
+				if (!stillOnTabs || !pill) return;
+				programmaticTabFocusRef.current = true;
+				try {
+					Spotlight.focus(pill);
+				} finally {
+					programmaticTabFocusRef.current = false;
+				}
 			}, 50);
 		}
 	}, [settings.searchDefaultTab]);
 
 	const doSearch = useCallback(async (searchQuery) => {
 		const requestId = ++requestIdRef.current;
+		tabPickedRef.current = false;
 		const q = (searchQuery || '').trim();
 		if (q.length < MIN_SEARCH_LENGTH) {
 			setIsLoading(false);
@@ -409,6 +429,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	}, [tabs, activeTab]);
 
 	const handleSelectTab = useCallback((id) => {
+		if (!programmaticTabFocusRef.current) tabPickedRef.current = true;
 		setActiveTab(id);
 		setActiveRowId(null);
 	}, []);
