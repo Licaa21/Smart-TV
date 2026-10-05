@@ -13,6 +13,7 @@ dist
 *.ipk
 *.wgt
 *.zip
+*.vpkg
 
 # misc
 .DS_Store

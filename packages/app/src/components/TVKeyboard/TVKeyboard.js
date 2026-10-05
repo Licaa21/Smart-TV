@@ -1,8 +1,9 @@
-import {Component} from 'react';
+import {Component, memo} from 'react';
 import {Pause} from '@enact/spotlight/Pause';
 
 import {useSettings} from '../../context/SettingsContext';
 import {toCssColor, toCssColorWithAlpha, radiusToCss, shadowToCss} from '../../theme/themeSpec';
+import {getPerfTier} from '../../utils/perfTier';
 import {
 	NUMERIC_LAYOUT,
 	NUMBER_PAD_LAYOUT,
@@ -79,6 +80,79 @@ const buildPalette = (theme) => {
 		accent: toCssColor(c.accent)
 	};
 };
+
+const keyContent = (label, selected, palette, width, shifted) => {
+	if (label === 'SHIFT') {
+		const idleColor = shifted ? palette.accent : palette.textPrimary;
+		return <KeyIcon name={shifted ? 'SHIFT_LOCKED' : 'SHIFT'} color={selected ? palette.textOnSelected : idleColor} />;
+	}
+	if (label === 'SPACE') {
+		return (
+			<div
+				className={css.spaceBar}
+				style={{width: width * 0.5, background: selected ? palette.textOnSelected : palette.textMuted, opacity: 0.65}}
+			/>
+		);
+	}
+	if (label === 'DONE' || label === 'IME') {
+		return <KeyIcon name={label} color={selected ? palette.textOnSelected : palette.accent} />;
+	}
+	if (ICON_PATHS[label]) {
+		return <KeyIcon name={label} color={selected ? palette.textOnSelected : palette.textPrimary} />;
+	}
+	return label;
+};
+
+// A press only changes two keys, so each one renders on its own props and the
+// rest of the grid is left alone.
+const Key = memo(({label, row, col, selected, width, marginRight, palette, glow, shifted, hasAlternates, onClick, onHoldStart, onHoldEnd, children}) => (
+	<div
+		className={css.key}
+		data-row={row}
+		data-col={col}
+		data-key={label}
+		style={{
+			width: width > 0 ? width : undefined,
+			flex: width > 0 ? undefined : 1,
+			marginRight,
+			background: selected ? palette.selectedKey : palette.idleKey,
+			border: selected ? palette.selectedKeyBorder : palette.idleKeyBorder,
+			borderRadius: palette.chipRadius,
+			color: selected ? palette.textOnSelected : palette.textPrimary,
+			boxShadow: selected ? glow : 'none'
+		}}
+		onClick={onClick}
+		onMouseDown={onHoldStart}
+		onMouseUp={onHoldEnd}
+		onMouseLeave={onHoldEnd}
+	>
+		{keyContent(label, selected, palette, width, shifted)}
+		{hasAlternates && (
+			<div
+				className={css.alternatesDot}
+				style={{background: selected ? palette.textOnSelected : palette.textMuted, opacity: 0.55}}
+			/>
+		)}
+		{children}
+	</div>
+));
+
+const Chip = memo(({value, index, selected, palette, glow, onClick}) => (
+	<div
+		className={css.chip}
+		data-index={index}
+		style={{
+			background: selected ? palette.selectedKey : palette.chipBackground,
+			border: selected ? palette.selectedKeyBorder : palette.idleKeyBorder,
+			borderRadius: palette.chipRadius,
+			color: selected ? palette.textOnSelected : palette.textPrimary,
+			boxShadow: selected ? glow : 'none'
+		}}
+		onClick={onClick}
+	>
+		{value}
+	</div>
+));
 
 class TVKeyboardHost extends Component {
 	constructor(props) {
@@ -601,28 +675,6 @@ class TVKeyboardHost extends Component {
 		this.commitAlternate(e.currentTarget.dataset.value);
 	};
 
-	renderKeyContent(key, isSelected, palette, keyWidth) {
-		if (key === 'SHIFT') {
-			const idleColor = this.state.shifted ? palette.accent : palette.textPrimary;
-			return <KeyIcon name={this.state.shifted ? 'SHIFT_LOCKED' : 'SHIFT'} color={isSelected ? palette.textOnSelected : idleColor} />;
-		}
-		if (key === 'SPACE') {
-			return (
-				<div
-					className={css.spaceBar}
-					style={{width: keyWidth * 0.5, background: isSelected ? palette.textOnSelected : palette.textMuted, opacity: 0.65}}
-				/>
-			);
-		}
-		if (key === 'DONE' || key === 'IME') {
-			return <KeyIcon name={key} color={isSelected ? palette.textOnSelected : palette.accent} />;
-		}
-		if (ICON_PATHS[key]) {
-			return <KeyIcon name={key} color={isSelected ? palette.textOnSelected : palette.textPrimary} />;
-		}
-		return key;
-	}
-
 	renderPopup(palette) {
 		const {popup} = this.state;
 		return (
@@ -660,10 +712,10 @@ class TVKeyboardHost extends Component {
 		);
 	}
 
-	renderGrid(palette) {
+	renderGrid(palette, glow) {
 		const layout = this.layout();
 		const uniform = this.usesNumberPad();
-		const {row, col, popup, gridWidth} = this.state;
+		const {row, col, popup, gridWidth, shifted} = this.state;
 		const base = gridWidth > 0 ? gridWidth / maxRowSpan(layout, uniform) : 0;
 		const spacing = base * KEY_GAP_FACTOR;
 		return (
@@ -672,39 +724,25 @@ class TVKeyboardHost extends Component {
 					<div key={rowIndex} className={css.gridRow}>
 						{line.map((key, colIndex) => {
 							const isSelected = row === rowIndex && col === colIndex;
-							const keyWidth = base * keyUnitSpan(key, uniform);
-							const hasAlternates = !!alternatesFor(key);
 							return (
-								<div
+								<Key
 									key={`${rowIndex}-${colIndex}`}
-									className={css.key}
-									data-row={rowIndex}
-									data-col={colIndex}
-									data-key={key}
-									style={{
-										width: base > 0 ? keyWidth : undefined,
-										flex: base > 0 ? undefined : 1,
-										marginRight: colIndex === line.length - 1 ? 0 : spacing,
-										background: isSelected ? palette.selectedKey : palette.idleKey,
-										border: isSelected ? palette.selectedKeyBorder : palette.idleKeyBorder,
-										borderRadius: palette.chipRadius,
-										color: isSelected ? palette.textOnSelected : palette.textPrimary,
-										boxShadow: isSelected ? palette.focusGlow : 'none'
-									}}
+									label={key}
+									row={rowIndex}
+									col={colIndex}
+									selected={isSelected}
+									width={base * keyUnitSpan(key, uniform)}
+									marginRight={colIndex === line.length - 1 ? 0 : spacing}
+									palette={palette}
+									glow={glow}
+									shifted={key === 'SHIFT' && shifted}
+									hasAlternates={!!alternatesFor(key)}
 									onClick={this.handleKeyClick}
-									onMouseDown={this.handleKeyHoldStart}
-									onMouseUp={this.handleKeyHoldEnd}
-									onMouseLeave={this.handleKeyHoldEnd}
+									onHoldStart={this.handleKeyHoldStart}
+									onHoldEnd={this.handleKeyHoldEnd}
 								>
-									{this.renderKeyContent(key, isSelected, palette, keyWidth)}
-									{hasAlternates && (
-										<div
-											className={css.alternatesDot}
-											style={{background: isSelected ? palette.textOnSelected : palette.textMuted, opacity: 0.55}}
-										/>
-									)}
-									{popup && isSelected && this.renderPopup(palette)}
-								</div>
+									{popup && isSelected ? this.renderPopup(palette) : null}
+								</Key>
 							);
 						})}
 					</div>
@@ -713,33 +751,24 @@ class TVKeyboardHost extends Component {
 		);
 	}
 
-	renderChips(palette) {
+	renderChips(palette, glow) {
 		const chips = this.chips();
 		if (!chips.length) return null;
 		const {row, col} = this.state;
 		const activeIndex = row === -1 ? Math.min(col, chips.length - 1) : -1;
 		return (
 			<div className={css.chipBar}>
-				{chips.map((chip, index) => {
-					const isSelected = index === activeIndex;
-					return (
-						<div
-							key={`${chip.value}-${index}`}
-							className={css.chip}
-							data-index={index}
-							style={{
-								background: isSelected ? palette.selectedKey : palette.chipBackground,
-								border: isSelected ? palette.selectedKeyBorder : palette.idleKeyBorder,
-								borderRadius: palette.chipRadius,
-								color: isSelected ? palette.textOnSelected : palette.textPrimary,
-								boxShadow: isSelected ? palette.focusGlow : 'none'
-							}}
-							onClick={this.handleChipClick}
-						>
-							{chip.value}
-						</div>
-					);
-				})}
+				{chips.map((chip, index) => (
+					<Chip
+						key={`${chip.value}-${index}`}
+						value={chip.value}
+						index={index}
+						selected={index === activeIndex}
+						palette={palette}
+						glow={glow}
+						onClick={this.handleChipClick}
+					/>
+				))}
 			</div>
 		);
 	}
@@ -748,6 +777,8 @@ class TVKeyboardHost extends Component {
 		const {session} = this.state;
 		if (!session) return null;
 		const palette = this.getPalette();
+		// The glow is a blurred shadow, which the lower tiers skip as the cards do
+		const glow = getPerfTier() === 'high' ? palette.focusGlow : 'none';
 		const narrow = this.usesNumberPad();
 		return (
 			<div className={css.overlay} onClick={this.handleOverlayClick}>
@@ -757,8 +788,8 @@ class TVKeyboardHost extends Component {
 					style={{background: palette.panel, border: palette.panelBorder, borderRadius: palette.panelRadius}}
 					onClick={this.handlePanelClick}
 				>
-					{this.renderChips(palette)}
-					{this.renderGrid(palette)}
+					{this.renderChips(palette, glow)}
+					{this.renderGrid(palette, glow)}
 				</div>
 			</div>
 		);

@@ -2,6 +2,7 @@ import {useCallback, useEffect, useRef} from 'react';
 
 import {useItemMenu} from '../components/ItemContextMenu';
 import {LONG_PRESS_MS, isSelectKey} from '../utils/longPress';
+import {isMenuKey} from '../utils/keys';
 
 // How long after a pointer lets go of a hold its click can still arrive.
 const RELEASE_CLICK_MS = 100;
@@ -81,8 +82,16 @@ const useItemMenuHold = (itemAt, options) => {
 	}, [menu, itemAt, options]);
 
 	const handleKeyDownCapture = useCallback((e) => {
+		if (isMenuKey(e)) {
+			const item = itemAt(e.target);
+			if (!item || !menu?.canOpen(item, options)) return;
+			e.preventDefault();
+			e.stopPropagation();
+			menu.open(item, options);
+			return;
+		}
 		if (isSelectKey(e)) start(e.target);
-	}, [start]);
+	}, [start, menu, itemAt, options]);
 
 	const handleMouseDownCapture = useCallback((e) => start(e.target), [start]);
 

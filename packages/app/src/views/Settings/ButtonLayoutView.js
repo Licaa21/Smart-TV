@@ -19,7 +19,7 @@ const ButtonLayoutView = ({kind, tempButtons, onToggleButton, onMoveButton, onRe
 		</SectionTitle>
 		<div className={css.viewDescription}>
 			{isCodecOrder
-				? $L('Move the codecs up or down to rank them, best first. Your audio language is applied before this, so the ranking only decides between tracks in the same language.')
+				? $L('Order the codecs from best to worst. Your audio language is applied before this, so the ranking only decides between tracks in the same language.')
 				: (kind === 'osd'
 				? $L('Enable/disable and reorder the buttons around the playback controls.')
 				: (kind === 'metadata'
