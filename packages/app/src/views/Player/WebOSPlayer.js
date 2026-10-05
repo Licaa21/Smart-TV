@@ -1759,6 +1759,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			// made for, rather than restarting the video.
 			const lookup = previousLookupRef.current;
 			const previous = previousEpisode || (lookup && lookup.itemId === item.Id ? await lookup.promise : null);
+			serverLogger.playback('Previous pressed', {from: item.Id, to: previous ? previous.Id : 'restart'});
 			if (previous) {
 				onPlayNextWithCleanup(previous);
 				return;
@@ -2676,6 +2677,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (newTicks && !groupSeekTo(newTicks)) seekToTicks(newTicks);
 	}, [duration, seekToTicks, groupSeekTo]);
 
+	// A held key repeats several times a second, so the report gets one line a second of it.
+	const lastSeekLogRef = useRef(0);
+	const logSeekKey = useCallback((source, jumpSeconds) => {
+		const now = Date.now();
+		if (now - lastSeekLogRef.current < 1000) return;
+		lastSeekLogRef.current = now;
+		serverLogger.playback('Seek: long jump', {source, jumpSeconds, durationSeconds: Math.round(duration)});
+	}, [duration]);
+
 	const handleProgressKeyDown = useCallback((e) => {
 		if (!videoRef.current) return;
 		const step = settings.seekStep;
@@ -3013,7 +3023,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				if (!isLiveTV && !(isAudioMode && focusRow === 'panel')) {
 					showControls();
 					setFocusRow('progress');
-					scrubBy(channelStep * channelSeekSeconds(settings.seekStep, duration));
+					const jump = channelStep * channelSeekSeconds(settings.seekStep, duration);
+					logSeekKey('channel key', jump);
+					scrubBy(jump);
 				}
 				return;
 			}

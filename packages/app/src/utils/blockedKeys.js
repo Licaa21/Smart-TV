@@ -9,6 +9,10 @@ import {getPlatform} from '../platform';
 export const BLOCKED_KEY_NAMES = ['ChannelUp', 'ChannelDown', 'ChannelList', 'PreviousChannel', 'Guide'];
 export const BLOCKED_KEY_PATTERN = /netflix|rakuten|prime|amazon|disney|hulu|hbo|youtube|apple|tvplus|shortcut/i;
 
+// What the last registration found, for the diagnostic report: the keys this TV offers at all, and
+// the ones taken from it.
+export const blockedKeysReport = {offered: [], registered: []};
+
 export const registerBlockedKeys = () => {
 	if (getPlatform() !== 'tizen') return;
 	if (typeof tizen === 'undefined' || !tizen.tvinputdevice) return;
@@ -16,10 +20,13 @@ export const registerBlockedKeys = () => {
 	try {
 		const supportedKeyNames = tizen.tvinputdevice.getSupportedKeys().map((k) => k.name);
 		console.log('[keys] keys this TV offers:', supportedKeyNames.join(', '));
+		blockedKeysReport.offered = supportedKeyNames;
 		const wanted = supportedKeyNames.filter((name) => BLOCKED_KEY_NAMES.includes(name) || BLOCKED_KEY_PATTERN.test(name));
+		blockedKeysReport.registered = [];
 		wanted.forEach((keyName) => {
 			try {
 				tizen.tvinputdevice.registerKey(keyName);
+				blockedKeysReport.registered.push(keyName);
 			} catch (e) {
 				console.warn(`Failed to register key ${keyName}:`, e);
 			}

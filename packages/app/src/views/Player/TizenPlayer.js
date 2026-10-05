@@ -16,6 +16,7 @@ import {useSyncPlay} from '../../context/SyncPlayContext';
 import * as syncPlayService from '../../services/syncPlay';
 import {KEYS, isBackKey} from '../../utils/keys';
 import {channelKeyStep} from '../../utils/channelKeys';
+import {blockedKeysReport} from '../../utils/blockedKeys';
 import {channelSeekSeconds} from '../../utils/channelSeek';
 import {isPreroll, nextInQueue, shouldAutoAdvance} from '../../utils/cinemaMode';
 import {driftMs, needsSeek, correctionOptions, DRIFT_CHECK_MS, GROUP_SEEK_SETTLE_TIMEOUT_MS} from '../../utils/syncDrift';
@@ -891,6 +892,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// ==============================
 	useEffect(() => {
 		const init = async () => {
+			serverLogger.playback('Keys: taken from the TV', {registered: blockedKeysReport.registered, offered: blockedKeysReport.offered.length});
 			await initTizenAPI();
 			await keepScreenOn(!isPaused);
 
@@ -1773,6 +1775,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			// made for, rather than restarting the video.
 			const lookup = previousLookupRef.current;
 			const previous = previousEpisode || (lookup && lookup.itemId === item.Id ? await lookup.promise : null);
+			serverLogger.playback('Previous pressed', {from: item.Id, to: previous ? previous.Id : 'restart'});
 			if (previous) {
 				onPlayNextWithCleanup(previous);
 				return;
@@ -2459,6 +2462,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		else scheduleDeferredSeek(newMs);
 	}, [noteViewerActivity, beginScrub, scheduleDeferredSeek]);
 
+	// A held key repeats several times a second, so the report gets one line a second of it.
+	const lastSeekLogRef = useRef(0);
+	const logSeekKey = useCallback((source, jumpSeconds) => {
+		const now = Date.now();
+		if (now - lastSeekLogRef.current < 1000) return;
+		lastSeekLogRef.current = now;
+		serverLogger.playback('Seek: long jump', {source, jumpSeconds, durationSeconds: Math.round(duration)});
+	}, [duration]);
+
 	// Progress bar keyboard control - deferred seeking
 	const handleProgressKeyDown = useCallback((e) => {
 		if (!avplayReadyRef.current) return;
@@ -2956,7 +2968,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				if (!isLiveTV && avplayReadyRef.current && !(isAudioMode && focusRow === 'panel')) {
 					showControls();
 					setFocusRow('progress');
-					scrubBy(channelStep * channelSeekSeconds(settings.seekStep, duration));
+					const jump = channelStep * channelSeekSeconds(settings.seekStep, duration);
+					logSeekKey('channel key', jump);
+					scrubBy(jump);
 				}
 				return;
 			}

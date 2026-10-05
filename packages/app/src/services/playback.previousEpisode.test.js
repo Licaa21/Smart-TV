@@ -3,7 +3,7 @@ import {getNextEpisode, getPreviousEpisode} from './playback';
 jest.mock('./deviceProfile', () => ({}));
 jest.mock('./video', () => ({}));
 jest.mock('./storage', () => ({}));
-jest.mock('./serverLogger', () => ({serverLogger: {}}));
+jest.mock('./serverLogger', () => ({serverLogger: {playback: jest.fn()}}));
 jest.mock('../utils/deviceProfileTuning', () => ({}));
 jest.mock('../utils/alternateAudio', () => ({}));
 jest.mock('./systemVolume', () => ({getVolumeState: jest.fn(), lastVolumeState: jest.fn()}));

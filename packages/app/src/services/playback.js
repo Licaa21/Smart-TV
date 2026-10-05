@@ -1108,6 +1108,14 @@ export const getNextEpisode = async (item) => {
 	}
 };
 
+// Says in the diagnostic report which episode the Previous button will go to, or that there is none.
+const logEpisodeLookup = (direction, item, found) => {
+	serverLogger.playback(`${direction} episode looked up`, {
+		from: {id: item.Id, season: item.ParentIndexNumber, episode: item.IndexNumber},
+		to: found ? {id: found.Id, season: found.ParentIndexNumber, episode: found.IndexNumber} : null
+	});
+};
+
 // The episode before this one in air order, rolling back into the last of the previous season.
 export const getPreviousEpisode = async (item) => {
 	if (item.Type !== 'Episode' || !item.SeriesId) return null;
@@ -1118,7 +1126,10 @@ export const getPreviousEpisode = async (item) => {
 		const api = getApiForItem(item);
 		const episodesResult = await api.getEpisodes(item.SeriesId, seasonId);
 		const previous = findPreviousInSeason(episodesResult.Items, item.Id);
-		if (previous) return previous;
+		if (previous) {
+			logEpisodeLookup('Previous', item, previous);
+			return previous;
+		}
 
 		// A season with nothing playable in it, only missing episodes, is stepped over.
 		const seasonsResult = await api.getSeasons(item.SeriesId);
@@ -1126,15 +1137,22 @@ export const getPreviousEpisode = async (item) => {
 		let fromSeasonNumber = item.ParentIndexNumber;
 		for (;;) {
 			const previousSeason = findPreviousSeason(seasonsResult.Items, fromSeasonId, fromSeasonNumber);
-			if (!previousSeason) return null;
+			if (!previousSeason) {
+				logEpisodeLookup('Previous', item, null);
+				return null;
+			}
 			const previousSeasonEpisodes = await api.getEpisodes(item.SeriesId, previousSeason.Id);
 			const last = lastPlayableEpisode(previousSeasonEpisodes.Items);
-			if (last) return last;
+			if (last) {
+				logEpisodeLookup('Previous', item, last);
+				return last;
+			}
 			fromSeasonId = previousSeason.Id;
 			fromSeasonNumber = previousSeason.IndexNumber;
 		}
 	} catch (e) {
 		console.warn('[playback] Failed to get previous episode:', e.message);
+		serverLogger.playback('Previous episode lookup failed', {itemId: item.Id, error: e.message});
 		return null;
 	}
 };
