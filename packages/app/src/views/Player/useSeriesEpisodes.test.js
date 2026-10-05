@@ -8,8 +8,10 @@ jest.mock('../../services/jellyfinApi', () => ({
 	get api() { return mockApi; },
 	createApiForServer: (...args) => mockCreateApi(...args)
 }));
+// Ids blocked by the viewer's ratings at the moment, which can change after a list was fetched.
+let mockBlockedIds = new Set();
 jest.mock('../../services/parentalControls', () => ({
-	withoutBlockedItems: (items) => items.filter((entry) => !entry.Blocked)
+	withoutBlockedItems: (items) => items.filter((entry) => !entry.Blocked && !mockBlockedIds.has(entry.Id))
 }));
 
 const item = {Id: 'e2', Type: 'Episode', SeriesId: 'series', SeasonId: 's2'};
@@ -23,6 +25,7 @@ const episodesOf = (season) => ({
 });
 
 beforeEach(() => {
+	mockBlockedIds = new Set();
 	clearSeriesEpisodesCache();
 	mockApi.getSeasons.mockReset().mockResolvedValue(seasons);
 	mockApi.getEpisodes.mockReset().mockImplementation((series, season) => Promise.resolve(episodesOf(season)));
@@ -145,5 +148,39 @@ describe('useSeriesEpisodes', () => {
 			expect(otherResult.current.episodes).toBeNull();
 		});
 	});
-});
 
+	describe('what has changed since a list was held', () => {
+		it('applies the ratings blocked since, to the lists drawn from memory', async () => {
+			const firstOpen = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			await waitFor(() => expect(firstOpen.result.current.episodes).not.toBeNull());
+			firstOpen.unmount();
+
+			mockBlockedIds.add('s2-a');
+			mockApi.getEpisodes.mockImplementation(() => new Promise(() => {}));
+			mockApi.getSeasons.mockImplementation(() => new Promise(() => {}));
+			const reopened = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			expect(reopened.result.current.episodes).toEqual([]);
+		});
+
+		it('starts from what is held for the new series when the playing item moves to another', async () => {
+			const {result, rerender} = renderHook(({playing}) => useSeriesEpisodes({item: playing, enabled: true}), {initialProps: {playing: item}});
+			await waitFor(() => expect(result.current.episodes).not.toBeNull());
+
+			mockApi.getEpisodes.mockImplementation(() => new Promise(() => {}));
+			mockApi.getSeasons.mockImplementation(() => new Promise(() => {}));
+			rerender({playing: {Id: 'x1', Type: 'Episode', SeriesId: 'other-series', SeasonId: 'other-season'}});
+			await waitFor(() => expect(result.current.selectedSeasonId).toBe('other-season'));
+			expect(result.current.episodes).toBeNull();
+			expect(result.current.seasons).toBeNull();
+		});
+
+		it('drops an episode list that lands after the browser was closed', async () => {
+			let land;
+			mockApi.getEpisodes.mockImplementation(() => new Promise((resolve) => { land = resolve; }));
+			const {result, rerender} = renderHook(({enabled}) => useSeriesEpisodes({item, enabled}), {initialProps: {enabled: true}});
+			rerender({enabled: false});
+			await act(async () => { land(episodesOf('s2')); });
+			expect(result.current.episodes).toBeNull();
+		});
+	});
+});
