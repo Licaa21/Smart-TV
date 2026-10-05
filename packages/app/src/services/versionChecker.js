@@ -8,7 +8,7 @@
 import $L from '@enact/i18n/$L';
 
 import {getFromStorage, saveToStorage} from './storage';
-import {isWebOS, isTizen} from '../platform';
+import {isTizen, isVega, isWebOS} from '../platform';
 import packageJson from '../../package.json';
 const APP_VERSION = packageJson.version;
 
@@ -122,11 +122,12 @@ export const clearVersionCache = async () => {
 
 /**
  * Get the expected asset file extension for this platform
- * @returns {string} '.ipk' for webOS, '.wgt' for Tizen
+ * @returns {string} '.ipk' for webOS, '.wgt' for Tizen, '.vpkg' for Fire TV
  */
 const getPlatformAssetExtension = () => {
 	if (isWebOS()) return '.ipk';
 	if (isTizen()) return '.wgt';
+	if (isVega()) return '.vpkg';
 	return '';
 };
 

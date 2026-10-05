@@ -718,3 +718,62 @@ text-align: center;
 color: var(--theme-text-secondary, #888);
 font-size: 16px;
 }
+
+.libraryOrderHint {
+margin-top: 4px;
+}
+
+.libraryOrderArrows {
+color: var(--theme-text-secondary, #888);
+}
+
+.libraryOrderArrow {
+width: 18px;
+height: 18px;
+}
+
+.libraryOrderMessage {
+padding: 24px 16px 8px;
+text-align: center;
+color: var(--theme-text-primary, #fff);
+font-size: 17px;
+
+> div {
+margin-bottom: 12px;
+}
+}
+
+.libraryOrderToast {
+position: fixed;
+bottom: 60px;
+left: 50%;
+transform: translateX(-50%);
+background: rgba(30, 30, 40, 0.95);
+color: var(--theme-text-primary, #fff);
+padding: 14px 28px;
+border-radius: 12px;
+font-size: 18px;
+font-weight: 500;
+z-index: 10000;
+pointer-events: none;
+animation: libraryOrderToastLifecycle 4s ease forwards;
+}
+
+@keyframes libraryOrderToastLifecycle {
+0% {
+opacity: 0;
+transform: translateX(-50%) translateY(16px);
+}
+8% {
+opacity: 1;
+transform: translateX(-50%) translateY(0);
+}
+83% {
+opacity: 1;
+transform: translateX(-50%) translateY(0);
+}
+100% {
+opacity: 0;
+transform: translateX(-50%) translateY(16px);
+}
+}

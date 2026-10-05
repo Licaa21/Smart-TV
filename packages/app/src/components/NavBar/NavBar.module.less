@@ -99,6 +99,13 @@
 	white-space: nowrap;
 	flex-shrink: 0;
 
+	// Focus widens the pill, and animating that lays the bar out on every frame,
+	// which halves the frame rate on the sets that raster in software.
+	:global(.perf-low) &,
+	:global(.perf-mid) & {
+		transition: none;
+	}
+
 	> * + * {
 		margin-left: 14px;
 	}
@@ -209,6 +216,11 @@
 		overflow: hidden;
 		opacity: 0;
 		transition: max-width 0.25s ease-out, opacity 0.2s ease-out;
+
+		:global(.perf-low) &,
+		:global(.perf-mid) & {
+			transition: none;
+		}
 	}
 
 	&.expanded .librariesList {

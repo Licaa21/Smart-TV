@@ -5,7 +5,7 @@ import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDeco
 import Spotlight from '@enact/spotlight';
 import {isPaused} from '@enact/spotlight/Pause';
 import {useAuth} from '../../context/AuthContext';
-import {pointerHover} from '../../utils/focusScroll';
+import {keepFocusInView, pointerHover} from '../../utils/focusScroll';
 import {isKidsMode} from '../../utils/kidsMode';
 import {withoutBlockedItems} from '../../services/parentalControls';
 import {useSettings} from '../../context/SettingsContext';
@@ -51,10 +51,20 @@ const RecentContainer = SpotlightContainerDecorator({
 const SEARCH_DEBOUNCE_MS = 400;
 const MIN_SEARCH_LENGTH = 2;
 const GLOBAL_FETCH_LIMIT = 240;
+const PEOPLE_FETCH_LIMIT = 24;
+// How long the rest of the results wait for people before showing without them.
+// The People row fills in when the answer lands.
+const PEOPLE_GRACE_MS = 1000;
 const SEERR_CAP = 24;
 const RECENT_SEARCHES_KEY = 'search_recentQueries';
 const RECENT_SEARCHES_MAX = 10;
 const ROW_SCROLL_MARGIN = 50;
+
+const VoiceIcon = () => (
+	<svg viewBox="0 0 24 24" fill="currentColor" className={css.voiceIcon}>
+		<path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z" />
+	</svg>
+);
 
 const SearchIcon = () => (
 	<svg viewBox="0 0 24 24" fill="currentColor" className={css.searchIcon}>
@@ -74,6 +84,12 @@ const cardSizeClass = (type) => {
 const placeholderShape = (row) => row.kind === 'game'
 	? {card: css.cardGame, img: css.imgGame}
 	: cardSizeClass(row.kind === 'jellyfin' ? row.items[0]?.Type : 'Movie');
+
+// Resolves with what the search found inside the grace, or null when it is still out.
+const withinGrace = (promise, ms) => Promise.race([
+	promise,
+	new Promise((resolve) => setTimeout(() => resolve(null), ms))
+]);
 
 const jellyfinSubtitle = (item) => {
 	switch (item.Type) {
@@ -106,7 +122,10 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	const [gameResults, setGameResults] = useState([]);
 	const [activeTab, setActiveTab] = useState('all');
 	const [searchInputFocused, setSearchInputFocused] = useState(false);
-	const [activeRowIndex, setActiveRowIndex] = useState(0);
+	const searchInputRef = useRef(null);
+	// The row in focus goes by id rather than position, so a row that arrives late
+	// above it doesn't move the mounted window off it.
+	const [activeRowId, setActiveRowId] = useState(null);
 	const [visibleCardCounts, setVisibleCardCounts] = useState({});
 	const [recentSearches, saveRecentSearches] = useStorage(RECENT_SEARCHES_KEY, []);
 
@@ -176,7 +195,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 			setGroups([]);
 			setSeerrResults([]);
 			setGameResults([]);
-			setActiveRowIndex(0);
+			setActiveRowId(null);
 			setVisibleCardCounts({});
 			return;
 		}
@@ -185,6 +204,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		setIsLoading(true);
 
 		try {
+			// A people search that fails leaves the other results alone.
+			const peoplePromise = (unifiedMode
+				? connectionPool.searchPeopleAllServers(q, PEOPLE_FETCH_LIMIT)
+				: api.searchPeople(q, PEOPLE_FETCH_LIMIT).then((r) => r?.Items || [])
+			).then(withoutBlockedItems).catch(() => []);
 			const [libraryResult, channels] = await Promise.all([
 				unifiedMode
 					? connectionPool.searchAllServers(q, GLOBAL_FETCH_LIMIT).then((serverItems) => ({Items: serverItems}))
@@ -197,9 +221,25 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 
 			// Suggestions come from these results, so this keeps blocked titles out of both.
 			const items = [...withoutBlockedItems(libraryResult.Items || []), ...filterByName(channels, q)];
-			lastResultNamesRef.current = items.map((found) => found.Name).filter(Boolean);
-			setGroups(groupSearchResults(items));
-			setActiveRowIndex(0);
+			// With nothing else to show, the results wait for people instead of coming up empty.
+			const people = items.length > 0
+				? await withinGrace(peoplePromise, PEOPLE_GRACE_MS)
+				: await peoplePromise;
+			if (requestId !== requestIdRef.current) return;
+
+			const showResults = (found) => {
+				const all = [...items, ...found];
+				lastResultNamesRef.current = all.map((result) => result.Name).filter(Boolean);
+				setGroups(groupSearchResults(all));
+			};
+			showResults(people || []);
+			if (people === null) {
+				peoplePromise.then((found) => {
+					if (found.length === 0 || requestId !== requestIdRef.current) return;
+					showResults(found);
+				});
+			}
+			setActiveRowId(null);
 			setVisibleCardCounts({});
 			setIsLoading(false);
 			rememberSearch(q);
@@ -294,7 +334,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		setGroups([]);
 		setSeerrResults([]);
 		setGameResults([]);
-		setActiveRowIndex(0);
+		setActiveRowId(null);
 		setVisibleCardCounts({});
 		Spotlight.focus('search-input');
 	}, [remoteSearch]);
@@ -346,11 +386,32 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		return rows;
 	}, [groups, seerrResults, gameResults, seerrLabel]);
 
+	const activeRowIndex = useMemo(
+		() => Math.max(0, allRows.findIndex((row) => row.id === activeRowId)),
+		[allRows, activeRowId]
+	);
+
+	// A row that arrives late pushes the rows below it down, which can leave the
+	// focused card off screen.
+	const containerRef = useRef(null);
+	useEffect(() => {
+		const focused = document.activeElement;
+		if (!focused || !focused.closest('[data-row-index]')) return;
+		window.requestAnimationFrame(() => {
+			if (document.activeElement !== focused || !containerRef.current) return;
+			keepFocusInView({currentTarget: containerRef.current, target: focused});
+		});
+	}, [allRows]);
+
 	useEffect(() => {
 		setTimeout(() => Spotlight.focus('search-input'), 100);
 	}, []);
 
-	useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+	// Keeps people that answer after the screen closed from landing on it.
+	useEffect(() => () => {
+		if (debounceRef.current) clearTimeout(debounceRef.current);
+		requestIdRef.current++;
+	}, []);
 
 	const showRecent = !hasResults &&
 		query.trim().length < MIN_SEARCH_LENGTH &&
@@ -377,15 +438,25 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		if (focusBelowInput()) e.preventDefault();
 	}, [focusBelowInput]);
 
+	// Each TV keyboard carries the remote's microphone, and what it hears lands
+	// in the field like typed text. The field is handed over on the key down,
+	// since the Fire TV keyboard only comes up for a focus made there.
+	const handleVoiceSearch = useCallback(() => searchInputRef.current?.activateSystemInput(), []);
+	const handleVoiceKeyDown = useCallback((e) => {
+		if (e.keyCode !== KEYS.ENTER) return;
+		e.preventDefault();
+		handleVoiceSearch();
+	}, [handleVoiceSearch]);
+
 	const handleSearchInputFocus = useCallback(() => setSearchInputFocused(true), []);
 	const handleSearchInputBlur = useCallback((e) => {
 		if (!e.currentTarget.contains(e.relatedTarget)) setSearchInputFocused(false);
 	}, []);
 
 	const focusContent = useCallback(() => {
-		if (activeTab === 'all') setActiveRowIndex(0);
+		if (activeTab === 'all') setActiveRowId(allRows[0]?.id || null);
 		Spotlight.focus(activeTab === 'all' ? 'search-row-0' : 'search-grid');
-	}, [activeTab]);
+	}, [activeTab, allRows]);
 
 	// The press is stopped as well as prevented. Spotlight makes its own move once
 	// the event reaches the top, and it would make that move out of whatever was
@@ -410,22 +481,22 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 			if (rowIndex === 0) {
 				Spotlight.focus(ACTIVE_SEARCH_TAB_SELECTOR);
 			} else {
-				setActiveRowIndex(rowIndex - 1);
+				setActiveRowId(allRows[rowIndex - 1].id);
 				Spotlight.focus(`search-row-${rowIndex - 1}`);
 			}
 		} else if (e.keyCode === KEYS.DOWN) {
 			e.preventDefault();
 			e.stopPropagation();
 			if (rowIndex < allRows.length - 1) {
-				setActiveRowIndex(rowIndex + 1);
+				setActiveRowId(allRows[rowIndex + 1].id);
 				Spotlight.focus(`search-row-${rowIndex + 1}`);
 			}
 		}
-	}, [allRows.length]);
+	}, [allRows]);
 
-	const handleRowFocus = useCallback((rowId, rowIndex, itemCount) => (e) => {
+	const handleRowFocus = useCallback((rowId, itemCount) => (e) => {
 		if (pointerHover()) return;
-		setActiveRowIndex((current) => current === rowIndex ? current : rowIndex);
+		setActiveRowId(rowId);
 		const card = e.target.closest('[data-spotlight-id]');
 		const scroller = scrollerRefs.current[rowId];
 		if (!card || !scroller) return;
@@ -607,7 +678,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 								<div
 									className={css.rowScroller}
 									ref={(el) => { scrollerRefs.current[row.id] = el; }}
-									onFocus={handleRowFocus(row.id, rowIndex, row.items.length)}
+									onFocus={handleRowFocus(row.id, row.items.length)}
 								>
 									{mounted ? (
 										<div className={css.resultItems}>
@@ -640,7 +711,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	};
 
 	return (
-		<div className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>
+		<div ref={containerRef} className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>
 			<div className={css.searchInputSection}>
 				<div
 					className={`${css.searchInputWrapper} ${searchInputFocused ? css.searchInputFocused : ''}`}
@@ -650,6 +721,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 				>
 					<SearchIcon />
 					<SpottableInput
+						ref={searchInputRef}
 						type="text"
 						purpose="search"
 						recents={recentSearches}
@@ -664,6 +736,9 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 						autoComplete="off"
 					/>
 					{query && <button className={css.clearBtn} onClick={handleClearSearch}>×</button>}
+					<SpottableButton className={css.voiceBtn} data-spotlight-id="search-voice" onClick={handleVoiceSearch} onKeyDown={handleVoiceKeyDown} aria-label={$L('Voice search')}>
+						<VoiceIcon />
+					</SpottableButton>
 				</div>
 			</div>
 

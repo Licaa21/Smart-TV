@@ -3,7 +3,10 @@ import $L from '@enact/i18n/$L';
 
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
 import {TMDB_PRESETS} from '../../utils/externalHomeRows';
-import {renderSettingsIcon, renderToggle} from './settingsIcons';
+import {withSeasonalRow} from '../../utils/homeLayout';
+import {SEASONAL_COUNTRY_OPTIONS, SEASONAL_HOLIDAYS} from '../../utils/seasonalRow';
+import {seasonalCountryLabel, seasonalTitle} from '../../utils/seasonalTitles';
+import {renderRadio, renderSettingsIcon, renderToggle} from './settingsIcons';
 import {SpottableDiv} from './settingsSpottables';
 import {SectionTitle, ToggleRow} from './settingsRows';
 import SettingsView from './SettingsView';
@@ -79,6 +82,60 @@ export const ExternalCalendarsView = ({enabledMap, settings, onToggleRow, onTogg
 			{sonarrOn && toggleRow('sonarrCalendarShowDate', $L('Show Release Date'), '', 'tv')}
 			{radarrOn && sonarrOn &&
 				toggleRow('mergeRadarrSonarrCalendars', $L('Merge Into One Row'), $L('Combine Radarr and Sonarr into a single upcoming row'), 'list')}
+		</SettingsView>
+	);
+};
+
+// The seasonal row is stored twice, as its own synced toggle and as a home row, so switching it
+// writes both. Holidays are stored as the hidden ones, so a ticked box is a holiday not in the list.
+export const SeasonalRowView = ({settings, onUpdateSettings}) => {
+	const enabled = settings.seasonalRowEnabled === true;
+	const country = settings.seasonalRowCountry || 'auto';
+	const hidden = Array.isArray(settings.seasonalRowHiddenHolidays) ? settings.seasonalRowHiddenHolidays : [];
+	const toggleRow = () => onUpdateSettings({
+		seasonalRowEnabled: !enabled,
+		homeRows: withSeasonalRow(settings.homeRows, !enabled)
+	});
+	const toggleHoliday = (id) => onUpdateSettings({
+		seasonalRowHiddenHolidays: hidden.includes(id) ? hidden.filter((h) => h !== id) : [...hidden, id]
+	});
+
+	return (
+		<SettingsView spotlightId='seasonal-row-view'>
+			<SectionTitle>{$L('Seasonal Row')}</SectionTitle>
+			<div className={css.viewDescription}>
+				{$L('Show a row of holiday movies from your library, with Seerr suggestions when available.')}
+			</div>
+			<ToggleRow settingKey='seasonalRowEnabled' title={$L('Seasonal Row')} icon='star_shine' checked={enabled} onToggle={toggleRow} />
+			<SectionTitle>{$L('Country')}</SectionTitle>
+			{SEASONAL_COUNTRY_OPTIONS.map((code) => (
+				<SpottableDiv
+					key={code}
+					className={`${css.listItem} ${code === country ? css.listItemSelected : ''}`}
+					onClick={() => onUpdateSettings({seasonalRowCountry: code})}
+					spotlightId={`seasonal-country-${code}`}
+				>
+					<div className={css.listItemBody}>
+						<div className={css.listItemHeading}>{seasonalCountryLabel(code)}</div>
+					</div>
+					<div className={css.listItemTrailing}>{renderRadio(code === country)}</div>
+				</SpottableDiv>
+			))}
+			<SectionTitle>{$L('Holidays')}</SectionTitle>
+			<div className={css.viewCaption}>{$L('Untick a holiday to hide its row.')}</div>
+			{SEASONAL_HOLIDAYS.map((id) => (
+				<SpottableDiv
+					key={id}
+					className={css.listItem}
+					onClick={() => toggleHoliday(id)}
+					spotlightId={`seasonal-holiday-${id}`}
+				>
+					<div className={css.listItemBody}>
+						<div className={css.listItemHeading}>{seasonalTitle(id)}</div>
+					</div>
+					<div className={css.listItemTrailing}>{renderToggle(!hidden.includes(id))}</div>
+				</SpottableDiv>
+			))}
 		</SettingsView>
 	);
 };

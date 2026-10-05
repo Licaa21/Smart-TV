@@ -24,7 +24,10 @@ const normalizeItem = (raw) => {
 		backdropUrl: raw.backdropUrl ?? raw.BackdropUrl ?? null,
 		userRating: raw.userRating ?? raw.UserRating ?? null,
 		rating: raw.rating ?? raw.Rating ?? null,
+		officialRating: raw.officialRating ?? raw.OfficialRating ?? null,
 		overview: raw.overview ?? raw.Overview ?? raw.description ?? raw.Description ?? '',
+		genres: Array.isArray(raw.genres ?? raw.Genres) ? (raw.genres ?? raw.Genres) : [],
+		runTimeTicks: raw.runTimeTicks ?? raw.RunTimeTicks ?? null,
 		providerIds: {
 			Tmdb: providerIds.Tmdb ?? providerIds.tmdb ?? null,
 			Imdb: providerIds.Imdb ?? providerIds.imdb ?? null,
@@ -77,6 +80,39 @@ export const fetchCustomRow = async ({source, type, params = {}}, options = {}) 
 	} catch (err) {
 		console.warn('[ExternalRows] Fetch failed:', err);
 		return cache[key]?.items || [];
+	}
+};
+
+// The seasonal row Moonbase built for this user. Owned movies arrive as library items and
+// suggestions in the custom row shape. A holiday of null means there is no row today.
+export const fetchSeasonalRow = async ({country} = {}) => {
+	const key = `seasonal:${country || ''}`;
+	const cached = cache[key];
+	if (cached && (Date.now() - cached.fetchedAt) < CACHE_TTL_MS) {
+		return cached.payload;
+	}
+
+	const baseUrl = getServerUrl();
+	if (!baseUrl) return null;
+
+	try {
+		const url = `${baseUrl}/Moonfin/Seasonal/Row` + (country ? `?country=${encodeURIComponent(country)}` : '');
+		const response = await mediaServerQueue.run(
+			() => fetchWithTimeout(url, {headers: {'Authorization': getAuthHeader()}}, 10000)
+		);
+		if (!response.ok) return cache[key]?.payload || null;
+
+		const data = await response.json();
+		const payload = {
+			holiday: data.holiday ?? null,
+			items: Array.isArray(data.items) ? data.items : [],
+			suggestions: Array.isArray(data.suggestions) ? data.suggestions.map(normalizeItem) : []
+		};
+		cache[key] = {payload, fetchedAt: Date.now()};
+		return payload;
+	} catch (err) {
+		console.warn('[ExternalRows] Seasonal fetch failed:', err);
+		return cache[key]?.payload || null;
 	}
 };
 

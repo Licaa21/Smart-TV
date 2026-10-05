@@ -10,6 +10,7 @@
 
 import {detectServerType} from '../utils/connectionErrors';
 import {normalizeServerBaseUrl} from '../utils/serverUrl';
+import {resolvePlatformModule} from './platformModule';
 
 const REQUEST_TIMEOUT = 1200;
 const MAX_IN_FLIGHT = 16;
@@ -355,6 +356,17 @@ export const buildPrivateSubnetCandidates = ({prefixes, currentHostByPrefix, ori
 	return candidates;
 };
 
+// A platform may know the device's own address where the page cant find it,
+// since newer browsers hide the host candidates behind mDNS names.
+const deviceAddress = async () => {
+	try {
+		const {getDeviceInfo} = await resolvePlatformModule('deviceInfo');
+		return (await getDeviceInfo())?.ipAddress || '';
+	} catch (e) {
+		return '';
+	}
+};
+
 const discoverPrivateSubnet = async (state) => {
 	if (state.canceled) return;
 
@@ -369,8 +381,10 @@ const discoverPrivateSubnet = async (state) => {
 	const originOctets = parseIpv4(window.location.hostname);
 	if (originOctets && isPrivateIpv4(originOctets)) remember(originOctets);
 
-	const webRtcIps = await collectPrivateIpv4FromWebRtc();
+	const [deviceIp, webRtcIps] = await Promise.all([deviceAddress(), collectPrivateIpv4FromWebRtc()]);
 	if (state.canceled) return;
+	const deviceOctets = parseIpv4(deviceIp);
+	if (deviceOctets && isPrivateIpv4(deviceOctets)) remember(deviceOctets);
 	webRtcIps.forEach(remember);
 
 	const candidates = buildPrivateSubnetCandidates({

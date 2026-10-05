@@ -15,8 +15,9 @@
 	transition: width 0.2s ease, background 0.2s ease;
 	overflow: hidden;
 
-	:global(.perf-low) & {
-		transition: background 0.2s ease;
+	:global(.perf-low) &,
+	:global(.perf-mid) & {
+		transition: none;
 	}
 }
 
@@ -101,6 +102,11 @@
 	width: 100%;
 	text-align: left;
 
+	:global(.perf-low) &,
+	:global(.perf-mid) & {
+		transition: none;
+	}
+
 	&:global(.focusRing) {
 		outline: none !important;
 	}
@@ -180,6 +186,11 @@
 	max-height: 0;
 	overflow: hidden;
 	transition: max-height 0.25s ease;
+
+	:global(.perf-low) &,
+	:global(.perf-mid) & {
+		transition: none;
+	}
 }
 
 .librariesListExpanded {
@@ -203,6 +214,11 @@
 	font-weight: 500;
 	white-space: nowrap;
 	min-height: 50px;
+
+	:global(.perf-low) &,
+	:global(.perf-mid) & {
+		transition: none;
+	}
 
 	&:global(.focusRing) {
 		outline: none !important;

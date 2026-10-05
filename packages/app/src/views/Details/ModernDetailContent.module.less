@@ -326,7 +326,6 @@
 	cursor: pointer;
 	outline: none;
 	overflow: hidden;
-	transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .actionPrimary {
@@ -373,7 +372,14 @@
 	opacity: 0;
 	overflow: hidden;
 	white-space: nowrap;
-	transition: max-width 0.15s ease, opacity 0.15s ease, padding 0.15s ease;
+	// Only the fade animates. Sliding the width open lays the whole row out again
+	// on every frame, which cost a sweep along the buttons a third of its frames.
+	transition: opacity 0.15s ease;
+
+	:global(.perf-low) &,
+	:global(.perf-mid) & {
+		transition: none;
+	}
 }
 
 .actionLabel {

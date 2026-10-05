@@ -3,11 +3,12 @@
  * Version bump script — updates version references for a specific platform.
  *
  * Usage:
- *   node scripts/bump-version.js <webos|tizen|all> <version>
+ *   node scripts/bump-version.js <webos|tizen|vega|all> <version>
  *
  * Examples:
  *   node scripts/bump-version.js webos 2.3.0
  *   node scripts/bump-version.js tizen 2.1.1
+ *   node scripts/bump-version.js vega 2.10.0
  *   node scripts/bump-version.js all 3.0.0
  */
 
@@ -19,13 +20,14 @@ const ROOT = path.resolve(__dirname, '..');
 const platform = process.argv[2];
 const newVersion = process.argv[3];
 
-if (!platform || !newVersion || !/^\d+\.\d+\.\d+$/.test(newVersion) || !['webos', 'tizen', 'all'].includes(platform)) {
-	console.error('Usage: node scripts/bump-version.js <webos|tizen|all> <major.minor.patch>');
+if (!platform || !newVersion || !/^\d+\.\d+\.\d+$/.test(newVersion) || !['webos', 'tizen', 'vega', 'all'].includes(platform)) {
+	console.error('Usage: node scripts/bump-version.js <webos|tizen|vega|all> <major.minor.patch>');
 	process.exit(1);
 }
 
 const doWebos = platform === 'webos' || platform === 'all';
 const doTizen = platform === 'tizen' || platform === 'all';
+const doVega = platform === 'vega' || platform === 'all';
 
 /**
  * Update "version" in a JSON file, preserving its indentation style.
@@ -58,6 +60,11 @@ const webosJsonFiles = [
 const tizenJsonFiles = [
 	'packages/platform-tizen/package.json',
 	'packages/build-tizen/package.json',
+];
+
+const vegaJsonFiles = [
+	'packages/platform-vega/package.json',
+	'packages/build-vega/package.json',
 ];
 
 console.log(`Bumping ${platform} to ${newVersion}\n`);
@@ -130,6 +137,13 @@ if (doTizen) {
 			fs.writeFileSync(readmePath, readme);
 			console.log(`  README.md: updated ${count} wgt reference(s)`);
 		}
+	}
+}
+
+// ── Vega ──
+if (doVega) {
+	for (const rel of vegaJsonFiles) {
+		updateJsonVersion(rel);
 	}
 }
 

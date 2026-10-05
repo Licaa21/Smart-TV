@@ -1,8 +1,11 @@
 import {useEffect, useState} from 'react';
 import $L from '@enact/i18n/$L';
 
-import {getExternalHomeRowConfigs, fetchExternalPresetRow, fetchCustomHomeRow, fetchCalendarRows} from '../../utils/externalHomeRows';
+import {getExternalHomeRowConfigs, fetchExternalPresetRow, fetchCustomHomeRow, fetchCalendarRows, buildSeasonalRow} from '../../utils/externalHomeRows';
+import {fetchSeasonalRow} from '../../services/externalRowsApi';
 import {resolveItemsByProviderIds} from '../../services/jellyfinApi';
+import {seasonalCountryParam} from '../../utils/seasonalRow';
+import {resolveDeviceCountry} from '../../utils/deviceCountry';
 
 // Home rows built from TMDB and IMDb charts, lists the viewer pasted a URL for, and the
 // Radarr and Sonarr calendars. Items arrive as provider ids, so every row is resolved against
@@ -26,7 +29,9 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 		const radarrEnabled = rows.some((r) => r.enabled && r.id === 'radarr_calendar');
 		const sonarrEnabled = rows.some((r) => r.enabled && r.id === 'sonarr_calendar');
 		const calendarsEnabled = radarrEnabled || sonarrEnabled;
-		if (enabledPresets.length === 0 && customRows.length === 0 && !calendarsEnabled) {
+		// The seasonal row is stored as a home row and as its own synced toggle, and both have to be on.
+		const seasonalEnabled = settings.seasonalRowEnabled === true && rows.some((r) => r.enabled && r.id === 'seasonal');
+		if (enabledPresets.length === 0 && customRows.length === 0 && !calendarsEnabled && !seasonalEnabled) {
 			setExternalRows([]);
 			setPending([]);
 			return undefined;
@@ -41,6 +46,7 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 				.filter(Boolean)
 				.map((cfg) => ({id: cfg.id, title: cfg.title})),
 			...customRows.map((row) => ({id: `external-${row.id}`, title: row.name || row.title || $L('Custom'), isCustomRow: true})),
+			...(seasonalEnabled ? [{id: 'seasonal', title: $L('Seasonal Row')}] : []),
 			...(mergedCalendars ? [{id: 'radarr_calendar', title: $L('Upcoming Releases'), isCalendarMerged: true}] : []),
 			...(radarrEnabled && !mergedCalendars ? [{id: 'radarr_calendar', title: $L('Upcoming Movies')}] : []),
 			...(sonarrEnabled && !mergedCalendars ? [{id: 'sonarr_calendar', title: $L('Upcoming Episodes')}] : [])
@@ -70,6 +76,14 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 					sonarrCalendarShowEpisodeInfo: settings.sonarrCalendarShowEpisodeInfo
 				};
 				const calendarRows = calendarsEnabled ? await fetchCalendarRows(calendarSettings, {radarrEnabled, sonarrEnabled}) : [];
+
+				// Owned seasonal titles are library items already, so this row skips the
+				// provider id matching the others go through.
+				let seasonalRow = null;
+				if (seasonalEnabled) {
+					const country = seasonalCountryParam(settings.seasonalRowCountry, await resolveDeviceCountry());
+					seasonalRow = buildSeasonalRow(await fetchSeasonalRow({country}), settings.seasonalRowHiddenHolidays || []);
+				}
 
 				const allRows = [
 					...presetData,
@@ -116,7 +130,7 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 				}
 
 				if (!cancelled) {
-					setExternalRows([...presetRows, ...builtCustomRows, ...resolvedCalendarRows].filter(Boolean));
+					setExternalRows([...presetRows, ...builtCustomRows, seasonalRow, ...resolvedCalendarRows].filter(Boolean));
 				}
 			} catch (err) {
 				console.warn('[Browse] Failed to fetch and resolve external rows:', err);
@@ -128,6 +142,7 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 			cancelled = true;
 		};
 	}, [settings.useMoonfinPlugin, homeRows, kidsMode, settings.homeRows, settings.customHomeRows,
+		settings.seasonalRowEnabled, settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays,
 		settings.mergeRadarrSonarrCalendars,
 		settings.radarrCalendarShowCinema, settings.radarrCalendarShowDigital, settings.radarrCalendarShowPhysical,
 		settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo]);

@@ -37,10 +37,14 @@
 	-webkit-backdrop-filter: blur(26px) saturate(1.4);
 	box-shadow: 0 6px 29px rgba(0, 0, 0, 0.45);
 
-	// Blur is stripped on the lower tiers, so the fill has to carry the card.
+	// Blur is stripped on the lower tiers, and on Fire TV any blur over the video
+	// turns the picture black, so the fill has to carry the card.
 	:global(.perf-low) &,
-	:global(.perf-mid) & {
+	:global(.perf-mid) &,
+	:global(.vega) & {
 		background: rgba(var(--theme-surface-rgb, 30, 30, 40), 0.97);
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
 	}
 }
 
@@ -148,12 +152,14 @@
 	border: 2px solid transparent;
 	border-radius: 17px;
 	background: @accent;
-	color: #fff;
+	// Ink on the accent fill. A theme with a bright accent (8-bit Hero) names a dark
+	// onAccent, and a hardcoded white here is unreadable against it.
+	color: var(--theme-on-accent, #fff);
 	font-size: 22px;
 	font-weight: 600;
 
 	&:focus {
-		border-color: #fff;
+		border-color: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 1);
 		outline: none;
 	}
 }
@@ -184,11 +190,12 @@
 }
 
 .ringTrack {
-	stroke: rgba(255, 255, 255, 0.24);
+	stroke: currentColor;
+	stroke-opacity: 0.28;
 }
 
 .ringValue {
-	stroke: #fff;
+	stroke: currentColor;
 	stroke-linecap: round;
 	transition: stroke-dashoffset 0.3s linear;
 }
