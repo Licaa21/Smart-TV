@@ -100,6 +100,13 @@ const RESTORE_TIMEOUT_MS = 6000;
 // is still a valid $L() key since it's a plain string, just shared instead of inlined.
 const RELOAD_FAILED_MESSAGE = "Playback didn't resume automatically. Select Retry to try again.";
 const RELOAD_RETRY_MAX_DELAY_MS = 30000;
+// A reload that has been running for less than this is still treated as working, even after the
+// timeout above has put the error screen up. A second reload started on top of it would only
+// restart the transcode the first one is waiting for, so retries and key presses leave it be. A
+// reload older than this is taken to be dead, which is what a frozen TV leaves behind.
+const RELOAD_STILL_RUNNING_MS = 45000;
+// How soon a retry that found a reload still running looks again.
+const RELOAD_RECHECK_MS = 3000;
 const reloadRetryDelay = (attempt) => RELOAD_RETRY_DELAYS[attempt] ?? RELOAD_RETRY_MAX_DELAY_MS;
 
 const getRootFontSizePx = () => {
@@ -299,6 +306,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const reloadRetryTimeoutRef = useRef(null);
 	const isUnmountedRef = useRef(false);
 	const reloadInFlightRef = useRef(false);
+	const reloadRunningSinceRef = useRef(0);
 	// index of a subtitle the server is currently burning into the stream
 	const burnInSubtitleRef = useRef(null);
 
@@ -914,6 +922,19 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			serverLogger.playback('Standby diag: recoverByReload skipped, already in flight', {attempt});
 			return;
 		}
+		if (reloadRunningSinceRef.current && Date.now() - reloadRunningSinceRef.current < RELOAD_STILL_RUNNING_MS) {
+			serverLogger.playback('Standby diag: recoverByReload waits, an earlier reload is still running', {
+				attempt,
+				runningForMs: Date.now() - reloadRunningSinceRef.current
+			});
+			// A scheduled retry looks again shortly. A key press that landed here changes nothing.
+			if (attempt > 0 && !isUnmountedRef.current) {
+				reloadRetryTimeoutRef.current = setTimeout(() => {
+					if (!isUnmountedRef.current) recoverByReload(attempt);
+				}, RELOAD_RECHECK_MS);
+			}
+			return;
+		}
 		reloadInFlightRef.current = true;
 		console.warn(`[Player] AVPlay restore left the session unplayable, reloading stream${attempt ? ` (retry ${attempt})` : ''}`);
 		// A request already in flight when the TV actually powers off is frozen
@@ -921,12 +942,18 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		// so this can't wait on it indefinitely - past this timeout the reload is
 		// treated as failed even if it later resolves.
 		const reloadPromise = reloadPlaybackRef.current?.() ?? Promise.resolve(false);
+		const reloadStartedAt = Date.now();
+		reloadRunningSinceRef.current = reloadStartedAt;
+		const reloadSettled = () => {
+			if (reloadRunningSinceRef.current === reloadStartedAt) reloadRunningSinceRef.current = 0;
+		};
+		reloadPromise.then(reloadSettled, reloadSettled);
 		const timedOut = new Promise((resolve) => {
 			setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
 		});
 		Promise.race([reloadPromise, timedOut]).then((reloaded) => {
 			reloadInFlightRef.current = false;
-			serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded, attempt});
+			serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded, attempt, tookMs: Date.now() - reloadStartedAt});
 			if (isUnmountedRef.current) return;
 			if (reloaded) {
 				// The attempt this is recovering from may have kept running in the
@@ -944,7 +971,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			// here still clears the error instead of leaving it stuck in front of
 			// playback that's now actually working.
 			reloadPromise.then((lateReloaded) => {
-				serverLogger.playback('Standby diag: reloadPlaybackRef late result', {lateReloaded, attempt});
+				serverLogger.playback('Standby diag: reloadPlaybackRef late result', {lateReloaded, attempt, tookMs: Date.now() - reloadStartedAt});
 				if (!isUnmountedRef.current && lateReloaded) setError(null);
 			});
 			// A scheduled retry relies on setTimeout, which - like every other
