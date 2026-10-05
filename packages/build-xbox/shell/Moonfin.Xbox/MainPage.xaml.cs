@@ -366,7 +366,7 @@ namespace Moonfin.Xbox
             switch (message.Type)
             {
                 case "EXIT_APP":
-                    Application.Current.Exit();
+                    ExitApp();
                     break;
 
                 case "KEEP_DISPLAY_ACTIVE":
@@ -585,6 +585,21 @@ namespace Moonfin.Xbox
             PlaybackSession session = playbackSession;
             playbackSession = null;
             if (session != null) await session.SendStopAsync(insecureHosts.Contains(session.Authority));
+        }
+
+        // Leaving by the app's own exit isnt a suspend, so whatever is playing is reported
+        // stopped from here first.
+        private async void ExitApp()
+        {
+            try
+            {
+                await SuspendAsync();
+            }
+            catch (Exception ex)
+            {
+                HostLog.Write("host", "Could not wrap up before exit: " + ex.Message);
+            }
+            Application.Current.Exit();
         }
 
         public void Resume()
