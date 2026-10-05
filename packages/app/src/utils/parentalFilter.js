@@ -76,3 +76,16 @@ export const withoutBlocked = (items, filter, fallbackRating) => {
 	});
 	return kept.length === items.length ? items : kept;
 };
+
+// Titles from outside lists only carry a rating when the plugin looked one up, so once anything
+// is blocked a title with no rating stays out. With `strict` off that applies only to the items
+// marked _strictRating, which is how a row mixing library titles and outside ones is judged.
+export const withoutBlockedOrUnrated = (items, filter, strict = true) => {
+	if (!filter?.isActive || !Array.isArray(items)) return items;
+	const kept = items.filter((item) => {
+		const own = normalizeRating(item?.OfficialRating);
+		if (!own) return !(strict || item?._strictRating);
+		return !filter.isBlockedRating(own);
+	});
+	return kept.length === items.length ? items : kept;
+};

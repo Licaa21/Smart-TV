@@ -157,6 +157,17 @@ export const getMediaDownloadSummary = (media, is4k) => {
 	return getDownloadSummary(is4k ? media.downloadStatus4k : media.downloadStatus);
 };
 
+const isOnItsWay = (status) => status === MEDIA_STATUS.PENDING || status === MEDIA_STATUS.PROCESSING;
+
+// Whether the title or one of its seasons is still on its way into the library on this
+// track, waiting on approval, a download or the import.
+export const isMediaInFlight = (media, is4k) => {
+	if (!media) return false;
+	if (isOnItsWay(is4k ? media.status4k : media.status)) return true;
+	if (getMediaDownloadSummary(media, is4k)) return true;
+	return (media.seasons || []).some((season) => isOnItsWay(is4k ? season.status4k : season.status));
+};
+
 // Summary for a request row, using the request's quality flavor and skipping
 // requests that can no longer be downloading.
 export const getRequestDownloadSummary = (req) => {

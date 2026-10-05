@@ -41,6 +41,12 @@ describe('computePerfTier', () => {
 		expect(computePerfTier('Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 WebAppManager')).toBe('high');
 	});
 
+	// The stick rasters on its GPU, so Home rows, the keyboard and details pages
+	// all hold 60 fps on high, measured on a Fire TV Stick 4K 3rd Gen.
+	test('a Fire TV stick on Vega OS is high', () => {
+		expect(computePerfTier('Mozilla/5.0 (Linux; Kepler 2.0; AFTCR001 user/55; wv) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Chrome/144.0.7559.246 Safari/537.36')).toBe('high');
+	});
+
 	test('empty and garbage UAs are low', () => {
 		expect(computePerfTier('')).toBe('low');
 		expect(computePerfTier(undefined)).toBe('low');

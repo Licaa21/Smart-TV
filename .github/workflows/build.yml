@@ -73,6 +73,39 @@ jobs:
           path: Moonfin_Tizen_*.wgt
 
   # ───────────────────────────────────────────────
+  # Vega web bundle and shell checks
+  # ───────────────────────────────────────────────
+  build-vega:
+    name: Build Vega
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.build.outcome }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --force
+
+      # The package itself needs the Vega SDK, which only Amazon's partners get in CI,
+      # so this stops once the web bundle is in the shell.
+      - name: Build Vega web bundle
+        id: build
+        run: node packages/build-vega/build.js --no-vpkg
+
+      - name: Check the shell
+        working-directory: packages/build-vega/shell
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run lint
+          npm test
+
+  # ───────────────────────────────────────────────
   # Jest suite
   # ───────────────────────────────────────────────
   test:
@@ -104,7 +137,7 @@ jobs:
     # the comment workflow has nothing to read, so the run that most needs a comment
     # is the one that never gets one.
     if: always() && github.event_name == 'pull_request'
-    needs: [build-webos, build-tizen, test]
+    needs: [build-webos, build-tizen, build-vega, test]
     runs-on: ubuntu-latest
     steps:
       - name: Write outcomes.json
@@ -115,6 +148,7 @@ jobs:
             "sha": "${{ github.event.pull_request.head.sha }}",
             "webos": "${{ needs.build-webos.outputs.result }}",
             "tizen": "${{ needs.build-tizen.outputs.result }}",
+            "vega": "${{ needs.build-vega.outputs.result }}",
             "tests": "${{ needs.test.outputs.result }}"
           }
           EOF

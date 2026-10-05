@@ -8,7 +8,7 @@
  */
 /* global tizen */
 
-import {getServerUrl, getUserId, getAuthHeader, userRoutes} from '@moonfin/app/src/services/jellyfinApi';
+import {getServerUrl, getUserId, getAuthHeader, getServerType, userRoutes} from '@moonfin/app/src/services/jellyfinApi';
 
 const NEXT_UP_LIMIT = 2;
 const RESUME_LIMIT = 4;
@@ -325,13 +325,15 @@ export async function runSmartViewUpdate () {
 	try {
 		const baseFields = 'PrimaryImageAspectRatio,Overview';
 		const imageFields = 'ImageTypeLimit=1&EnableImageTypes=Primary,Backdrop,Thumb';
+		// Emby 4.10 only fills a Next Up that isn't scoped to one series when asked for its legacy list.
+		const legacyNextUp = getServerType() === 'emby' ? '&LegacyNextUp=true' : '';
 
 		const [resumableItems, nextUpEpisodes] = await Promise.all([
 			apiRequest(
 				`${userRoutes.resume()}Limit=${RESUME_LIMIT}&MediaTypes=Video&Fields=${baseFields}&${imageFields}&EnableTotalRecordCount=false&Recursive=true`
 			),
 			apiRequest(
-				`/Shows/NextUp?UserId=${userId}&Limit=${NEXT_UP_LIMIT}&Fields=${baseFields}&${imageFields}&EnableTotalRecordCount=false`
+				`/Shows/NextUp?UserId=${userId}&Limit=${NEXT_UP_LIMIT}&Fields=${baseFields}&${imageFields}&EnableTotalRecordCount=false${legacyNextUp}`
 			)
 		]);
 

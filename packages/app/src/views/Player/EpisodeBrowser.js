@@ -5,7 +5,7 @@ import Spotlight from '@enact/spotlight';
 import {useSettings} from '../../context/SettingsContext';
 import {getServerUrl} from '../../services/jellyfinApi';
 import {getImageUrl} from '../../utils/helpers';
-import {channelKeyStep} from '../../utils/keys';
+import {channelKeyStep} from '../../utils/channelKeys';
 import {keepFocusInView} from '../../utils/focusScroll';
 import {watchedPercent} from '../../utils/episodeBrowser';
 import {ActiveTabContainer, ModalContainer} from '../../utils/spotlightContainers';
