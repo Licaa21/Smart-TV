@@ -29,6 +29,7 @@ export const isRowEnabledBySetting = (rowId, settings) => {
 	if (rowId === 'imdb-popular-tv') return settings.imdbMostPopularTvShowsEnabled;
 	if (rowId === 'imdb-lowest-rated') return settings.imdbLowestRatedMoviesEnabled;
 	if (rowId === 'imdb-top-english') return settings.imdbTopEnglishMoviesEnabled;
+	if (rowId === 'seasonal') return settings.seasonalRowEnabled === true;
 	return true;
 };
 
@@ -38,4 +39,5 @@ export const isPluginSourcedRow = (rowId) =>
 	rowId.startsWith('seerr_') ||
 	rowId.startsWith('tmdb_') ||
 	rowId === 'radarr_calendar' ||
-	rowId === 'sonarr_calendar';
+	rowId === 'sonarr_calendar' ||
+	rowId === 'seasonal';

@@ -67,7 +67,8 @@ jobs:
 
             const PLATFORMS = [
               ['Tizen', /\bTizen\b/i],
-              ['webOS', /\bwebOS\b/i]
+              ['webOS', /\bwebOS\b/i],
+              ['Vega', /\b(Vega|Fire\s*TV)\b/i]
             ];
 
             const SERVERS = [
@@ -102,10 +103,10 @@ jobs:
             const platformLines = section(body, /^platform(\(s\))?\b/i);
             if (platformLines) {
               const items = selected(platformLines);
-              // With only two platforms, "Both" is worth spelling out as both labels so
-              // filtering by one platform still finds the shared work.
-              const both = items.some(i => /^both\b/i.test(i));
-              apply(PLATFORMS, both ? ['Tizen', 'webOS'] : items);
+              // "Both" and "All" are spelled out as every platform label so filtering
+              // by one platform still finds the shared work.
+              const all = items.some(i => /^(both|all)\b/i.test(i));
+              apply(PLATFORMS, all ? ['Tizen', 'webOS', 'Vega'] : items);
             }
 
             // "Both" on the feature request form gets both labels, so filtering by

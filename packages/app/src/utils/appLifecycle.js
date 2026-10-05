@@ -1,5 +1,5 @@
 /* global tizen */
-import {isTizen, isWebOS} from '../platform';
+import {isTizen, isVega, isWebOS} from '../platform';
 
 // webOS holds a relaunched app in the background until this is called. Sets on 4.x and
 // below carry the object as PalmSystem alone, and 5.0 and above carry it under both names.
@@ -17,6 +17,11 @@ export const activateApp = () => {
 export const exitApp = () => {
 	if (isTizen() && typeof tizen !== 'undefined') {
 		tizen.application.getCurrentApplication().exit();
+		return;
+	}
+	// The WebView has no window of its own to close, so the shell is asked instead.
+	if (isVega()) {
+		import('@moonfin/platform-vega/bridge').then((bridge) => bridge.exitApp());
 		return;
 	}
 	window.close();

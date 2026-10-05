@@ -231,6 +231,14 @@ export const getHomeRowsStyleOptions = () => [
 	{ value: 'v1', label: $L('Classic') }
 ];
 
+export const getModernCardTransitionSpeedOptions = () => [
+	{ value: 'extraSlow', label: $L('Extra Slow') },
+	{ value: 'slow', label: $L('Slow') },
+	{ value: 'medium', label: $L('Medium') },
+	{ value: 'fast', label: $L('Fast') },
+	{ value: 'off', label: $L('Off') }
+];
+
 export const getDetailScreenStyleOptions = () => [
 	{ value: 'v2', label: $L('Modern') },
 	{ value: 'v3', label: $L('Spotlight') },
@@ -606,11 +614,20 @@ export const getMediaSegmentActionOptions = () => [
 
 export const getSeasonalThemeOptions = () => [
 	{ value: 'none', label: $L('None') },
-	{ value: 'winter', label: $L('Winter') },
-	{ value: 'spring', label: $L('Spring') },
-	{ value: 'summer', label: $L('Summer') },
-	{ value: 'fall', label: $L('Fall') },
+	{ value: 'snow', label: $L('Snow') },
+	{ value: 'christmas', label: $L('Christmas') },
+	{ value: 'fireworks', label: $L('Fireworks') },
+	{ value: 'confetti', label: $L('Confetti') },
+	{ value: 'petals', label: $L('Spring Petals') },
+	{ value: 'fireflies', label: $L('Fireflies') },
+	{ value: 'leaves', label: $L('Falling Leaves') },
 	{ value: 'halloween', label: $L('Halloween') }
+];
+
+export const getSeasonalDensityOptions = () => [
+	{ value: 'light', label: $L('Light') },
+	{ value: 'normal', label: $L('Normal') },
+	{ value: 'heavy', label: $L('Heavy') }
 ];
 
 export const getAccentColorOptions = () => [

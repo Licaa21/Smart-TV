@@ -95,6 +95,35 @@
 	}
 }
 
+.voiceBtn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	margin-left: 8px;
+	flex-shrink: 0;
+	background: transparent;
+	border: 3px solid transparent;
+	border-radius: 50%;
+	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.6));
+	cursor: pointer;
+	padding: 0;
+
+	&:focus {
+		outline: none;
+		color: var(--theme-text-primary, #ffffff);
+		border-color: var(--theme-focus-border-color, #ffffff);
+		background: var(--theme-input-focused, rgba(255, 255, 255, 0.15));
+	}
+}
+
+.voiceIcon {
+	width: 26px;
+	height: 26px;
+	fill: currentColor;
+}
+
 /* Search Results */
 .searchResults {
 	padding: 20px 60px 60px;

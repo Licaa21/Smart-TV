@@ -37,7 +37,7 @@ const isLosslessPassthroughOutput = (audioStatus = {}) => {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const lunaRequest = async (service, method, parameters) => {
+export const lunaRequest = async (service, method, parameters) => {
 	try {
 		const LS2Request = (await import('@enact/webos/LS2Request')).default;
 		return await new Promise((resolve) => {

@@ -190,7 +190,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	// screen's overlays use.
 	const overviewBackRef = useRef(null);
 	const spotlightBackRef = useRef(null);
-	const modals = useDetailsModals({backHandlerRef, onArtworkClosed: refreshItem, seerrBackRef, overviewBackRef, spotlightBackRef});
+	const trailerBackRef = useRef(null);
+	const modals = useDetailsModals({backHandlerRef, onArtworkClosed: refreshItem, seerrBackRef, overviewBackRef, spotlightBackRef, trailerBackRef});
 	const {activeModal, openModal, closeModal, advancedResumeRef} = modals;
 
 	const trailer = useDetailsTrailer({
@@ -198,7 +199,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 		effectiveApi,
 		onPlay,
 		trailerMuted: settings.featuredTrailerMuted,
-		seerrOnly
+		seerrOnly,
+		backRef: trailerBackRef
 	});
 
 	const canChangeArtwork = useMemo(() => {
@@ -941,7 +943,6 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 			videoRef={trailer.trailerVideoRef}
 			muted={settings.featuredTrailerMuted}
 			onClose={trailer.handleCloseTrailer}
-			onKeyDown={trailer.handleTrailerOverlayKeyDown}
 		/>
 	);
 

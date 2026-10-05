@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useReducer, useRef} from 'react';
+import {useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react';
 import {retainPermitted} from '../../services/libraryScope';
 import {isKidsMode, mergesContinueWatchingNextUp} from '../../utils/kidsMode';
 import {isLiveTvLibrary, librariesForNav} from '../../utils/liveTvLibrary';
@@ -15,7 +15,7 @@ import {EXCLUDED_COLLECTION_TYPES, filterItemsByExcludedGenres} from './browseFi
 import {featuredConfigKey} from './featuredConfig';
 import {
 	CACHE_TTL_LIBRARIES, CACHE_TTL_VOLATILE, VOLATILE_REFRESH_COOLDOWN_MS,
-	cancelPendingCacheSave, clearMemoryCache, isCacheValid, loadBrowseCache, memoryCache, saveBrowseCache
+	cancelPendingCacheSave, clearBrowseCache, clearMemoryCache, isCacheValid, loadBrowseCache, memoryCache, saveBrowseCache
 } from './browseCache';
 
 // A row that quietly loses its source looks the same as a server with nothing to offer, so the
@@ -42,6 +42,7 @@ const useBrowseData = ({
 	homeRowsConfig
 }) => {
 	const [state, dispatch] = useReducer(browseReducer, browseInitialState);
+	const [reloadKey, setReloadKey] = useState(0);
 
 	const cacheOwner = useMemo(() => ({serverUrl, userId}), [serverUrl, userId]);
 
@@ -197,8 +198,11 @@ const useBrowseData = ({
 
 	useEffect(() => {
 		// detail.featured marks refreshes that change what the bar may hold, like hiding a library.
+		// detail.libraries marks a change to the libraries themselves, like their order, which has
+		// to show straight away, so the stored rows go too and the rows are asked for again.
 		const handleBrowseRefresh = (e) => {
 			clearMemoryCache({keepFeatured: !e?.detail?.featured});
+			if (e?.detail?.libraries) clearBrowseCache().then(() => setReloadKey((key) => key + 1));
 		};
 
 		window.addEventListener('moonfin:browseRefresh', handleBrowseRefresh);
@@ -535,6 +539,7 @@ const useBrowseData = ({
 		api,
 		serverUrl,
 		accessToken,
+		reloadKey,
 		settings.featuredContentType,
 		settings.featuredItemCount,
 		settings.displayFavoritesRows,
