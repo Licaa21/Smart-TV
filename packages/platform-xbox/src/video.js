@@ -11,6 +11,9 @@ import {pressOnFocused, raiseHostBack} from './keys';
 
 export {giveControllerToGame} from './keys';
 
+// A console has no remote with a Back key to open a game's menu with
+export const controllerIsOnlyRemote = true;
+
 export {
 	getMimeType,
 	canRenderEmbeddedPgsInBand,

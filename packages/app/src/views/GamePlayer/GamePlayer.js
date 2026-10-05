@@ -11,7 +11,7 @@ import {iconViewBox} from '../../components/icons/iconViewBox';
 import useGamepadButtons from '../../hooks/useGamepadButtons';
 import * as gamesApi from '../../services/gamesApi';
 import serverLogger from '../../services/serverLogger';
-import {giveControllerToGame, initVideo, keepScreenOn, setupVisibilityHandler} from '../../services/video';
+import {controllerIsOnlyRemote, giveControllerToGame, initVideo, keepScreenOn, setupVisibilityHandler} from '../../services/video';
 import * as ejs from '../../utils/emulatorjs';
 import {gameStateKey, loadGameStateWithMigration} from '../../utils/gameSaves';
 import {KEYS, isBackKey} from '../../utils/keys';
@@ -52,6 +52,9 @@ const PAD_KEYS = {
 
 // How long Start and Select have to be held together to open the pause menu.
 const MENU_COMBO_HOLD = 5000;
+// Where the controller is all there is to open it with, holding Start alone does it, and
+// sooner. A short press is still the game's Start.
+const MENU_START_HOLD = 1000;
 
 // Sends a remote key through the path the remote takes, so a gamepad moves and selects in the
 // menus exactly like it.
@@ -374,7 +377,9 @@ const GamePlayer = ({library, game, startFresh, onBack, backHandlerRef}) => {
 
 	const updateCombo = useCallback(() => {
 		const s = stateRef.current;
-		const active = padHeld.current.start && padHeld.current.select && !s.overlayOpen && !s.settingsOpen && !s.controlsOpen;
+		const startAlone = controllerIsOnlyRemote();
+		const held = padHeld.current.start && (startAlone || padHeld.current.select);
+		const active = held && !s.overlayOpen && !s.settingsOpen && !s.controlsOpen;
 		setComboActive(active);
 		if (!active) {
 			clearTimeout(comboTimer.current);
@@ -383,7 +388,7 @@ const GamePlayer = ({library, game, startFresh, onBack, backHandlerRef}) => {
 			comboTimer.current = setTimeout(() => {
 				comboTimer.current = null;
 				openOverlay();
-			}, MENU_COMBO_HOLD);
+			}, startAlone ? MENU_START_HOLD : MENU_COMBO_HOLD);
 		}
 	}, [openOverlay]);
 

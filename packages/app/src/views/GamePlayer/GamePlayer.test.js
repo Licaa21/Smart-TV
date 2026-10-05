@@ -1,7 +1,7 @@
 import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import Spotlight from '@enact/spotlight';
 import * as gamesApi from '../../services/gamesApi';
-import {giveControllerToGame} from '../../services/video';
+import {controllerIsOnlyRemote, giveControllerToGame} from '../../services/video';
 import * as ejs from '../../utils/emulatorjs';
 import {loadGameStateWithMigration} from '../../utils/gameSaves';
 import GamePlayer from './GamePlayer';
@@ -39,6 +39,7 @@ jest.mock('../../components/LoadingSpinner', () => () => null);
 jest.mock('../../services/serverLogger', () => ({error: jest.fn(), LOG_CATEGORIES: {APP: 'app'}}));
 jest.mock('../../services/video', () => ({
 	initVideo: () => Promise.resolve(),
+	controllerIsOnlyRemote: jest.fn(() => false),
 	giveControllerToGame: jest.fn(),
 	keepScreenOn: jest.fn(),
 	setupVisibilityHandler: () => () => {}
@@ -377,6 +378,22 @@ test('holding Start and Select for five seconds opens the pause menu, with the p
 	await act(async () => { jest.advanceTimersByTime(100); });
 	expect(screen.getByText('Resume')).toBeTruthy();
 	expect(screen.queryByText('Hold to open menu')).toBeNull();
+});
+
+test('where the controller is the only remote, holding Start alone for a second opens the pause menu', async () => {
+	jest.useFakeTimers();
+	controllerIsOnlyRemote.mockReturnValue(true);
+	await startGame();
+
+	pressPad(9);
+	await act(async () => { jest.advanceTimersByTime(300); });
+	pressPad(9, false);
+	await act(async () => { jest.advanceTimersByTime(2000); });
+	expect(screen.queryByText('Resume')).toBeNull();
+
+	pressPad(9);
+	await act(async () => { jest.advanceTimersByTime(1000); });
+	expect(screen.getByText('Resume')).toBeTruthy();
 });
 
 test('letting go early cancels the hold', async () => {
