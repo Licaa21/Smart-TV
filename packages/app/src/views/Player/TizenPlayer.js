@@ -307,6 +307,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const isUnmountedRef = useRef(false);
 	const reloadInFlightRef = useRef(false);
 	const reloadRunningSinceRef = useRef(0);
+	// Which reload is the latest, so one that a newer attempt has replaced can stop before it reaches AVPlay.
+	const reloadRunRef = useRef(0);
 	// index of a subtitle the server is currently burning into the stream
 	const burnInSubtitleRef = useRef(null);
 
@@ -927,8 +929,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				attempt,
 				runningForMs: Date.now() - reloadRunningSinceRef.current
 			});
-			// A scheduled retry looks again shortly. A key press that landed here changes nothing.
-			if (attempt > 0 && !isUnmountedRef.current) {
+			// Whoever landed here looks again shortly, a scheduled retry and a key press alike, so
+			// recovery is not left without a next step if the running reload never settles or fails.
+			// A success clears this timer.
+			if (!isUnmountedRef.current) {
+				if (reloadRetryTimeoutRef.current) clearTimeout(reloadRetryTimeoutRef.current);
 				reloadRetryTimeoutRef.current = setTimeout(() => {
 					if (!isUnmountedRef.current) recoverByReload(attempt);
 				}, RELOAD_RECHECK_MS);
@@ -941,17 +946,27 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		// along with everything else and can sit unsettled for the entire outage,
 		// so this can't wait on it indefinitely - past this timeout the reload is
 		// treated as failed even if it later resolves.
-		const reloadPromise = reloadPlaybackRef.current?.() ?? Promise.resolve(false);
+		// A reload this one replaces stops before it can open the stream again on the same player.
+		const run = ++reloadRunRef.current;
+		const reloadPromise = reloadPlaybackRef.current?.(() => run !== reloadRunRef.current) ?? Promise.resolve(false);
 		const reloadStartedAt = Date.now();
 		reloadRunningSinceRef.current = reloadStartedAt;
 		const reloadSettled = () => {
 			if (reloadRunningSinceRef.current === reloadStartedAt) reloadRunningSinceRef.current = 0;
 		};
 		reloadPromise.then(reloadSettled, reloadSettled);
+		let raceTimer = null;
 		const timedOut = new Promise((resolve) => {
-			setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
+			raceTimer = setTimeout(() => resolve(false), RELOAD_TIMEOUT_MS);
 		});
+		const clearRetry = () => {
+			if (reloadRetryTimeoutRef.current) {
+				clearTimeout(reloadRetryTimeoutRef.current);
+				reloadRetryTimeoutRef.current = null;
+			}
+		};
 		Promise.race([reloadPromise, timedOut]).then((reloaded) => {
+			clearTimeout(raceTimer);
 			reloadInFlightRef.current = false;
 			serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded, attempt, tookMs: Date.now() - reloadStartedAt});
 			if (isUnmountedRef.current) return;
@@ -959,8 +974,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// The attempt this is recovering from may have kept running in the
 				// background and thrown its own error after this reload already
 				// succeeded - clear it so a stale error screen doesn't sit on top
-				// of playback that's actually working.
+				// of playback that's actually working. No retry is left armed behind it.
 				setError(null);
+				clearRetry();
 				return;
 			}
 			setError($L(RELOAD_FAILED_MESSAGE));
@@ -972,7 +988,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			// playback that's now actually working.
 			reloadPromise.then((lateReloaded) => {
 				serverLogger.playback('Standby diag: reloadPlaybackRef late result', {lateReloaded, attempt, tookMs: Date.now() - reloadStartedAt});
-				if (!isUnmountedRef.current && lateReloaded) setError(null);
+				if (!isUnmountedRef.current && lateReloaded) {
+					setError(null);
+					clearRetry();
+				}
 			});
 			// A scheduled retry relies on setTimeout, which - like every other
 			// timer - does not fire while the TV is genuinely frozen, not just
@@ -2116,7 +2135,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	// Reload the current item from its last position, used when a suspended
 	// session cant be restored after the app returns to the foreground
-	const reloadCurrentPlayback = useCallback(async () => {
+	const reloadCurrentPlayback = useCallback(async (isSuperseded) => {
 		try {
 			const result = await playback.getPlaybackInfo(item.Id, {
 				startPositionTicks: positionRef.current,
@@ -2126,6 +2145,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				item,
 				stereoUpmixEnabled: settings.stereoUpmixEnabled
 			});
+			if (isSuperseded?.()) return false;
 			return await restartFromResult(result, positionRef.current);
 		} catch (err) {
 			console.error('[Player] Stream reload failed:', err);
@@ -3082,9 +3102,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			// still falls through to its normal handling below and exits in one
 			// press, same as always.
 			if (error && !(isBackKey(e) || key === 'GoBack' || key === 'Backspace')) {
-				e.preventDefault();
-				e.stopPropagation();
-				triggerManualRetry();
+				// Enter and the arrows go to the buttons on the screen, and live TV has its own retry
+				// card, so only the other keys on a failed reload mean try again.
+				const navigationKey = key === 'Enter' || e.keyCode === 13 || (e.keyCode >= 37 && e.keyCode <= 40);
+				if (!isLiveTV && !navigationKey && error === $L(RELOAD_FAILED_MESSAGE)) {
+					e.preventDefault();
+					e.stopPropagation();
+					triggerManualRetry();
+				}
 				return;
 			}
 
