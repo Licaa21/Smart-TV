@@ -24,8 +24,19 @@ const SRC = path.join(ROOT, 'packages', 'app', 'src');
 const OUT = path.join(SRC, 'theme', 'accentRules.generated.js');
 const CLI_MODULES = path.join(ROOT, 'tools', 'node_modules', '@enact', 'cli', 'node_modules');
 
-const less = require(path.join(CLI_MODULES, 'less'));
-const postcss = require(path.join(CLI_MODULES, 'postcss'));
+// Resolved the way Node would, looking in the CLI's own modules first and then the repo's, with a
+// plain message when the tools are not installed yet.
+const loadTool = (name) => {
+	try {
+		return require(require.resolve(name, {paths: [CLI_MODULES, ROOT]}));
+	} catch (err) {
+		console.error(`gen-accent-rules: cannot find "${name}" (${err.code || err.message}). Run npm install, which sets up the CLI under tools/, and try again.`);
+		process.exit(1);
+	}
+};
+
+const less = loadTool('less');
+const postcss = loadTool('postcss');
 
 // First match wins, and anything unmatched belongs to 'other'. Keep in step with
 // ACCENT_SURFACES in theme/accentSurfaces.js.
