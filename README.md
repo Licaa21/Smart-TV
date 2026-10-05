@@ -17,7 +17,7 @@
 
 ## What is Moonfin for Smart TVs?
 
-Moonfin is a Jellyfin and Emby client for Samsung Smart TVs (Tizen), LG Smart TVs (webOS) and Fire TV sticks running Vega OS. One shared codebase powers every platform, with a video pipeline tuned for each, so you get hardware-accelerated playback, a UI designed around a remote instead of a mouse, and features that most TV clients leave out.
+Moonfin is a Jellyfin and Emby client for Samsung Smart TVs (Tizen), LG Smart TVs (webOS), Fire TV sticks running Vega OS and Xbox consoles. One shared codebase powers every platform, with a video pipeline tuned for each, so you get hardware-accelerated playback, a UI designed around a remote instead of a mouse, and features that most TV clients leave out.
 
 ## Features
 
@@ -68,6 +68,7 @@ The easiest route on each brand:
 - **LG:** the Homebrew Channel if your TV has it. Otherwise LG's Developer Mode app plus [Dev Manager Desktop](https://github.com/webosbrew/dev-manager-desktop), a free desktop program that installs the `.ipk` in a few clicks. The webOS CLI (`ares-install`) works too.
 - **Samsung:** the [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung) tool, which signs and installs the `.wgt` for you.
 - **Fire TV (Vega OS):** Developer Mode on the stick and the Vega SDK's `vega device install-app` on a computer, until the app is in the Amazon Appstore.
+- **Xbox:** not on the Releases page yet. Build it from source and install it on a console in Developer Mode through the Xbox Device Portal, until the app is in the Microsoft Store.
 
 Step-by-step instructions for all of them, including turning on Developer Mode, are on the [Installation and Sideloading](https://github.com/Moonfin-Client/Smart-TV/wiki/Installation-and-Sideloading) page. Once installed, [Getting Started](https://github.com/Moonfin-Client/Smart-TV/wiki/Getting-Started) walks through connecting to your server.
 
@@ -96,6 +97,7 @@ The deeper reference material lives in the [Wiki](https://github.com/Moonfin-Cli
 npm install
 npm run build:tizen:all   # Samsung: Regular, Oblong, and Legacy
 npm run build:webos       # LG
+npm run build:xbox        # Xbox, on Windows with the Visual Studio Build Tools
 ```
 
 A current Node.js LTS release (20 or newer) with npm is the only prerequisite.
