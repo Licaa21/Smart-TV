@@ -1,5 +1,7 @@
 import $L from '@enact/i18n/$L';
 
+import {SHOWS_EVERYTHING} from './detailSectionLayout';
+
 // A birthday is a calendar date, not a moment. Both servers send it anchored to
 // UTC, so reading it back in the viewer's zone moves it a day earlier for
 // anyone west of it. The parts are taken as written and rebuilt locally.
@@ -46,16 +48,18 @@ export const personDateLines = (birthValue, deathValue) => {
 
 // The filmography comes back as one list, and each kind of work gets its own
 // row. An episode of a series the person is billed on is already covered by
-// that series, so only the rest count as a guest appearance.
-export const splitFilmography = (items) => {
+// that series, so only the rest count as a guest appearance. Guest appearances
+// and music videos each have a switch in the detail sections setting, and a
+// hidden one comes back empty.
+export const splitFilmography = (items, showsSection = SHOWS_EVERYTHING) => {
 	const all = Array.isArray(items) ? items : [];
 	const movies = all.filter((item) => item.Type === 'Movie');
 	const series = all.filter((item) => item.Type === 'Series');
-	const musicVideos = all.filter((item) => item.Type === 'MusicVideo');
+	const musicVideos = showsSection('musicVideos') ? all.filter((item) => item.Type === 'MusicVideo') : [];
 	const seriesIds = new Set(series.map((item) => item.Id));
-	const guestAppearances = all.filter((item) => (
-		item.Type === 'Episode' && (!item.SeriesId || !seriesIds.has(item.SeriesId))
-	));
+	const guestAppearances = showsSection('guestAppearances')
+		? all.filter((item) => item.Type === 'Episode' && (!item.SeriesId || !seriesIds.has(item.SeriesId)))
+		: [];
 
 	return {movies, series, guestAppearances, musicVideos};
 };

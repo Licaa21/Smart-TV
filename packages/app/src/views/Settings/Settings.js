@@ -56,12 +56,14 @@ import {RatingSourcesView, ExcludedGenresView, PinCodeView, BlockedRatingsView, 
 import {KidsModeSetView, KidsModeExitView} from './KidsModeViews';
 import HomeRowsView from './HomeRowsView';
 import ButtonLayoutView from './ButtonLayoutView';
+import DetailSectionsView from './DetailSectionsView';
 import DiagnosticsView from './DiagnosticsView';
 import LibrariesView from './LibrariesView';
 import LibraryOrderView from './LibraryOrderView';
 import MediaBarSourceView from './MediaBarSourceView';
 import SeerrAccountPanel from './SeerrAccountPanel';
 import {LOG_RENDER_STEP} from './useDiagnosticsLog';
+import {DETAIL_SECTIONS_HIDDEN_KEY, toggleHiddenSection} from '../../utils/detailSectionLayout';
 
 import css from './Settings.module.less';
 
@@ -213,6 +215,8 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 				Spotlight.focus('libraries-view');
 			} else if (cv.view === 'libraryOrder') {
 				Spotlight.focus('library-order-view');
+			} else if (cv.view === 'detailSections') {
+				Spotlight.focus('detail-sections-view');
 			} else if (cv.view === 'ratingSources') {
 				Spotlight.focus('rating-sources-view');
 			} else if (cv.view === 'blockedRatings') {
@@ -778,6 +782,15 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		pushView({view: 'libraryOrder', returnFocusTo: 'setting-libraryOrder'});
 	}, [pushView]);
 
+	const openDetailSections = useCallback(() => {
+		pushView({view: 'detailSections', returnFocusTo: 'setting-detailSections'});
+	}, [pushView]);
+
+	const hiddenDetailSections = settings[DETAIL_SECTIONS_HIDDEN_KEY];
+	const toggleDetailSection = useCallback((id) => {
+		updateSetting(DETAIL_SECTIONS_HIDDEN_KEY, toggleHiddenSection(hiddenDetailSections, id));
+	}, [hiddenDetailSections, updateSetting]);
+
 	const {
 		mediaBarLibraries, mediaBarCollections, tempMediaBarLibraryIds, tempMediaBarCollectionIds,
 		mediaBarSourcesLoading, openMediaBarLibraries, openMediaBarCollections,
@@ -1034,10 +1047,11 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			openDetailButtons,
 			openOsdButtons,
 			openDetailMetadata,
-			openAudioCodecs,
+			openDetailSections,
 			openDiagnostics,
 			openPinCode,
 			openKidsMode,
+			openAudioCodecs,
 			openLibraries,
 			openLibraryOrder,
 			openParentalControls,
@@ -1064,9 +1078,9 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	}), [
 		settings, capabilities, seerr, achievements, seerrLabel, isSeerr, serverUrl, ratingsResetArmed, resetRatingsSettings,
 		serverVersion, availableThemes, activeThemeId, openThemes, openThemeStore, openHomeRows,
-		openDetailButtons, openOsdButtons, openDetailMetadata, openDiagnostics,
-		openAudioCodecs,
+		openDetailButtons, openOsdButtons, openDetailMetadata, openDetailSections, openDiagnostics,
 		openPinCode, openKidsMode, openLibraries, openLibraryOrder, openParentalControls, openQrLink, openRatingSources, openRowImageTypes, openExcludedGenres, openMediaBarLibraries,
+		openAudioCodecs,
 		openMediaBarCollections, openScreensaverLibraries, openScreensaverCollections, openScreensaverGenres,
 		openImdbLists, openSeasonalRow, openExternalTmdbLists, openExternalCalendars,
 		openExternalCustomRows, openSeerrHomeRows, openScreen, handleMoonfinToggle, onRunSetupWizard
@@ -1524,6 +1538,15 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 					api={api}
 					unified={settings.unifiedLibraryMode && hasMultipleServers}
 					onLibrariesChanged={onLibrariesChanged}
+				/>
+			)}
+			{viewName === 'detailSections' && (
+				<DetailSectionsView
+					style={settings.detailScreenStyle}
+					seerrAvailable={seerr.isEnabled}
+					seerrLabel={seerrLabel}
+					hidden={hiddenDetailSections}
+					onToggle={toggleDetailSection}
 				/>
 			)}
 			{viewName === 'mediaBarLibraries' && (

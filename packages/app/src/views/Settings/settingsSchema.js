@@ -293,6 +293,7 @@ export const SETTINGS_SCHEMA = [
 					},
 					{kind: KIND.SECTION, id: 'mediaDetailsAndSpoilers', label: () => $L('Media Details and Spoilers')},
 					{kind: KIND.NAV, id: 'detailMetadata', label: () => $L('Metadata Row'), desc: () => $L('Choose which metadata items the details screen shows and reorder them'), icon: 'reorder', action: (ctx) => ctx.actions.openDetailMetadata()},
+					{kind: KIND.NAV, id: 'detailSections', label: () => $L('Sections'), desc: () => $L('Choose which parts of the Details screen to show'), icon: 'dashboard_customize', keywords: () => ['sections', 'hide', 'logo', 'tagline', 'cast', 'crew', 'studios', 'chapters', 'extras', 'collections', 'similar', 'more like this', 'episodes', 'media info', 'seerr', 'recommendations', 'biography'], action: (ctx) => ctx.actions.openDetailSections()},
 					{kind: KIND.TOGGLE, key: 'detailShowTechnicalDetails', label: () => $L('Show Technical Details'), desc: () => $L('Show codec, resolution, and stream information in banner summary'), icon: 'info'},
 					{kind: KIND.TOGGLE, key: 'hideDetailsMediaDescription', label: () => $L('Hide Media Description on Details Page'), desc: () => $L('Hide the movie or episode descriptive text.'), icon: 'hide'},
 					{kind: KIND.TOGGLE, key: 'detailUseSeriesThumbnails', label: () => $L('Use Series Thumbnails on Details Page'), desc: () => $L('Replace thumbnails on the details page with the series thumbnail'), icon: 'aspectratio', when: (ctx) => ['v1', 'v4', 'v5'].indexOf(ctx.settings.detailScreenStyle) >= 0}

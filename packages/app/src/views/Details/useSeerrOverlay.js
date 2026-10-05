@@ -14,7 +14,9 @@ import useSeerrDetailsData from './useSeerrDetailsData';
 import useSeerrRequests from './useSeerrRequests';
 import useSeerrWatchlist from './useSeerrWatchlist';
 
-const useSeerrOverlay = ({item, seerrOnly}) => {
+// `showsSection` is the viewer's detail sections setting. A piece switched off reads as one
+// Seerr had nothing for, so every style draws and focuses the same set.
+const useSeerrOverlay = ({item, seerrOnly, showsSection}) => {
 	const {isEnabled, isAuthenticated, user, displayName} = useSeerr();
 
 	const rawTarget = useMemo(
@@ -92,22 +94,33 @@ const useSeerrOverlay = ({item, seerrOnly}) => {
 		details: data.details
 	});
 
-	// Seerr's rows arrive in its own shape, and both detail styles draw their rows with the
+	// Seerr's rows arrive in its own shape, and every detail style draws its rows with the
 	// library's MediaCard, so they are converted once here rather than in each screen.
-	const similarCards = useMemo(() => data.similar.map(normalizeMediaItem), [data.similar]);
-	const recommendationCards = useMemo(() => data.recommendations.map(normalizeMediaItem), [data.recommendations]);
+	const showsSimilar = showsSection('seerrSimilar');
+	const showsRecommendations = showsSection('seerrRecommendations');
+	const similarCards = useMemo(
+		() => (showsSimilar ? data.similar.map(normalizeMediaItem) : []),
+		[data.similar, showsSimilar]
+	);
+	const recommendationCards = useMemo(
+		() => (showsRecommendations ? data.recommendations.map(normalizeMediaItem) : []),
+		[data.recommendations, showsRecommendations]
+	);
 
 	const isActive = Boolean(target.mediaId && data.details);
 
+	// The parts of the Seerr block with something to show that the viewer left on.
+	const pieces = {
+		chips: isActive && showsSection('seerrGenresTags') && hasSeerrChips(data.details),
+		facts: isActive && showsSection('seerrStats') && hasMediaFacts(data.details, target.mediaType),
+		recommendations: isActive && recommendationCards.length > 0,
+		similar: isActive && similarCards.length > 0,
+		collection: isActive && showsSection('seerrCollection') && Boolean(data.details.collection)
+	};
+
 	// A title Seerr knows of but has nothing to say about would otherwise offer
 	// an empty tab.
-	const hasTabContent = isActive && Boolean(
-		hasSeerrChips(data.details) ||
-		hasMediaFacts(data.details, target.mediaType) ||
-		recommendationCards.length ||
-		similarCards.length ||
-		data.details.collection
-	);
+	const hasTabContent = pieces.chips || pieces.facts || pieces.recommendations || pieces.similar || pieces.collection;
 
 	const offersRequest = seerrOnly
 		? requests.canRequestHd || requests.canRequest4k
@@ -131,6 +144,7 @@ const useSeerrOverlay = ({item, seerrOnly}) => {
 		displayName,
 		mediaType: target.mediaType,
 		isActive,
+		pieces,
 		hasTabContent,
 		onRequest4k,
 		onCancel,

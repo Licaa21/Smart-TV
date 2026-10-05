@@ -31,11 +31,14 @@ const Tracks = ({rows}) => (
 
 // What the page closes on: who made the title, and what the file behind it actually is. Every group
 // is left out rather than shown empty, since a server is silent about different things per file.
+// Studios, the Seerr pieces and the media info each have a switch, and a hidden one reads as empty.
+// With nothing left the footer draws nothing, and the focus walk steps past its stop.
 const NouveauDetailsFooter = ({
-	item, mediaSource, effectiveApi, selectedAudioIndex, selectedSubtitleIndex,
+	item, showsSection, mediaSource, effectiveApi, selectedAudioIndex, selectedSubtitleIndex,
 	seerr, seerrNav, onSelectStudio
 }) => {
-	const streams = mediaSource?.MediaStreams || [];
+	const fileSource = showsSection('mediaInfo') ? mediaSource : null;
+	const streams = fileSource?.MediaStreams || [];
 	const video = streams.find((stream) => stream.Type === 'Video');
 	const audio = streams.filter((stream) => stream.Type === 'Audio');
 	const subtitles = streams.filter((stream) => stream.Type === 'Subtitle');
@@ -45,15 +48,19 @@ const NouveauDetailsFooter = ({
 	const activeAudio = audio[selectedAudioIndex]?.Index;
 	const activeSubtitle = selectedSubtitleIndex >= 0 ? subtitles[selectedSubtitleIndex]?.Index : undefined;
 
-	const studios = (item.Studios || []).map((studio) => studio?.Name).filter(Boolean);
-	const name = fileName(mediaSource);
-	const sizeLine = fileSizeLine(mediaSource);
+	const studios = showsSection('studios') ? (item.Studios || []).map((studio) => studio?.Name).filter(Boolean) : [];
+	const name = fileName(fileSource);
+	const sizeLine = fileSizeLine(fileSource);
 	const videoDetails = videoLines(video);
+	const showsChips = Boolean(seerr?.pieces?.chips);
+	const showsFacts = Boolean(seerr?.pieces?.facts);
 
 	const openStudio = useCallback((ev) => {
 		const studio = ev.currentTarget.dataset.studioName;
 		if (studio) onSelectStudio?.(studio);
 	}, [onSelectStudio]);
+
+	if (!studios.length && !showsChips && !showsFacts && !fileSource) return null;
 
 	return (
 		<div className={css.footer}>
@@ -75,12 +82,11 @@ const NouveauDetailsFooter = ({
 						</div>
 					</Group>
 				)}
-				{/* Both carry their own label and drop out on their own when Seerr knows nothing,
-				    so neither is wrapped in a titled group or gated here. A library item can have
-				    this as readily as a Seerr only one. */}
-				<SeerrChips details={seerr?.details} mediaType={seerr?.mediaType} seerrNav={seerrNav} />
-				<SeerrFacts details={seerr?.details} mediaType={seerr?.mediaType} />
-				{mediaSource && (
+				{/* Both carry their own label, so neither is wrapped in a titled group. A library
+				    item can have this as readily as a Seerr only one. */}
+				{showsChips && <SeerrChips details={seerr.details} mediaType={seerr.mediaType} seerrNav={seerrNav} />}
+				{showsFacts && <SeerrFacts details={seerr.details} mediaType={seerr.mediaType} />}
+				{fileSource && (
 					<Group title={$L('File Information')}>
 						{name && <div className={css.fileName}>{name}</div>}
 						{sizeLine && <div className={css.fileMeta}>{sizeLine}</div>}
@@ -88,7 +94,7 @@ const NouveauDetailsFooter = ({
 							api={effectiveApi}
 							itemId={item.Id}
 							serverType={item._serverType}
-							mediaSourceId={mediaSource.Id}
+							mediaSourceId={fileSource.Id}
 							audioStreamIndex={activeAudio}
 							subtitleStreamIndex={activeSubtitle}
 						/>

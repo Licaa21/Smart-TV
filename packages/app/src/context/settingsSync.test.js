@@ -45,6 +45,12 @@ describe('profileToLocal', () => {
 		expect(local.hiddenDetailMetadataTv).toEqual(['status']);
 	});
 
+	test('takes the TV detail sections list under its own name or PascalCase', () => {
+		expect(profileToLocal({hiddenDetailSectionsTv: ['cast']}).hiddenDetailSectionsTv).toEqual(['cast']);
+		expect(profileToLocal({HiddenDetailSectionsTv: ['logo']}).hiddenDetailSectionsTv).toEqual(['logo']);
+		expect(profileToLocal({hiddenDetailSectionsMobile: ['cast']})).toEqual({});
+	});
+
 	test('leaves the desktop and mobile button fields alone', () => {
 		const local = profileToLocal({
 			osdButtonOrderDesktop: ['desktop-order'],
