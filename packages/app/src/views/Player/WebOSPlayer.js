@@ -191,6 +191,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const [mediaSegments, setMediaSegments] = useState(null);
 	const [nextEpisode, setNextEpisode] = useState(null);
 	const [previousEpisode, setPreviousEpisode] = useState(null);
+	// The lookup behind previousEpisode and the item it was made for, so Previous can wait on it.
+	const previousLookupRef = useRef(null);
 	const [isSeeking, setIsSeeking] = useState(false);
 	const [seekPosition, setSeekPosition] = useState(0);
 	const [mediaSourceId, setMediaSourceId] = useState(null);
@@ -878,6 +880,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			resetPopups(); // eslint-disable-line no-use-before-define
 			setNextEpisode(null);
 			setPreviousEpisode(null);
+			previousLookupRef.current = null;
 
 			await waitForDecoderRelease();
 
@@ -1139,7 +1142,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						playback.getNextEpisode(item).then(setNextEpisode);
 					}
 					if (item.Type === 'Episode') {
-						playback.getPreviousEpisode(item).then((previous) => {
+						const lookup = playback.getPreviousEpisode(item);
+						previousLookupRef.current = {itemId: item.Id, promise: lookup};
+						lookup.then((previous) => {
 							if (!cancelled) setPreviousEpisode(previous);
 						});
 					}
@@ -1748,13 +1753,19 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	// Previous steps back to the episode before this one, the way Next steps on. A movie, a first
 	// episode, or a lookup that found nothing restarts it, as before.
-	const handlePrevious = useCallback(() => {
-		if (!isAudioMode && previousEpisode) {
-			onPlayNextWithCleanup(previousEpisode);
-			return;
+	const handlePrevious = useCallback(async () => {
+		if (!isAudioMode) {
+			// A press that comes before the lookup has answered waits for it, and for the very item it was
+			// made for, rather than restarting the video.
+			const lookup = previousLookupRef.current;
+			const previous = previousEpisode || (lookup && lookup.itemId === item.Id ? await lookup.promise : null);
+			if (previous) {
+				onPlayNextWithCleanup(previous);
+				return;
+			}
 		}
 		handlePrevTrack();
-	}, [isAudioMode, previousEpisode, onPlayNextWithCleanup, handlePrevTrack]);
+	}, [isAudioMode, previousEpisode, item, onPlayNextWithCleanup, handlePrevTrack]);
 
 	const {carouselOpenRef, openCarousel, markChannelPlaying, carouselProps} = useChannelCarousel({
 		item, isLiveTV, liveTvChannels, sortBy: settings.liveTvChannelSortBy,
