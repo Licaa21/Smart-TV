@@ -1,4 +1,5 @@
 import {allowInsecureHost, bootData, exitApp, onShellMessage, postToShell} from '../../../platform-xbox/src/bridge';
+import {getCountryCode} from '../../../platform-xbox/src/countryCode';
 import {keepScreenOn, registerAppStateObserver, setupXboxLifecycle} from '../../../platform-xbox/src/video';
 
 const hostSays = (type, payload) => window.dispatchEvent(new CustomEvent('moonfin:xbox', {detail: {v: 1, type, payload}}));
@@ -24,6 +25,14 @@ describe('the Xbox bridge', () => {
 		expect(bootData().ip).toBe('192.168.1.30');
 		window.__MOONFIN_XBOX__ = {v: 2, ip: '192.168.1.30'};
 		expect(bootData()).toBeNull();
+	});
+
+	test('gives the country the host read off the console, or none', async () => {
+		expect(await getCountryCode()).toBeNull();
+		window.__MOONFIN_XBOX__ = {v: 1, country: 'MX'};
+		expect(await getCountryCode()).toBe('MX');
+		window.__MOONFIN_XBOX__ = {v: 1, country: null};
+		expect(await getCountryCode()).toBeNull();
 	});
 
 	test('posts versioned messages to the host and says when there is none', () => {

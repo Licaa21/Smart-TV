@@ -9,6 +9,7 @@ using Windows.Media.Protection;
 using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.System.Profile;
+using Windows.System.UserProfile;
 
 namespace Moonfin.Xbox
 {
@@ -41,6 +42,7 @@ namespace Moonfin.Xbox
             data.SetNamedValue("protection", await ReadProtectionAsync());
             data.SetNamedValue("webview", ReadWebView(webViewVersion));
             data.SetNamedValue("ip", NullableString(ReadIp()));
+            data.SetNamedValue("country", NullableString(ReadCountry()));
             return data;
         }
 
@@ -72,6 +74,21 @@ namespace Moonfin.Xbox
                     if (first == null) first = host.CanonicalName;
                 }
                 return first;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        // The region the console is set to, as two letters. Windows gives a number for a
+        // few places, which is left out.
+        private static string ReadCountry()
+        {
+            try
+            {
+                string region = GlobalizationPreferences.HomeGeographicRegion;
+                return region != null && region.Length == 2 ? region.ToUpperInvariant() : null;
             }
             catch (Exception)
             {

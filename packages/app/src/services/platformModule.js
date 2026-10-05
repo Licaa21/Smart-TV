@@ -38,7 +38,8 @@ const LOADERS = {
 	countryCode: {
 		tizen: () => import('@moonfin/platform-tizen/countryCode'),
 		webos: () => import('@moonfin/platform-webos/countryCode'),
-		vega: () => import('@moonfin/platform-vega/countryCode')
+		vega: () => import('@moonfin/platform-vega/countryCode'),
+		xbox: () => import('@moonfin/platform-xbox/countryCode')
 	}
 };
 
