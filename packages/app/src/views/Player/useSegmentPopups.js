@@ -156,6 +156,10 @@ const useSegmentPopups = ({
 		setNextEpisodeCountdown(null);
 		setAskStillWatching(false);
 		dismissedSegmentsRef.current.clear();
+		// A new episode starts the prompt's auto hide over. Left alone, an intro that begins at the same
+		// tick as the last episode's (chapter markers often put it at zero) found the old clock already
+		// run out and was hidden the moment it appeared.
+		promptShownAtRef.current = null;
 		hasTriggeredNextEpisodeRef.current = false;
 		if (nextEpisodeTimerRef.current) {
 			clearInterval(nextEpisodeTimerRef.current);
@@ -232,6 +236,7 @@ const useSegmentPopups = ({
 					}
 				}
 			} else if (!active) {
+				promptShownAtRef.current = null;
 				setSkipSegment((prev) => (prev ? null : prev));
 			}
 

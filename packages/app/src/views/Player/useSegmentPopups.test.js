@@ -63,3 +63,61 @@ test('pressing skip counts as the viewer being there, an automatic skip doesnt',
 	second.playOut();
 	expect(second.result.current.askStillWatching).toBe(false);
 });
+
+describe('the auto hide of the skip prompt', () => {
+	const SECOND = 10000000;
+	let now;
+
+	beforeEach(() => {
+		now = 1000000;
+		jest.spyOn(Date, 'now').mockImplementation(() => now);
+	});
+	afterEach(() => jest.restoreAllMocks());
+
+	const setupAutoHide = () => renderHook(() => useSegmentPopups({
+		mediaSegments: {list: [{type: 'intro', start: 0, end: 60 * SECOND}]},
+		nextEpisode: null,
+		settings: {autoPlay: false, introAction: 'ask', mediaSegmentAutoHide: 's5'},
+		runTimeRef: {current: 1500 * SECOND},
+		activeModal: null,
+		controlsVisible: false,
+		hideControls: () => {},
+		showControls: () => {},
+		onSeekToSegmentEnd: () => {},
+		onPlayNext: () => {},
+		onPausePlayback: () => {}
+	})).result;
+
+	test('hides the prompt after the time set', () => {
+		const result = setupAutoHide();
+		act(() => result.current.checkSegments(1 * SECOND));
+		expect(result.current.skipSegment).not.toBeNull();
+		now += 6000;
+		act(() => result.current.checkSegments(7 * SECOND));
+		expect(result.current.skipSegment).toBeNull();
+	});
+
+	test('the next episode gets its prompt even when its intro starts at the same tick', () => {
+		const result = setupAutoHide();
+		act(() => result.current.checkSegments(1 * SECOND));
+		now += 6000;
+		act(() => result.current.checkSegments(7 * SECOND));
+		expect(result.current.skipSegment).toBeNull();
+
+		// The next episode: a new load, then its intro at the same position as the last one's.
+		now += 120000;
+		act(() => result.current.resetPopups());
+		act(() => result.current.checkSegments(1 * SECOND));
+		expect(result.current.skipSegment).not.toBeNull();
+	});
+
+	test('an intro that comes round again after leaving it gets a fresh clock', () => {
+		const result = setupAutoHide();
+		act(() => result.current.checkSegments(1 * SECOND));
+		now += 6000;
+		act(() => result.current.checkSegments(70 * SECOND));
+		now += 60000;
+		act(() => result.current.checkSegments(2 * SECOND));
+		expect(result.current.skipSegment).not.toBeNull();
+	});
+});
