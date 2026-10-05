@@ -28,6 +28,7 @@ let mockSeerr = {isEnabled: false};
 jest.mock('../../context/SeerrContext', () => ({useSeerr: () => mockSeerr}));
 jest.mock('../../utils/seerrHomeRows', () => ({normalizeMediaItem: (result) => ({Id: `seerr-${result.id}`, Type: 'Movie', Name: result.title, _seerrMediaType: result.mediaType})}));
 jest.mock('../../services/connectionPool', () => ({}));
+jest.mock('../../services/serverLogger', () => ({__esModule: true, default: {info: jest.fn(), LOG_CATEGORIES: {APP: 'Application'}}}));
 jest.mock('../../services/gamesApi', () => ({}));
 jest.mock('../../services/parentalControls', () => ({withoutBlockedItems: (items) => items}));
 jest.mock('../../hooks/useStorage', () => () => [[], mockSave]);

@@ -24,6 +24,7 @@ import {foldForSearch} from '../../utils/accentFolding';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
 import {closeTvKeyboard} from '../../components/TVKeyboard/keyboardBus';
 import useStorage from '../../hooks/useStorage';
+import serverLogger from '../../services/serverLogger';
 import {
 	initialCardCount,
 	expandedCardCount,
@@ -215,9 +216,14 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// over once there is something to show. It stays put when the viewer has already gone to another
 	// tab or into the results, and carries focus along only if that sat on a tab pill.
 	const openOnSeerr = useCallback((count) => {
-		if (!count || settings.searchDefaultTab !== 'seerr' || activeTabRef.current !== 'all' || tabPickedRef.current) return;
+		if (settings.searchDefaultTab !== 'seerr') return;
+		const stay = (reason) => serverLogger.info(serverLogger.LOG_CATEGORIES.APP, 'Search: stayed on the open tab', {reason, seerrResults: count});
+		if (!count) return stay('Seerr found nothing');
+		if (activeTabRef.current !== 'all') return stay('another tab is open');
+		if (tabPickedRef.current) return stay('the viewer picked a tab');
 		const focused = document.activeElement;
-		if (focused && focused.closest && focused.closest('[data-spotlight-id^="search-row-"], [data-spotlight-id="search-grid"]')) return;
+		if (focused && focused.closest && focused.closest('[data-spotlight-id^="search-row-"], [data-spotlight-id="search-grid"]')) return stay('the viewer is in the results');
+		serverLogger.info(serverLogger.LOG_CATEGORIES.APP, 'Search: opened on Seerr', {seerrResults: count});
 		const onTabs = Boolean(focused && focused.closest && focused.closest('[data-spotlight-id="search-tabs"]'));
 		setActiveTab('seerr');
 		if (onTabs) {
