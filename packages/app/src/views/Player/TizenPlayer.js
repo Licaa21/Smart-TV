@@ -1293,6 +1293,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const serverAudio = result.audioStreams?.find(s => s.index === result.defaultAudioStreamIndex);
 				const fileDefaultAudio = result.audioStreams?.find(s => s.isDefault);
 				const autoAudio = preferredAudio || serverAudio || fileDefaultAudio;
+				serverLogger.playback('Audio: starting track chosen', {
+					picked: autoAudio ? `${autoAudio.index}:${autoAudio.language || '?'}:${autoAudio.codec || '?'}` : null,
+					because: rememberedAudio ? 'remembered for the series' : (preferredAudio ? 'language and codec settings' : (serverAudio ? 'server default' : 'file default')),
+					codecOrderSaved: Array.isArray(settings.audioCodecOrder) && settings.audioCodecOrder.length > 0,
+					tracks: (result.audioStreams || []).map((s) => `${s.index}:${s.language || '?'}:${s.codec || '?'}:${s.channels || '?'}ch`)
+				});
 
 				// A remux or transcode carries only the track the server built it around, so
 				// switching on the player cant reach any other one. Direct play gets the
