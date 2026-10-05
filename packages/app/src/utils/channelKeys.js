@@ -1,10 +1,10 @@
 import {getPlatform} from '../platform';
 
-// The remote's channel keys. Tizen sends them as ChannelUp and ChannelDown, and webOS as page up
-// and page down. A platform with no channel keys never matches by code.
+// The remote's channel keys. Tizen sends them as ChannelUp and ChannelDown. webOS does not hand
+// them to apps, and its page up and page down are not channel keys, so a platform with no channel
+// keys never matches by code.
 const CHANNEL_CODES = {
-	tizen: {up: 427, down: 428},
-	webos: {up: 33, down: 34}
+	tizen: {up: 427, down: 428}
 };
 
 // 1 for channel up, -1 for channel down, 0 for any other key.
