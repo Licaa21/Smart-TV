@@ -1120,12 +1120,19 @@ export const getPreviousEpisode = async (item) => {
 		const previous = findPreviousInSeason(episodesResult.Items, item.Id);
 		if (previous) return previous;
 
+		// A season with nothing playable in it, only missing episodes, is stepped over.
 		const seasonsResult = await api.getSeasons(item.SeriesId);
-		const previousSeason = findPreviousSeason(seasonsResult.Items, seasonId, item.ParentIndexNumber);
-		if (!previousSeason) return null;
-
-		const previousSeasonEpisodes = await api.getEpisodes(item.SeriesId, previousSeason.Id);
-		return lastPlayableEpisode(previousSeasonEpisodes.Items);
+		let fromSeasonId = seasonId;
+		let fromSeasonNumber = item.ParentIndexNumber;
+		for (;;) {
+			const previousSeason = findPreviousSeason(seasonsResult.Items, fromSeasonId, fromSeasonNumber);
+			if (!previousSeason) return null;
+			const previousSeasonEpisodes = await api.getEpisodes(item.SeriesId, previousSeason.Id);
+			const last = lastPlayableEpisode(previousSeasonEpisodes.Items);
+			if (last) return last;
+			fromSeasonId = previousSeason.Id;
+			fromSeasonNumber = previousSeason.IndexNumber;
+		}
 	} catch (e) {
 		console.warn('[playback] Failed to get previous episode:', e.message);
 		return null;

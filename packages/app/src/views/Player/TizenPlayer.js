@@ -1226,6 +1226,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			setCurrentSubtitleText(null);
 			setSelectedSubtitleIndex(-1);
 			setMediaSegments(null);
+			setPreviousEpisode(null);
 			setVideoAspectRatio(null);
 			resetPopups(); // eslint-disable-line no-use-before-define
 
@@ -1528,7 +1529,6 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 							if (stillCurrent()) setNextEpisode(next);
 						});
 					}
-					setPreviousEpisode(null);
 					if (item.Type === 'Episode') {
 						playback.getPreviousEpisode(item).then((previous) => {
 							if (stillCurrent()) setPreviousEpisode(previous);

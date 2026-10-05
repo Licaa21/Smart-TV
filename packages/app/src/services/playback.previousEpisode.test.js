@@ -33,6 +33,17 @@ describe('getPreviousEpisode', () => {
 		expect((await getPreviousEpisode(current)).Id).toBe('b');
 	});
 
+	test('steps over a season that has nothing playable in it', async () => {
+		mockApi.getEpisodes.mockImplementation(async (series, season) => {
+			if (season === 's3') return {Items: [ep('e1', 1)]};
+			if (season === 's2') return {Items: [ep('x', 1, {LocationType: 'Virtual'})]};
+			return {Items: [ep('a', 1), ep('b', 2)]};
+		});
+		mockApi.getSeasons.mockResolvedValue({Items: [{Id: 's1', IndexNumber: 1}, {Id: 's2', IndexNumber: 2}, {Id: 's3', IndexNumber: 3}]});
+		const fromSeasonThree = {...current, SeasonId: 's3', ParentIndexNumber: 3};
+		expect((await getPreviousEpisode(fromSeasonThree)).Id).toBe('b');
+	});
+
 	test('returns null on the first episode of the first season', async () => {
 		mockApi.getEpisodes.mockResolvedValue({Items: [ep('e1', 1)]});
 		mockApi.getSeasons.mockResolvedValue({Items: [{Id: 's0', IndexNumber: 0}, {Id: 's2', IndexNumber: 2}]});

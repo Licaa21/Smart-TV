@@ -1139,7 +1139,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						playback.getNextEpisode(item).then(setNextEpisode);
 					}
 					if (item.Type === 'Episode') {
-						playback.getPreviousEpisode(item).then(setPreviousEpisode);
+						playback.getPreviousEpisode(item).then((previous) => {
+							if (!cancelled) setPreviousEpisode(previous);
+						});
 					}
 				}
 
