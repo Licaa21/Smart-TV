@@ -1,4 +1,4 @@
-import {GAMEPAD_KEYS, installGamepadKeys, raiseHostBack} from '../../../platform-xbox/src/keys';
+import {GAMEPAD_KEYS, giveControllerToGame, installGamepadKeys, raiseHostBack} from '../../../platform-xbox/src/keys';
 
 const press = (target, keyCode, type = 'keydown', init = {}) => {
 	const event = new window.KeyboardEvent(type, {keyCode, which: keyCode, bubbles: true, cancelable: true, ...init});
@@ -43,7 +43,8 @@ describe('the Xbox gamepad keys', () => {
 		[203, 38, 'ArrowUp'], [204, 40, 'ArrowDown'], [205, 37, 'ArrowLeft'], [206, 39, 'ArrowRight'],
 		[211, 38, 'ArrowUp'], [212, 40, 'ArrowDown'], [213, 39, 'ArrowRight'], [214, 37, 'ArrowLeft'],
 		[138, 38, 'ArrowUp'], [139, 40, 'ArrowDown'], [140, 37, 'ArrowLeft'], [141, 39, 'ArrowRight'],
-		[195, 13, 'Enter'], [142, 13, 'Enter'], [196, 27, 'Escape'], [143, 27, 'Escape'], [207, 93, 'ContextMenu']
+		[195, 13, 'Enter'], [142, 13, 'Enter'], [196, 27, 'Escape'], [143, 27, 'Escape'], [207, 93, 'ContextMenu'],
+		[201, 227, 'MediaRewind'], [202, 228, 'MediaFastForward']
 	])('gamepad code %i reaches the app once, as %i', (gamepad, keyCode, key) => {
 		const raw = press(button, gamepad);
 		expect(seen).toEqual([{type: 'keydown', keyCode, key, repeat: false}]);
@@ -77,8 +78,60 @@ describe('the Xbox gamepad keys', () => {
 
 	test('every code in the table stands for a key the app handles', () => {
 		for (const standard of Object.values(GAMEPAD_KEYS)) {
-			expect([13, 27, 37, 38, 39, 40, 93]).toContain(standard.keyCode);
+			expect([13, 27, 37, 38, 39, 40, 93, 227, 228]).toContain(standard.keyCode);
 		}
+	});
+
+	describe('while a game has the controller', () => {
+		const withGamepads = (pads) => Object.defineProperty(window.navigator, 'getGamepads', {configurable: true, value: () => pads});
+
+		beforeEach(() => {
+			withGamepads([null, {buttons: []}]);
+			giveControllerToGame(true);
+		});
+
+		afterEach(() => {
+			giveControllerToGame(false);
+			delete window.navigator.getGamepads;
+		});
+
+		test('its buttons dont reach the app as keys, in either form the console sends them', () => {
+			const raw = press(button, 195);
+			press(button, 203);
+			press(button, 198);
+			press(button, 40, 'keydown', {key: 'Unidentified'});
+			press(button, 27, 'keydown', {key: 'Unidentified'});
+			press(button, 27, 'keyup', {key: 'Unidentified'});
+			expect(seen).toEqual([]);
+			expect(raw.defaultPrevented).toBe(true);
+		});
+
+		test('a keyboard and a media remote still get through', () => {
+			press(button, 40, 'keydown', {key: 'ArrowDown'});
+			press(button, 27, 'keydown', {key: 'Escape'});
+			press(button, 143);
+			expect(seen.map((entry) => entry.keyCode)).toEqual([40, 27, 27]);
+		});
+
+		test('a B the game took isnt raised again when the host reports it', () => {
+			press(button, 27, 'keydown', {key: 'Unidentified'});
+			now += 50;
+			expect(raiseHostBack()).toBe(false);
+			expect(seen).toEqual([]);
+		});
+
+		test('the keys come through when the page sees no gamepad', () => {
+			withGamepads([null, null]);
+			press(button, 195);
+			press(button, 27, 'keydown', {key: 'Unidentified'});
+			expect(seen.map((entry) => entry.keyCode)).toEqual([13, 27]);
+		});
+
+		test('they come through again once the game gives it back', () => {
+			giveControllerToGame(false);
+			press(button, 195);
+			expect(seen.map((entry) => entry.keyCode)).toEqual([13]);
+		});
 	});
 
 	test('a Back the host reports is raised as a press and a release', () => {

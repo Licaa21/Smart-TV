@@ -9,6 +9,8 @@ import {getSharedVideoElement as sharedVideoElement} from '@moonfin/platform-web
 import {onShellMessage, postToShell} from './bridge';
 import {pressOnFocused, raiseHostBack} from './keys';
 
+export {giveControllerToGame} from './keys';
+
 export {
 	getMimeType,
 	canRenderEmbeddedPgsInBand,

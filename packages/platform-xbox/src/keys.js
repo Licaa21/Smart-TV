@@ -16,6 +16,8 @@ const RIGHT = {keyCode: 39, key: 'ArrowRight', code: 'ArrowRight'};
 const ENTER = {keyCode: 13, key: 'Enter', code: 'Enter'};
 const BACK = {keyCode: 27, key: 'Escape', code: 'Escape'};
 const MENU = {keyCode: 93, key: 'ContextMenu', code: 'ContextMenu'};
+const REWIND = {keyCode: 227, key: 'MediaRewind', code: 'MediaRewind'};
+const FAST_FORWARD = {keyCode: 228, key: 'MediaFastForward', code: 'MediaFastForward'};
 
 export const GAMEPAD_KEYS = {
 	// Navigation keys, sent by a media remote
@@ -28,6 +30,9 @@ export const GAMEPAD_KEYS = {
 	// A and B
 	195: ENTER,
 	196: BACK,
+	// Left and right trigger
+	201: REWIND,
+	202: FAST_FORWARD,
 	// D-pad
 	203: UP,
 	204: DOWN,
@@ -67,8 +72,31 @@ export const pressOnFocused = (standard) => {
 	raise(target, 'keyup', standard);
 };
 
+// A game reads the controller through the Gamepad API, so its buttons arriving as
+// keys too would press Enter in the game and open its menu on every B. They stop
+// here while a game has the controller and the page can see a gamepad.
+let gameHasController = false;
+
+export const giveControllerToGame = (given) => {
+	gameHasController = !!given;
+};
+
+// The controller's own codes run from A to the right stick. What the console has
+// already turned into an arrow or Escape comes without the name a keyboard gives.
+const CONSOLE_MADE = [BACK.keyCode, LEFT.keyCode, UP.keyCode, RIGHT.keyCode, DOWN.keyCode];
+const fromController = (event, keyCode) => (keyCode >= 195 && keyCode <= 218) ||
+	(event.key === 'Unidentified' && CONSOLE_MADE.includes(keyCode));
+
+const gamepadInReach = () => Array.from(navigator.getGamepads?.() || []).some(Boolean);
+
 const translate = (event) => {
 	const keyCode = event.keyCode || event.which;
+	if (gameHasController && fromController(event, keyCode) && gamepadInReach()) {
+		if (event.type === 'keydown' && keyCode === BACK.keyCode) lastPageBack = Date.now();
+		event.stopImmediatePropagation();
+		event.preventDefault();
+		return;
+	}
 	const standard = GAMEPAD_KEYS[keyCode];
 	if (!standard) {
 		if (event.type === 'keydown' && event.isTrusted && keyCode === BACK.keyCode) lastPageBack = Date.now();

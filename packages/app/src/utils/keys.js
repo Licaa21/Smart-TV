@@ -61,7 +61,8 @@ const VEGA_KEYS = {
 
 // The controller's own key codes are turned into arrows, Enter, Escape and the
 // context menu key before the app sees them, see @moonfin/platform-xbox/keys.
-// The transport keys are the ones the host raises for the media remote.
+// The transport keys are the ones the host raises for the media remote, and the
+// triggers come as its rewind and fast forward.
 const XBOX_KEYS = {
 	BACK: 27,
 	MENU: 93,

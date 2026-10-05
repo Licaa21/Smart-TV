@@ -11,7 +11,7 @@ import {iconViewBox} from '../../components/icons/iconViewBox';
 import useGamepadButtons from '../../hooks/useGamepadButtons';
 import * as gamesApi from '../../services/gamesApi';
 import serverLogger from '../../services/serverLogger';
-import {initVideo, keepScreenOn, setupVisibilityHandler} from '../../services/video';
+import {giveControllerToGame, initVideo, keepScreenOn, setupVisibilityHandler} from '../../services/video';
 import * as ejs from '../../utils/emulatorjs';
 import {gameStateKey, loadGameStateWithMigration} from '../../utils/gameSaves';
 import {KEYS, isBackKey} from '../../utils/keys';
@@ -414,6 +414,14 @@ const GamePlayer = ({library, game, startFresh, onBack, backHandlerRef}) => {
 		if (ready) Spotlight.pause();
 		return () => Spotlight.resume();
 	}, [ready]);
+
+	// A running game has the controller to itself where it would otherwise get it as keys
+	// too. An error is left to the keys, which are all that can dismiss it.
+	useEffect(() => {
+		if (!ready || error) return undefined;
+		giveControllerToGame(true);
+		return () => giveControllerToGame(false);
+	}, [ready, error]);
 
 	// Keep the TV screen awake while the game runs. initVideo() loads the platform module
 	// first, since keepScreenOn throws before it loads.

@@ -34,6 +34,10 @@ export const waitForDecoderRelease = (...args) => impl.waitForDecoderRelease(...
 export const getSharedVideoElement = (...args) => impl.getSharedVideoElement(...args);
 export const leavesPlayerInBackground = () => !!impl.leavesPlayerInBackground;
 
+// Only Xbox hands the page its controller as keys as well, which a game reading the
+// controller itself would get twice.
+export const giveControllerToGame = (given) => impl?.giveControllerToGame?.(given);
+
 // Only webOS has a service bridge to bring up before the player can use it.
 export const initPlayerPlatform = () => (impl.initLunaAPI ? impl.initLunaAPI() : Promise.resolve(false));
 
