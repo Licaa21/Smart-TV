@@ -1,4 +1,5 @@
 import {useState, useEffect, useCallback, useRef} from 'react';
+import Spotlight from '@enact/spotlight';
 
 import {stopPlaybackForTrailer} from '../../utils/trailerPlayback';
 import {
@@ -6,11 +7,10 @@ import {
 	needsHlsJs, noteNativeManifest, playsManifestNatively, watchManifestPlayback
 } from '../../services/youtubeTrailer';
 import serverLogger from '../../services/serverLogger';
-import {isBackKey} from '../../utils/keys';
 
 // Plays a title's trailer. A local one goes to the real player, and a YouTube link plays in
 // an overlay here, since the player has no way to open a stream that isn't on the server.
-const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly}) => {
+const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly, backRef}) => {
 	const [trailerOverlay, setTrailerOverlay] = useState(null);
 	const [trailerStreamUrl, setTrailerStreamUrl] = useState(null);
 
@@ -91,15 +91,23 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly}
 		}
 		setTrailerOverlay(null);
 		setTrailerStreamUrl(null);
+		window.requestAnimationFrame(() => Spotlight.focus('details-action-buttons'));
 	}, [clearSponsorSkip]);
 
-	const handleTrailerOverlayKeyDown = useCallback((e) => {
-		if (isBackKey(e)) {
-			e.preventDefault();
-			e.stopPropagation();
+	// BACK is settled by the app before the overlay ever sees the key, so the
+	// trailer answers through the detail screen's handler like its other overlays.
+	useEffect(() => {
+		if (!backRef) return undefined;
+		const handler = () => {
+			if (!trailerOverlay) return false;
 			handleCloseTrailer();
-		}
-	}, [handleCloseTrailer]);
+			return true;
+		};
+		backRef.current = handler;
+		return () => {
+			if (backRef.current === handler) backRef.current = null;
+		};
+	}, [backRef, trailerOverlay, handleCloseTrailer]);
 
 	useEffect(() => {
 		if (!trailerOverlay) {
@@ -213,8 +221,7 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly}
 		trailerStreamUrl,
 		trailerVideoRef,
 		handleTrailer,
-		handleCloseTrailer,
-		handleTrailerOverlayKeyDown
+		handleCloseTrailer
 	};
 };
 

@@ -47,6 +47,8 @@ import NextUpOverlay from './NextUpOverlay';
 import SkipSegmentOverlay from './SkipSegmentOverlay';
 import StillWatchingDialog from './StillWatchingDialog';
 import useBufferingAnimation from './useBufferingAnimation';
+import useLiveRecovery, {reopenLiveChannel} from './useLiveRecovery';
+import LiveFailedCard from './LiveFailedCard';
 import LoadingAnimationLayer from '../../components/LoadingAnimation';
 import {
 	toSubtitleLanguage,
@@ -235,6 +237,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// Refs for stable callbacks inside AVPlay listener (avoids stale closures)
 	const handleEndedCallbackRef = useRef(null);
 	const handleErrorCallbackRef = useRef(null);
+	// The AVPlay listeners are set before the recovery exists, so they reach it through this.
+	const liveRecoveryRef = useRef(null);
 	// Ref for time-update logic (reassigned each render to get fresh state)
 	const timeUpdateLogicRef = useRef(null);
 	// Deferred seek: only execute actual avplaySeek after user stops pressing arrows
@@ -698,9 +702,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		};
 
 		avplaySetListener({
-			onbufferingstart: () => { setIsBuffering(true); },
+			onbufferingstart: () => {
+				setIsBuffering(true);
+				liveRecoveryRef.current?.update({buffering: true});
+			},
 			onbufferingcomplete: () => {
 				setIsBuffering(false);
+				liveRecoveryRef.current?.update({buffering: false});
 				latchResolve();
 				runDeferredResumeSeek();
 				applyPendingTracksRef.current?.();
@@ -724,6 +732,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			},
 			oncurrentplaytime: () => {
 				if (pausedErrorRef.current) pausedErrorRef.current = null;
+				liveRecoveryRef.current?.update({playing: true});
 				const now = Date.now();
 				if (now - lastTrackAttemptRef.current >= 500) {
 					lastTrackAttemptRef.current = now;
@@ -995,6 +1004,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	useEffect(() => {
 		isPausedRef.current = isPaused;
+		if (isPaused) liveRecoveryRef.current?.update({playing: false});
+		liveRecoveryRef.current?.setPaused(isPaused);
 	}, [isPaused]);
 
 	useEffect(() => {
@@ -1158,6 +1169,47 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 	}, [waitForSubtitleCanvas]);
 
+	const [tuneRevision, setTuneRevision] = useState(0);
+	const directAllowed = !forceTranscode && !settings.preferTranscode;
+
+	const releaseLiveChannel = useCallback(async () => {
+		stopTimeUpdatePolling();
+		cleanupAVPlay();
+		avplayReadyRef.current = false;
+		await playback.reportStop(positionRef.current);
+	}, [stopTimeUpdatePolling]);
+
+	const reResolveLiveChannel = useCallback(async (route) => {
+		stopTimeUpdatePolling();
+		cleanupAVPlay();
+		avplayReadyRef.current = false;
+		const result = await reopenLiveChannel({
+			item,
+			mediaSourceId,
+			maxBitrate: selectedQuality || settings.maxBitrate,
+			stereoUpmixEnabled: settings.stereoUpmixEnabled,
+			directAllowed,
+			wasDirectPlay: playMethod === playback.PlayMethod.DirectPlay,
+			positionTicks: positionRef.current
+		}, route);
+		if (!await restartFromResult(result, 0)) throw new Error('No playable stream for the channel');
+	}, [item, playMethod, selectedQuality, settings.maxBitrate, settings.stereoUpmixEnabled, mediaSourceId, directAllowed, restartFromResult, stopTimeUpdatePolling]);
+
+	const {recovery: liveRecovery, reconnecting} = useLiveRecovery({
+		isLiveTV,
+		itemId: item.Id,
+		reResolve: reResolveLiveChannel,
+		release: releaseLiveChannel,
+		onLost: () => setError($L('Failed to play {name}').replace('{name}', item.Name || '')),
+		isDirectPlay: () => playMethod === playback.PlayMethod.DirectPlay
+	});
+	liveRecoveryRef.current = liveRecovery;
+
+	const handleRetryChannel = useCallback(() => {
+		liveRecovery?.abandon('the viewer retried the channel');
+		setTuneRevision((revision) => revision + 1);
+	}, [liveRecovery]);
+
 	// ==============================
 	// Load Media & Start AVPlay
 	// ==============================
@@ -1194,9 +1246,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const playbackInfoOptions = {
 					startPositionTicks: startPosition,
 					maxBitrate: effectiveBitrate,
-					preferTranscode: settings.preferTranscode,
-					enableDirectPlay: !forceTranscode,
-					enableDirectStream: !forceTranscode,
+					enableDirectPlay: directAllowed,
+					enableDirectStream: directAllowed,
 					forceDirectPlay: (isLiveTV || forceTranscode) ? false : settings.forceDirectPlay,
 					item: item,
 					mediaSourceId: initialMediaSourceId,
@@ -1503,6 +1554,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					shouldAbort: () => !stillCurrent()
 				});
 				if (!stillCurrent()) return;
+				liveRecoveryRef.current?.tuned();
 
 				// keep firmware from auto enabling the first embedded track when
 				// nothing renders natively
@@ -1597,7 +1649,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			burnInSubtitleRef.current = null;
 		};
 	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [item, resume, onPlayNext, selectedQuality, settings.maxBitrate, settings.preferTranscode, settings.forceDirectPlay, forceTranscode, settings.subtitleMode, settings.introAction, settings.outroAction]);
+	}, [item, resume, onPlayNext, selectedQuality, settings.maxBitrate, settings.preferTranscode, settings.forceDirectPlay, forceTranscode, settings.subtitleMode, settings.introAction, settings.outroAction, tuneRevision]);
 
 	// Another client can queue more while this plays, and what it puts behind this plays next.
 	useEffect(() => {
@@ -1768,6 +1820,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// Playback Event Handlers (via AVPlay listener refs)
 	// ==============================
 	const handleEnded = useCallback(async () => {
+		// A live stream has no end, so reaching one means the source starved.
+		if (liveRecovery) {
+			liveRecovery.recover('completed');
+			return;
+		}
+
 		stopTimeUpdatePolling();
 		await playback.reportStop(positionRef.current);
 
@@ -1789,10 +1847,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		} else {
 			onEnded?.();
 		}
-	}, [onEnded, onPlayNext, nextEpisode, stopTimeUpdatePolling, audioPlaylist, repeatMode, restartCurrent, getNextStep, settings.autoPlay, item]);
+	}, [onEnded, onPlayNext, nextEpisode, stopTimeUpdatePolling, audioPlaylist, repeatMode, restartCurrent, getNextStep, settings.autoPlay, item, liveRecovery]);
 
 	const handleError = useCallback(async () => {
 		console.error('[Player] Playback error');
+
+		// A channel past its tune is the live recovery's to bring back.
+		if (liveRecovery?.engaged()) {
+			liveRecovery.recover('source-error');
+			return;
+		}
 
 		// A broken pre-roll skips to the feature rather than surfacing an error or
 		// spending the transcode fallback on it.
@@ -1844,7 +1908,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 
 		setError($L('Playback failed. The file format may not be supported.'));
-	}, [hasTriedTranscode, playMethod, item, selectedQuality, settings.maxBitrate, settings.stereoUpmixEnabled, restartFromResult, mediaSourceId, videoQueue, onPlayNext]);
+	}, [hasTriedTranscode, playMethod, item, selectedQuality, settings.maxBitrate, settings.stereoUpmixEnabled, restartFromResult, mediaSourceId, videoQueue, onPlayNext, liveRecovery]);
 
 	// Reload the current item from its last position, used when a suspended
 	// session cant be restored after the app returns to the foreground
@@ -2881,6 +2945,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				return;
 			}
 
+			// The rest of the remote belongs to a failed channel's Retry.
+			if (error && isLiveTV) return;
+
 			// Left/Right when controls hidden -> show controls and focus on seekbar
 			if (!controlsVisible && !activeModal) {
 				if ((key === 'Enter' || e.keyCode === 13) && (skipSegment || showSkipCredits || showNextEpisode)) {
@@ -3005,11 +3072,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		return (
 			<div className={css.container}>
 				{channelCarousel}
-				<div className={css.error}>
-					<h2>{$L('Playback Error')}</h2>
-					<p>{error}</p>
-					<Button onClick={onBack}>{$L('Go Back')}</Button>
-				</div>
+				{isLiveTV ? (
+					!carouselProps && <LiveFailedCard channelName={item.Name} onRetry={handleRetryChannel} />
+				) : (
+					<div className={css.error}>
+						<h2>{$L('Playback Error')}</h2>
+						<p>{error}</p>
+						<Button onClick={onBack}>{$L('Go Back')}</Button>
+					</div>
+				)}
 			</div>
 		);
 	}
@@ -3074,7 +3145,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			)}
 
 
-			{showBuffering && <LoadingAnimationLayer label={$L('Loading Stream...')} />}
+			{(reconnecting || showBuffering) && <LoadingAnimationLayer label={reconnecting || $L('Loading Stream...')} />}
 
 			{isPaused && settings.showDescriptionOnPause && item?.Overview && !isAudioMode && !activeModal && !controlsVisible && (
 				<div className={css.pauseDescriptionOverlay}>

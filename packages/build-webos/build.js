@@ -75,6 +75,7 @@ const appPkg = require(path.join(APP_DIR, 'package.json'));
 const ENACT_ALIAS = JSON.stringify({
 	'@moonfin/platform-webos': path.resolve(__dirname, '..', 'platform-webos', 'src'),
 	'@moonfin/platform-tizen': path.resolve(__dirname, '..', 'platform-tizen', 'src'),
+	'@moonfin/platform-vega': path.resolve(__dirname, '..', 'platform-vega', 'src'),
 	'@moonfin/app': path.resolve(__dirname, '..', 'app')
 });
 

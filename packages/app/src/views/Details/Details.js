@@ -199,20 +199,9 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 		effectiveApi,
 		onPlay,
 		trailerMuted: settings.featuredTrailerMuted,
-		seerrOnly
+		seerrOnly,
+		backRef: trailerBackRef
 	});
-
-	// BACK while a trailer plays closes the trailer and stays on this title. The app hears the
-	// key before the overlay does, so without this it would leave the screen altogether.
-	const {trailerOverlay, handleCloseTrailer} = trailer;
-	useEffect(() => {
-		trailerBackRef.current = () => {
-			if (!trailerOverlay) return false;
-			handleCloseTrailer();
-			return true;
-		};
-		return () => { trailerBackRef.current = null; };
-	}, [trailerOverlay, handleCloseTrailer]);
 
 	const canChangeArtwork = useMemo(() => {
 		if (!item) return false;
@@ -954,7 +943,6 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 			videoRef={trailer.trailerVideoRef}
 			muted={settings.featuredTrailerMuted}
 			onClose={trailer.handleCloseTrailer}
-			onKeyDown={trailer.handleTrailerOverlayKeyDown}
 		/>
 	);
 

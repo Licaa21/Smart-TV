@@ -1,0 +1,16 @@
+{
+	"name": "@moonfin/platform-vega",
+	"version": "2.9.0",
+	"private": true,
+	"main": "src/index.js",
+	"exports": {
+		".": "./src/index.js",
+		"./bridge": "./src/bridge.js",
+		"./storage": "./src/storage.js",
+		"./deviceProfile": "./src/deviceProfile.js",
+		"./deviceInfo": "./src/deviceInfo.js",
+		"./video": "./src/video.js",
+		"./volume": "./src/volume.js",
+		"./countryCode": "./src/countryCode.js"
+	}
+}

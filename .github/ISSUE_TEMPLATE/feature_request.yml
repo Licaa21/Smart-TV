@@ -30,7 +30,8 @@ body:
       options:
         - Tizen (Samsung)
         - webOS (LG)
-        - Both / Not platform-specific
+        - Vega (Fire TV)
+        - All / Not platform-specific
     validations:
       required: true
 

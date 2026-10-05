@@ -30,7 +30,8 @@ List the key changes included in this PR.
 ## Platform
 - [ ] Tizen (Samsung)
 - [ ] webOS (LG)
-- [ ] Both / Shared code
+- [ ] Vega (Fire TV)
+- [ ] All / Shared code
 
 ## Testing
 Describe how this change was tested.

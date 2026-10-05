@@ -14,7 +14,7 @@ export const INITIAL_PLUGIN_SECTION_RENDER_COUNT = 60;
 export const PLUGIN_SECTION_RENDER_STEP = 60;
 
 export const isHomeRowVisibleByGates = (rowId, settings) => {
-	if (isPluginSourcedRow(rowId)) return settings.useMoonfinPlugin;
+	if (isPluginSourcedRow(rowId)) return Boolean(settings.useMoonfinPlugin) && isRowEnabledBySetting(rowId, settings);
 	return isRowEnabledBySetting(rowId, settings);
 };
 

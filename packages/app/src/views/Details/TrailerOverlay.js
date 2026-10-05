@@ -8,13 +8,13 @@ import css from './Details.module.less';
 
 // Sits on document.body rather than inside the page, so the detail screen's own stacking
 // and scrolling can't end up on top of a playing trailer.
-const TrailerOverlay = ({videoId, streamUrl, videoRef, muted, onClose, onKeyDown}) => {
+const TrailerOverlay = ({videoId, streamUrl, videoRef, muted, onClose}) => {
 	const stopPropagation = useCallback((e) => e.stopPropagation(), []);
 
 	if (!videoId) return null;
 
 	const content = (
-		<OverlayContainer className={css.trailerOverlay} onClick={onClose} onKeyDown={onKeyDown}>
+		<OverlayContainer className={css.trailerOverlay} onClick={onClose}>
 			<div className={css.trailerCloseHint}>{$L('Press BACK to close')}</div>
 			<div className={css.trailerIframeWrap} onClick={stopPropagation}>
 				{streamUrl ? (
@@ -26,6 +26,7 @@ const TrailerOverlay = ({videoId, streamUrl, videoRef, muted, onClose, onKeyDown
 						autoPlay
 						controls
 						playsInline
+						disableRemotePlayback
 						muted={muted}
 					/>
 				) : (

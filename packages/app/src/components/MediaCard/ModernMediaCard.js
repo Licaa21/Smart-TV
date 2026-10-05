@@ -6,6 +6,7 @@ import RatingsRow from '../RatingsRow';
 import {getImageUrl, toAbsoluteImageUrl} from '../../utils/helpers';
 import {useSettings} from '../../context/SettingsContext';
 import {getPlatform} from '../../platform';
+import {getPerfTier} from '../../utils/perfTier';
 import {isStaticLibraryCard, modernCardMetrics, getEpisodeLabels, getCardDisplayTitle} from './modernCardLayout';
 import SeerrIcon from '../icons/SeerrIcon';
 import {showsWatchedCheck} from '../../utils/playedState';
@@ -47,6 +48,16 @@ const getMetadataLine = (item) => {
 	return parts.join(' • ');
 };
 
+// The same speeds and curve Moonfin Core opens its modern cards with
+const EXPAND_MS = {extraSlow: 450, slow: 300, medium: 180, fast: 90, off: 0};
+const EXPAND_CURVE = 'cubic-bezier(0.65, 0, 0.35, 1)';
+
+// The lower tiers open the card instantly, as the rest of their effects go.
+const expandTransition = (speed) => {
+	const ms = getPerfTier() === 'high' ? EXPAND_MS[speed] || 0 : 0;
+	return ms ? `width ${ms}ms ${EXPAND_CURVE}` : 'none';
+};
+
 const ModernMediaCard = ({
 	item,
 	serverUrl,
@@ -65,6 +76,7 @@ const ModernMediaCard = ({
 	const {settings} = useSettings();
 	const focusTimeoutRef = useRef(null);
 	const platform = useMemo(() => getPlatform(), []);
+	const transition = expandTransition(settings.modernCardTransitionSpeed);
 
 	useEffect(() => {
 		return () => {
@@ -260,6 +272,7 @@ const ModernMediaCard = ({
 		item?._external === true ||
 		item?._seerr === true
 	);
+	const expanded = isFocused && canRenderExpanded;
 
 	const cardClassName = [
 		css.card,
@@ -278,7 +291,8 @@ const ModernMediaCard = ({
 			onClick={handleClick}
 			onFocus={handleFocus}
 			style={{
-				width: `${isFocused && canRenderExpanded ? expandedWidth : cardWidth}px`,
+				width: `${expanded ? expandedWidth : cardWidth}px`,
+				transition,
 				'--modern-card-image-height': `${imageHeight}px`,
 				'--modern-card-expanded-width': `${expandedWidth}px`
 			}}
@@ -368,7 +382,7 @@ const ModernMediaCard = ({
 				<div className={css.secondaryTitle}>{episodeLabels ? episodeLabels.short : item.Subtitle}</div>
 			) : null}
 
-			{isFocused && canRenderExpanded && (
+			{expanded && (
 				<div className={css.extendedSection} style={{width: `${expandedWidth}px`}}>
 					<RatingsRow
 						item={item}

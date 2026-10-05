@@ -120,11 +120,10 @@ const useDetailsModals = ({backHandlerRef, onArtworkClosed, seerrBackRef, overvi
 	// first refusal before the whole thing is dismissed. The Seerr popups and the expanded
 	// overview run off their own state, so they answer through refs rather than flags of ours.
 	// A Seerr popup floats over everything the detail styles draw, their own menus and section
-	// modals included, so it answers before them.
+	// modals included, so it answers before them, and a playing trailer covers the lot.
 	useEffect(() => {
 		if (!backHandlerRef) return;
 		const handler = () => {
-			// A trailer fills the whole screen, so BACK ends it before anything underneath.
 			if (trailerBackRef?.current?.()) return true;
 			if (seerrBackRef?.current?.()) return true;
 			if (spotlightBackRef?.current?.()) return true;

@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useRef} from 'react';
 
-import {KEYS} from './keys';
+import {KEYS, isMenuKey} from './keys';
 
 // Long enough that a normal press never trips it, short enough that the menu still
 // feels like a response to holding the button rather than a delay.
@@ -56,9 +56,15 @@ const useLongPress = (onLongPress, onClick) => {
 	}, [onLongPress]);
 
 	const handleKeyDown = useCallback((e) => {
+		if (isMenuKey(e)) {
+			if (!onLongPress) return;
+			e.preventDefault();
+			onLongPress();
+			return;
+		}
 		if (!isSelectKey(e)) return;
 		start();
-	}, [start]);
+	}, [start, onLongPress]);
 
 	const handleKeyUp = useCallback((e) => {
 		if (!isSelectKey(e)) return;

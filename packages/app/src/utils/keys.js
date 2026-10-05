@@ -41,18 +41,38 @@ const TIZEN_KEYS = {
 
 const WEBOS_KEYS = {
 	BACK: 461,
+	PLAY: 415,
+	PAUSE: 19,
+	STOP: 413,
+	REWIND: 412,
+	FAST_FORWARD: 417,
 };
+
+// The Vega WebView hands the page the back key as Escape and the transport keys
+// by their media key codes. The remote's menu key never reaches the page, so the
+// shell reports it and the platform raises it as the context menu key.
+const VEGA_KEYS = {
+	BACK: 27,
+	MENU: 93,
+	PLAY_PAUSE: 179,
+	REWIND: 227,
+	FAST_FORWARD: 228,
+};
+
+const PLATFORM_KEYS = {tizen: TIZEN_KEYS, webos: WEBOS_KEYS, vega: VEGA_KEYS};
 
 export const KEYS = {
 	...STANDARD_KEYS,
-	...(getPlatform() === 'tizen' ? TIZEN_KEYS : WEBOS_KEYS),
-	BACK: getPlatform() === 'tizen' ? 10009 : 461,
+	...(PLATFORM_KEYS[getPlatform()] || WEBOS_KEYS),
 };
 
 export const isBackKey = (e) => {
 	const code = e.keyCode || e.which;
 	return code === KEYS.BACK || code === 27 || code === 8;
 };
+
+// A remote with a menu key does with one press what the others do by holding OK.
+export const isMenuKey = (e) => KEYS.MENU !== undefined && (e.keyCode || e.which) === KEYS.MENU;
 
 export const isExitKey = (e) => {
 	if (getPlatform() !== 'tizen') return false;
