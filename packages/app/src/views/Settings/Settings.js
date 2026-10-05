@@ -1063,9 +1063,9 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		}
 	}), [
 		settings, capabilities, seerr, achievements, seerrLabel, isSeerr, serverUrl, ratingsResetArmed, resetRatingsSettings,
-		openAudioCodecs,
 		serverVersion, availableThemes, activeThemeId, openThemes, openThemeStore, openHomeRows,
 		openDetailButtons, openOsdButtons, openDetailMetadata, openDiagnostics,
+		openAudioCodecs,
 		openPinCode, openKidsMode, openLibraries, openLibraryOrder, openParentalControls, openQrLink, openRatingSources, openRowImageTypes, openExcludedGenres, openMediaBarLibraries,
 		openMediaBarCollections, openScreensaverLibraries, openScreensaverCollections, openScreensaverGenres,
 		openImdbLists, openSeasonalRow, openExternalTmdbLists, openExternalCalendars,
