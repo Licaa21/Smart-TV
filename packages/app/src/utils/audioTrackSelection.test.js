@@ -167,4 +167,10 @@ describe('codec order edge cases', () => {
 		const french = make(1, 'fre', 'truehd');
 		expect(selectPreferredAudioStream([german, french], {audioLanguage: 'jpn', audioCodecOrder: ['truehd', 'ac3']})).toBe(german);
 	});
+
+	test('preferring the default track does not let the codec order choose between languages', () => {
+		const german = {index: 0, language: 'ger', codec: 'ac3', channels: 6, isDefault: true};
+		const french = {index: 1, language: 'fre', codec: 'truehd', channels: 6, isDefault: true};
+		expect(selectPreferredAudioStream([german, french], {preferDefaultAudioTrack: true, audioCodecOrder: ['truehd', 'ac3']})).toBe(german);
+	});
 });

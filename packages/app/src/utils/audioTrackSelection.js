@@ -125,7 +125,8 @@ export const selectPreferredAudioStream = (audioStreams, settings = {}) => {
 
 	if (preferDefaultAudioTrack) {
 		const defaults = candidates.filter((stream) => stream.isDefault === true);
-		if (defaults.length) return rankAudioCandidates(defaults, prefs);
+		// The defaults can be in several languages, and the codec order must not pick between those.
+		if (defaults.length) return rankAudioCandidates(defaults, {...prefs, codecOrder: null});
 	}
 
 	for (const language of [audioLanguage, fallbackAudioLanguage, 'eng']) {
