@@ -10,8 +10,13 @@ jest.mock('../../services/jellyfinApi', () => ({
 }));
 // Ids blocked by the viewer's ratings at the moment, which can change after a list was fetched.
 let mockBlockedIds = new Set();
+const mockParentalListeners = new Set();
 jest.mock('../../services/parentalControls', () => ({
-	withoutBlockedItems: (items) => items.filter((entry) => !entry.Blocked && !mockBlockedIds.has(entry.Id))
+	withoutBlockedItems: (items) => items.filter((entry) => !entry.Blocked && !mockBlockedIds.has(entry.Id)),
+	subscribeParentalControls: (listener) => {
+		mockParentalListeners.add(listener);
+		return () => mockParentalListeners.delete(listener);
+	}
 }));
 
 const item = {Id: 'e2', Type: 'Episode', SeriesId: 'series', SeasonId: 's2'};
@@ -181,6 +186,16 @@ describe('useSeriesEpisodes', () => {
 			rerender({enabled: false});
 			await act(async () => { land(episodesOf('s2')); });
 			expect(result.current.episodes).toBeNull();
+		});
+
+		it('redraws the lists when the blocked ratings change while the browser is open', async () => {
+			const {result} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			await waitFor(() => expect(result.current.episodes).not.toBeNull());
+			expect(result.current.episodes.map((e) => e.Id)).toEqual(['s2-a']);
+
+			mockBlockedIds.add('s2-a');
+			act(() => mockParentalListeners.forEach((listener) => listener()));
+			expect(result.current.episodes).toEqual([]);
 		});
 	});
 });
