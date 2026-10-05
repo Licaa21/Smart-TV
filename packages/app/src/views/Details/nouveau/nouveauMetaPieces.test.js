@@ -31,6 +31,14 @@ describe('nouveauMetaPieces', () => {
 		expect(pieces).not.toContain('2h');
 	});
 
+	it('leaves the birthplace off when the viewer hid it', () => {
+		const pieces = nouveauMetaPieces({
+			item: {Type: 'Person', ProductionLocations: ['San Francisco, California']},
+			showsBirthplace: false
+		});
+		expect(pieces).not.toContain('San Francisco, California');
+	});
+
 	// A series has no runtime of its own, so the number belonging to one episode would be
 	// misleading sat next to the season count.
 	it('leaves the runtime off a series', () => {

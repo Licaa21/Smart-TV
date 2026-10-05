@@ -28,7 +28,7 @@ const seasonEndsAt = (episodes, settings) => {
 // it is about, and then what can be done with it.
 const NouveauHero = (props) => {
 	const {
-		item, settings, seerr, genres = [], year, officialRating, runtime, seasonCount,
+		item, settings, showsSection, seerr, genres = [], year, officialRating, runtime, seasonCount,
 		episodes = [], techBadges = [], techSize, logoUrl, onLogoError,
 		effectiveServerUrl, serverToken, overviewBackRef, isPerson
 	} = props;
@@ -69,10 +69,13 @@ const NouveauHero = (props) => {
 	const pieces = nouveauMetaPieces({
 		item, year, officialRating, runtime, seasonCount,
 		episodeCount: episodes.length,
-		endsAt: isSeason ? seasonEndsAt(episodes, settings) : ''
+		endsAt: isSeason ? seasonEndsAt(episodes, settings) : '',
+		showsBirthplace: showsSection('birthplace')
 	});
 
-	const showsOverview = Boolean(item.Overview) && !hidesMediaDescription(item, settings);
+	// On a person the overview is the biography, which has a switch of its own.
+	const showsOverview = Boolean(item.Overview) && !hidesMediaDescription(item, settings) &&
+		(!isPerson || showsSection('biography'));
 
 	const renderBranding = () => {
 		if (!logoUrl) return <h1 className={css.title}>{item.Name}</h1>;

@@ -63,7 +63,7 @@ const NO_PERSON_CREDITS = {appearances: [], crewCredits: []};
 
 const NouveauDetailContent = (props) => {
 	const {
-		item, settings, seerr, seerrOnly, isPerson, effectiveServerUrl,
+		item, settings, showsSection, seerr, seerrOnly, isPerson, effectiveServerUrl,
 		backdropUrl, similar = [], extras = [], cast = [], crew = [],
 		similarLoaded = false, handleChapterSelect, handleExtraSelect, onSelectPerson,
 		onSelectItem, onSelectSeerrCard, handleEpisodePlay, isSeries,
@@ -77,11 +77,14 @@ const NouveauDetailContent = (props) => {
 	const [personCredits, setPersonCredits] = useState(NO_PERSON_CREDITS);
 
 	// Seerr is an extra on a person page, so a failure leaves the rails the library can fill.
+	// Neither list is asked for when the viewer hid both.
+	const showsSeerrAppearances = showsSection('seerrPersonAppearances');
+	const showsSeerrCrew = showsSection('seerrPersonCrew');
 	useEffect(() => {
 		let cancelled = false;
 		const tmdbId = item.ProviderIds?.Tmdb;
 		setPersonCredits(NO_PERSON_CREDITS);
-		if (!isPerson || !tmdbId || !seerrEnabled) return undefined;
+		if (!isPerson || !tmdbId || !seerrEnabled || (!showsSeerrAppearances && !showsSeerrCrew)) return undefined;
 		loadSeerrPersonCredits(tmdbId)
 			.then((credits) => {
 				if (!cancelled) setPersonCredits(credits);
@@ -90,13 +93,18 @@ const NouveauDetailContent = (props) => {
 		return () => {
 			cancelled = true;
 		};
-	}, [item.Id, item.ProviderIds, isPerson, seerrEnabled]);
+	}, [item.Id, item.ProviderIds, isPerson, seerrEnabled, showsSeerrAppearances, showsSeerrCrew]);
 
 	// Keyed off the list itself rather than a filmography split upstream, which is rebuilt every
-	// render and would take the sections and the focus chain with it.
+	// render and would take the sections and the focus chain with it. A hidden rail has no
+	// items, so it never gets a stop.
 	const personRails = useMemo(
-		() => (isPerson ? buildPersonRails({filmography: splitFilmography(similar), ...personCredits}) : []),
-		[isPerson, similar, personCredits]
+		() => (isPerson ? buildPersonRails({
+			filmography: splitFilmography(similar, showsSection),
+			appearances: showsSeerrAppearances ? personCredits.appearances : [],
+			crewCredits: showsSeerrCrew ? personCredits.crewCredits : []
+		}) : []),
+		[isPerson, similar, personCredits, showsSection, showsSeerrAppearances, showsSeerrCrew]
 	);
 
 	const [windowWidth, setWindowWidth] = useState(
@@ -123,20 +131,23 @@ const NouveauDetailContent = (props) => {
 		'--gradient-scale': 0.3 + 0.7 * opacityFactor
 	};
 
+	const chapters = showsSection('chapters') ? item.Chapters : undefined;
+
 	const sections = useMemo(() => {
 		if (isPerson) return [...personRails.map((rail) => rail.id), SECTION_DETAILS];
 
 		const seerrState = seerr || {};
 		return nouveauSectionOrder({
 			type: item.Type,
-			chapterCount: item.Chapters?.length || 0,
+			chapterCount: chapters?.length || 0,
 			extraCount: extras.length,
 			actorCount: cast.length,
 			// Directors and writers arrive as one crew list here, so the gate weighs two counts.
 			directorCount: crew.length,
 			similarLoaded,
 			similarCount: similar.length,
-			seerrExpected: seerrDiscoveryExpected({
+			// With both Seerr lists hidden there is nothing to hold the slot open for.
+			seerrExpected: (showsSection('seerrSimilar') || showsSection('seerrRecommendations')) && seerrDiscoveryExpected({
 				type: item.Type,
 				seerrAvailable: Boolean(seerrState.isActive || seerrOnly),
 				tmdbId: item.ProviderIds?.Tmdb,
@@ -149,8 +160,8 @@ const NouveauDetailContent = (props) => {
 			seerrRecommendationCount: (seerrState.recommendationCards || []).length
 		});
 	}, [
-		item.Type, item.Chapters, item.ProviderIds, isPerson, personRails, extras.length, cast.length,
-		crew.length, similarLoaded, similar.length, seerrOnly, seerr
+		item.Type, chapters, item.ProviderIds, isPerson, personRails, extras.length, cast.length,
+		crew.length, similarLoaded, similar.length, seerrOnly, seerr, showsSection
 	]);
 
 	// A series arrives as one run of episodes and shows a season at a time, so the selector only
@@ -292,7 +303,7 @@ const NouveauDetailContent = (props) => {
 	const collectionWidth = collectionCardWidth(viewportWidth);
 	const collectionHeight = collectionCardHeight(collectionWidth);
 
-	const chapterCards = (item.Chapters || []).map((chapter, index) => ({
+	const chapterCards = (chapters || []).map((chapter, index) => ({
 		Id: `chapter-${index}`,
 		name: chapterDisplayName(chapter.Name, chapter.StartPositionTicks),
 		raw: chapter.Name,
@@ -337,11 +348,11 @@ const NouveauDetailContent = (props) => {
 	}, [sections, sortedPlaylist.length, discovery.related.length, discovery.recommendations.length]);
 
 	const chain = useMemo(() => buildNouveauChain({
-		hasOverview: Boolean(item.Overview),
+		hasOverview: Boolean(item.Overview) && (!isPerson || showsSection('biography')),
 		hasSeasonSelector: isSeries && seasonNumbers.length > 1,
 		rails: railNodes,
 		footerRows: sections.includes(SECTION_DETAILS) ? 1 : 0
-	}), [item.Overview, isSeries, seasonNumbers.length, railNodes, sections]);
+	}), [item.Overview, isPerson, showsSection, isSeries, seasonNumbers.length, railNodes, sections]);
 
 	chainRef.current = chain;
 
@@ -479,6 +490,7 @@ const NouveauDetailContent = (props) => {
 				<RowContainer spotlightId="nouveau-footer-0">
 					<NouveauDetailsFooter
 						item={item}
+						showsSection={showsSection}
 						mediaSource={mediaSource}
 						effectiveApi={effectiveApi}
 						selectedAudioIndex={selectedAudioIndex}

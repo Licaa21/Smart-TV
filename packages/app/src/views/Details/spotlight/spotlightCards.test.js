@@ -288,6 +288,60 @@ describe('spotlightCardsFor', () => {
 	});
 });
 
+describe('hidden sections', () => {
+	const hiding = (...hidden) => (id) => !hidden.includes(id);
+
+	it('leaves a card out once every section of it is hidden', () => {
+		const cards = spotlightCardsFor(state({
+			item: {Id: 'item-1', Type: 'Movie', Chapters: [{Name: 'One'}]},
+			showsSection: hiding('chapters')
+		}));
+		expect(ids(cards)).not.toContain('chapters_extras');
+	});
+
+	it('counts and subtitles only what is left on', () => {
+		const card = spotlightCardsFor(state({
+			item: {Id: 'item-1', Type: 'Movie', Chapters: [{Name: 'One'}, {Name: 'Two'}]},
+			extras: [child('x1')],
+			showsSection: hiding('chapters')
+		})).find((c) => c.id === 'chapters_extras');
+		expect(card.subtitle).toBe('1 extra');
+		expect(titles(card)).not.toContain('Chapters');
+	});
+
+	it('gives an episode no more episodes card when the section is hidden', () => {
+		const cards = spotlightCardsFor(state({
+			item: {Id: 'item-1', Type: 'Episode'},
+			episodes: [child('e1', 'Episode')],
+			showsSection: hiding('moreEpisodes')
+		}));
+		expect(ids(cards)).not.toContain('episodes');
+	});
+
+	it('lets the person seerr sections follow their own switches', () => {
+		const card = spotlightCardsFor(state({
+			item: {Id: 'item-1', Type: 'Person'},
+			personMovies: [child('m1')],
+			seerrAppearances: [child('a1')],
+			seerrCrewCredits: [child('c1')],
+			showsSection: hiding('seerrPersonCrew')
+		}))[0];
+		expect(titles(card)).toEqual(['Movies', 'Appearances (Seerr)']);
+	});
+
+	it('drops the hidden people from a box set', () => {
+		const card = spotlightCardsFor(state({
+			item: {Id: 'item-1', Type: 'BoxSet'},
+			collectionItems: [
+				child('m1', 'Movie', {People: [{Id: 'p1', Name: 'A', Type: 'Actor'}, {Id: 'd1', Name: 'D', Type: 'Director'}]})
+			],
+			showsSection: hiding('cast')
+		})).find((c) => c.id === 'people');
+		expect(card.subtitle).toBe('1 person');
+		expect(titles(card)).toEqual(['Crew']);
+	});
+});
+
 describe('spotlightCardFor', () => {
 	it('builds the one card asked for', () => {
 		const built = state({cast: [child('p1')], similar: [child('s1')]});

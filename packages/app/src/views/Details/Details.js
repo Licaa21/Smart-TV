@@ -1,5 +1,6 @@
 import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
 import {isKidsMode, kidsModeSettings} from '../../utils/kidsMode';
+import {sectionVisibility} from '../../utils/detailSectionLayout';
 import $L from '@enact/i18n/$L';
 import Spotlight from '@enact/spotlight';
 
@@ -70,6 +71,10 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	// renders, or the effects and memos that depend on it would run again every time.
 	const {settings: storedSettings} = useSettings();
 	const settings = useMemo(() => kidsModeSettings(storedSettings), [storedSettings]);
+	// Which sections the viewer left on. Read once here so every style and the Seerr block
+	// agree, and a hidden section reads as one with nothing in it. The data behind it stays,
+	// since playback and the pickers still read it.
+	const showsSection = useMemo(() => sectionVisibility(settings.hiddenDetailSectionsTv), [settings.hiddenDetailSectionsTv]);
 	const {pluginInfo, isEnabled: seerrEnabled} = useSeerr();
 	const recommendationsSupported = pluginInfo?.recommendationsSupported === true;
 	const {isInGroup: isSyncPlayInGroup} = useSyncPlay();
@@ -148,7 +153,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 		selectedSubtitleIndex, setSelectedSubtitleIndex
 	} = data;
 
-	const seerr = useSeerrOverlay({item: seerrOnly ? initialItem : data.item, seerrOnly});
+	const seerr = useSeerrOverlay({item: seerrOnly ? initialItem : data.item, seerrOnly, showsSection});
 
 	// A tap that came in as a bare TMDB or IMDb id can turn out to be a title the
 	// library holds, which only Seerr's answer reveals.
@@ -165,10 +170,13 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	const item = seerrOnly ? seerrItem : data.item;
 	const isLoading = seerrOnly ? seerr.loading : libraryLoading;
 
-	const {cast: detailCast, crew: detailCrew} = useMemo(
-		() => splitCastAndCrew(seerrOnly ? item?.People || [] : cast),
-		[seerrOnly, item?.People, cast]
-	);
+	const {cast: detailCast, crew: detailCrew} = useMemo(() => {
+		const split = splitCastAndCrew(seerrOnly ? item?.People || [] : cast);
+		return {
+			cast: showsSection('cast') ? split.cast : [],
+			crew: showsSection('crew') ? split.crew : []
+		};
+	}, [seerrOnly, item?.People, cast, showsSection]);
 
 	// The Seerr popups have to answer BACK before the screen's own overlays do, and the ref is
 	// how they reach the handler useDetailsModals owns.
@@ -257,9 +265,10 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 		autoFocusedRef.current = Spotlight.getCurrent();
 	}, [isSeed, seerrOnly]);
 
+	// A hidden logo falls back to the title text, as a missing one does.
 	const logoUrl = useMemo(
-			() => (item ? getLogoUrl(effectiveServerUrl, item, {maxWidth: 400, quality: 90}) : null),
-			[item, effectiveServerUrl]
+			() => (item && showsSection('logo') ? getLogoUrl(effectiveServerUrl, item, {maxWidth: 400, quality: 90}) : null),
+			[item, effectiveServerUrl, showsSection]
 		);
 
 	// A single video with real sources is the only thing with one stream to pick a
@@ -909,13 +918,25 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	const currentSubtitleStream = selectedSubtitleIndex >= 0 ? subtitleStreams[selectedSubtitleIndex] : null;
 
 	const genres = item.Genres || [];
-	const tagline = item.Taglines?.[0];
+	const tagline = showsSection('tagline') ? item.Taglines?.[0] : undefined;
+
+	const shownNextUp = showsSection('upNext') ? nextUp : [];
+	const shownNextEpisode = showsSection('upNext') ? nextEpisode : null;
+	const shownExtras = showsSection('extras') ? extras : [];
+	// A person's filmography travels in `similar`, so only the real similar rows go.
+	const showsSimilar = isPerson || showsSection('moreLikeThis');
+	const shownSimilar = showsSimilar ? similar : [];
+	// A hidden row never holds a loading slot open.
+	const shownSimilarLoaded = showsSimilar ? similarLoaded : true;
+	const shownParentCollections = showsSection('collections') ? parentCollections : [];
+	// A collection's playlist order, not a playlist's own tracks.
+	const shownPlaylistItems = isBoxSet && !showsSection('playlistOrder') ? [] : playlistItems;
 
 	const hasPlaybackPosition = item.UserData?.PlaybackPositionTicks > 0;
 	const resumeTimeText = hasPlaybackPosition ? formatDuration(item.UserData.PlaybackPositionTicks) : '';
 
 	// Modern and Classic list each collection with its missing titles merged in.
-	const collectionSections = parentCollections.map((collection) => ({
+	const collectionSections = shownParentCollections.map((collection) => ({
 		id: collection.id,
 		name: collection.name,
 		items: mergeCollectionWithMissing(collection.items, collection.missingItems)
@@ -925,12 +946,12 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	const canManagePlaylist = isPlaylist && playlistItems.length > 0 &&
 		playlistItems.every((track) => track.PlaylistItemId);
 
-	const filmography = isPerson ? splitFilmography(similar) : null;
+	const filmography = isPerson ? splitFilmography(similar, showsSection) : null;
 	const personMovies = filmography?.movies || [];
 	const personSeries = filmography?.series || [];
 	const personDates = isPerson ? personDateLines(item.PremiereDate, item.EndDate) : [];
 	const birthDate = isPerson && item.PremiereDate ? new Date(item.PremiereDate) : null;
-	const birthPlace = isPerson && item.ProductionLocations?.length > 0 ? item.ProductionLocations[0] : '';
+	const birthPlace = isPerson && showsSection('birthplace') && item.ProductionLocations?.length > 0 ? item.ProductionLocations[0] : '';
 
 	const backdrop = (
 		<DetailBackdrop backdropUrl={backdropUrl} isPerson={isPerson} blur={settings.backdropBlurDetail} />
@@ -1003,6 +1024,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					key={item.Id}
 					item={item}
 					settings={settings}
+					showsSection={showsSection}
 					seerr={seerr}
 					seerrNav={seerrNav}
 					seerrOnly={seerrOnly}
@@ -1041,16 +1063,16 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					seasons={seasons}
 					episodes={episodes}
 					seriesEpisodes={seriesEpisodes}
-					similar={similar}
-					extras={extras}
+					similar={shownSimilar}
+					extras={shownExtras}
 					cast={detailCast}
 					crew={detailCrew}
-					nextUp={nextUp}
+					nextUp={shownNextUp}
 					collectionItems={collectionItems}
 					collectionSections={collectionSections}
 					albumTracks={albumTracks}
 					artistAlbums={artistAlbums}
-					playlistItems={playlistItems}
+					playlistItems={shownPlaylistItems}
 					personMovies={personMovies}
 					personSeries={personSeries}
 					birthDate={birthDate}
@@ -1088,9 +1110,9 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					onSelectPerson={openPerson}
 					onSelectStudio={onSelectStudio}
 					similarSource={similarSource}
-					similarLoaded={similarLoaded}
+					similarLoaded={shownSimilarLoaded}
 					missingCollectionItems={missingCollectionItems}
-					parentCollections={parentCollections}
+					parentCollections={shownParentCollections}
 					loadMoreCollectionItems={loadMoreCollectionItems}
 					collectionMenu={collectionMenu}
 					filmography={filmography}
@@ -1111,6 +1133,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					item={item}
 					serverUrl={effectiveServerUrl}
 					settings={settings}
+					showsSection={showsSection}
 					filmography={filmography}
 					personDates={personDates}
 					birthPlace={birthPlace}
@@ -1128,6 +1151,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					item={item}
 					serverUrl={effectiveServerUrl}
 					settings={settings}
+					showsSection={showsSection}
 					posterUrl={posterUrl}
 					episodes={episodes}
 					episodeRatings={episodeRatings}
@@ -1151,6 +1175,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 				<PlaylistScreen
 					item={item}
 					serverUrl={effectiveServerUrl}
+					showsSection={showsSection}
 					posterUrl={posterUrl}
 					genres={genres}
 					playlistItems={playlistItems}
@@ -1172,11 +1197,12 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					item={item}
 					serverUrl={effectiveServerUrl}
 					settings={settings}
+					showsSection={showsSection}
 					posterUrl={posterUrl}
 					year={year}
 					genres={genres}
 					albumTracks={albumTracks}
-					similar={similar}
+					similar={shownSimilar}
 					onPlay={handlePlay}
 					onShuffle={handleShuffle}
 					onToggleFavorite={handleToggleFavorite}
@@ -1196,7 +1222,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					serverUrl={effectiveServerUrl}
 					settings={settings}
 					artistAlbums={artistAlbums}
-					similar={similar}
+					similar={shownSimilar}
 					onPlay={handleArtistPlay}
 					onShuffle={handleArtistShuffle}
 					onToggleFavorite={handleToggleFavorite}
@@ -1214,6 +1240,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					item={item}
 					serverUrl={effectiveServerUrl}
 					settings={settings}
+					showsSection={showsSection}
 					posterUrl={posterUrl}
 					year={year}
 					runtime={runtime}
@@ -1281,6 +1308,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 				serverUrl={effectiveServerUrl}
 				serverToken={initialItem?._serverAccessToken || jellyfinApi.getApiKey()}
 				settings={settings}
+				showsSection={showsSection}
 				isEpisode={isEpisode}
 				isSeries={isSeries}
 				isBoxSet={isBoxSet}
@@ -1305,14 +1333,14 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 				seasons={seasons}
 				episodes={episodes}
 				episodeRatings={episodeRatings}
-				nextUp={nextUp}
-				nextEpisode={nextEpisode}
+				nextUp={shownNextUp}
+				nextEpisode={shownNextEpisode}
 				collectionItems={collectionItems}
-				extras={extras}
+				extras={shownExtras}
 				cast={detailCast}
 				crew={detailCrew}
 				collectionSections={collectionSections}
-				similar={similar}
+				similar={shownSimilar}
 				onSeasonSelect={handleSeasonSelect}
 				onEpisodeSelect={handleEpisodeSelect}
 				onChapterSelect={handleChapterSelect}

@@ -9,6 +9,7 @@ import {findParentCollections} from './parentCollection';
 import {canScoreSeedLocally, getOnlineRecommendations, getRecommendations, mergeRecommendations} from '../../services/homeRecommendations';
 import {fetchMissingCollectionItems} from './seerrMissingCollectionItems';
 import {buildCollectionIndex, fetchCollectionPage} from './collectionPlaylist';
+import {sectionVisibility} from '../../utils/detailSectionLayout';
 import {isBlocked as isContentBlocked, isBlockedNow, observeItem} from '../../services/blockedContentGate';
 import {getActiveParentalFilter, withoutBlockedItems} from '../../services/parentalControls';
 import * as userDataSync from '../../services/userDataSync';
@@ -279,10 +280,11 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					const seasonId = data.SeasonId || data.ParentId;
 					// Spotlight and Minimalist offer the whole run grouped by season, which this
 					// episode's own season cant fill. No other style shows it, so no other style
-					// pays for it.
+					// pays for it, and neither does a viewer who hid More episodes.
 					const episodeStyle = settingsRef.current?.detailScreenStyle;
 					const wantsWholeSeries = Boolean(data.SeriesId) &&
-						(episodeStyle === 'v3' || episodeStyle === 'v5');
+						(episodeStyle === 'v3' || episodeStyle === 'v5') &&
+						sectionVisibility(settingsRef.current?.hiddenDetailSectionsTv)('moreEpisodes');
 					const [seasonData, seriesData] = await Promise.all([
 						data.SeriesId && seasonId
 							? effectiveApi.getEpisodes(data.SeriesId, seasonId).catch(() => null)

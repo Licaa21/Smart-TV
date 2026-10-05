@@ -4,6 +4,7 @@ import {DETAIL_ICON_PATHS} from '../detailIcons';
 import {MATERIAL_ICON_PATHS} from '../../Settings/materialIconMap';
 import {groupExtrasByCategory, getExtraCategoryLabel} from '../extraCategories';
 import {mergeMissingByReleaseOrder} from '../seerrMissingCollectionItems';
+import {SHOWS_EVERYTHING} from '../../../utils/detailSectionLayout';
 import {
 	spotlightItemImageUrl,
 	spotlightLandscapeImageUrl,
@@ -85,6 +86,12 @@ export const dedupePeople = (people = []) => {
 class CardBuilder {
 	constructor(state) {
 		this.s = state;
+	}
+
+	// A section the viewer switched off counts as empty, so a card with nothing else drops out
+	// and the counts only tally what is left on.
+	shows(id) {
+		return (this.s.showsSection || SHOWS_EVERYTHING)(id);
 	}
 
 	// Which cards this item gets and in what order, each still unbuilt so a caller after one
@@ -185,7 +192,7 @@ class CardBuilder {
 
 	chaptersExtrasCard() {
 		const {item, serverUrl, extras = [], fallbackImageUrl} = this.s;
-		const chapters = item?.Chapters || [];
+		const chapters = this.shows('chapters') ? item?.Chapters || [] : [];
 		if (!chapters.length && !extras.length) return null;
 
 		return {
@@ -195,7 +202,7 @@ class CardBuilder {
 				chapters.length ? countLabel(chapters.length, $L('1 chapter'), $L('{count} chapters')) : null,
 				extras.length ? countLabel(extras.length, $L('1 extra'), $L('{count} extras')) : null
 			]),
-			imageUrl: firstChapterImageUrl(serverUrl, item) ||
+			imageUrl: (chapters.length ? firstChapterImageUrl(serverUrl, item) : null) ||
 				(extras.length ? spotlightLandscapeImageUrl(serverUrl, extras[0], {fallbackUrl: fallbackImageUrl}) : null) ||
 				fallbackImageUrl,
 			icon: CARD_ICONS.chaptersExtras,
@@ -334,6 +341,7 @@ class CardBuilder {
 	// The whole run rather than just this episode's season, split into a foldable section per
 	// season with only the one being watched left open.
 	moreEpisodesCard() {
+		if (!this.shows('moreEpisodes')) return null;
 		const {episodes = [], seriesEpisodes = [], item, serverUrl, fallbackImageUrl} = this.s;
 		const all = seriesEpisodes.length ? seriesEpisodes : episodes;
 		if (!all.length) return null;
@@ -442,10 +450,9 @@ class CardBuilder {
 	}
 
 	filmographyCard() {
-		const {
-			personMovies = [], personSeries = [], filmography = [],
-			seerrAppearances = [], seerrCrewCredits = [], serverUrl, fallbackImageUrl
-		} = this.s;
+		const {personMovies = [], personSeries = [], filmography = [], serverUrl, fallbackImageUrl} = this.s;
+		const seerrAppearances = this.shows('seerrPersonAppearances') ? this.s.seerrAppearances || [] : [];
+		const seerrCrewCredits = this.shows('seerrPersonCrew') ? this.s.seerrCrewCredits || [] : [];
 		const hasLibrary = personMovies.length > 0 || personSeries.length > 0;
 		if (!hasLibrary && !filmography.length && !seerrAppearances.length && !seerrCrewCredits.length) return null;
 
@@ -512,11 +519,15 @@ class CardBuilder {
 		// The people of every item in the collection, deduped by id, actors ahead of crew.
 		const cast = new Map();
 		const crew = new Map();
+		const showsCast = this.shows('cast');
+		const showsCrew = this.shows('crew');
 		collectionItems.forEach((child) => {
 			(child.People || []).forEach((person) => {
 				const key = person?.Id || person?.Name || '';
 				if (!key) return;
-				const bucket = person.Type === 'Actor' ? cast : crew;
+				const isActor = person.Type === 'Actor';
+				if (isActor ? !showsCast : !showsCrew) return;
+				const bucket = isActor ? cast : crew;
 				if (!bucket.has(key)) bucket.set(key, person);
 			});
 		});
