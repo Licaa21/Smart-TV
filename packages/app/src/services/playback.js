@@ -9,6 +9,7 @@ import {applyProfileTuning} from '../utils/deviceProfileTuning';
 import {findNextInSeason, findNextSeason, findPreviousInSeason, findPreviousSeason, firstPlayableEpisode, lastPlayableEpisode} from '../utils/nextEpisode';
 import {videoRangeTypeOf} from '../utils/videoRange';
 import {getVolumeState, lastVolumeState} from './systemVolume';
+import {isVega} from '../platform';
 
 export const PlayMethod = {
 	DirectPlay: 'DirectPlay',
@@ -41,6 +42,36 @@ const isAudioOnlyRemuxTranscode = (mediaSource) => {
 let currentSession = null;
 let progressInterval = null;
 let healthMonitor = null;
+
+const apiForSession = (session) => (session.serverCredentials
+	? jellyfinApi.createApiForServer(
+		session.serverCredentials.serverUrl,
+		session.serverCredentials.accessToken,
+		session.serverCredentials.userId
+	)
+	: jellyfinApi.api);
+
+// Every PlaybackInfo opens a live channel again and the server counts each open
+// as a viewer, so a session gives its stream back once and only once, whether
+// it ends in a stop or is replaced by a fresh PlaybackInfo.
+const closeLiveStreamOnce = async (session) => {
+	if (!session.liveStreamId || session.liveStreamClosed) return;
+	session.liveStreamClosed = true;
+	try {
+		await apiForSession(session).closeLiveStream(session.liveStreamId);
+	} catch (closeErr) {
+		console.warn('[playback] Failed to close live stream:', closeErr.message);
+	}
+};
+
+// A session dropped for a fresh one closes its stream only after the fresh one
+// is back, even when both carry the same id, since closing first leaves a
+// shared stream with no viewers and makes it reconnect to its source.
+const replaceSession = (session) => {
+	const previous = currentSession;
+	currentSession = session;
+	if (previous && previous !== session) closeLiveStreamOnce(previous);
+};
 
 const DEFAULT_PASSTHROUGH_SETTINGS = {
 	passthroughEnabled: true,
@@ -420,6 +451,16 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 
 	const isLiveTV = options.isLiveTV || options.item?.Type === 'TvChannel';
 
+	// What the first request for an item allowed holds for every later one while
+	// it plays, so a track switch, a reopen or a fallback never brings back what
+	// Force Transcode or Prefer Transcoding turned off. A stop clears it with the
+	// session.
+	const playing = currentSession?.itemId === itemId ? currentSession : null;
+	const allowDirectPlay = playing ? playing.allowDirectPlay : options.enableDirectPlay !== false;
+	const allowDirectStream = playing ? playing.allowDirectStream : options.enableDirectStream !== false;
+	const enableDirectPlay = allowDirectPlay && options.enableDirectPlay !== false;
+	const enableDirectStream = allowDirectStream && options.enableDirectStream !== false;
+
 	// maxBitrate: user-set value (>0), or auto-detect from device capabilities
 	const maxBitrate = options.maxBitrate > 0 ? options.maxBitrate : getAutoMaxBitrate(capabilities);
 
@@ -454,7 +495,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		startPositionTicks: requestedStartTime,
 		maxBitrate,
 		subtitleStreamIndex,
-		enableDirectPlay: options.enableDirectPlay !== false,
+		enableDirectPlay,
 		enableTranscoding: options.enableTranscoding !== false
 	});
 
@@ -467,8 +508,8 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		DeviceProfile: deviceProfile,
 		StartTimeTicks: requestedStartTime,
 		AutoOpenLiveStream: true,
-		EnableDirectPlay: options.enableDirectPlay !== false,
-		EnableDirectStream: options.enableDirectStream !== false,
+		EnableDirectPlay: enableDirectPlay,
+		EnableDirectStream: enableDirectStream,
 		EnableTranscoding: options.enableTranscoding !== false,
 		AudioStreamIndex: options.audioStreamIndex,
 		SubtitleStreamIndex: sentSubtitleStreamIndex,
@@ -503,7 +544,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		const audioStreams = extractAudioStreams(mediaSource);
 		const subtitleStreams = extractSubtitleStreams(mediaSource, itemId, creds, storedSettings.assDirectPlay === false, null, playMethod);
 
-		currentSession = {
+		replaceSession({
 			itemId,
 			playSessionId: playbackInfo.PlaySessionId,
 			mediaSourceId: mediaSource.Id,
@@ -515,8 +556,10 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 			audioStreamIndex: mediaSource.DefaultAudioStreamIndex,
 			subtitleStreamIndex: requestedSubtitleStreamIndex,
 			maxBitrate: options.maxBitrate,
+			allowDirectPlay,
+			allowDirectStream,
 			serverCredentials: creds
-		};
+		});
 
 		console.log(`[playback] Live TV: ${itemId} via ${playMethod}`);
 
@@ -590,8 +633,8 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 					DeviceProfile: deviceProfile,
 					StartTimeTicks: requestedStartTime,
 					AutoOpenLiveStream: true,
-					EnableDirectPlay: options.enableDirectPlay !== false,
-					EnableDirectStream: options.enableDirectStream !== false,
+					EnableDirectPlay: enableDirectPlay,
+					EnableDirectStream: enableDirectStream,
 					EnableTranscoding: options.enableTranscoding !== false,
 					AudioStreamIndex: altStream.Index,
 					SubtitleStreamIndex: sentSubtitleStreamIndex,
@@ -650,8 +693,8 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 				DeviceProfile: deviceProfile,
 				StartTimeTicks: requestedStartTime,
 				AutoOpenLiveStream: true,
-				EnableDirectPlay: options.enableDirectPlay !== false,
-				EnableDirectStream: options.enableDirectStream !== false,
+				EnableDirectPlay: enableDirectPlay,
+				EnableDirectStream: enableDirectStream,
 				EnableTranscoding: options.enableTranscoding !== false,
 				AudioStreamIndex: audioStreamIndex,
 				SubtitleStreamIndex: -1,
@@ -729,7 +772,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	const audioOnlyRemux = playMethod === PlayMethod.Transcode && isAudioOnlyRemuxTranscode(mediaSource);
 	const reportedPlayMethod = audioOnlyRemux ? PlayMethod.DirectStream : playMethod;
 
-	currentSession = {
+	replaceSession({
 		itemId,
 		playSessionId: playbackInfo.PlaySessionId,
 		mediaSourceId: mediaSource.Id,
@@ -742,8 +785,10 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		audioStreamIndex: audioStreamIndex ?? mediaSource.DefaultAudioStreamIndex,
 		subtitleStreamIndex: requestedSubtitleStreamIndex,
 		maxBitrate: options.maxBitrate,
+		allowDirectPlay,
+		allowDirectStream,
 		serverCredentials: creds
-	};
+	});
 
 	if (audioOnlyRemux) {
 		console.log(`[playback] Audio-only remux detected; reporting session as DirectStream (video=copy) for ${itemId}`);
@@ -1132,6 +1177,52 @@ const volumeReport = () => {
 	return state ? {VolumeLevel: Math.round(state.volume), IsMuted: state.muted} : {IsMuted: false};
 };
 
+// The request that ends the current session on its server, ready to send
+// without any help from the API client.
+const stopRequest = (positionTicks) => {
+	if (!currentSession) return null;
+
+	const creds = currentSession.serverCredentials;
+	let serverUrl = creds?.serverUrl || jellyfinApi.getServerUrl();
+	const token = creds?.accessToken || jellyfinApi.getApiKey();
+	if (!serverUrl || !token) return null;
+
+	serverUrl = serverUrl.trim().replace(/\/+$/, '');
+	if (!/^https?:\/\//i.test(serverUrl)) serverUrl = 'http://' + serverUrl;
+
+	return {
+		endpoint: `${serverUrl}/Sessions/Playing/Stopped?${jellyfinApi.getTokenParam(creds?.serverType)}=${encodeURIComponent(token)}`,
+		json: JSON.stringify({
+			ItemId: currentSession.itemId,
+			PlaySessionId: currentSession.playSessionId,
+			MediaSourceId: currentSession.mediaSourceId,
+			PositionTicks: positionTicks || 0,
+			PlayMethod: currentSession.reportedPlayMethod || currentSession.playMethod,
+			AudioStreamIndex: currentSession.audioStreamIndex,
+			SubtitleStreamIndex: currentSession.subtitleStreamIndex
+		})
+	};
+};
+
+// Page scripts freeze once the app is in the background on Fire TV, so the shell
+// that hosts the page gets what it needs to end the session itself.
+let vegaBridge = null;
+if (isVega()) {
+	import('@moonfin/platform-vega/bridge').then((mod) => {
+		vegaBridge = mod;
+	});
+}
+
+const shareStopWithShell = (positionTicks) => {
+	if (!vegaBridge) return;
+	const request = stopRequest(positionTicks);
+	vegaBridge.postToShell('PLAYBACK_SESSION', request && {
+		stopUrl: request.endpoint,
+		headers: {'Content-Type': 'application/json'},
+		body: request.json
+	});
+};
+
 export const reportStart = async (positionTicks = 0) => {
 	if (!currentSession) return;
 
@@ -1191,23 +1282,15 @@ export const reportProgress = async (positionTicks, options = {}) => {
 			info.EventName = options.eventName;
 		}
 
+		shareStopWithShell(positionTicks);
 		await api.reportPlaybackProgress(info);
 	} catch (e) { void e; }
 };
 
-const sendSessionBeacon = (path, payload) => {
-	if (!currentSession) return false;
-
-	const creds = currentSession.serverCredentials;
-	let serverUrl = creds?.serverUrl || jellyfinApi.getServerUrl();
-	const token = creds?.accessToken || jellyfinApi.getApiKey();
-	if (!serverUrl || !token) return false;
-
-	serverUrl = serverUrl.trim().replace(/\/+$/, '');
-	if (!/^https?:\/\//i.test(serverUrl)) serverUrl = 'http://' + serverUrl;
-
-	const endpoint = `${serverUrl}${path}?${jellyfinApi.getTokenParam(creds?.serverType)}=${encodeURIComponent(token)}`;
-	const json = JSON.stringify(payload);
+export const reportStopBeacon = (positionTicks) => {
+	const request = stopRequest(positionTicks);
+	if (!request) return false;
+	const {endpoint, json} = request;
 
 	if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
 		try {
@@ -1229,19 +1312,6 @@ const sendSessionBeacon = (path, payload) => {
 		void e;
 		return false;
 	}
-};
-
-export const reportStopBeacon = (positionTicks) => {
-	if (!currentSession) return false;
-	return sendSessionBeacon('/Sessions/Playing/Stopped', {
-		ItemId: currentSession.itemId,
-		PlaySessionId: currentSession.playSessionId,
-		MediaSourceId: currentSession.mediaSourceId,
-		PositionTicks: positionTicks || 0,
-		PlayMethod: currentSession.reportedPlayMethod || currentSession.playMethod,
-		AudioStreamIndex: currentSession.audioStreamIndex,
-		SubtitleStreamIndex: currentSession.subtitleStreamIndex
-	});
 };
 
 export const stopProgressReporting = () => {
@@ -1267,6 +1337,7 @@ let backgroundStopFired = false;
 
 export const reportBackgroundStop = (positionTicks) => {
 	if (!currentSession) return;
+	shareStopWithShell(positionTicks);
 	reportStopBeacon(positionTicks);
 	// stop the local reporting loops so they cant revive the session we just
 	// told the server to end
@@ -1292,21 +1363,13 @@ export const reportStop = async (positionTicks) => {
 	const session = currentSession;
 	if (!session) return;
 	currentSession = null;
+	shareStopWithShell(null);
 
 	stopProgressReporting();
 	stopHealthMonitoring();
 
-	// Use session's server credentials for cross-server support
-	const api = session.serverCredentials
-		? jellyfinApi.createApiForServer(
-			session.serverCredentials.serverUrl,
-			session.serverCredentials.accessToken,
-			session.serverCredentials.userId
-		)
-		: jellyfinApi.api;
-
 	try {
-		await api.reportPlaybackStopped({
+		await apiForSession(session).reportPlaybackStopped({
 			ItemId: session.itemId,
 			PlaySessionId: session.playSessionId,
 			MediaSourceId: session.mediaSourceId,
@@ -1316,13 +1379,7 @@ export const reportStop = async (positionTicks) => {
 		console.warn('[playback] Failed to report stop:', e.message);
 	}
 
-	if (session.liveStreamId) {
-		try {
-			await api.closeLiveStream(session.liveStreamId);
-		} catch (closeErr) {
-			console.warn('[playback] Failed to close live stream:', closeErr.message);
-		}
-	}
+	await closeLiveStreamOnce(session);
 };
 
 export const startProgressReporting = (getPositionTicks, intervalMs = 10000, getPlayState) => {

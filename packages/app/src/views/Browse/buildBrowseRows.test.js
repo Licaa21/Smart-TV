@@ -356,3 +356,63 @@ describe('loading placeholders', () => {
 		expect(rows.map((r) => [r.title, r.subtitle, Boolean(r.isPlaceholder)])).toEqual([['IMDb Top 250 Movies', 'IMDb List', true]]);
 	});
 });
+
+describe('ratings on rows from outside lists', () => {
+	const filter = parentalFilterFromRatings(['R']);
+	const external = (id, items, extra = {}) => row(id, items, {isExternalRow: true, ...extra});
+
+	test('an unrated title in a chart row drops out once anything is blocked', () => {
+		const rows = build({
+			externalRows: [external('imdb-top250-movies', [
+				item('pg', {OfficialRating: 'PG'}),
+				item('unrated'),
+				item('r', {OfficialRating: 'R'})
+			])],
+			settings: settings({parentalFilter: filter})
+		});
+
+		expect(rows[0].items.map((i) => i.Id)).toEqual(['pg']);
+	});
+
+	test('calendar rows keep their unrated items, since they never carry ratings', () => {
+		const rows = build({
+			externalRows: [
+				external('radarr_calendar', [item('1')], {isCalendarRow: true}),
+				external('radarr_calendar', [item('2')], {isCalendarMerged: true})
+			],
+			settings: settings({parentalFilter: filter})
+		});
+
+		expect(rows.map((r) => r.items.length)).toEqual([1, 1]);
+	});
+
+	test('the seasonal row judges owned titles by the library rule and suggestions strictly', () => {
+		const rows = build({
+			externalRows: [external('seasonal', [
+				item('owned-unrated'),
+				item('owned-r', {OfficialRating: 'R'}),
+				item('suggested-unrated', {_strictRating: true}),
+				item('suggested-pg', {OfficialRating: 'PG', _strictRating: true})
+			], {isSeasonalRow: true, holiday: 'christmas'})],
+			settings: settings({parentalFilter: filter})
+		});
+
+		expect(rows[0].items.map((i) => i.Id)).toEqual(['owned-unrated', 'suggested-pg']);
+	});
+
+	test('with nothing blocked every outside title stays', () => {
+		const rows = build({
+			externalRows: [external('imdb-top250-movies', [item('pg', {OfficialRating: 'PG'}), item('unrated')])],
+			settings: settings({parentalFilter: parentalFilterFromRatings([])})
+		});
+
+		expect(rows[0].items).toHaveLength(2);
+	});
+
+	test('the seasonal row is labelled as seasonal under its title', () => {
+		const rows = build({externalRows: [external('seasonal', [item('1')], {isSeasonalRow: true, title: 'Halloween'})]});
+
+		expect(rows[0].title).toBe('Halloween');
+		expect(rows[0].subtitle).toBe('Seasonal');
+	});
+});

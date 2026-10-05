@@ -41,29 +41,38 @@ const TIZEN_KEYS = {
 
 const WEBOS_KEYS = {
 	BACK: 461,
-	// The remote's channel keys arrive as page up and page down.
-	CHANNEL_UP: 33,
-	CHANNEL_DOWN: 34,
+	PLAY: 415,
+	PAUSE: 19,
+	STOP: 413,
+	REWIND: 412,
+	FAST_FORWARD: 417,
 };
+
+// The Vega WebView hands the page the back key as Escape and the transport keys
+// by their media key codes. The remote's menu key never reaches the page, so the
+// shell reports it and the platform raises it as the context menu key.
+const VEGA_KEYS = {
+	BACK: 27,
+	MENU: 93,
+	PLAY_PAUSE: 179,
+	REWIND: 227,
+	FAST_FORWARD: 228,
+};
+
+const PLATFORM_KEYS = {tizen: TIZEN_KEYS, webos: WEBOS_KEYS, vega: VEGA_KEYS};
 
 export const KEYS = {
 	...STANDARD_KEYS,
-	...(getPlatform() === 'tizen' ? TIZEN_KEYS : WEBOS_KEYS),
-	BACK: getPlatform() === 'tizen' ? 10009 : 461,
-};
-
-// 1 for channel up, -1 for channel down, 0 for any other key.
-export const channelKeyStep = (e) => {
-	const code = e.keyCode || e.which;
-	if (e.key === 'ChannelUp' || code === KEYS.CHANNEL_UP) return 1;
-	if (e.key === 'ChannelDown' || code === KEYS.CHANNEL_DOWN) return -1;
-	return 0;
+	...(PLATFORM_KEYS[getPlatform()] || WEBOS_KEYS),
 };
 
 export const isBackKey = (e) => {
 	const code = e.keyCode || e.which;
 	return code === KEYS.BACK || code === 27 || code === 8;
 };
+
+// A remote with a menu key does with one press what the others do by holding OK.
+export const isMenuKey = (e) => KEYS.MENU !== undefined && (e.keyCode || e.which) === KEYS.MENU;
 
 export const isExitKey = (e) => {
 	if (getPlatform() !== 'tizen') return false;
@@ -86,34 +95,6 @@ export const ESSENTIAL_KEY_NAMES = [
 	'ChannelUp',
 	'ChannelDown'
 ];
-
-// Remote buttons that hand the TV over to its tuner or to another app. A registered key goes to
-// Moonfin and not to the system, and nothing here is bound to these, so pressing one leaves the app
-// where it is. Besides the channel and guide keys, any key the TV lists by the name of a streaming
-// service is taken too. The dedicated app buttons on some remotes are not listed, and the firmware
-// keeps those for itself.
-export const BLOCKED_KEY_NAMES = ['ChannelUp', 'ChannelDown', 'ChannelList', 'PreviousChannel', 'Guide'];
-export const BLOCKED_KEY_PATTERN = /netflix|rakuten|prime|amazon|disney|hulu|hbo|youtube|apple|tvplus|shortcut/i;
-
-export const registerBlockedKeys = () => {
-	if (getPlatform() !== 'tizen') return;
-	if (typeof tizen === 'undefined' || !tizen.tvinputdevice) return;
-
-	try {
-		const supportedKeyNames = tizen.tvinputdevice.getSupportedKeys().map((k) => k.name);
-		console.log('[keys] keys this TV offers:', supportedKeyNames.join(', '));
-		const wanted = supportedKeyNames.filter((name) => BLOCKED_KEY_NAMES.includes(name) || BLOCKED_KEY_PATTERN.test(name));
-		wanted.forEach((keyName) => {
-			try {
-				tizen.tvinputdevice.registerKey(keyName);
-			} catch (e) {
-				console.warn(`Failed to register key ${keyName}:`, e);
-			}
-		});
-	} catch (e) {
-		console.error('Error registering blocked TV keys:', e);
-	}
-};
 
 export const registerKeys = (keyNames = ESSENTIAL_KEY_NAMES) => {
 	if (getPlatform() !== 'tizen') return;

@@ -1,4 +1,4 @@
-import {buildFilterParams} from './libraryFilters';
+import {buildFilterParams, facetRows} from './libraryFilters';
 
 describe('library filters', () => {
 	it('asks for nothing when nothing is picked', () => {
@@ -48,5 +48,41 @@ describe('library filters', () => {
 		expect(params.VideoTypes).toBe('BluRay,Iso');
 		expect(params.AudioLanguages).toBe('jpn');
 		expect(params.SubtitleLanguages).toBe('eng,spa');
+	});
+});
+
+describe('facet rows', () => {
+	const tags = ['action', 'Amélie', 'anime', 'biopic', 'comedy', 'cult', 'drama', 'heist', 'noir', 'western'];
+
+	it('offers a search only once a list reaches ten values', () => {
+		expect(facetRows(tags, [], '', 50).searchable).toBe(true);
+		expect(facetRows(tags.slice(0, 9), [], '', 50).searchable).toBe(false);
+	});
+
+	it('matches the search without case or accents', () => {
+		expect(facetRows(tags, [], 'AMELIE', 50).visible.map((row) => row.value)).toEqual(['Amélie']);
+		expect(facetRows(tags, [], ' an', 50).visible.map((row) => row.value)).toEqual(['anime']);
+	});
+
+	it('says so when nothing matches', () => {
+		const rows = facetRows(tags, [], 'zzz', 50);
+		expect(rows.noMatches).toBe(true);
+		expect(rows.visible).toEqual([]);
+	});
+
+	it('leaves a short list as it is, whatever is typed', () => {
+		expect(facetRows(tags.slice(0, 3), [], 'zzz', 50).visible).toHaveLength(3);
+	});
+
+	it('matches language names, not the codes behind them', () => {
+		const languages = tags.map((name, i) => ({name, value: `code${i}`}));
+		expect(facetRows(languages, [], 'noir', 50).visible).toEqual([{name: 'noir', value: 'code8'}]);
+	});
+
+	it('keeps a picked value on screen past the page limit and counts what is left', () => {
+		const rows = facetRows(tags, ['western'], '', 2);
+		expect(rows.visible.map((row) => row.value)).toEqual(['action', 'Amélie', 'western']);
+		expect(rows.remaining).toBe(7);
+		expect(rows.chosen).toBe(1);
 	});
 });

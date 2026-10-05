@@ -61,7 +61,7 @@ const useLibraryVisibility = ({api, settings, hasMultipleServers, pushView, popV
 				const savePromises = serverConfigs.map((cfg) => {
 					const excludes = serverExcludes[cfg.serverUrl] || [];
 					const updatedConfig = { ...cfg.configuration, MyMediaExcludes: excludes };
-					return connectionPool.updateUserConfigOnServer(cfg.serverUrl, cfg.accessToken, cfg.userId, updatedConfig);
+					return connectionPool.updateUserConfigOnServer(cfg.serverUrl, cfg.accessToken, cfg.userId, updatedConfig, cfg.serverType);
 				});
 				await Promise.all(savePromises);
 			} else {
@@ -77,8 +77,9 @@ const useLibraryVisibility = ({api, settings, hasMultipleServers, pushView, popV
 			// refresh rather than on the next launch.
 			resetLibraryScope();
 			onLibrariesChanged?.();
-			// Hiding a library can change the media bar, so this refresh redraws it.
-			window.dispatchEvent(new window.CustomEvent('moonfin:browseRefresh', {detail: {featured: true}}));
+			// Hiding a library can change the media bar, so this refresh redraws it, and the rows
+			// load again now rather than from what was stored.
+			window.dispatchEvent(new window.CustomEvent('moonfin:browseRefresh', {detail: {featured: true, libraries: true}}));
 		} catch (err) {
 			console.error('Failed to save library visibility:', err);
 		} finally {

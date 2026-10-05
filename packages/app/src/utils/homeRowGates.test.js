@@ -74,3 +74,14 @@ describe('isPluginSourcedRow', () => {
 		expect(gated.filter(isPluginSourcedRow)).toEqual([]);
 	});
 });
+
+describe('the seasonal row', () => {
+	test('answers to its own toggle and is off until it is switched on', () => {
+		expect(isRowEnabledBySetting('seasonal', settings())).toBe(false);
+		expect(isRowEnabledBySetting('seasonal', settings({seasonalRowEnabled: true}))).toBe(true);
+	});
+
+	test('comes through the plugin too, so the editor hides it while the plugin is off', () => {
+		expect(isPluginSourcedRow('seasonal')).toBe(true);
+	});
+});

@@ -259,7 +259,8 @@ export const getLatestPerLibraryFromAllServers = async (excludedLibraryIds = [],
 								_serverName: server.name
 							},
 							latest: taggedItems,
-							serverName: server.name
+							serverName: server.name,
+							libraryIndex: libraries.indexOf(lib)
 						});
 					}
 				} catch {
@@ -271,11 +272,12 @@ export const getLatestPerLibraryFromAllServers = async (excludedLibraryIds = [],
 		}
 	}));
 
+	// Each server's rows keep the order its libraries are in, which is the order the viewer chose.
 	results.sort((a, b) => {
 		if (a.serverName !== b.serverName) {
 			return a.serverName.localeCompare(b.serverName);
 		}
-		return (a.lib.Name || '').localeCompare(b.lib.Name || '');
+		return a.libraryIndex - b.libraryIndex;
 	});
 
 	return results;
@@ -323,13 +325,8 @@ export const getRandomItemsFromAllServers = async (contentType = 'both', limit =
 	);
 };
 
-/**
- * Search across all servers
- * @param {string} query - Search query
- * @param {number} limit - Total max results to return
- * @returns {Promise<Array>} Search results from all servers
- */
-export const searchAllServers = async (query, limit = 20) => {
+// Runs one search on every server and ranks the answers by how well they match the query.
+const searchEveryServer = async (query, limit, search) => {
 	// Calculate per-server limit for distribution
 	const servers = await multiServerManager.getAllServersArray();
 	const serverCount = servers.length;
@@ -337,7 +334,7 @@ export const searchAllServers = async (query, limit = 20) => {
 
 	return executeAll(
 		async (api) => {
-			const result = await api.search(query, perServerLimit);
+			const result = await search(api, perServerLimit);
 			return result.Items || [];
 		},
 		{
@@ -358,6 +355,24 @@ export const searchAllServers = async (query, limit = 20) => {
 		}
 	);
 };
+
+/**
+ * Search across all servers
+ * @param {string} query - Search query
+ * @param {number} limit - Total max results to return
+ * @returns {Promise<Array>} Search results from all servers
+ */
+export const searchAllServers = (query, limit = 20) =>
+	searchEveryServer(query, limit, (api, perServerLimit) => api.search(query, perServerLimit));
+
+/**
+ * Search people across all servers
+ * @param {string} query - Search query
+ * @param {number} limit - Total max results to return
+ * @returns {Promise<Array>} People from all servers
+ */
+export const searchPeopleAllServers = (query, limit = 24) =>
+	searchEveryServer(query, limit, (api, perServerLimit) => api.searchPeople(query, perServerLimit));
 
 const DEFAULT_FAVORITE_TYPES = 'Movie,Series,Episode,Person';
 const DEFAULT_FAVORITE_FIELDS = 'PrimaryImageAspectRatio,ProductionYear,ParentIndexNumber,IndexNumber,SeriesName,ProviderIds,UserData';
@@ -518,7 +533,7 @@ export const getAllLibrariesFromAllServers = async () => {
 
 /**
  * Get user configuration from all servers
- * @returns {Promise<Array>} Array of {serverUrl, userId, accessToken, serverName, configuration} per server
+ * @returns {Promise<Array>} Array of {serverUrl, userId, accessToken, serverName, serverType, configuration} per server
  */
 export const getUserConfigFromAllServers = async () => {
 	const servers = await multiServerManager.getAllServersArray();
@@ -532,6 +547,7 @@ export const getUserConfigFromAllServers = async () => {
 				userId: server.userId,
 				accessToken: server.accessToken,
 				serverName: server.name,
+				serverType: server.serverType || 'jellyfin',
 				configuration: userData.Configuration
 			});
 		} catch (e) {
@@ -547,9 +563,10 @@ export const getUserConfigFromAllServers = async () => {
  * @param {string} accessToken - Auth token
  * @param {string} userId - User ID
  * @param {Object} config - Updated configuration object
+ * @param {string} [serverType] - Emby takes the configuration on its own route
  */
-export const updateUserConfigOnServer = async (serverUrl, accessToken, userId, config) => {
-	const api = createApiForServer(serverUrl, accessToken, userId);
+export const updateUserConfigOnServer = async (serverUrl, accessToken, userId, config, serverType = 'jellyfin') => {
+	const api = createApiForServer(serverUrl, accessToken, userId, serverType);
 	return api.updateUserConfiguration(config);
 };
 
@@ -564,6 +581,7 @@ const connectionPool = {
 	getLatestItemsFromAllServers,
 	getRandomItemsFromAllServers,
 	searchAllServers,
+	searchPeopleAllServers,
 	getFavoritesFromAllServers,
 	getGenresFromAllServers,
 	getGenreItemsFromAllServers,

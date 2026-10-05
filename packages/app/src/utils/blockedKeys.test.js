@@ -1,6 +1,6 @@
 jest.mock('../platform', () => ({getPlatform: () => 'tizen'}));
 
-import {registerBlockedKeys} from './keys';
+import {registerBlockedKeys} from './blockedKeys';
 
 describe('registerBlockedKeys', () => {
 	const supported = ['MediaPlay', 'ChannelUp', 'ChannelDown', 'ChannelList', 'Guide', 'PreviousChannel', 'NetflixKey', 'RakutenTV', 'Menu', 'Source', 'VolumeUp'];

@@ -8,7 +8,8 @@ import {createRoot, hydrateRoot} from 'react-dom/client';
 
 import App, {localeStringsReady} from './App';
 import {isTizen} from './platform';
-import {registerKeys, registerBlockedKeys, ESSENTIAL_KEY_NAMES} from './utils/keys';
+import {registerKeys, ESSENTIAL_KEY_NAMES} from './utils/keys';
+import {registerBlockedKeys} from './utils/blockedKeys';
 
 const enforceTizenViewport = () => {
 	if (typeof document === 'undefined' || !isTizen()) return;

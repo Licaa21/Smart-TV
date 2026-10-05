@@ -165,6 +165,13 @@ export const saveBrowseCache = (rowData, libraries, featuredItems, {serverUrl, u
 	}, CACHE_SAVE_DEBOUNCE_MS);
 };
 
+// A change the rows depend on was made somewhere else, so the stored rows cant be drawn again.
+export const clearBrowseCache = () => {
+	cancelPendingCacheSave();
+	lastSignature = null;
+	return removeFromStorage(STORAGE_KEY_BROWSE).catch(() => {});
+};
+
 // A cache written for a different server or user says nothing about this one.
 export const loadBrowseCache = async (serverUrl, userId) => {
 	STALE_BROWSE_KEYS.forEach((key) => {

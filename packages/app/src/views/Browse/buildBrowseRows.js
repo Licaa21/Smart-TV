@@ -5,7 +5,7 @@
 import $L from '@enact/i18n/$L';
 import {isKidsMode} from '../../utils/kidsMode';
 import {isLiveTvLibrary} from '../../utils/liveTvLibrary';
-import {withoutBlocked} from '../../utils/parentalFilter';
+import {withoutBlocked, withoutBlockedOrUnrated} from '../../utils/parentalFilter';
 
 import {SERVER_TO_TV_ROW, TV_TO_SERVER_ROW} from '../../utils/homeLayout';
 import {FAVORITE_ROW_CONFIGS, isHiddenByMap, parseHiddenMap} from './browseFilters';
@@ -135,6 +135,7 @@ const rowSubtitleFor = (row) => {
 	if (row.id?.startsWith('imdb-')) return $L('IMDb List');
 	if (row.id?.startsWith('tmdb_')) return $L('TMDB Lists');
 	if (row.id === 'radarr_calendar' || row.id === 'sonarr_calendar' || row.id === 'merged_calendar') return $L('Radarr and Sonarr Calendars');
+	if (row.id === 'seasonal') return $L('Seasonal');
 	return undefined;
 };
 
@@ -176,14 +177,22 @@ const orderRows = (rows, rowOrderMap) => {
 		.map((entry) => entry.row);
 };
 
-// Unrated items always pass, since a server that rates nothing can't be told apart from one that
-// just didn't rate this item.
+// Unrated library items always pass, since a server that rates nothing can't be told apart from
+// one that just didn't rate this item. Rows from outside lists are the exception: their ratings
+// come from a lookup, so an unrated title there is one nobody vouched for. The calendars carry
+// no ratings at all and keep the library rule.
+const filterRowItems = (row, parentalFilter) => {
+	if (row.isSeasonalRow) return withoutBlockedOrUnrated(row.items, parentalFilter, false);
+	if (row.isExternalRow && !row.isCalendarRow && !row.isCalendarMerged) return withoutBlockedOrUnrated(row.items, parentalFilter);
+	return withoutBlocked(row.items, parentalFilter);
+};
+
 const filterBlockedRatings = (rows, parentalFilter) => {
 	if (!parentalFilter?.isActive) return rows;
 	return rows
 		.map((row) => {
 			if (!Array.isArray(row.items)) return row;
-			const items = withoutBlocked(row.items, parentalFilter);
+			const items = filterRowItems(row, parentalFilter);
 			return items === row.items ? row : {...row, items};
 		})
 		.filter((row) => !Array.isArray(row.items) || row.items.length > 0);

@@ -13,8 +13,10 @@
 		"build:tizen:all": "cd packages/build-tizen && node scripts/build-all.js",
 		"build:tizen:oblong": "cd packages/build-tizen && node scripts/build-wgt.js --oblong",
 		"build:tizen:legacy": "cd packages/build-tizen && node scripts/build-wgt.js --legacy",
+		"build:vega": "cd packages/build-vega && node build.js",
 		"dev:webos": "cd packages/app && cross-env REACT_APP_PLATFORM=webos npm run serve",
 		"dev:tizen": "cd packages/app && cross-env REACT_APP_PLATFORM=tizen npm run serve",
+		"dev:vega": "cd packages/app && cross-env REACT_APP_PLATFORM=vega npm run serve",
 		"postinstall": "node scripts/ensure-clis.js"
 	},
 	"//cli-tools": "@enact/cli and @webos-tools/cli are installed into the git-ignored tools/ folder by the postinstall above, not as devDependencies. See tools/package.json for why.",

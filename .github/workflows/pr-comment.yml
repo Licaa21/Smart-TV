@@ -54,6 +54,7 @@ jobs:
             const sha      = outcomes.sha;
             const webos    = outcomes.webos;
             const tizen    = outcomes.tizen;
+            const vega     = outcomes.vega;
             // A build from before the suite was wired in reports no outcome, which is
             // not the same as the tests failing.
             const tests    = outcomes.tests;
@@ -65,6 +66,7 @@ jobs:
             const label = (r) => r === 'success' ? 'Passed' : r === 'failure' ? 'Failed' : 'Skipped';
 
             const overallSuccess = webos === 'success' && tizen === 'success' &&
+              (vega === undefined || vega === 'success') &&
               (tests === undefined || tests === 'success');
 
             const marker = '<!-- moonfin-build-result -->';
@@ -83,6 +85,9 @@ jobs:
                 `| **Tizen Oblong** | ✅ Passed | [Moonfin_Tizen_Oblong_*.wgt](${artifactsUrl}) |`,
                 `| **Tizen Legacy** | ✅ Passed | [Moonfin_Tizen_Legacy_*.wgt](${artifactsUrl}) |`,
               );
+              if (vega !== undefined) {
+                lines.push(`| **Vega** | ✅ Passed | web bundle and shell checks |`);
+              }
             } else {
               lines.push(
                 '## ❌ Build Failed',
@@ -92,6 +97,9 @@ jobs:
                 `| **webOS build** | ${icon(webos)} ${label(webos)} |`,
                 `| **Tizen build** | ${icon(tizen)} ${label(tizen)} |`,
               );
+              if (vega !== undefined) {
+                lines.push(`| **Vega build** | ${icon(vega)} ${label(vega)} |`);
+              }
               if (tests !== undefined) {
                 lines.push(`| **Tests** | ${icon(tests)} ${label(tests)} |`);
               }
