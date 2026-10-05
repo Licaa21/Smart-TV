@@ -30,6 +30,9 @@ packages/build-xbox/shell/**/*.csproj.user
 packages/build-xbox/.cert
 packages/build-xbox/shell/**/Package.Build.appxmanifest
 
+# test clips for the Xbox probe, made by probe/make-clips.js
+packages/build-xbox/probe/media
+
 # misc
 .DS_Store
 .vscode

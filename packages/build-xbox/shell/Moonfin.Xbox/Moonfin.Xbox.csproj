@@ -23,7 +23,7 @@
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <!-- build.js turns signing on and hands over the certificate. -->
     <AppxPackageSigningEnabled Condition=" '$(AppxPackageSigningEnabled)' == '' ">false</AppxPackageSigningEnabled>
-    <!-- build.js names a manifest of its own making for a Debug build. -->
+    <!-- build.js names a manifest of its own making for a Debug or a probe build. -->
     <MoonfinManifest Condition=" '$(MoonfinManifest)' == '' ">Package.appxmanifest</MoonfinManifest>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
@@ -57,6 +57,7 @@
     <Compile Include="BootData.cs" />
     <Compile Include="Bridge.cs" />
     <Compile Include="CorsRelay.cs" />
+    <Compile Include="DisplayModes.cs" />
     <Compile Include="HostLog.cs" />
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>

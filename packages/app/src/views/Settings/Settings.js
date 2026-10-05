@@ -40,6 +40,7 @@ import useLibraryVisibility from './useLibraryVisibility';
 import useMediaBarSources from './useMediaBarSources';
 import useScreensaverSources from './useScreensaverSources';
 import useDiagnosticsLog from './useDiagnosticsLog';
+import {openDeviceProbe} from '../../utils/deviceProbe';
 import renderDescriptorRow from './settingsDescriptorRow';
 import {CategoriesView, CategoryView, SubcategoryView, OptionsView} from './BrowseViews';
 import {ThemesView, ThemeStoreView} from './ThemeViews';
@@ -1034,6 +1035,8 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		await logoutAll();
 	}, [resetSettings, logoutAll]);
 
+	const canProbeDevice = isXbox() && !!serverUrl && !!accessToken;
+
 	const settingsCtx = useMemo(() => ({
 		settings,
 		capabilities,
@@ -1081,7 +1084,10 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			openScreen,
 			handleMoonfinToggle,
 			resetRatingsSettings,
-			runSetupAgain: onRunSetupWizard
+			runSetupAgain: onRunSetupWizard,
+			// The probe page ships with the Xbox build, and its report goes to the server
+			// the user is signed in to, so it is only offered there and then.
+			openDeviceProbe: canProbeDevice ? openDeviceProbe : null
 		}
 	}), [
 		settings, capabilities, seerr, achievements, seerrLabel, isSeerr, serverUrl, ratingsResetArmed, resetRatingsSettings,
@@ -1090,7 +1096,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		openPinCode, openKidsMode, openLibraries, openLibraryOrder, openParentalControls, openQrLink, openRatingSources, openRowImageTypes, openExcludedGenres, openMediaBarLibraries,
 		openMediaBarCollections, openScreensaverLibraries, openScreensaverCollections, openScreensaverGenres,
 		openImdbLists, openSeasonalRow, openExternalTmdbLists, openExternalCalendars,
-		openExternalCustomRows, openSeerrHomeRows, openScreen, handleMoonfinToggle, onRunSetupWizard
+		openExternalCustomRows, openSeerrHomeRows, openScreen, handleMoonfinToggle, onRunSetupWizard, canProbeDevice
 	]);
 
 	const openCategory = useCallback((id) => {

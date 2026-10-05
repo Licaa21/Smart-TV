@@ -121,7 +121,7 @@ namespace Moonfin.Xbox
             return device;
         }
 
-        private static IJsonValue ReadDisplay()
+        public static IJsonValue ReadDisplay()
         {
             try
             {

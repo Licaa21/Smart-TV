@@ -15,6 +15,7 @@
 		"build:tizen:legacy": "cd packages/build-tizen && node scripts/build-wgt.js --legacy",
 		"build:vega": "cd packages/build-vega && node build.js",
 		"build:xbox": "cd packages/build-xbox && node build.js",
+		"build:xbox:probe": "cd packages/build-xbox && node build.js --probe",
 		"dev:webos": "cd packages/app && cross-env REACT_APP_PLATFORM=webos npm run serve",
 		"dev:tizen": "cd packages/app && cross-env REACT_APP_PLATFORM=tizen npm run serve",
 		"dev:vega": "cd packages/app && cross-env REACT_APP_PLATFORM=vega npm run serve",

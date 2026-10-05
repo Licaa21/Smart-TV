@@ -6,6 +6,8 @@ namespace Moonfin.Xbox
     internal sealed class PageMessage
     {
         public string Type;
+        // Set when the page wants an answer, and repeated in the reply.
+        public double? Id;
         // Null when the page sent none, or sent something that isnt an object.
         public JsonObject Payload;
     }
@@ -23,18 +25,25 @@ namespace Moonfin.Xbox
     //   KEEP_DISPLAY_ACTIVE  {active}
     //   PLAYBACK_SESSION     {stopUrl, headers, body} or null
     //   ALLOW_INSECURE_HOST  {host}
+    //   MEMORY               (answered with {usage, limit, level})
+    //   SAVE_REPORT          {text} (answered with {path}), from the probe page
+    //   DISPLAY_GET_MODES    (answered with the display as in the boot data)
+    //   DISPLAY_SET_FOR_MEDIA {hdr: "hdr10"} (answered with {ok, mode, reason})
+    //   DISPLAY_RESTORE      (answered with {ok})
     //
     // Host to page:
     //   APP_STATE  {state: "active" | "background"}
     //   NETWORK    {connected, ip}
     //   KEY        {key}
+    //   REPLY      the answer to a message that carried an id
     internal static class Bridge
     {
         public const int Version = 1;
         public const string PageEvent = "moonfin:xbox";
 
-        // Nothing the page sends comes near this. A longer message is dropped unread.
-        public const int MaxMessageLength = 64 * 1024;
+        // The probe's report is the longest thing the page sends and stays well under
+        // this. A longer message is dropped unread.
+        public const int MaxMessageLength = 256 * 1024;
 
         public static PageMessage Parse(string raw)
         {
@@ -49,6 +58,9 @@ namespace Moonfin.Xbox
 
             var message = new PageMessage { Type = type.GetString() };
 
+            IJsonValue id = Named(envelope, "id");
+            if (id != null && id.ValueType == JsonValueType.Number) message.Id = id.GetNumber();
+
             IJsonValue payload = Named(envelope, "payload");
             if (payload != null && payload.ValueType == JsonValueType.Object) message.Payload = payload.GetObject();
 
@@ -59,6 +71,15 @@ namespace Moonfin.Xbox
         public static string ToPageScript(string type, IJsonValue payload)
         {
             return DispatchScript(Envelope(type, payload));
+        }
+
+        // The answer to a page message that carried an id. A null error means it went well.
+        public static string ReplyScript(double id, IJsonValue payload, string error)
+        {
+            JsonObject envelope = Envelope("REPLY", payload);
+            envelope.SetNamedValue("id", JsonValue.CreateNumberValue(id));
+            if (error != null) envelope.SetNamedValue("error", JsonValue.CreateStringValue(error));
+            return DispatchScript(envelope);
         }
 
         // Runs before any page code, so the app can read the console and its address

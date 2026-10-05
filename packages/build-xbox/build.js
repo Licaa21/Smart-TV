@@ -7,7 +7,17 @@
 // with the Visual Studio Build Tools and their UWP workload. Pass --no-msix to stop
 // once the web app is in place, which works on any system.
 //
-//   node build.js [--debug] [--no-msix] [--no-web] [--dev-url <url>]
+//   node build.js [--debug] [--no-msix] [--no-web] [--probe-clips] [--dev-url <url>]
+//   node build.js --probe [--debug] [--server <url>] [--emby <url>] [--image <url>] [--report <url>] [--media <label=url>]...
+//
+// The app carries the device probe, which Settings opens for a signed in user, see
+// probe/probe.js. --probe-clips adds the test clips its playback run plays, made
+// beforehand with probe/make-clips.js. They are some 70 MB, so a build for testers
+// takes them and an ordinary one doesnt.
+//
+// --probe packages the probe page instead of the app, with the clips. It is a
+// package of its own name, so it installs beside the app rather than over it, and
+// is for a device the app doesnt start on.
 //
 // --no-web keeps the web app already in www and only builds the host again, for
 // when nothing but the C# changed.
@@ -35,6 +45,7 @@ const WWW_DIR = path.join(HOST_DIR, 'www');
 const PACKAGES_DIR = path.join(HOST_DIR, 'AppPackages');
 const CERT_DIR = path.join(__dirname, '.cert');
 const MANIFEST_PATH = path.join(HOST_DIR, 'Package.appxmanifest');
+const PROBE_DIR = path.join(__dirname, 'probe');
 const BUILD_MANIFEST = 'Package.Build.appxmanifest';
 
 // Files the subtitle renderers load next to the page. The page has a real origin
@@ -51,6 +62,7 @@ const PAGE_ASSETS = [
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
 const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : null);
+const everyOption = (name) => args.map((arg, index) => (arg === name ? args[index + 1] : null)).filter(Boolean);
 
 const run = (cmd, opts = {}) => {
 	console.log(`> ${cmd}`);
@@ -138,11 +150,70 @@ const buildApp = (appPkg) => {
 	console.log('\n Copying Sandstone fonts...');
 	copyDirRecursive(path.join(ROOT_DIR, SANDSTONE_FONTS), path.join(WWW_DIR, SANDSTONE_FONTS));
 
+	// Settings opens the probe once the user is signed in. Its test clips are large, so
+	// they only go along when asked for.
+	console.log('\n Adding the device probe...');
+	const probe = writeProbe(path.join(WWW_DIR, 'probe'), {assets: '../', clips: flag('--probe-clips')});
+	console.log(`  ${probe.bundled.length} test clips${flag('--probe-clips') ? '' : ' (pass --probe-clips to bundle them)'}`);
+
 	console.log('\n Pruning ilib locale data...');
 	require(path.join(ROOT_DIR, 'scripts', 'prune-ilib-locales.js'))(WWW_DIR);
 
 	console.log('\n Pruning bundled translation copies...');
 	require(path.join(ROOT_DIR, 'scripts', 'prune-bundled-strings.js'))(WWW_DIR);
+};
+
+// What kind of file a test clip is, which tells the probe what has to come out of it.
+const AUDIO_ONLY = /\.(mp3|flac|m4a|aac|ogg|opus|wav)$/i;
+const MEDIA_FILE = /\.(mp4|m4v|mkv|webm|mov|ts|mp3|flac|m4a|aac|ogg|opus|wav)$/i;
+
+// The probe page reports what the WebView can do. Server and media addresses are
+// written into the package rather than the repo. Test clips in probe/media travel
+// with it, so the playback run needs no server at all.
+//
+// The page goes into `dir`. `assets` is where, seen from there, the subtitle workers
+// sit, and `clips` says whether the test clips go along.
+const writeProbe = (dir, {assets = '', clips = true} = {}) => {
+	fs.rmSync(dir, {recursive: true, force: true});
+	fs.mkdirSync(dir, {recursive: true});
+	for (const entry of fs.readdirSync(PROBE_DIR, {withFileTypes: true})) {
+		if (entry.isFile() && entry.name !== 'make-clips.js') fs.copyFileSync(path.join(PROBE_DIR, entry.name), path.join(dir, entry.name));
+	}
+
+	const mediaSource = path.join(PROBE_DIR, 'media');
+	const bundled = clips && fs.existsSync(mediaSource) ? fs.readdirSync(mediaSource).filter((name) => MEDIA_FILE.test(name)).sort() : [];
+	if (bundled.length) {
+		fs.mkdirSync(path.join(dir, 'media'), {recursive: true});
+		for (const name of bundled) fs.copyFileSync(path.join(mediaSource, name), path.join(dir, 'media', name));
+	}
+
+	const config = {
+		assets,
+		jellyfin: option('--server') || '',
+		emby: option('--emby') || '',
+		image: option('--image') || '',
+		report: option('--report') || '',
+		media: [
+			// A clip named t- belongs to a test a person has to judge, and the unattended run
+			// leaves it out.
+			...bundled.map((name) => ({label: name, url: `media/${name}`, video: !AUDIO_ONLY.test(name), interactive: /^t-/.test(name)})),
+			...everyOption('--media').map((entry) => {
+				const split = entry.indexOf('=');
+				return split === -1 ? {label: entry, url: entry} : {label: entry.slice(0, split), url: entry.slice(split + 1)};
+			})
+		]
+	};
+	fs.writeFileSync(path.join(dir, 'probe-config.js'), `window.PROBE_CONFIG = ${JSON.stringify(config, null, '\t')};\n`);
+	return {config, bundled};
+};
+
+// The probe as a package of its own, for a device the app doesnt start on.
+const buildProbe = () => {
+	console.log(' Packaging the probe page...\n');
+	const {config, bundled} = writeProbe(WWW_DIR);
+	copyPageAssets(WWW_DIR);
+	console.log(`  Jellyfin: ${config.jellyfin || '(none)'}\n  Emby: ${config.emby || '(none)'}\n  Media files: ${config.media.length} (${bundled.length} bundled)`);
+	if (!bundled.length) console.log('  No test clips, so the playback run has nothing to play. Make them with: node probe/make-clips.js');
 };
 
 // A console only takes a package over one it already has when the version went up,
@@ -158,13 +229,23 @@ const nextDebugRevision = () => {
 	return next;
 };
 
-// The manifest a Debug build is made from: the app's own under a higher version. It
-// is written fresh each build and never committed. Null for a Release build, which
-// uses the manifest as it is.
+// The manifest a Debug or a probe build is made from: the app's own, with the probe
+// under another name and a Debug build under a higher version. It is written fresh
+// each build and never committed. Null for a Release build of the app, which uses
+// the manifest as it is.
 const writeBuildManifest = (version) => {
-	if (!flag('--debug')) return null;
-	const manifest = fs.readFileSync(MANIFEST_PATH, 'utf8')
-		.replace(/(<Identity[^>]*?Version=")[^"]*(")/, `$1${version}.${nextDebugRevision()}$2`);
+	if (!flag('--probe') && !flag('--debug')) return null;
+	let manifest = fs.readFileSync(MANIFEST_PATH, 'utf8');
+	if (flag('--debug')) {
+		manifest = manifest.replace(/(<Identity[^>]*?Version=")[^"]*(")/, `$1${version}.${nextDebugRevision()}$2`);
+	}
+	if (flag('--probe')) {
+		manifest = manifest
+			.replace(/(<Identity[^>]*?Name=")[^"]*(")/, '$1Moonfin.Xbox.Probe$2')
+			.replace(/(PhoneProductId=")[^"]*(")/, '$1b0c9f6a2-6d0f-4c0e-9f5e-2f1d8a7c4e11$2')
+			.replace(/<DisplayName>[^<]*<\/DisplayName>/, '<DisplayName>Moonfin Probe</DisplayName>')
+			.replace(/(<uap:VisualElements[^>]*?DisplayName=")[^"]*(")/, '$1Moonfin Probe$2');
+	}
 	fs.writeFileSync(path.join(HOST_DIR, BUILD_MANIFEST), manifest);
 	return BUILD_MANIFEST;
 };
@@ -285,10 +366,10 @@ const buildMsix = (version) => {
 	// too, so it stays out of the command line and the log.
 	execFileSync(msbuild, msbuildArgs, {stdio: 'inherit', env: {...process.env, PackageCertificatePassword: certificate.password}});
 
-	const built = findFiles(PACKAGES_DIR, (name) => /^Moonfin\.Xbox_.*\.(msix|appx)$/.test(name))[0];
+	const built = findFiles(PACKAGES_DIR, (name) => /^Moonfin\.Xbox(\.Probe)?_.*\.(msix|appx)$/.test(name))[0];
 	if (!built) throw new Error(`No package found under ${PACKAGES_DIR}`);
 
-	const prefix = `Moonfin_Xbox_${configuration === 'Debug' ? 'Debug_' : ''}`;
+	const prefix = `Moonfin_Xbox_${flag('--probe') ? 'Probe_' : ''}${configuration === 'Debug' ? 'Debug_' : ''}`;
 	for (const file of fs.readdirSync(ROOT_DIR).filter((entry) => entry.startsWith(prefix) && /^\d+\.\d+\.\d+\.msix$/.test(entry.slice(prefix.length)))) {
 		fs.unlinkSync(path.join(ROOT_DIR, file));
 	}
@@ -307,9 +388,10 @@ try {
 	if (flag('--dev-url') && !flag('--debug')) throw new Error('--dev-url only works with --debug, since a Release host loads nothing but its own package');
 
 	console.log(' Building Moonfin for Xbox...\n');
-	if (flag('--dev-url')) writeDevUrl(option('--dev-url'));
+	if (flag('--probe')) buildProbe();
+	else if (flag('--dev-url')) writeDevUrl(option('--dev-url'));
 	else if (!flag('--no-web')) buildApp(appPkg);
-	else if (!fs.existsSync(path.join(WWW_DIR, 'main.js'))) throw new Error(`--no-web needs the web app in ${WWW_DIR}, and it is not there.`);
+	else if (!fs.existsSync(path.join(WWW_DIR, 'main.js'))) throw new Error(`--no-web needs the web app in ${WWW_DIR}, and it is not there. A probe build leaves its own page in that folder.`);
 	syncManifestVersion(appPkg.version);
 
 	if (flag('--no-msix')) {

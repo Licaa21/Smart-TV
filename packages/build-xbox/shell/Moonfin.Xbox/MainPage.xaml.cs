@@ -381,8 +381,29 @@ namespace Moonfin.Xbox
                     AllowInsecureHost(Bridge.NamedString(message.Payload, "host"));
                     break;
 
+                case "MEMORY":
+                    Reply(message, ReadMemory(), null);
+                    break;
+
+                case "SAVE_REPORT":
+                    SaveReport(message);
+                    break;
+
+                case "DISPLAY_GET_MODES":
+                    Reply(message, BootData.ReadDisplay(), null);
+                    break;
+
+                case "DISPLAY_SET_FOR_MEDIA":
+                    SetDisplayForMedia(message);
+                    break;
+
+                case "DISPLAY_RESTORE":
+                    RestoreDisplay(message);
+                    break;
+
                 default:
                     HostLog.Write("bridge", "Unknown message " + message.Type);
+                    Reply(message, null, "Unknown message " + message.Type);
                     break;
             }
         }
@@ -393,6 +414,58 @@ namespace Moonfin.Xbox
             // The WebView names a server without its port when the port is the usual one.
             if (host.EndsWith(":443", StringComparison.Ordinal)) host = host.Substring(0, host.Length - 4);
             insecureHosts.Add(host);
+        }
+
+        // The probe page's findings, kept in the app's own folder where the Device Portal's
+        // file explorer can fetch them: LocalAppData, this package, LocalState.
+        private async void SaveReport(PageMessage message)
+        {
+            try
+            {
+                string text = Bridge.NamedString(message.Payload, "text");
+                if (text == null)
+                {
+                    Reply(message, null, "No report text");
+                    return;
+                }
+                StorageFile file = await ApplicationData.Current.LocalFolder.CreateFileAsync("probe-report.txt", CreationCollisionOption.ReplaceExisting);
+                await FileIO.WriteTextAsync(file, text);
+
+                var saved = new JsonObject();
+                saved.SetNamedValue("path", JsonValue.CreateStringValue(file.Path));
+                Reply(message, saved, null);
+            }
+            catch (Exception ex)
+            {
+                Reply(message, null, ex.Message);
+            }
+        }
+
+        // Only HDR10 is asked for. Anything else the page names is left as the console has it.
+        private async void SetDisplayForMedia(PageMessage message)
+        {
+            if (Bridge.NamedString(message.Payload, "hdr") != "hdr10")
+            {
+                Reply(message, null, "Only hdr10 can be asked for");
+                return;
+            }
+            Reply(message, await DisplayModes.SetForHdr10Async(), null);
+        }
+
+        private async void RestoreDisplay(PageMessage message)
+        {
+            var answer = new JsonObject();
+            answer.SetNamedValue("ok", JsonValue.CreateBooleanValue(await DisplayModes.RestoreAsync()));
+            Reply(message, answer, null);
+        }
+
+        private static JsonObject ReadMemory()
+        {
+            var memory = new JsonObject();
+            memory.SetNamedValue("usage", JsonValue.CreateNumberValue(MemoryManager.AppMemoryUsage));
+            memory.SetNamedValue("limit", JsonValue.CreateNumberValue(MemoryManager.AppMemoryUsageLimit));
+            memory.SetNamedValue("level", JsonValue.CreateStringValue(MemoryManager.AppMemoryUsageLevel.ToString()));
+            return memory;
         }
 
         // The console dims the screen when the controller is left alone, so the request is
@@ -442,6 +515,12 @@ namespace Moonfin.Xbox
         private void SendToPage(string type, IJsonValue payload)
         {
             RunScript(Bridge.ToPageScript(type, payload));
+        }
+
+        // The page that asked is there to hear the answer, loaded or not.
+        private void Reply(PageMessage message, IJsonValue payload, string error)
+        {
+            if (message.Id.HasValue) RunScript(Bridge.ReplyScript(message.Id.Value, payload, error), true);
         }
 
         private void SendKey(string key)
@@ -501,6 +580,7 @@ namespace Moonfin.Xbox
         {
             SetDisplayActive(false);
             SendAppState(false);
+            await DisplayModes.RestoreAsync();
 
             PlaybackSession session = playbackSession;
             playbackSession = null;

@@ -974,6 +974,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.TOGGLE, key: 'serverLogging', label: () => $L('Server Logging'), desc: () => $L('Send logs to Jellyfin server for troubleshooting'), icon: 'info'},
 					{kind: KIND.TOGGLE, key: 'diagnosticLoggingEnabled', label: () => $L('Diagnostic Logging'), desc: () => $L('Record server requests, playback and subtitle activity so problems can be traced'), icon: 'bug_report'},
 					{kind: KIND.NAV, id: 'viewLogs', label: () => $L('View Logs'), desc: () => $L('Read the recorded log and send a report'), icon: 'description', action: (ctx) => ctx.actions.openDiagnostics()},
+					{kind: KIND.NAV, id: 'deviceProbe', label: () => $L('Device Probe'), desc: () => $L('Test what this device can play and send the report to your server'), icon: 'tv', when: (ctx) => !!ctx.actions.openDeviceProbe, action: (ctx) => ctx.actions.openDeviceProbe()},
 					{kind: KIND.SECTION, id: 'device', label: () => $L('Device'), when: (ctx) => !!ctx.capabilities},
 					{kind: KIND.INFO, id: 'model', label: () => $L('Model'), value: (ctx) => ctx.capabilities?.modelName || $L('Unknown'), icon: 'info', when: (ctx) => !!ctx.capabilities},
 					{
