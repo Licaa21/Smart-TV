@@ -43,7 +43,10 @@ const portal = async (method, route, body) => {
 
 const installed = async () => {
 	const {InstalledPackages} = await (await portal('GET', '/api/app/packagemanager/packages')).json();
-	return InstalledPackages.find((entry) => entry.PackageFullName.startsWith(`${IDENTITY}_`)) || null;
+	// The one being replaced stays listed for a while after an install, so the newest is taken
+	const versionOf = ({Version: v}) => [v.Major, v.Minor, v.Build, v.Revision];
+	const newer = (a, b) => versionOf(b).map((part, i) => part - versionOf(a)[i]).find((difference) => difference !== 0) || 0;
+	return InstalledPackages.filter((entry) => entry.PackageFullName.startsWith(`${IDENTITY}_`)).sort(newer)[0] || null;
 };
 
 const close = async () => {
