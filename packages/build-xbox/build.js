@@ -101,6 +101,33 @@ const copyPageAssets = (dir) => {
 // very path and the CSS stays as it is.
 const SANDSTONE_FONTS = path.join('node_modules', '@enact', 'sandstone', 'fonts');
 
+// What the page may load and run. A server can be at any address, so pictures,
+// media and requests are left open. What is shut is a script written into the page,
+// which is how markup out of a server or a subtitle would run one, along with frames
+// and plugins. Scripts may still be evaluated and come from anywhere, since the
+// emulator builds its workers that way and fetches its cores from the server.
+const CONTENT_SECURITY_POLICY = [
+	"default-src 'self'",
+	"script-src 'self' 'unsafe-eval' blob: http: https:",
+	"style-src 'self' 'unsafe-inline' http: https:",
+	'img-src * data: blob:',
+	'media-src * data: blob:',
+	'connect-src * ws: wss: data: blob:',
+	"font-src 'self' data: blob: http: https:",
+	"worker-src 'self' blob:",
+	"frame-src 'none'",
+	"object-src 'none'",
+	"base-uri 'self'",
+	"form-action 'none'"
+].join('; ');
+
+const addContentSecurityPolicy = (dir) => {
+	const file = path.join(dir, 'index.html');
+	const html = fs.readFileSync(file, 'utf8');
+	if (!html.includes('<head>')) throw new Error('index.html has no head to put the content security policy in');
+	fs.writeFileSync(file, html.replace('<head>', `<head>\n\t\t<meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">`));
+};
+
 const buildApp = (appPkg) => {
 	const ENACT_ALIAS = JSON.stringify({
 		'@moonfin/platform-webos': path.resolve(__dirname, '..', 'platform-webos', 'src'),
@@ -146,6 +173,7 @@ const buildApp = (appPkg) => {
 	fs.rmSync(WWW_DIR, {recursive: true, force: true});
 	copyDirRecursive(path.join(APP_DIR, 'dist'), WWW_DIR);
 	fs.rmSync(path.join(APP_DIR, 'dist'), {recursive: true, force: true});
+	addContentSecurityPolicy(WWW_DIR);
 
 	console.log('\n Copying the subtitle workers and banner...');
 	copyPageAssets(WWW_DIR);
