@@ -10,6 +10,10 @@
 // where it said so, and DTS, which it said no to, played the picture in silence, as
 // TrueHD did. HDR, VP9 and AV1 arent offered, since only light test clips of those
 // have been played, which dont say how a real file fares.
+//
+// The WebView is given no hardware decoder there, so H.264 is decoded by the
+// processor and stays at 1080p. HEVC goes through the console's own decoder, and is
+// the only codec offered in 4K.
 import {bootData} from './bridge';
 import {modelName} from './deviceInfo';
 
@@ -63,7 +67,12 @@ export const getDeviceCapabilities = async () => {
 		webm: false,
 		ts: false,
 
-		nativeHls: canPlay('application/vnd.apple.mpegurl')
+		nativeHls: canPlay('application/vnd.apple.mpegurl'),
+
+		// A console is often on a wireless link that carries a fraction of what it plays
+		fitsBitrateToLink: true,
+		// The console's HEVC decoder shows some files with a quarter of their frames missing
+		watchesDroppedFrames: true
 	};
 
 	return cachedCapabilities;
@@ -136,7 +145,7 @@ export const getJellyfinDeviceProfile = async () => {
 			Conditions: [
 				{Condition: 'EqualsAny', Property: 'VideoProfile', Value: 'high|main|baseline|constrained baseline', IsRequired: false},
 				{Condition: 'EqualsAny', Property: 'VideoRangeType', Value: 'SDR', IsRequired: false},
-				{Condition: 'LessThanEqual', Property: 'VideoLevel', Value: caps.uhd ? '51' : '42', IsRequired: false}
+				{Condition: 'LessThanEqual', Property: 'VideoLevel', Value: '42', IsRequired: false}
 			]
 		},
 		{
@@ -145,7 +154,9 @@ export const getJellyfinDeviceProfile = async () => {
 			Conditions: [
 				{Condition: 'EqualsAny', Property: 'VideoProfile', Value: 'main|main 10', IsRequired: false},
 				{Condition: 'EqualsAny', Property: 'VideoRangeType', Value: 'SDR', IsRequired: false},
-				{Condition: 'LessThanEqual', Property: 'VideoLevel', Value: caps.uhd ? '153' : '123', IsRequired: false}
+				{Condition: 'LessThanEqual', Property: 'VideoLevel', Value: '153', IsRequired: false},
+				// A 1080p file is often marked with a 4K level, so the size is held by itself
+				...(caps.uhd ? [] : [{Condition: 'LessThanEqual', Property: 'Width', Value: '1920', IsRequired: false}])
 			]
 		},
 		{

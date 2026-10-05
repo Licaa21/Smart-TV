@@ -33,6 +33,7 @@ export const setupVisibilityHandler = (...args) => impl.setupVisibilityHandler(.
 export const waitForDecoderRelease = (...args) => impl.waitForDecoderRelease(...args);
 export const getSharedVideoElement = (...args) => impl.getSharedVideoElement(...args);
 export const leavesPlayerInBackground = () => !!impl.leavesPlayerInBackground;
+export const resumesAfterFirstFrame = (mediaSource) => !!impl.resumesAfterFirstFrame?.(mediaSource);
 
 // Only Xbox hands the page its controller as keys as well, which a game reading the
 // controller itself would get twice.

@@ -1,5 +1,5 @@
 import {clearCapabilitiesCache, detectXboxVersion, getDeviceCapabilities, getDeviceName, getJellyfinDeviceProfile} from '../../../platform-xbox/src/deviceProfile';
-import {getPlayMethod} from '../../../platform-xbox/src/video';
+import {getPlayMethod, resumesAfterFirstFrame} from '../../../platform-xbox/src/video';
 
 // Chromium with the HEVC decoder present
 const canPlayType = (type) => (/hvc1|avc1|mp4a|flac/.test(type) ? 'probably' : '');
@@ -58,7 +58,7 @@ describe('the Xbox device profile', () => {
 
 	test('reads the console and its OS from the host', async () => {
 		const capabilities = await capabilitiesFor(boot());
-		expect(capabilities).toMatchObject({modelName: 'Xbox One S', xboxVersionDisplay: 'Xbox OS 10.0.26100.5000'});
+		expect(capabilities).toMatchObject({modelName: 'Xbox One S', xboxVersionDisplay: 'Xbox OS 10.0.26100.5000', fitsBitrateToLink: true, watchesDroppedFrames: true});
 		expect(detectXboxVersion()).toBe('10.0.26100.5000');
 		expect(await getDeviceName()).toBe('Xbox One S');
 	});
@@ -100,8 +100,24 @@ describe('the Xbox device profile', () => {
 		expect(mp4.VideoCodec).toBe('h264,hevc');
 		expect(mp4.AudioCodec).toBe('aac,mp3,flac');
 		expect(profile.CodecProfiles.find((entry) => entry.Codec === 'hevc').Conditions[1].Value).toBe('SDR');
-		expect(profile.CodecProfiles.find((entry) => entry.Codec === 'hevc').Conditions[2].Value).toBe('153');
 		expect(profile.DirectPlayProfiles.some((entry) => /(^|,)(ts|webm)(,|$)/.test(entry.Container))).toBe(false);
+	});
+
+	test('keeps H.264 at 1080p on any console, and HEVC there too until the console reports 4K', async () => {
+		const conditions = (profile, codec) => profile.CodecProfiles.find((entry) => entry.Codec === codec).Conditions;
+		const widthLimit = (list) => list.find((condition) => condition.Property === 'Width');
+		const level = (list) => list.find((condition) => condition.Property === 'VideoLevel').Value;
+
+		await capabilitiesFor(boot());
+		const full = await getJellyfinDeviceProfile();
+		expect(level(conditions(full, 'h264'))).toBe('42');
+		expect(level(conditions(full, 'hevc'))).toBe('153');
+		expect(widthLimit(conditions(full, 'hevc'))).toBeUndefined();
+
+		await capabilitiesFor(boot({protection: {hevc: true, uhd: false}}));
+		const hd = await getJellyfinDeviceProfile();
+		expect(level(conditions(hd, 'hevc'))).toBe('153');
+		expect(widthLimit(conditions(hd, 'hevc'))).toMatchObject({Condition: 'LessThanEqual', Value: '1920'});
 	});
 
 	test('every transcode is H.264 and stereo AAC over HLS', async () => {
@@ -136,9 +152,17 @@ describe('the Xbox play method', () => {
 		expect(getPlayMethod(source({MediaStreams: [{Type: 'Video', Codec: 'h264', Width: 1920}, {Type: 'Audio', Codec: 'eac3', Index: 1}]}), full)).toBe('Transcode');
 	});
 
-	test('plays SDR HEVC and 4K where the console reported them', () => {
+	test('plays SDR HEVC and 4K where the console reported them, and 4K in no other codec', () => {
 		expect(getPlayMethod(video({Codec: 'hevc'}), full)).toBe('DirectPlay');
 		expect(getPlayMethod(video({Codec: 'hevc', Width: 3840}), full)).toBe('DirectPlay');
+		expect(getPlayMethod(video({Width: 3840}), full)).toBe('Transcode');
+		expect(getPlayMethod(video({Codec: 'hevc', Width: 3840}), {...full, uhd: false})).toBe('Transcode');
+	});
+
+	test('only an HEVC file has to show its first frame before it is resumed', () => {
+		expect(resumesAfterFirstFrame(video({Codec: 'hevc'}))).toBe(true);
+		expect(resumesAfterFirstFrame(video({Codec: 'h264'}))).toBe(false);
+		expect(resumesAfterFirstFrame(null)).toBe(false);
 	});
 
 	test('respects a bitrate limit the user set', () => {

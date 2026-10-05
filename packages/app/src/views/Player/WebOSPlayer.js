@@ -24,7 +24,8 @@ import {
 	getSharedVideoElement,
 	setupVisibilityHandler,
 	setupPlatformLifecycle,
-	leavesPlayerInBackground
+	leavesPlayerInBackground,
+	resumesAfterFirstFrame
 } from '../../services/video';
 import {KEYS, isBackKey} from '../../utils/keys';
 import {useSettings} from '../../context/SettingsContext';
@@ -1471,14 +1472,20 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			destroyHlsPlayer();
 
 			let srcUrl = mediaUrl;
+			const isHls = mimeType === 'application/x-mpegURL' || mediaUrl.includes('.m3u8');
 			const resumeTicks = pendingResumeTicksRef.current;
-			if (resumeTicks > 0) {
+			if (resumeTicks > 0 && !isHls && resumesAfterFirstFrame(playback.getCurrentSession()?.mediaSource)) {
+				// Where a seek made before the first frame shows never lands, the file is
+				// opened at its start and the resume waits for that frame.
+				video.addEventListener('loadeddata', () => {
+					if (video.src === mediaUrl && pendingResumeTicksRef.current > 0) video.currentTime = pendingResumeTicksRef.current / 10000000;
+				}, {once: true});
+			} else if (resumeTicks > 0) {
 				const resumeSec = resumeTicks / 10000000;
 				srcUrl = mediaUrl + '#t=' + resumeSec;
 				console.log('[Player] Appending media fragment #t=' + resumeSec + ' for resume (' + resumeTicks + ' ticks)');
 			}
 
-			const isHls = mimeType === 'application/x-mpegURL' || mediaUrl.includes('.m3u8');
 			// forceHlsJsRef overrides native when HEVC decoding already failed
 			const nativeHlsOk = !forceHlsJsRef.current
 				&& !!(video.canPlayType('application/x-mpegURL').replace(/no/, ''));
@@ -1850,6 +1857,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			if (healthMonitorRef.current) {
 				healthMonitorRef.current.recordProgress();
+				healthMonitorRef.current.recordFrames(videoRef.current);
 			}
 
 			if (subtitleTrackEvents && subtitleTrackEvents.length > 0) {

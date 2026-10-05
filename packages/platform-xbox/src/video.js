@@ -19,6 +19,9 @@ export {
 	setupVisibilityHandler
 } from '@moonfin/platform-webos/video';
 
+const H264_NAMES = ['h264', 'avc'];
+const HEVC_NAMES = ['hevc', 'h265', 'hev1', 'hvc1'];
+
 export const getSharedVideoElement = () => {
 	const video = sharedVideoElement();
 	video.disableRemotePlayback = true;
@@ -28,6 +31,14 @@ export const getSharedVideoElement = () => {
 // A suspended app is frozen and may be ended at any moment, so the player lets
 // go of playback and the user comes back to the details page.
 export const leavesPlayerInBackground = true;
+
+// A seek made before the first frame has shown never lands for HEVC here, though
+// one made after it does. So such a file is opened at its start and the player seeks
+// to the resume point once that frame is in.
+export const resumesAfterFirstFrame = (mediaSource) => {
+	const video = (mediaSource?.MediaStreams || []).find((stream) => stream.Type === 'Video');
+	return HEVC_NAMES.includes((video?.Codec || '').toLowerCase());
+};
 
 // The page hears of its own visibility and the host of the app's, and one trip
 // to the background can be told both ways, so only a change is passed on.
@@ -127,14 +138,14 @@ export const getPlayMethod = (mediaSource, capabilities, options = {}) => {
 		return 'Transcode';
 	}
 
-	const videoCodecs = ['h264', 'avc'];
-	if (capabilities.hevc) videoCodecs.push('hevc', 'h265', 'hev1', 'hvc1');
 	const videoCodec = (videoStream.Codec || '').toLowerCase();
+	const isHevc = HEVC_NAMES.includes(videoCodec);
 
-	const videoOk = !videoCodec || videoCodecs.includes(videoCodec);
+	const videoOk = !videoCodec || H264_NAMES.includes(videoCodec) || (isHevc && !!capabilities.hevc);
 	const containerOk = !container || containerParts.some((part) => VIDEO_CONTAINERS.includes(part));
 	const hdrOk = rangeOk(videoStream, capabilities);
-	const sizeOk = capabilities.uhd || !videoStream.Width || videoStream.Width <= 1920;
+	// Only HEVC has the console's own decoder behind it, so nothing else goes past 1080p
+	const sizeOk = !videoStream.Width || videoStream.Width <= 1920 || (capabilities.uhd && isHevc);
 	const bitrateOk = !(options.maxBitrate > 0) || !videoStream.BitRate || videoStream.BitRate <= options.maxBitrate;
 
 	const playable = videoOk && audioOk && containerOk && hdrOk && sizeOk && bitrateOk;

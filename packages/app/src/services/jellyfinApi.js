@@ -87,6 +87,7 @@ const buildAuthHeader = (type, token) => {
 };
 
 export const getAuthHeader = () => buildAuthHeader(serverType, accessToken);
+export const getAuthHeaderFor = buildAuthHeader;
 
 export const initDeviceId = async () => {
 	try {
