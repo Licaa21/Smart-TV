@@ -994,6 +994,18 @@ export const getTrickplayInfo = async (itemId) => {
 	return null;
 };
 
+// What a segment lookup found, in the diagnostic report, so a missing skip prompt can be told from a
+// lookup that came back empty.
+const logSegments = (itemId, source, segments) => {
+	serverLogger.playback('Media segments looked up', {
+		itemId,
+		source,
+		intro: segments.introStart != null ? [segments.introStart, segments.introEnd] : null,
+		credits: segments.creditsStart != null ? [segments.creditsStart, segments.creditsEnd] : null,
+		segments: segments.list.length
+	});
+};
+
 export const getMediaSegments = async (itemId) => {
 	const segments = {
 		introStart: null,
@@ -1024,11 +1036,13 @@ export const getMediaSegments = async (itemId) => {
 			}
 			if (segments.introStart !== null || segments.creditsStart !== null) {
 				console.log('[Playback] Media segments found:', segments);
+				logSegments(itemId, 'server', segments);
 				return segments;
 			}
 		}
 	} catch (e) {
 		console.warn('[Playback] Media Segments API not available, falling back to chapters:', e.message);
+		serverLogger.playback('Media segment request failed', {itemId, error: e.message});
 	}
 
 	// Fallback: check chapter markers
@@ -1073,6 +1087,7 @@ export const getMediaSegments = async (itemId) => {
 			if (segments.introStart !== null || segments.creditsStart !== null) {
 				console.log('[Playback] Segments found via chapters:', segments);
 			}
+			logSegments(itemId, 'chapters', segments);
 		}
 	} catch (e) {
 		console.warn('[Playback] Failed to fetch chapters for segments:', e.message);
