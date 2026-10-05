@@ -6,7 +6,7 @@ import {personDateLines} from '../../../utils/personCredits';
 //
 // Genres, the series status and the ratings all have rows of their own on this hero, so none of
 // them take part here.
-export const nouveauMetaPieces = ({item, year, officialRating, runtime, endsAt, seasonCount, episodeCount}) => {
+export const nouveauMetaPieces = ({item, year, officialRating, runtime, endsAt, seasonCount, episodeCount, showsBirthplace = true}) => {
 	const pieces = [];
 	const add = (text) => {
 		if (text) pieces.push(text);
@@ -16,7 +16,7 @@ export const nouveauMetaPieces = ({item, year, officialRating, runtime, endsAt, 
 	// were born.
 	if (item.Type === 'Person') {
 		personDateLines(item.PremiereDate, item.EndDate).forEach(add);
-		add(item.ProductionLocations?.[0]);
+		if (showsBirthplace) add(item.ProductionLocations?.[0]);
 		return pieces;
 	}
 

@@ -69,7 +69,8 @@ const SERVER_TO_LOCAL = {
 	unpauseRewindDuration: 'unpauseRewind',
 	confirmExit: 'exitConfirmation',
 	DetailMetadataOrderTv: 'detailMetadataOrderTv',
-	HiddenDetailMetadataTv: 'hiddenDetailMetadataTv'
+	HiddenDetailMetadataTv: 'hiddenDetailMetadataTv',
+	HiddenDetailSectionsTv: 'hiddenDetailSectionsTv'
 };
 const LOCAL_TO_SERVER = Object.fromEntries(
 	Object.entries(SERVER_TO_LOCAL).map(([s, l]) => [l, s])
@@ -300,6 +301,7 @@ export const SYNCABLE_KEYS = [
 	'detailButtonsMaxVisible',
 	'detailButtonOrderTv', 'hiddenDetailButtonsTv', 'osdButtonOrderTv', 'hiddenOsdButtonsTv',
 	'detailMetadataOrderTv', 'hiddenDetailMetadataTv',
+	'hiddenDetailSectionsTv',
 	'focusBorderColor',
 	'navbarOpacity',
 	'navbarColor',

@@ -55,7 +55,7 @@ const hasSpottableBelow = (container, active) => {
 
 const ModernDetailContent = (props) => {
 	const {
-		item, effectiveServerUrl, effectiveApi, serverToken, settings,
+		item, effectiveServerUrl, effectiveApi, serverToken, settings, showsSection,
 		isEpisode, isSeries, isSeason, isPerson, isBoxSet, isAlbum, isMusicArtist, isPlaylist,
 		backdropUrl, posterUrl, logoUrl, onLogoError,
 		year, runtime, endsAt, officialRating, seasonCount, genres, tagline,
@@ -138,11 +138,12 @@ const ModernDetailContent = (props) => {
 
 	// Studio logos come from the plugin TMDB proxy, which caches them server-side
 	// using its own key, so the client only needs the plugin to be enabled.
+	const studios = showsSection('studios') ? item.Studios : undefined;
 	const [tmdbCompanies, setTmdbCompanies] = useState(null);
 	useEffect(() => {
 		let cancelled = false;
 		const tmdbId = item.ProviderIds?.Tmdb;
-		if (!settings.useMoonfinPlugin || !tmdbId || !item.Studios?.length || !effectiveApi?.getStudioCompanies) {
+		if (!settings.useMoonfinPlugin || !tmdbId || !studios?.length || !effectiveApi?.getStudioCompanies) {
 			setTmdbCompanies(null);
 			return undefined;
 		}
@@ -154,13 +155,13 @@ const ModernDetailContent = (props) => {
 		return () => {
 			cancelled = true;
 		};
-	}, [item.Id, item.ProviderIds, item.Studios, settings.useMoonfinPlugin, isSeries, effectiveApi]);
+	}, [item.Id, item.ProviderIds, studios, settings.useMoonfinPlugin, isSeries, effectiveApi]);
 
 	// Only the Jellyfin studios are listed, so selecting one matches the library filter, and
 	// each borrows a TMDB logo when the names line up.
 	const studioCards = useMemo(
-		() => studioCardsFor(item.Studios, studioLogoIndex(tmdbCompanies, effectiveServerUrl, serverToken)),
-		[tmdbCompanies, item.Studios, effectiveServerUrl, serverToken]
+		() => studioCardsFor(studios, studioLogoIndex(tmdbCompanies, effectiveServerUrl, serverToken)),
+		[tmdbCompanies, studios, effectiveServerUrl, serverToken]
 	);
 
 	const [upcomingEpisode, setUpcomingEpisode] = useState(null);
@@ -253,11 +254,17 @@ const ModernDetailContent = (props) => {
 	}, [onSelectStudio]);
 
 	const collectionTabLabel = collectionSections.length > 1 ? $L('Collections') : collectionSections[0]?.name;
-	// Tabs are data-driven, appearing only when their data is present.
+	const chapters = showsSection('chapters') ? item.Chapters : undefined;
+	// On an episode the Episodes tab lists the rest of its season, which is the More episodes
+	// section. A season's own list is the page itself.
+	const listsEpisodes = isSeason || (isEpisode && showsSection('moreEpisodes'));
+	const showsDetails = showsSection('mediaInfo') && supportsMediaSourceSelection && mediaSource?.MediaStreams?.length;
+	// Tabs are data-driven, appearing only when their data is present. A section the viewer
+	// switched off counts as one with nothing in it, so its tab goes the same way.
 	const tabs = useMemo(() => {
 		const list = [];
 		if (isSeries && seasons.length) list.push({id: 'seasons', label: $L('Seasons')});
-		if ((isSeason || isEpisode) && episodes.length) list.push({id: 'episodes', label: $L('Episodes')});
+		if (listsEpisodes && episodes.length) list.push({id: 'episodes', label: $L('Episodes')});
 		if (isPerson) {
 			if (personMovies.length) list.push({id: 'movies', label: $L('Movies')});
 			if (personSeries.length) list.push({id: 'series', label: $L('TV Shows')});
@@ -267,15 +274,15 @@ const ModernDetailContent = (props) => {
 		if (isBoxSet && collectionItems.length) list.push({id: 'items', label: $L('Items')});
 		if (cast.length) list.push({id: 'cast', label: $L('Cast')});
 		if (crew.length) list.push({id: 'crew', label: $L('Crew')});
-		if (item.Studios?.length) list.push({id: 'studios', label: $L('Studios')});
-		if (item.Chapters?.length) list.push({id: 'chapters', label: $L('Chapters')});
+		if (studios?.length) list.push({id: 'studios', label: $L('Studios')});
+		if (chapters?.length) list.push({id: 'chapters', label: $L('Chapters')});
 		if (extras.length) list.push({id: 'extras', label: $L('Extras')});
-		if (supportsMediaSourceSelection && mediaSource?.MediaStreams?.length) list.push({id: 'details', label: $L('Details')});
+		if (showsDetails) list.push({id: 'details', label: $L('Details')});
 		if (collectionSections.length) list.push({id: 'collection', label: collectionTabLabel});
 		if (similar.length) list.push({id: 'similar', label: $L('More Like This')});
 		if (seerr.hasTabContent) list.push({id: 'seerr', label: seerr.displayName});
 		return list;
-	}, [isSeries, seasons.length, isSeason, isEpisode, episodes.length, isPerson, personMovies.length, personSeries.length, isAlbum, isPlaylist, albumTracks.length, playlistItems.length, isMusicArtist, artistAlbums.length, isBoxSet, collectionItems.length, collectionSections.length, collectionTabLabel, cast.length, crew.length, item.Studios, item.Chapters, extras.length, supportsMediaSourceSelection, mediaSource, similar.length, seerr.hasTabContent, seerr.displayName]);
+	}, [isSeries, seasons.length, listsEpisodes, episodes.length, isPerson, personMovies.length, personSeries.length, isAlbum, isPlaylist, albumTracks.length, playlistItems.length, isMusicArtist, artistAlbums.length, isBoxSet, collectionItems.length, collectionSections.length, collectionTabLabel, cast.length, crew.length, studios, chapters, extras.length, showsDetails, similar.length, seerr.hasTabContent, seerr.displayName]);
 
 	const [activeTab, setActiveTab] = useState(null);
 	// Expanded Tabs on keeps the first tab open and lets focus follow selection.
@@ -506,16 +513,16 @@ const ModernDetailContent = (props) => {
 	// what it is like, and the collection it belongs to.
 	const renderSeerrTab = () => (
 		<div className={css.sectionStack}>
-			<SeerrChips details={seerr.details} mediaType={seerr.mediaType} seerrNav={seerrNav} />
-			<SeerrCollectionBanner collection={seerr.details?.collection} onOpen={seerrNav?.onOpenCollection} />
-			<SeerrFacts details={seerr.details} mediaType={seerr.mediaType} />
-			{seerr.recommendationCards.length > 0 && (
+			{seerr.pieces.chips && <SeerrChips details={seerr.details} mediaType={seerr.mediaType} seerrNav={seerrNav} />}
+			{seerr.pieces.collection && <SeerrCollectionBanner collection={seerr.details.collection} onOpen={seerrNav?.onOpenCollection} />}
+			{seerr.pieces.facts && <SeerrFacts details={seerr.details} mediaType={seerr.mediaType} />}
+			{seerr.pieces.recommendations && (
 				<div onFocus={handleSectionFocus}>
 					<h3 className={css.sectionHeading}>{$L('Recommendations')}</h3>
 					{renderGrid(seerr.recommendationCards, 'portrait', onSelectSeerrCard)}
 				</div>
 			)}
-			{seerr.similarCards.length > 0 && (
+			{seerr.pieces.similar && (
 				<div onFocus={handleSectionFocus}>
 					<h3 className={css.sectionHeading}>{$L('Similar')}</h3>
 					{renderGrid(seerr.similarCards, 'portrait', onSelectSeerrCard)}
@@ -705,7 +712,7 @@ const ModernDetailContent = (props) => {
 							{!hideMediaDescription && (
 								<>
 									{tagline && <div className={css.tagline}>{tagline}</div>}
-									<ExpandableOverview text={item.Overview} itemId={item.Id} className={css.descriptionSlot} backRef={overviewBackRef} />
+									<ExpandableOverview text={isPerson && !showsSection('biography') ? '' : item.Overview} itemId={item.Id} className={css.descriptionSlot} backRef={overviewBackRef} />
 								</>
 							)}
 							{!isPerson && (

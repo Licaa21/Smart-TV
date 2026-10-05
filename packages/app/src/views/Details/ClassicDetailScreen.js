@@ -9,8 +9,7 @@ import {castPhotoUrl, hidesMediaDescription, seriesThumbUrl} from './detailsMedi
 import {isMdblistEnabled} from '../../services/mdblistApi';
 import {formatTime} from '../Player/PlayerConstants';
 import {SeerrStatusBadge, SeerrDownloadBars, SeerrSeasonDot} from '../../components/seerr/SeerrStatusBadge';
-import {SeerrChips, SeerrFacts, SeerrCollectionBanner, hasSeerrChips} from '../../components/seerr/SeerrSections';
-import {hasMediaFacts} from '../../utils/seerrMediaFacts';
+import {SeerrChips, SeerrFacts, SeerrCollectionBanner} from '../../components/seerr/SeerrSections';
 import {SpottableDiv, RowContainer} from './detailsSpottables';
 import ExpandableOverview from './ExpandableOverview';
 import {handleSectionKeyDown, handleScrollerFocus} from './detailsFocus';
@@ -37,6 +36,7 @@ const ClassicDetailScreen = ({
 	serverUrl,
 	serverToken,
 	settings,
+	showsSection,
 	isEpisode,
 	isSeries,
 	isBoxSet,
@@ -224,27 +224,29 @@ const ClassicDetailScreen = ({
 				)}
 			</div>
 
-			<div className={`${css.posterSection} ${isEpisode ? css.posterLandscape : ''}`}>
-				<div className={css.poster}>
-					{posterUrl ? (
-						<img src={posterUrl} alt="" />
-					) : (
-						<div className={css.posterPlaceholder}>
-							<svg viewBox="0 0 24 24" fill="currentColor">
-								<path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z"/>
-							</svg>
-						</div>
-					)}
-					<PosterBadges userData={item.UserData} />
+			{showsSection('poster') && (
+				<div className={`${css.posterSection} ${isEpisode ? css.posterLandscape : ''}`}>
+					<div className={css.poster}>
+						{posterUrl ? (
+							<img src={posterUrl} alt="" />
+						) : (
+							<div className={css.posterPlaceholder}>
+								<svg viewBox="0 0 24 24" fill="currentColor">
+									<path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z"/>
+								</svg>
+							</div>
+						)}
+						<PosterBadges userData={item.UserData} />
+					</div>
 				</div>
-			</div>
+			)}
 		</div>
 
 		{actionButtons}
 
 		<SeerrDownloadBars seerr={seerr} />
 
-		<DetailMetadata item={item} />
+		<DetailMetadata item={item} showsCrew={showsSection('crew')} showsStudios={showsSection('studios')} />
 
 		<div className={css.sectionsContainer} onKeyDown={handleSectionKeyDown}>
 			{nextUp.length > 0 && (
@@ -296,7 +298,7 @@ const ClassicDetailScreen = ({
 				<NextUpCard episode={nextEpisode} title={$L('Next Episode')} serverUrl={serverUrl} settings={settings} onSelectItem={onSelectItem} />
 			)}
 
-			{isEpisode && episodes.length > 0 && (
+			{isEpisode && showsSection('moreEpisodes') && episodes.length > 0 && (
 				<RowContainer className={css.section}>
 					<div className={css.sectionHeader}>
 						<h3 className={css.sectionTitle}>
@@ -377,7 +379,7 @@ const ClassicDetailScreen = ({
 				/>
 			)}
 
-			{item.Chapters?.length > 0 && (
+			{showsSection('chapters') && item.Chapters?.length > 0 && (
 				<RowContainer className={css.section}>
 					<div className={css.sectionHeader}>
 						<h3 className={css.sectionTitle}>{$L('Chapters')}</h3>
@@ -521,25 +523,25 @@ const ClassicDetailScreen = ({
 				</RowContainer>
 			)}
 
-			{seerr.isActive && hasSeerrChips(seerr.details) && (
+			{seerr.pieces.chips && (
 				<RowContainer className={css.section}>
 					<SeerrChips details={seerr.details} mediaType={seerr.mediaType} seerrNav={seerrNav} />
 				</RowContainer>
 			)}
 
-			{seerr.isActive && seerr.details?.collection && seerrNav?.onOpenCollection && (
+			{seerr.pieces.collection && seerrNav?.onOpenCollection && (
 				<RowContainer className={css.section}>
 					<SeerrCollectionBanner collection={seerr.details.collection} onOpen={seerrNav.onOpenCollection} />
 				</RowContainer>
 			)}
 
-			{seerr.isActive && hasMediaFacts(seerr.details, seerr.mediaType) && (
+			{seerr.pieces.facts && (
 				<RowContainer className={css.section}>
 					<SeerrFacts details={seerr.details} mediaType={seerr.mediaType} />
 				</RowContainer>
 			)}
 
-			{seerr.isActive && seerr.recommendationCards.length > 0 && (
+			{seerr.pieces.recommendations && (
 				<RowContainer className={css.section}>
 					<div className={css.sectionHeader}>
 						<h3 className={css.sectionTitle}>{`${seerr.displayName} · ${$L('Recommendations')}`}</h3>
@@ -552,7 +554,7 @@ const ClassicDetailScreen = ({
 				</RowContainer>
 			)}
 
-			{seerr.isActive && seerr.similarCards.length > 0 && (
+			{seerr.pieces.similar && (
 				<RowContainer className={css.section}>
 					<div className={css.sectionHeader}>
 						<h3 className={css.sectionTitle}>{`${seerr.displayName} · ${$L('Similar')}`}</h3>

@@ -35,7 +35,7 @@ const EMPTY_LIST = [];
 
 const SpotlightDetailContent = (props) => {
 	const {
-		item, settings, effectiveServerUrl, seerr, seerrNav, seerrOnly,
+		item, settings, showsSection, effectiveServerUrl, seerr, seerrNav, seerrOnly,
 		isPerson, isEpisode, isSeries, isSeason, backdropUrl, posterUrl, logoUrl, onLogoError,
 		year, officialRating, seasonCount, genres = [], tagline, techBadges = [], techSize,
 		overviewBackRef, episodes = [], seriesEpisodes = [], birthDate, birthPlace,
@@ -75,10 +75,11 @@ const SpotlightDetailContent = (props) => {
 
 	// Studio logos come from the plugin TMDB proxy, which caches them server side using its own
 	// key, so the client only needs the plugin to be switched on.
+	const studios = showsSection('studios') ? item.Studios : undefined;
 	useEffect(() => {
 		let cancelled = false;
 		const tmdbId = item.ProviderIds?.Tmdb;
-		if (!settings.useMoonfinPlugin || !tmdbId || !item.Studios?.length || !effectiveApi?.getStudioCompanies) {
+		if (!settings.useMoonfinPlugin || !tmdbId || !studios?.length || !effectiveApi?.getStudioCompanies) {
 			setTmdbCompanies(null);
 			return undefined;
 		}
@@ -90,7 +91,7 @@ const SpotlightDetailContent = (props) => {
 		return () => {
 			cancelled = true;
 		};
-	}, [item.Id, item.ProviderIds, item.Studios, item.Type, settings.useMoonfinPlugin, effectiveApi]);
+	}, [item.Id, item.ProviderIds, studios, item.Type, settings.useMoonfinPlugin, effectiveApi]);
 
 	// Seerr is an extra on a person page, so a failure leaves the card with the library lists.
 	useEffect(() => {
@@ -109,8 +110,8 @@ const SpotlightDetailContent = (props) => {
 	}, [item.Id, item.ProviderIds, isPerson, seerrEnabled]);
 
 	const studioCards = useMemo(
-		() => studioCardsFor(item.Studios, studioLogoIndex(tmdbCompanies, effectiveServerUrl, serverToken)),
-		[item.Studios, tmdbCompanies, effectiveServerUrl, serverToken]
+		() => studioCardsFor(studios, studioLogoIndex(tmdbCompanies, effectiveServerUrl, serverToken)),
+		[studios, tmdbCompanies, effectiveServerUrl, serverToken]
 	);
 
 	// A person's filmography is rebuilt on every render, so the list itself is what the memo
@@ -123,7 +124,7 @@ const SpotlightDetailContent = (props) => {
 	);
 
 	const cardState = useMemo(() => ({
-		item, serverUrl: effectiveServerUrl, settings, seerrOnly,
+		item, serverUrl: effectiveServerUrl, settings, showsSection, seerrOnly,
 		seasons, episodes, seriesEpisodes, similar, similarSource, extras, cast, crew, nextUp,
 		collectionItems, missingCollectionItems, parentCollections,
 		albumTracks, artistAlbums, playlistItems,
@@ -133,18 +134,19 @@ const SpotlightDetailContent = (props) => {
 		seerr: {
 			recommendations: seerr.recommendationCards || [],
 			similar: seerr.similarCards || [],
-			chipCount: seerrChipCount(seerr.details),
-			factCount: buildMediaFacts(seerr.details, seerr.mediaType).length,
+			chipCount: seerr.pieces.chips ? seerrChipCount(seerr.details) : 0,
+			factCount: seerr.pieces.facts ? buildMediaFacts(seerr.details, seerr.mediaType).length : 0,
 			collection: seerr.collection,
 			seasonMarkers: settings.showSeerrAvailabilityBadges !== false ? seerr.seasonMarkers : null
 		},
 		fallbackImageUrl: cardFallbackImageUrl
 	}), [
-		item, effectiveServerUrl, settings, seerrOnly, seasons, episodes, seriesEpisodes, similar, similarSource,
+		item, effectiveServerUrl, settings, showsSection, seerrOnly, seasons, episodes, seriesEpisodes, similar, similarSource,
 		extras, cast, crew, nextUp, collectionItems, missingCollectionItems, parentCollections,
 		albumTracks, artistAlbums, playlistItems, personMovies, personSeries, otherCredits,
 		seerrCredits, studioCards, canManagePlaylist, cardFallbackImageUrl,
-		seerr.recommendationCards, seerr.similarCards, seerr.details, seerr.mediaType, seerr.collection, seerr.seasonMarkers
+		seerr.recommendationCards, seerr.similarCards, seerr.details, seerr.mediaType, seerr.collection, seerr.seasonMarkers,
+		seerr.pieces.chips, seerr.pieces.facts
 	]);
 
 	const cardActions = useMemo(() => ({
@@ -253,7 +255,7 @@ const SpotlightDetailContent = (props) => {
 	}, []);
 
 	const hasTech = Boolean(techSize) || techBadges.length > 0;
-	const hideMediaDescription = hidesMediaDescription(item, settings);
+	const hideMediaDescription = hidesMediaDescription(item, settings) || (isPerson && !showsSection('biography'));
 
 	const heroTitle = () => {
 		if (isEpisode) {

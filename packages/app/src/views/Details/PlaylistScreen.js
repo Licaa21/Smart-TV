@@ -11,6 +11,7 @@ import css from './Details.module.less';
 const PlaylistScreen = ({
 	item,
 	serverUrl,
+	showsSection,
 	posterUrl,
 	genres,
 	playlistItems,
@@ -27,7 +28,7 @@ const PlaylistScreen = ({
 	return (
 		<>
 			<div className={css.seasonDetailHeader}>
-				{posterUrl && (
+				{showsSection('poster') && posterUrl && (
 					<div className={css.seasonDetailPoster}>
 						<img src={posterUrl} alt="" />
 						<PosterBadges userData={item.UserData} />

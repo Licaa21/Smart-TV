@@ -1,4 +1,4 @@
-import {useCallback, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 import $L from '@enact/i18n/$L';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
@@ -16,7 +16,7 @@ const SpottableDiv = Spottable('div');
 
 const TabsContainer = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'div');
 
-const PersonScreen = ({item, serverUrl, settings, filmography, personDates, birthPlace, onSelectItem, onSelectSeerrItem}) => {
+const PersonScreen = ({item, serverUrl, settings, showsSection, filmography, personDates, birthPlace, onSelectItem, onSelectSeerrItem}) => {
 	const {appearances, crewCredits} = usePersonSeerrCredits(item.ProviderIds?.Tmdb);
 	const {movies, series, guestAppearances, musicVideos} = filmography || {movies: [], series: [], guestAppearances: [], musicVideos: []};
 
@@ -30,13 +30,18 @@ const PersonScreen = ({item, serverUrl, settings, filmography, personDates, birt
 		if (series.length > 0) list.push({key: 'series', label: $L('Series'), items: series, cardType: 'portrait', select: onSelectItem});
 		if (guestAppearances.length > 0) list.push({key: 'guest', label: $L('Guest Appearances'), items: guestAppearances, cardType: 'landscape', select: onSelectItem});
 		if (musicVideos.length > 0) list.push({key: 'music', label: $L('Music Videos'), items: musicVideos, cardType: 'portrait', select: onSelectItem});
-		if (crewCredits.length > 0) list.push({key: 'crew', label: $L('Crew Contributions (Seerr)'), items: crewCredits, cardType: 'portrait', select: handleSeerrSelect});
-		if (appearances.length > 0) list.push({key: 'seerr', label: $L('Appearances (Seerr)'), items: appearances, cardType: 'portrait', select: handleSeerrSelect});
+		if (showsSection('seerrPersonCrew') && crewCredits.length > 0) list.push({key: 'crew', label: $L('Crew Contributions (Seerr)'), items: crewCredits, cardType: 'portrait', select: handleSeerrSelect});
+		if (showsSection('seerrPersonAppearances') && appearances.length > 0) list.push({key: 'seerr', label: $L('Appearances (Seerr)'), items: appearances, cardType: 'portrait', select: handleSeerrSelect});
 		return list;
-	}, [movies, series, guestAppearances, musicVideos, crewCredits, appearances, onSelectItem, handleSeerrSelect]);
+	}, [movies, series, guestAppearances, musicVideos, crewCredits, appearances, showsSection, onSelectItem, handleSeerrSelect]);
 
 	const [activeTab, setActiveTab] = useState(0);
 	const [expanded, setExpanded] = useState(false);
+
+	// A tab that was open can go away when its section is switched off.
+	useEffect(() => {
+		if (activeTab >= tabs.length && tabs.length > 0) setActiveTab(0);
+	}, [tabs.length, activeTab]);
 
 	const handleTabKeyDown = useCallback((e) => {
 		if (e.keyCode === KEYS.LEFT) {
@@ -105,7 +110,7 @@ const PersonScreen = ({item, serverUrl, settings, filmography, personDates, birt
 						{birthPlace && <span className={css.infoItem}>{birthPlace}</span>}
 					</div>
 					<RatingsRow item={item} serverUrl={serverUrl} pluginEnabled={isMdblistEnabled(settings)} />
-					{item.Overview && (
+					{showsSection('biography') && item.Overview && (
 						<SpottableDiv
 							className={css.overviewToggle}
 							onKeyDown={handleOverviewKeyDown}

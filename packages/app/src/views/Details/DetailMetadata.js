@@ -2,12 +2,13 @@ import $L from '@enact/i18n/$L';
 
 import css from './Details.module.less';
 
-// Genres, director, writers and studio, shown only for the ones the item actually has.
-const DetailMetadata = ({item}) => {
+// Genres, director, writers and studio, shown only for the ones the item actually has and
+// the viewer left on.
+const DetailMetadata = ({item, showsCrew = true, showsStudios = true}) => {
 	const genres = item.Genres || [];
-	const directors = item.People?.filter(p => p.Type === 'Director') || [];
-	const writers = item.People?.filter(p => p.Type === 'Writer') || [];
-	const studios = item.Studios || [];
+	const directors = showsCrew ? item.People?.filter(p => p.Type === 'Director') || [] : [];
+	const writers = showsCrew ? item.People?.filter(p => p.Type === 'Writer') || [] : [];
+	const studios = showsStudios ? item.Studios || [] : [];
 
 	const metaItems = [];
 	if (genres.length > 0) metaItems.push({label: $L('Genres'), value: genres.slice(0, 3).join(', ')});

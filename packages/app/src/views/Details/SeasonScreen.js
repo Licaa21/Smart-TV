@@ -25,6 +25,7 @@ const SeasonScreen = ({
 	item,
 	serverUrl,
 	settings,
+	showsSection,
 	posterUrl,
 	episodes,
 	episodeRatings,
@@ -37,7 +38,7 @@ const SeasonScreen = ({
 }) => (
 	<>
 		<div className={css.seasonDetailHeader}>
-			{posterUrl && (
+			{showsSection('poster') && posterUrl && (
 				<div className={css.seasonDetailPoster}>
 					<img src={posterUrl} alt="" />
 					<PosterBadges userData={item.UserData} />
