@@ -1,9 +1,11 @@
-import {clearMemoryCache, memoryCache, saveBrowseCache} from './browseCache';
+import {clearBrowseCache, clearMemoryCache, memoryCache, saveBrowseCache} from './browseCache';
 
 const mockSaveToStorage = jest.fn();
+const mockRemoveFromStorage = jest.fn();
 jest.mock('../../services/storage', () => ({
 	getFromStorage: () => Promise.resolve(null),
-	saveToStorage: (...args) => mockSaveToStorage(...args)
+	saveToStorage: (...args) => mockSaveToStorage(...args),
+	removeFromStorage: (...args) => Promise.resolve(mockRemoveFromStorage(...args))
 }));
 
 const fill = () => {
@@ -63,5 +65,12 @@ describe('saveBrowseCache', () => {
 		const saved = mockSaveToStorage.mock.calls[0][1];
 		expect(saved.featuredItems).toEqual([{Id: 'item1'}]);
 		expect(saved.featuredConfigKey).toBe('key');
+	});
+});
+
+describe('clearBrowseCache', () => {
+	test('drops the stored rows, so the next load asks the server', async () => {
+		await clearBrowseCache();
+		expect(mockRemoveFromStorage).toHaveBeenCalledWith('browse_cache_v5');
 	});
 });

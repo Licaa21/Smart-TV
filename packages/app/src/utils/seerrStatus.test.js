@@ -6,7 +6,8 @@ import {
 	getRequestStatusInfo,
 	getDownloadSummary,
 	formatBytes,
-	downloadLabelParts
+	downloadLabelParts,
+	isMediaInFlight
 } from './seerrStatus';
 
 const GB = 1024 * 1024 * 1024;
@@ -115,5 +116,36 @@ describe('downloadLabelParts', () => {
 
 	test('importing says so instead of a stuck 100%', () => {
 		expect(downloadLabelParts({fraction: 1, isImporting: true, totalBytes: GB, downloadedBytes: GB})).toEqual({leading: 'Importing', percent: null});
+	});
+});
+
+describe('isMediaInFlight', () => {
+	test('a title stays in flight from the request until it lands', () => {
+		expect(isMediaInFlight({status: MEDIA_STATUS.PENDING}, false)).toBe(true);
+		expect(isMediaInFlight({status: MEDIA_STATUS.PROCESSING}, false)).toBe(true);
+		expect(isMediaInFlight({status: MEDIA_STATUS.AVAILABLE}, false)).toBe(false);
+		expect(isMediaInFlight({status: MEDIA_STATUS.UNKNOWN}, false)).toBe(false);
+	});
+
+	test('a newly requested season keeps a partial series in flight', () => {
+		const media = {
+			status: MEDIA_STATUS.PARTIALLY_AVAILABLE,
+			status4k: MEDIA_STATUS.UNKNOWN,
+			seasons: [
+				{seasonNumber: 1, status: MEDIA_STATUS.AVAILABLE, status4k: MEDIA_STATUS.UNKNOWN},
+				{seasonNumber: 2, status: MEDIA_STATUS.PENDING, status4k: MEDIA_STATUS.UNKNOWN}
+			]
+		};
+		expect(isMediaInFlight(media, false)).toBe(true);
+		expect(isMediaInFlight(media, true)).toBe(false);
+	});
+
+	test('a partly available title with a download running is in flight', () => {
+		const media = {status: MEDIA_STATUS.PARTIALLY_AVAILABLE, downloadStatus: [{size: 100, sizeLeft: 40}]};
+		expect(isMediaInFlight(media, false)).toBe(true);
+	});
+
+	test('no media means nothing is on its way', () => {
+		expect(isMediaInFlight(null, false)).toBe(false);
 	});
 });

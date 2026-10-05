@@ -77,11 +77,12 @@ export const DEFAULT_HOME_ROWS = [
 	{id: 'tmdb_trending_all_weekly', name: 'TMDB Trending All (Weekly)', enabled: false, order: 58},
 	{id: 'radarr_calendar', name: 'Radarr Upcoming', enabled: false, order: 59},
 	{id: 'sonarr_calendar', name: 'Sonarr Upcoming', enabled: false, order: 60},
-	// Both ids match the plugin's own section types, so neither needs an entry
+	// These ids match the plugin's own section types, so none of them needs an entry
 	// in the mapping tables below.
 	{id: 'seerr_watchlist', name: 'Your Watchlist', enabled: false, order: 61},
 	{id: 'librarybuttons', name: 'Library Buttons', enabled: false, order: 62},
-	{id: 'studios', name: 'Studios', enabled: false, order: 63}
+	{id: 'studios', name: 'Studios', enabled: false, order: 63},
+	{id: 'seasonal', name: 'Seasonal Row', enabled: false, order: 64}
 ];
 
 export const TV_TO_SERVER_ROW = {
@@ -126,18 +127,39 @@ export const SERVER_TO_TV_ROW = {
 	'imdb_top_english_movies': 'imdb-top-english'
 };
 
-export const mergeHomeRows = (rows) => {
+// A row the saved layout lacks is appended switched off, except where `enabledById` says
+// otherwise. The seasonal row uses that: a client that predates it drops it from the layout it
+// pushes, so its own synced toggle decides.
+export const mergeHomeRows = (rows, enabledById = {}) => {
 	if (!Array.isArray(rows)) return [...DEFAULT_HOME_ROWS];
 	const merged = [...rows];
 	let added = false;
 	for (const def of DEFAULT_HOME_ROWS) {
 		if (!merged.find((row) => row.id === def.id)) {
-			merged.push({...def, enabled: false, order: merged.length});
+			merged.push({...def, enabled: enabledById[def.id] === true, order: merged.length});
 			added = true;
 		}
 	}
 	if (!added) return rows;
 	return merged;
+};
+
+// The seasonal row with its toggle applied. Switching it on puts it right after Continue
+// Watching and Next Up, where a holiday row gets noticed. Switching it off keeps its place.
+export const withSeasonalRow = (rows, enabled) => {
+	const sorted = [...(rows || [])].sort((left, right) => left.order - right.order);
+	const index = sorted.findIndex((row) => row.id === 'seasonal');
+	const current = index >= 0 ? sorted.splice(index, 1)[0] : DEFAULT_HOME_ROWS.find((row) => row.id === 'seasonal');
+	let insertAt = index >= 0 ? index : sorted.length;
+	if (enabled && !current.enabled) {
+		let anchor = -1;
+		sorted.forEach((row, i) => {
+			if (row.id === 'resume' || row.id === 'nextup') anchor = i;
+		});
+		insertAt = anchor + 1;
+	}
+	sorted.splice(insertAt, 0, {...current, enabled});
+	return sorted.map((row, order) => ({...row, order}));
 };
 
 // Sections this client has no row for, meaning plugin rows and any type belonging to a
@@ -166,7 +188,7 @@ const modelledRow = (section) => {
 	return rowForServerType(section.type);
 };
 
-export const homeRowsFromSections = (sections) => {
+export const homeRowsFromSections = (sections, enabledById) => {
 	if (!Array.isArray(sections) || sections.length === 0) return undefined;
 	const rows = sections
 		.map((section) => {
@@ -176,29 +198,29 @@ export const homeRowsFromSections = (sections) => {
 		.filter(Boolean)
 		.sort((left, right) => left.order - right.order)
 		.map((entry, index) => ({...entry.def, enabled: entry.enabled, order: index}));
-	return rows.length > 0 ? mergeHomeRows(rows) : undefined;
+	return rows.length > 0 ? mergeHomeRows(rows, enabledById) : undefined;
 };
 
-export const homeRowsFromRowOrder = (serverIds) => {
+export const homeRowsFromRowOrder = (serverIds, enabledById) => {
 	if (!Array.isArray(serverIds) || serverIds.length === 0) return undefined;
 	const rows = [];
 	serverIds.forEach((sid, index) => {
 		const def = rowForServerType(sid);
 		if (def) rows.push({...def, enabled: true, order: index});
 	});
-	return mergeHomeRows(rows);
+	return mergeHomeRows(rows, enabledById);
 };
 
 // The whole layout comes from the first profile that has one, never a row by row merge
 // across profiles.
-export const homeRowsFromProfile = (serverProfile) => {
+export const homeRowsFromProfile = (serverProfile, enabledById) => {
 	if (!serverProfile) return undefined;
-	const fromSections = homeRowsFromSections(serverProfile.homeSections);
+	const fromSections = homeRowsFromSections(serverProfile.homeSections, enabledById);
 	if (fromSections) {
 		homeSectionsPassthrough = serverProfile.homeSections.filter((s) => !modelledRow(s));
 		return fromSections;
 	}
-	const fromOrder = homeRowsFromRowOrder(serverProfile.homeRowOrder);
+	const fromOrder = homeRowsFromRowOrder(serverProfile.homeRowOrder, enabledById);
 	if (fromOrder) {
 		homeSectionsPassthrough = homeSectionsPassthrough || [];
 		return fromOrder;

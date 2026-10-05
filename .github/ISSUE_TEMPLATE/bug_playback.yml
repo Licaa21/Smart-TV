@@ -24,6 +24,7 @@ body:
       options:
         - Tizen (Samsung)
         - webOS (LG)
+        - Vega (Fire TV)
     validations:
       required: true
 
@@ -31,8 +32,8 @@ body:
     id: platform_version
     attributes:
       label: Platform version
-      description: "Tizen example: Tizen 4 / 5.0 / 6.5 / 7.0 \nwebOS example: webOS 4 / 6.x / 23 / 24"
-      placeholder: e.g. Tizen 6.5 or webOS 23
+      description: "Tizen example: Tizen 4 / 5.0 / 6.5 / 7.0 \nwebOS example: webOS 4 / 6.x / 23 / 24 \nFire TV example: Vega OS 1.2 / 2.0"
+      placeholder: e.g. Tizen 6.5, webOS 23 or Vega OS 2.0
     validations:
       required: true
 
@@ -150,7 +151,7 @@ body:
         2. Reproduce the problem, and don't close the app afterwards, closing it clears the buffer
         3. Settings > About > Debugging > View Logs, press "Send Report"
 
-        "Send Report" uploads to your own Jellyfin server, not to us. Fetch it from that server under Administration > Logs. It's the newest file whose name starts with "upload_Moonfin for Tizen_" or "upload_Moonfin for webOS_". Attach that file here.
+        "Send Report" uploads to your own Jellyfin server, not to us. Fetch it from that server under Administration > Logs. It's the newest file whose name starts with "upload_Moonfin for Tizen_", "upload_Moonfin for webOS_" or "upload_Moonfin for Fire TV_". Attach that file here.
 
         If you have no access to that server, photograph the View Logs screen instead and say so here.
       render: shell

@@ -19,6 +19,7 @@ import {
 	getGenresRowItemFilterOptions,
 	getHomeRowSortOptions, getPlaylistCollectionSortOptions,
 	getHomeRowsStyleOptions,
+	getModernCardTransitionSpeedOptions,
 	getImageTypeOptions,
 	getLoadingAnimationImageOptions,
 	getLoadingAnimationPositionOptions,
@@ -49,6 +50,7 @@ import {
 	getScreensaverPositionOptions,
 	getScreensaverSizeOptions,
 	getScreensaverTimeoutOptions,
+	getSeasonalDensityOptions,
 	getSeasonalThemeOptions,
 	getSearchDefaultTabOptions,
 	getSeekStepOptions,
@@ -127,7 +129,8 @@ const whenScreensaverLibrary = (ctx) => ctx.settings.screensaverEnabled && ctx.s
 const whenScreensaverComponent = (ctx) => ctx.settings.screensaverEnabled && ctx.settings.screensaverComponent !== 'none';
 const whenScreensaverStatic = (ctx) => whenScreensaverComponent(ctx) && ctx.settings.screensaverMovement === 'staticCorner';
 const whenLoadingAnimation = (ctx) => ctx.settings.loadingAnimationImage !== 'none';
-const whenPassthrough = (ctx) => ctx.settings.audioPassthroughMode === 'manual';
+// A Fire TV plays through a browser video element with no passthrough of its own
+const whenPassthrough = (ctx) => ctx.settings.audioPassthroughMode === 'manual' && !ctx.isVega;
 // Samsung sets decode AC3 and E-AC3 themselves, so these two toggles only do anything on webOS
 const whenWebOSPassthrough = (ctx) => whenPassthrough(ctx) && ctx.isWebOS;
 const whenSyncCorrection = (ctx) => ctx.settings.syncPlayAdvancedCorrectionEnabled !== false;
@@ -193,14 +196,16 @@ export const SETTINGS_SCHEMA = [
 						action: (ctx) => ctx.actions.openParentalControls()
 					},
 					{kind: KIND.TOGGLE, key: 'exitConfirmation', label: () => $L('Confirm Exit'), desc: () => $L('Show confirmation before exiting'), icon: 'exit'},
-					{kind: KIND.SECTION, id: 'connection', label: () => $L('Connection'), when: (ctx) => ctx.isWebOS},
+					{kind: KIND.SECTION, id: 'connection', label: () => $L('Connection'), when: (ctx) => ctx.isWebOS || ctx.isVega},
 					{
 						kind: KIND.TOGGLE,
 						key: 'allowInsecureCerts',
 						label: () => $L('Allow Untrusted Certificates'),
-						desc: () => $L('If your TV rejects a server\'s security certificate, fetch through the proxy without verifying it. Use only for servers you trust.'),
+						desc: (ctx) => (ctx.isVega
+							? $L('If your Fire TV rejects a server\'s security certificate, accept it anyway. Use only for servers you trust.')
+							: $L('If your TV rejects a server\'s security certificate, fetch through the proxy without verifying it. Use only for servers you trust.')),
 						icon: 'gpp_maybe',
-						when: (ctx) => ctx.isWebOS
+						when: (ctx) => ctx.isWebOS || ctx.isVega
 					}
 				]
 			}
@@ -385,6 +390,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.SECTION, id: 'homeRowDisplay', label: () => $L('Home Row Display')},
 					{kind: KIND.OPTION, key: 'homeRowsStyle', label: () => $L('Row Type'), desc: () => $L('Classic keeps per-row image type and info overlay. Modern uses portrait-to-backdrop rows.'), options: getHomeRowsStyleOptions, fallback: () => $L('Modern'), icon: 'appscontents'},
 					{kind: KIND.TOGGLE, key: 'modernCardsOnMyMediaRow', label: () => $L('Modern cards on My Media row'), desc: () => $L('Display customizable posters that expand on focus. Disable to always show landscape thumbnail.'), icon: 'picture', when: (ctx) => ctx.settings.homeRowsStyle !== 'v1'},
+					{kind: KIND.OPTION, key: 'modernCardTransitionSpeed', label: () => $L('Modern Cards Transition Speed'), desc: () => $L('Adjusts animation speed when expanding focused modern cards'), options: getModernCardTransitionSpeedOptions, fallback: () => $L('Off'), icon: 'speed', when: (ctx) => ctx.settings.homeRowsStyle !== 'v1'},
 					{kind: KIND.TOGGLE, key: 'fullScreenRows', label: () => $L('Expanded Home Rows'), desc: () => $L('Limit home rows to 1 row per screen'), icon: 'aspectratio'},
 					{kind: KIND.TOGGLE, key: 'homeRowOverlay', label: () => $L('Home Row Info Overlay'), desc: () => $L('Show title and metadata for the focused item above classic rows'), icon: 'info', when: (ctx) => ctx.settings.homeRowsStyle === 'v1'},
 					{kind: KIND.OPTION, key: 'homeRowsPosterSize', label: () => $L('Home Row Card Display Size'), options: getPosterSizeOptions, fallback: () => $L('Default'), icon: 'photo_size_select_large'},
@@ -461,6 +467,7 @@ export const SETTINGS_SCHEMA = [
 				rows: [
 					{kind: KIND.SECTION, id: 'librariesGeneral', label: () => $L('General')},
 					{kind: KIND.NAV, id: 'hideLibraries', label: () => $L('Library Visibility'), desc: () => $L('Toggle home page visibility per library'), icon: 'show', action: (ctx) => ctx.actions.openLibraries()},
+					{kind: KIND.NAV, id: 'libraryOrder', label: () => $L('Library Order'), desc: () => $L('Choose the order of your libraries'), icon: 'swap_vert', keywords: () => ['reorder libraries', 'sort libraries', 'my media', 'navbar'], action: (ctx) => ctx.actions.openLibraryOrder()},
 					{kind: KIND.TOGGLE, key: 'unifiedLibraryMode', label: () => $L('Multi-Server Libraries'), desc: () => $L('Show libraries from all connected servers'), icon: 'dns'},
 					{kind: KIND.OPTION, key: 'recentlyReleasedSeriesType', label: () => $L('Recently Released Series Sort By'), desc: () => $L('Sort Recently Released Series home rows by series, latest season, or latest episode air date'), options: getRecentlyReleasedSeriesTypeOptions, fallback: () => $L('Series'), icon: 'tv'},
 					{kind: KIND.SECTION, id: 'libraryView', label: () => $L('Library View')},
@@ -555,7 +562,8 @@ export const SETTINGS_SCHEMA = [
 				description: () => $L('Visual effects and seasonal decorations'),
 				rows: [
 					{kind: KIND.SECTION, id: 'seasonalEffects', label: () => $L('Seasonal Effects')},
-					{kind: KIND.OPTION, key: 'seasonalTheme', label: () => $L('Seasonal Surprise'), options: getSeasonalThemeOptions, fallback: () => $L('None'), icon: 'star_shine'}
+					{kind: KIND.OPTION, key: 'seasonalTheme', label: () => $L('Seasonal Surprise'), options: getSeasonalThemeOptions, fallback: () => $L('None'), icon: 'star_shine'},
+					{kind: KIND.OPTION, key: 'seasonalDensity', label: () => $L('Density'), options: getSeasonalDensityOptions, fallback: () => $L('Normal'), icon: 'blur_on'}
 				]
 			},
 			{
@@ -642,7 +650,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.TOGGLE, key: 'preferDefaultAudioTrack', label: () => $L('Prefer Default Audio Track'), desc: () => $L('Pick the track the file marks as default before matching languages'), icon: 'audiotrack'},
 					{kind: KIND.TOGGLE, key: 'preferAudioDescription', label: () => $L('Prefer Audio Description Tracks'), desc: () => $L('Pick narrated tracks for the visually impaired when available'), icon: 'hearing'},
 					{kind: KIND.SECTION, id: 'audioOutput', label: () => $L('Audio Output')},
-					{kind: KIND.OPTION, key: 'audioPassthroughMode', label: () => $L('Audio Passthrough'), desc: () => $L('Whether compressed audio is sent to your receiver untouched'), options: getPassthroughModeOptions, fallback: () => $L('Auto (match detected device support)'), icon: 'settings_input_hdmi'},
+					{kind: KIND.OPTION, key: 'audioPassthroughMode', label: () => $L('Audio Passthrough'), desc: () => $L('Whether compressed audio is sent to your receiver untouched'), options: getPassthroughModeOptions, fallback: () => $L('Auto (match detected device support)'), icon: 'settings_input_hdmi', when: (ctx) => !ctx.isVega},
 					{kind: KIND.OPTION, key: 'maxAudioChannels', label: () => $L('Max Audio Channels'), desc: () => $L('Cap decoded audio at this channel count'), options: getMaxAudioChannelsOptions, fallback: () => $L('Auto Detect (Hardware Default)'), icon: 'speakergroup'},
 					{kind: KIND.TOGGLE, key: 'downmixToStereo', label: () => $L('Downmix to Stereo'), desc: () => $L('Reduce multichannel audio to two channels'), icon: 'speaker'},
 					{kind: KIND.TOGGLE, key: 'stereoUpmixEnabled', label: () => $L('Stereo to Surround Upmix'), desc: () => $L('Upmix stereo audio to 5.1 surround via server transcoding'), icon: 'equalizer', when: (ctx) => !ctx.settings.downmixToStereo},
@@ -894,6 +902,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.NAV, id: 'homeRows', label: () => $L('Home Sections'), desc: () => $L('Reorder and toggle both library and external-based home rows'), icon: 'list', action: (ctx) => ctx.actions.openHomeRows(), when: whenPlugin},
 					{kind: KIND.SECTION, id: 'configurations', label: () => $L('External Home Row Configurations'), when: whenPlugin},
 					{kind: KIND.NAV, id: 'imdbLists', label: () => $L('IMDb Lists'), desc: () => $L('Configure IMDb Top 250, Popular, and other charts'), icon: 'movie', action: (ctx) => ctx.actions.openImdbLists(), when: whenPlugin},
+					{kind: KIND.NAV, id: 'seasonalRow', label: () => $L('Seasonal Row'), desc: () => $L('Show a row of holiday movies from your library, with Seerr suggestions when available.'), icon: 'star_shine', keywords: () => ['holiday', 'christmas', 'halloween', 'seasonal'], action: (ctx) => ctx.actions.openSeasonalRow(), when: whenPlugin},
 					{kind: KIND.NAV, id: 'externalTmdbLists', label: () => $L('TMDB Lists'), desc: () => $L('Configure Popular, Top Rated, and Trending TMDB lists'), icon: 'trending_up', action: (ctx) => ctx.actions.openExternalTmdbLists(), when: whenPlugin},
 					{kind: KIND.NAV, id: 'externalCalendars', label: () => $L('Upcoming Calendars'), desc: () => $L('Toggle upcoming calendars from Radarr and Sonarr'), icon: 'calendar_month', action: (ctx) => ctx.actions.openExternalCalendars(), when: (ctx) => whenPlugin(ctx) && whenSeerr(ctx)},
 					{kind: KIND.NAV, id: 'seerrHomeRows', label: (ctx) => `${ctx.seerrLabel} ${$L('Lists')}`, desc: () => $L('Configure Seerr discovery rows'), icon: 'list', action: (ctx) => ctx.actions.openSeerrHomeRows(), when: (ctx) => whenPlugin(ctx) && whenSeerr(ctx)},
@@ -930,7 +939,7 @@ export const SETTINGS_SCHEMA = [
 						id: 'platform',
 						icon: 'tv',
 						label: () => $L('Platform'),
-						value: (ctx) => (ctx.capabilities?.tizenVersionDisplay ? 'Tizen' : ctx.capabilities?.webosVersionDisplay ? 'webOS' : $L('Unknown'))
+						value: (ctx) => (ctx.capabilities?.tizenVersionDisplay ? 'Tizen' : ctx.capabilities?.webosVersionDisplay ? 'webOS' : ctx.capabilities?.vegaVersionDisplay ? 'Fire TV' : $L('Unknown'))
 					},
 					{kind: KIND.TOGGLE, key: 'updateNotificationsEnabled', label: () => $L('Update Notifications'), desc: () => $L('Show app update notifications when a new release is available'), icon: 'system_update_alt'},
 					{kind: KIND.CUSTOM, id: 'checkForUpdates', render: 'checkForUpdates'},
@@ -955,10 +964,10 @@ export const SETTINGS_SCHEMA = [
 					{
 						kind: KIND.INFO,
 						id: 'osVersion',
-						label: (ctx) => (ctx.capabilities?.tizenVersionDisplay ? $L('Tizen Version') : $L('webOS Version')),
-						value: (ctx) => ctx.capabilities?.tizenVersionDisplay || ctx.capabilities?.webosVersionDisplay,
+						label: (ctx) => (ctx.capabilities?.tizenVersionDisplay ? $L('Tizen Version') : ctx.capabilities?.vegaVersionDisplay ? $L('Vega OS Version') : $L('webOS Version')),
+						value: (ctx) => ctx.capabilities?.tizenVersionDisplay || ctx.capabilities?.webosVersionDisplay || ctx.capabilities?.vegaVersionDisplay,
 						icon: 'gear',
-						when: (ctx) => !!(ctx.capabilities?.tizenVersionDisplay || ctx.capabilities?.webosVersionDisplay)
+						when: (ctx) => !!(ctx.capabilities?.tizenVersionDisplay || ctx.capabilities?.webosVersionDisplay || ctx.capabilities?.vegaVersionDisplay)
 					},
 					{kind: KIND.INFO, id: 'firmware', label: () => $L('Firmware'), value: (ctx) => ctx.capabilities?.firmwareVersion, icon: 'gear', when: (ctx) => !!ctx.capabilities?.firmwareVersion},
 					{

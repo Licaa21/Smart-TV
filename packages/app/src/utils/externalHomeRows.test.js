@@ -4,7 +4,7 @@ jest.mock('../services/externalRowsApi', () => ({
 }));
 
 import {fetchCustomRow, constructSourceUrl} from '../services/externalRowsApi';
-import {validateCustomRow} from './externalHomeRows';
+import {buildSeasonalRow, fetchExternalPresetRow, validateCustomRow} from './externalHomeRows';
 
 const listUrl = 'https://mdblist.com/lists/user/list';
 const row = {source: 'mdblist', type: 'user_list', params: {username: 'user', listname: 'list'}};
@@ -25,5 +25,72 @@ describe('validateCustomRow', () => {
 		fetchCustomRow.mockResolvedValue([]);
 
 		expect(await validateCustomRow(row)).toEqual({error: expect.stringContaining(listUrl)});
+	});
+});
+
+describe('fetchExternalPresetRow', () => {
+	it('takes a TMDB chart item for what the chart holds, whatever it was labelled', async () => {
+		fetchCustomRow.mockResolvedValue([{name: 'Dragon Tales', type: 'Movie', providerIds: {Tmdb: '1585'}}]);
+
+		const [show] = await fetchExternalPresetRow('tmdb_popular_tv');
+		expect(show.Type).toBe('Series');
+		expect(show._seerrMediaType).toBe('tv');
+		expect(show._seerrRaw).toEqual({mediaId: 1585, mediaType: 'tv'});
+	});
+
+	it('keeps the type each item came with on the chart that mixes movies and shows', async () => {
+		fetchCustomRow.mockResolvedValue([
+			{name: 'A movie', type: 'Movie', providerIds: {Tmdb: '1'}},
+			{name: 'A show', type: 'Series', providerIds: {Tmdb: '2'}}
+		]);
+
+		const items = await fetchExternalPresetRow('tmdb_trending_all_weekly');
+		expect(items.map((item) => item.Type)).toEqual(['Movie', 'Series']);
+	});
+
+	it('keeps the rating the plugin looked up', async () => {
+		fetchCustomRow.mockResolvedValue([{name: 'Elf', type: 'Movie', officialRating: 'PG', providerIds: {Tmdb: '10719'}}]);
+
+		const [card] = await fetchExternalPresetRow('tmdb_popular_movies');
+		expect(card.OfficialRating).toBe('PG');
+	});
+});
+
+describe('buildSeasonalRow', () => {
+	const owned = {Id: 'abc', Name: 'Elf', Type: 'Movie', OfficialRating: 'PG', ImageTags: {Primary: '1A'}};
+	const suggestion = {name: 'The Polar Express', type: 'Movie', productionYear: 2004, officialRating: 'G', providerIds: {Tmdb: '10719'}, posterUrl: '/p.jpg', overview: 'A boy rides a train.', rating: 6.7, genres: ['Animation'], runTimeTicks: 60000000000};
+	const payload = (over = {}) => ({holiday: 'christmas', items: [owned], suggestions: [suggestion], ...over});
+
+	it('answers nothing without a holiday or for one the viewer hid', () => {
+		expect(buildSeasonalRow(null)).toBeNull();
+		expect(buildSeasonalRow(payload({holiday: null}))).toBeNull();
+		expect(buildSeasonalRow(payload(), ['christmas'])).toBeNull();
+		expect(buildSeasonalRow(payload({items: [], suggestions: []}))).toBeNull();
+	});
+
+	it('keeps owned movies as the library items they are and makes Seerr cards of the suggestions', () => {
+		const rowData = buildSeasonalRow(payload(), ['halloween']);
+
+		expect(rowData.id).toBe('seasonal');
+		expect(rowData.holiday).toBe('christmas');
+		expect(rowData.title).toBe('Christmas Movies');
+		expect(rowData.isExternalRow).toBe(true);
+		expect(rowData.isSeasonalRow).toBe(true);
+		expect(rowData.items[0]).toBe(owned);
+		const card = rowData.items[1];
+		expect(card._seerr).toBe(true);
+		expect(card._strictRating).toBe(true);
+		expect(card.OfficialRating).toBe('G');
+		expect(card.Overview).toBe('A boy rides a train.');
+		expect(card.CommunityRating).toBe(6.7);
+		expect(card.Genres).toEqual(['Animation']);
+		expect(card.RunTimeTicks).toBe(60000000000);
+		expect(card._seerrRaw).toEqual({mediaId: 10719, mediaType: 'movie'});
+	});
+
+	it('leaves the rating null on a suggestion nobody rated', () => {
+		const rowData = buildSeasonalRow(payload({items: [], suggestions: [{...suggestion, officialRating: null}]}));
+
+		expect(rowData.items[0].OfficialRating).toBeNull();
 	});
 });

@@ -1,4 +1,4 @@
-import {useCallback, useRef, useState, useEffect, useLayoutEffect} from 'react';
+import {forwardRef, useCallback, useImperativeHandle, useRef, useState, useEffect, useLayoutEffect} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import Spotlight from '@enact/spotlight';
 import {Pause} from '@enact/spotlight/Pause';
@@ -9,7 +9,7 @@ import css from './SpottableInput.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const SpottableInput = ({
+const SpottableInput = forwardRef(({
 	className,
 	spotlightId,
 	'data-spotlight-id': dataSpotlightId,
@@ -21,7 +21,7 @@ const SpottableInput = ({
 	onExitTop,
 	onExitBottom,
 	...inputProps
-}) => {
+}, ref) => {
 	const inputRef = useRef(null);
 	const pauseRef = useRef(new Pause('SpottableInput'));
 	const [inputFocused, setInputFocused] = useState(false);
@@ -60,6 +60,10 @@ const SpottableInput = ({
 		pauseRef.current.resume();
 		inputRef.current?.blur();
 	}, []);
+
+	// The TV's own keyboard is where its voice input lives, so a screen can
+	// hand the field to it whatever keyboard the user prefers.
+	useImperativeHandle(ref, () => ({activateSystemInput: activateInput}), [activateInput]);
 
 	const onExitTopRef = useRef(onExitTop);
 	onExitTopRef.current = onExitTop;
@@ -245,6 +249,8 @@ const SpottableInput = ({
 			</div>
 		</SpottableDiv>
 	);
-};
+});
+
+SpottableInput.displayName = 'SpottableInput';
 
 export default SpottableInput;

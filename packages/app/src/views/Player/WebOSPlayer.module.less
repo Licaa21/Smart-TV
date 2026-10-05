@@ -1100,6 +1100,12 @@
 	display: -webkit-box;
 	-webkit-line-clamp: 6;
 	-webkit-box-orient: vertical;
+
+	// Any blur over the video turns the picture black on Fire TV.
+	:global(.vega) & {
+		backdrop-filter: none;
+		-webkit-backdrop-filter: none;
+	}
 }
 
 @keyframes fadeIn {

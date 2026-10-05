@@ -20,7 +20,7 @@ import {isScrolledAway} from '../../utils/quickReturn';
 import RatingsRow from '../../components/RatingsRow';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
 import {useStorage} from '../../hooks/useStorage';
-import {buildFilterParams} from '../../utils/libraryFilters';
+import {buildFilterParams, facetRows} from '../../utils/libraryFilters';
 import {foldForSearch} from '../../utils/accentFolding';
 import {keepFocusInView} from '../../utils/focusScroll';
 import {PanelContainer} from '../../utils/spotlightContainers';
@@ -107,6 +107,10 @@ const QUALITY_FILTERS = [
 // A tag list can run to thousands of entries, and each one costs a focusable
 // row, so a facet opens on this many and grows a page at a time.
 const FACET_PAGE = 50;
+
+const SEARCH_ICON = 'M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z';
+
+const CLEAR_GROUP_ICON = 'm580-465-43-43 183-232H305l-60-60h527q21 0 31 19t-4 36L580-465ZM813-61 560-314v114q0 17-11.5 28.5T520-160h-80q-17 0-28.5-11.5T400-200v-274L61-813l43-43 752 752-43 43ZM537-508Z';
 
 // Sorting is what the panel is opened for most of the time, so it is the one section
 // standing open when the panel arrives.
@@ -229,6 +233,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const [facetValues, setFacetValues] = useState(null);
 	const [expandedSection, setExpandedSection] = useState(SORT_SECTION);
 	const [facetLimit, setFacetLimit] = useState(FACET_PAGE);
+	const [facetQuery, setFacetQuery] = useState('');
 	const [musicContentType, setMusicContentType] = useState('albums');
 	const [focusedItem, setFocusedItem] = useState(null);
 	const [musicGridView, setMusicGridView] = useState(null);
@@ -842,12 +847,35 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const handleSectionExpand = useCallback((ev) => {
 		const key = ev.currentTarget.dataset.sectionKey;
 		setFacetLimit(FACET_PAGE);
+		setFacetQuery('');
 		setExpandedSection(prev => (prev === key ? null : key));
 	}, []);
 
 	const handleFacetShowMore = useCallback(() => {
 		setFacetLimit(prev => prev + FACET_PAGE);
 	}, []);
+
+	const handleFacetQueryChange = useCallback((ev) => setFacetQuery(ev.target.value), []);
+
+	const filterGroupSetters = useMemo(() => ({
+		features: setFeatureFilters,
+		quality: setQualityFilters,
+		source: setVideoSourceFilters,
+		genres: setGenreFilters,
+		ratings: setRatingFilters,
+		tags: setTagFilters,
+		years: setYearFilters,
+		audio: setAudioLanguageFilters,
+		subtitles: setSubtitleLanguageFilters
+	}), []);
+
+	// The tile goes away once its group is empty, so focus moves to the heading first
+	// rather than being left on nothing.
+	const handleClearGroup = useCallback((ev) => {
+		const key = ev.currentTarget.dataset.sectionKey;
+		Spotlight.focus(`filter-section-${key}`);
+		filterGroupSetters[key]([]);
+	}, [filterGroupSetters]);
 
 	const handleClearFilters = useCallback(() => {
 		setFavoritesOnly(false);
@@ -873,6 +901,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		if (showSortPanel) return;
 		setExpandedSection(SORT_SECTION);
 		setFacetLimit(FACET_PAGE);
+		setFacetQuery('');
 	}, [showSortPanel]);
 
 	const handleCycleImageSize = useCallback(() => {
@@ -1097,45 +1126,89 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		);
 	};
 
+	const renderClearGroup = (key, count) => count > 0 && (
+		<SpottableButton
+			className={`${css.sortOption} ${css.clearGroup}`}
+			onClick={handleClearGroup}
+			data-section-key={key}
+			spotlightId={`filter-${key}-clear`}
+		>
+			<svg viewBox="0 -960 960 960" className={css.clearGroupIcon}>
+				<path d={CLEAR_GROUP_ICON} />
+			</svg>
+			<span className={css.sortOptionLabel}>{$L('Clear')}</span>
+		</SpottableButton>
+	);
+
+	const renderCheckRow = ({key, label, checked, value, spotlightId, onToggle}) => (
+		<SpottableButton
+			key={key}
+			className={`${css.sortOption} ${checked ? css.sortOptionActive : ''}`}
+			onClick={onToggle}
+			data-filter-value={value}
+			spotlightId={spotlightId}
+		>
+			<span className={css.checkboxSquare}>
+				{checked && (
+					<svg viewBox="0 0 24 24" className={css.checkIcon}>
+						<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+					</svg>
+				)}
+			</span>
+			<span className={css.sortOptionLabel}>{label}</span>
+		</SpottableButton>
+	);
+
+	// Features, quality and source are fixed lists, each cleared on its own the way a facet is.
+	const renderOptionSection = (key, title, options, selected, onToggle, idPrefix) => renderSection(key, title, countLabel(selected.length), () => (
+		<>
+			{renderClearGroup(key, selected.length)}
+			{options.map((option) => renderCheckRow({
+				key: option.key,
+				label: $L(option.label),
+				checked: selected.includes(option.key),
+				value: option.key,
+				spotlightId: `filter-${idPrefix}-${option.key}`,
+				onToggle
+			}))}
+		</>
+	));
+
 	// One collapsible group per facet, left out entirely when the library holds
-	// no values for it. Languages carry a display name beside the code the
-	// query takes, everything else is its own label.
+	// no values for it.
 	const renderFacetSection = (facetKey, title, values, selected, onToggle) => {
 		if (!values || values.length === 0) return null;
-		const options = values.map(v => (typeof v === 'string' ? {name: v, value: v} : v));
+		const {chosen, searchable, noMatches, visible, remaining} = facetRows(values, selected, facetQuery, facetLimit);
 		// Tags and genres are whatever the library owner typed, and a spotlight
 		// id ends up in a CSS selector, so the position identifies the row.
-		const chosen = options.filter(o => selected.includes(o.value)).length;
-		// Anything already picked stays on screen however far down the list it
-		// sits, otherwise a page limit could hide the only way to clear it.
-		let room = facetLimit;
-		const visible = options.filter(option => {
-			if (selected.includes(option.value)) return true;
-			if (room <= 0) return false;
-			room -= 1;
-			return true;
-		});
-		const remaining = options.length - visible.length;
 		return renderSection(facetKey, title, countLabel(chosen), () => (
 			<>
-				{visible.map((option, index) => (
-					<SpottableButton
-						key={option.value}
-						className={`${css.sortOption} ${selected.includes(option.value) ? css.sortOptionActive : ''}`}
-						onClick={onToggle}
-						data-filter-value={option.value}
-						spotlightId={`filter-${facetKey}-${index}`}
-					>
-						<span className={css.checkboxSquare}>
-							{selected.includes(option.value) && (
-								<svg viewBox="0 0 24 24" className={css.checkIcon}>
-									<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-								</svg>
-							)}
-						</span>
-						<span className={css.sortOptionLabel}>{option.name}</span>
-					</SpottableButton>
-				))}
+				{renderClearGroup(facetKey, selected.length)}
+				{searchable && (
+					<div className={`${css.searchWrap} ${css.facetSearch}`}>
+						<svg className={css.searchIcon} viewBox="0 -960 960 960">
+							<path d={SEARCH_ICON} />
+						</svg>
+						<SpottableInput
+							type="text"
+							className={css.searchField}
+							placeholder={title}
+							value={facetQuery}
+							onChange={handleFacetQueryChange}
+							spotlightId={`filter-${facetKey}-search`}
+							autoComplete="off"
+						/>
+					</div>
+				)}
+				{visible.map((option, index) => renderCheckRow({
+					key: option.value,
+					label: option.name,
+					checked: selected.includes(option.value),
+					value: option.value,
+					spotlightId: `filter-${facetKey}-${index}`,
+					onToggle
+				}))}
+				{noMatches && <div className={css.facetNoResults}>{$L('No results')}</div>}
 				{remaining > 0 && (
 					<SpottableButton
 						className={css.sortOption}
@@ -1272,7 +1345,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 					<div className={css.headerSide}>
 						<div className={css.searchWrap}>
 							<svg className={css.searchIcon} viewBox="0 -960 960 960">
-								<path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z" />
+								<path d={SEARCH_ICON} />
 							</svg>
 							<SpottableInput
 								type="text"
@@ -1534,68 +1607,11 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 							))
 						))}
 
-						{showVideoFilters && renderSection('features', $L('Features'), countLabel(featureFilters.length), () => (
-							supported(FEATURE_FILTERS).map((option) => (
-								<SpottableButton
-									key={option.key}
-									className={`${css.sortOption} ${featureFilters.includes(option.key) ? css.sortOptionActive : ''}`}
-									onClick={handleFeatureToggle}
-									data-filter-value={option.key}
-									spotlightId={`filter-feature-${option.key}`}
-								>
-									<span className={css.checkboxSquare}>
-										{featureFilters.includes(option.key) && (
-											<svg viewBox="0 0 24 24" className={css.checkIcon}>
-												<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-											</svg>
-										)}
-									</span>
-									<span className={css.sortOptionLabel}>{$L(option.label)}</span>
-								</SpottableButton>
-							))
-						))}
+						{showVideoFilters && renderOptionSection('features', $L('Features'), supported(FEATURE_FILTERS), featureFilters, handleFeatureToggle, 'feature')}
 
-						{showVideoFilters && renderSection('quality', $L('Quality'), countLabel(qualityFilters.length), () => (
-							supported(QUALITY_FILTERS).map((option) => (
-								<SpottableButton
-									key={option.key}
-									className={`${css.sortOption} ${qualityFilters.includes(option.key) ? css.sortOptionActive : ''}`}
-									onClick={handleQualityToggle}
-									data-filter-value={option.key}
-									spotlightId={`filter-quality-${option.key}`}
-								>
-									<span className={css.checkboxSquare}>
-										{qualityFilters.includes(option.key) && (
-											<svg viewBox="0 0 24 24" className={css.checkIcon}>
-												<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-											</svg>
-										)}
-									</span>
-									<span className={css.sortOptionLabel}>{$L(option.label)}</span>
-								</SpottableButton>
-							))
-						))}
+						{showVideoFilters && renderOptionSection('quality', $L('Quality'), supported(QUALITY_FILTERS), qualityFilters, handleQualityToggle, 'quality')}
 
-						{showVideoFilters && renderSection('source', $L('Source'), countLabel(videoSourceFilters.length), () => (
-							VIDEO_SOURCE_FILTERS.map((option) => (
-								<SpottableButton
-									key={option.key}
-									className={`${css.sortOption} ${videoSourceFilters.includes(option.key) ? css.sortOptionActive : ''}`}
-									onClick={handleVideoSourceToggle}
-									data-filter-value={option.key}
-									spotlightId={`filter-source-${option.key}`}
-								>
-									<span className={css.checkboxSquare}>
-										{videoSourceFilters.includes(option.key) && (
-											<svg viewBox="0 0 24 24" className={css.checkIcon}>
-												<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-											</svg>
-										)}
-									</span>
-									<span className={css.sortOptionLabel}>{$L(option.label)}</span>
-								</SpottableButton>
-							))
-						))}
+						{showVideoFilters && renderOptionSection('source', $L('Source'), VIDEO_SOURCE_FILTERS, videoSourceFilters, handleVideoSourceToggle, 'source')}
 
 						{!genreFilter && renderFacetSection('genres', $L('Genres'), facetValues?.genres, genreFilters, handleGenreToggle)}
 						{renderFacetSection('ratings', $L('Parental Rating'), facetValues?.officialRatings, ratingFilters, handleRatingToggle)}

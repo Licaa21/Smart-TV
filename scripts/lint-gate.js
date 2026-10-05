@@ -11,7 +11,8 @@ const PACKAGES_DIR = path.resolve(__dirname, '..', 'packages');
 const LINT_DIRS = [
 	path.join(PACKAGES_DIR, 'app'),
 	path.join(PACKAGES_DIR, 'platform-tizen'),
-	path.join(PACKAGES_DIR, 'platform-webos')
+	path.join(PACKAGES_DIR, 'platform-webos'),
+	path.join(PACKAGES_DIR, 'platform-vega')
 ];
 
 // enact lint reports style problems as warnings and still exits zero, so the

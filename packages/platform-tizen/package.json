@@ -11,6 +11,7 @@
 		"./video": "./src/video.js",
 		"./smarthub": "./src/smarthub.js",
 		"./keys": "./src/keys.js",
-		"./volume": "./src/volume.js"
+		"./volume": "./src/volume.js",
+		"./countryCode": "./src/countryCode.js"
 	}
 }

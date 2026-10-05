@@ -3,6 +3,9 @@
 export const isLiveTvLibrary = (library) =>
 	String(library?.CollectionType || '').toLowerCase() === 'livetv';
 
+// Both spellings turn up, so both count as a channel.
+export const isLiveTvChannel = (item) => item?.Type === 'TvChannel' || item?.Type === 'LiveTvChannel';
+
 // The guide has a button of its own, so the library list drops Live TV rather
 // than offering a second way to the same screen.
 //

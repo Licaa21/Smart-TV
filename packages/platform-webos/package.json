@@ -9,6 +9,7 @@
 		"./deviceProfile": "./src/deviceProfile.js",
 		"./deviceInfo": "./src/deviceInfo.js",
 		"./video": "./src/video.js",
-		"./volume": "./src/volume.js"
+		"./volume": "./src/volume.js",
+		"./countryCode": "./src/countryCode.js"
 	}
 }
