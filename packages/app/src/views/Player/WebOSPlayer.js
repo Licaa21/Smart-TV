@@ -2091,6 +2091,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		holdCommitTimerRef.current = null;
 		const held = scrubHoldRef.current;
 		if (!held.active) return;
+		serverLogger.playback('Seek: scrub landed by itself', {
+			targetMs: held.ticks != null ? Math.round(held.ticks / 10000) : null,
+			wasPlaying: held.wasPlaying
+		});
 		if (held.wasPlaying) {
 			resumeHeldScrub();
 			return;
