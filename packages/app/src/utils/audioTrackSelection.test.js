@@ -146,3 +146,25 @@ describe('without a saved codec order', () => {
 		expect(selectPreferredAudioStream(tracks, {audioLanguage: 'eng'})).toBe(tracks[0]);
 	});
 });
+
+describe('codec order edge cases', () => {
+	const make = (index, language, codec, channels = 6) => ({index, language, codec, channels});
+
+	test('a codec left out of the saved order ranks after every one named', () => {
+		const ac3 = make(0, 'eng', 'ac3');
+		const aac = make(1, 'eng', 'aac');
+		expect(selectPreferredAudioStream([ac3, aac], {audioLanguage: 'eng', audioCodecOrder: ['truehd', 'aac']})).toBe(aac);
+	});
+
+	test('an empty saved order is no order', () => {
+		const first = make(0, 'eng', 'ac3');
+		const second = make(1, 'eng', 'truehd');
+		expect(selectPreferredAudioStream([first, second], {audioLanguage: 'eng', audioCodecOrder: []})).toBe(first);
+	});
+
+	test('with no track in a named language the codec order does not pick the language', () => {
+		const german = make(0, 'ger', 'ac3');
+		const french = make(1, 'fre', 'truehd');
+		expect(selectPreferredAudioStream([german, french], {audioLanguage: 'jpn', audioCodecOrder: ['truehd', 'ac3']})).toBe(german);
+	});
+});

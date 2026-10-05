@@ -1,6 +1,5 @@
 import {languageMatches} from './audioLanguage';
-import {AUDIO_CODECS, audioCodecKey} from './audioCodecs';
-import {ordered} from './buttonLayout';
+import {audioCodecKey} from './audioCodecs';
 import {streamTitleText} from './streamTitle';
 
 // Picks the audio track a fresh playback starts on, following the same order the
@@ -117,7 +116,9 @@ export const selectPreferredAudioStream = (audioStreams, settings = {}) => {
 	const prefs = {
 		preferDefaultAudioTrack,
 		preferAudioDescription,
-		codecOrder: audioCodecOrder ? ordered(AUDIO_CODECS, audioCodecOrder).map((codec) => codec.id) : null,
+		// The saved ids as they stand, so a codec left out ranks after every one that is named. An empty
+		// list is no order at all.
+		codecOrder: Array.isArray(audioCodecOrder) && audioCodecOrder.length ? audioCodecOrder : null,
 		lastIndex: lastExplicitAudioIndex,
 		lastTitle: lastExplicitAudioTitle ? String(lastExplicitAudioTitle).trim().toLowerCase() : ''
 	};
@@ -132,5 +133,7 @@ export const selectPreferredAudioStream = (audioStreams, settings = {}) => {
 		if (matches.length) return preferRemembered(matches, prefs);
 	}
 
-	return rankAudioCandidates(candidates, prefs);
+	// No track is in a language the viewer named, so the codec order has no language to settle
+	// ties inside of, and it must not decide which language plays.
+	return rankAudioCandidates(candidates, {...prefs, codecOrder: null});
 };
