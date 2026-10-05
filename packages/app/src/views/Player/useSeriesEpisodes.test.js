@@ -151,15 +151,15 @@ describe('useSeriesEpisodes', () => {
 
 	describe('what has changed since a list was held', () => {
 		it('applies the ratings blocked since, to the lists drawn from memory', async () => {
-			const firstOpen = renderHook(() => useSeriesEpisodes({item, enabled: true}));
-			await waitFor(() => expect(firstOpen.result.current.episodes).not.toBeNull());
-			firstOpen.unmount();
+			const {result: firstResult, unmount} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			await waitFor(() => expect(firstResult.current.episodes).not.toBeNull());
+			unmount();
 
 			mockBlockedIds.add('s2-a');
 			mockApi.getEpisodes.mockImplementation(() => new Promise(() => {}));
 			mockApi.getSeasons.mockImplementation(() => new Promise(() => {}));
-			const reopened = renderHook(() => useSeriesEpisodes({item, enabled: true}));
-			expect(reopened.result.current.episodes).toEqual([]);
+			const {result: reopenedResult} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			expect(reopenedResult.current.episodes).toEqual([]);
 		});
 
 		it('starts from what is held for the new series when the playing item moves to another', async () => {
