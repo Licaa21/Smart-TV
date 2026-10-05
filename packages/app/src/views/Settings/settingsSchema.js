@@ -128,8 +128,11 @@ const whenScreensaverLibrary = (ctx) => ctx.settings.screensaverEnabled && ctx.s
 const whenScreensaverComponent = (ctx) => ctx.settings.screensaverEnabled && ctx.settings.screensaverComponent !== 'none';
 const whenScreensaverStatic = (ctx) => whenScreensaverComponent(ctx) && ctx.settings.screensaverMovement === 'staticCorner';
 const whenLoadingAnimation = (ctx) => ctx.settings.loadingAnimationImage !== 'none';
-// A Fire TV plays through a browser video element with no passthrough of its own
-const whenPassthrough = (ctx) => ctx.settings.audioPassthroughMode === 'manual' && !ctx.isVega;
+// A Fire TV and an Xbox play through a browser video element with no passthrough of its own
+const inBrowserElement = (ctx) => ctx.isVega || ctx.isXbox;
+const whenPassthrough = (ctx) => ctx.settings.audioPassthroughMode === 'manual' && !inBrowserElement(ctx);
+// The platforms where the app can be told to accept a certificate the device refuses
+const whenCertificateChoice = (ctx) => ctx.isWebOS || ctx.isVega || ctx.isXbox;
 // Samsung sets decode AC3 and E-AC3 themselves, so these two toggles only do anything on webOS
 const whenWebOSPassthrough = (ctx) => whenPassthrough(ctx) && ctx.isWebOS;
 const whenSyncCorrection = (ctx) => ctx.settings.syncPlayAdvancedCorrectionEnabled !== false;
@@ -195,16 +198,18 @@ export const SETTINGS_SCHEMA = [
 						action: (ctx) => ctx.actions.openParentalControls()
 					},
 					{kind: KIND.TOGGLE, key: 'exitConfirmation', label: () => $L('Confirm Exit'), desc: () => $L('Show confirmation before exiting'), icon: 'exit'},
-					{kind: KIND.SECTION, id: 'connection', label: () => $L('Connection'), when: (ctx) => ctx.isWebOS || ctx.isVega},
+					{kind: KIND.SECTION, id: 'connection', label: () => $L('Connection'), when: whenCertificateChoice},
 					{
 						kind: KIND.TOGGLE,
 						key: 'allowInsecureCerts',
 						label: () => $L('Allow Untrusted Certificates'),
-						desc: (ctx) => (ctx.isVega
-							? $L('If your Fire TV rejects a server\'s security certificate, accept it anyway. Use only for servers you trust.')
-							: $L('If your TV rejects a server\'s security certificate, fetch through the proxy without verifying it. Use only for servers you trust.')),
+						desc: (ctx) => (ctx.isXbox
+							? $L('If your Xbox rejects a server\'s security certificate, accept it anyway. Use only for servers you trust.')
+							: ctx.isVega
+								? $L('If your Fire TV rejects a server\'s security certificate, accept it anyway. Use only for servers you trust.')
+								: $L('If your TV rejects a server\'s security certificate, fetch through the proxy without verifying it. Use only for servers you trust.')),
 						icon: 'gpp_maybe',
-						when: (ctx) => ctx.isWebOS || ctx.isVega
+						when: whenCertificateChoice
 					}
 				]
 			}
@@ -651,7 +656,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.TOGGLE, key: 'preferDefaultAudioTrack', label: () => $L('Prefer Default Audio Track'), desc: () => $L('Pick the track the file marks as default before matching languages'), icon: 'audiotrack'},
 					{kind: KIND.TOGGLE, key: 'preferAudioDescription', label: () => $L('Prefer Audio Description Tracks'), desc: () => $L('Pick narrated tracks for the visually impaired when available'), icon: 'hearing'},
 					{kind: KIND.SECTION, id: 'audioOutput', label: () => $L('Audio Output')},
-					{kind: KIND.OPTION, key: 'audioPassthroughMode', label: () => $L('Audio Passthrough'), desc: () => $L('Whether compressed audio is sent to your receiver untouched'), options: getPassthroughModeOptions, fallback: () => $L('Auto (match detected device support)'), icon: 'settings_input_hdmi', when: (ctx) => !ctx.isVega},
+					{kind: KIND.OPTION, key: 'audioPassthroughMode', label: () => $L('Audio Passthrough'), desc: () => $L('Whether compressed audio is sent to your receiver untouched'), options: getPassthroughModeOptions, fallback: () => $L('Auto (match detected device support)'), icon: 'settings_input_hdmi', when: (ctx) => !inBrowserElement(ctx)},
 					{kind: KIND.OPTION, key: 'maxAudioChannels', label: () => $L('Max Audio Channels'), desc: () => $L('Cap decoded audio at this channel count'), options: getMaxAudioChannelsOptions, fallback: () => $L('Auto Detect (Hardware Default)'), icon: 'speakergroup'},
 					{kind: KIND.TOGGLE, key: 'downmixToStereo', label: () => $L('Downmix to Stereo'), desc: () => $L('Reduce multichannel audio to two channels'), icon: 'speaker'},
 					{kind: KIND.TOGGLE, key: 'stereoUpmixEnabled', label: () => $L('Stereo to Surround Upmix'), desc: () => $L('Upmix stereo audio to 5.1 surround via server transcoding'), icon: 'equalizer', when: (ctx) => !ctx.settings.downmixToStereo},
@@ -949,7 +954,7 @@ export const SETTINGS_SCHEMA = [
 						id: 'platform',
 						icon: 'tv',
 						label: () => $L('Platform'),
-						value: (ctx) => (ctx.capabilities?.tizenVersionDisplay ? 'Tizen' : ctx.capabilities?.webosVersionDisplay ? 'webOS' : ctx.capabilities?.vegaVersionDisplay ? 'Fire TV' : $L('Unknown'))
+						value: (ctx) => (ctx.capabilities?.tizenVersionDisplay ? 'Tizen' : ctx.capabilities?.webosVersionDisplay ? 'webOS' : ctx.capabilities?.vegaVersionDisplay ? 'Fire TV' : ctx.capabilities?.xboxVersionDisplay ? 'Xbox' : $L('Unknown'))
 					},
 					{kind: KIND.TOGGLE, key: 'updateNotificationsEnabled', label: () => $L('Update Notifications'), desc: () => $L('Show app update notifications when a new release is available'), icon: 'system_update_alt'},
 					{kind: KIND.CUSTOM, id: 'checkForUpdates', render: 'checkForUpdates'},
@@ -974,10 +979,10 @@ export const SETTINGS_SCHEMA = [
 					{
 						kind: KIND.INFO,
 						id: 'osVersion',
-						label: (ctx) => (ctx.capabilities?.tizenVersionDisplay ? $L('Tizen Version') : ctx.capabilities?.vegaVersionDisplay ? $L('Vega OS Version') : $L('webOS Version')),
-						value: (ctx) => ctx.capabilities?.tizenVersionDisplay || ctx.capabilities?.webosVersionDisplay || ctx.capabilities?.vegaVersionDisplay,
+						label: (ctx) => (ctx.capabilities?.tizenVersionDisplay ? $L('Tizen Version') : ctx.capabilities?.vegaVersionDisplay ? $L('Vega OS Version') : ctx.capabilities?.xboxVersionDisplay ? $L('Xbox OS Version') : $L('webOS Version')),
+						value: (ctx) => ctx.capabilities?.tizenVersionDisplay || ctx.capabilities?.webosVersionDisplay || ctx.capabilities?.vegaVersionDisplay || ctx.capabilities?.xboxVersionDisplay,
 						icon: 'gear',
-						when: (ctx) => !!(ctx.capabilities?.tizenVersionDisplay || ctx.capabilities?.webosVersionDisplay || ctx.capabilities?.vegaVersionDisplay)
+						when: (ctx) => !!(ctx.capabilities?.tizenVersionDisplay || ctx.capabilities?.webosVersionDisplay || ctx.capabilities?.vegaVersionDisplay || ctx.capabilities?.xboxVersionDisplay)
 					},
 					{kind: KIND.INFO, id: 'firmware', label: () => $L('Firmware'), value: (ctx) => ctx.capabilities?.firmwareVersion, icon: 'gear', when: (ctx) => !!ctx.capabilities?.firmwareVersion},
 					{

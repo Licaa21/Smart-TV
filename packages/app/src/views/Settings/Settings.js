@@ -16,7 +16,7 @@ import {useAchievements} from '../../context/AchievementsContext';
 import {useDeviceInfo} from '../../hooks/useDeviceInfo';
 import {isBackKey} from '../../utils/keys';
 import {isTvKeyboardVisible} from '../../components/TVKeyboard/keyboardBus';
-import {isVega, isWebOS} from '../../platform';
+import {isVega, isWebOS, isXbox} from '../../platform';
 import ClearDataDialog from '../../components/ClearDataDialog';
 import ScreensaverPreview from '../../components/Screensaver/ScreensaverPreview';
 import {LoadingAnimationPreview} from '../../components/LoadingAnimation';
@@ -1043,6 +1043,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		isSeerr,
 		isWebOS: isWebOS(),
 		isVega: isVega(),
+		isXbox: isXbox(),
 		serverUrl,
 		serverVersion,
 		availableThemes,

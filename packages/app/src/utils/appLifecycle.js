@@ -1,5 +1,6 @@
 /* global tizen */
-import {isTizen, isVega, isWebOS} from '../platform';
+import {isTizen, isVega, isWebOS, isXbox} from '../platform';
+import {loadShellBridge} from '../services/shellBridge';
 
 // webOS holds a relaunched app in the background until this is called. Sets on 4.x and
 // below carry the object as PalmSystem alone, and 5.0 and above carry it under both names.
@@ -20,8 +21,8 @@ export const exitApp = () => {
 		return;
 	}
 	// The WebView has no window of its own to close, so the shell is asked instead.
-	if (isVega()) {
-		import('@moonfin/platform-vega/bridge').then((bridge) => bridge.exitApp());
+	if (isVega() || isXbox()) {
+		loadShellBridge().then((bridge) => bridge.exitApp());
 		return;
 	}
 	window.close();

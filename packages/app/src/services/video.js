@@ -37,7 +37,7 @@ export const leavesPlayerInBackground = () => !!impl.leavesPlayerInBackground;
 // Only webOS has a service bridge to bring up before the player can use it.
 export const initPlayerPlatform = () => (impl.initLunaAPI ? impl.initLunaAPI() : Promise.resolve(false));
 
-const LIFECYCLE_SETUP = {tizen: 'setupTizenLifecycle', webos: 'setupWebOSLifecycle', vega: 'setupVegaLifecycle'};
+const LIFECYCLE_SETUP = {tizen: 'setupTizenLifecycle', webos: 'setupWebOSLifecycle', vega: 'setupVegaLifecycle', xbox: 'setupXboxLifecycle'};
 
 // Asked for before the platform module has loaded, so a caller that tears down first is
 // caught by the flag rather than by a remover for a handler that never went on.

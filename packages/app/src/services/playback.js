@@ -9,7 +9,7 @@ import {applyProfileTuning} from '../utils/deviceProfileTuning';
 import {findNextInSeason, findNextSeason, firstPlayableEpisode} from '../utils/nextEpisode';
 import {videoRangeTypeOf} from '../utils/videoRange';
 import {getVolumeState, lastVolumeState} from './systemVolume';
-import {isVega} from '../platform';
+import {loadShellBridge} from './shellBridge';
 
 export const PlayMethod = {
 	DirectPlay: 'DirectPlay',
@@ -1184,19 +1184,17 @@ const stopRequest = (positionTicks) => {
 	};
 };
 
-// Page scripts freeze once the app is in the background on Fire TV, so the shell
-// that hosts the page gets what it needs to end the session itself.
-let vegaBridge = null;
-if (isVega()) {
-	import('@moonfin/platform-vega/bridge').then((mod) => {
-		vegaBridge = mod;
-	});
-}
+// Page scripts freeze once the app is in the background on Fire TV and on Xbox,
+// so the shell that hosts the page gets what it needs to end the session itself.
+let shellBridge = null;
+loadShellBridge().then((mod) => {
+	shellBridge = mod;
+});
 
 const shareStopWithShell = (positionTicks) => {
-	if (!vegaBridge) return;
+	if (!shellBridge) return;
 	const request = stopRequest(positionTicks);
-	vegaBridge.postToShell('PLAYBACK_SESSION', request && {
+	shellBridge.postToShell('PLAYBACK_SESSION', request && {
 		stopUrl: request.endpoint,
 		headers: {'Content-Type': 'application/json'},
 		body: request.json

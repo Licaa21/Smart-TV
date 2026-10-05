@@ -14,6 +14,21 @@ dist
 *.wgt
 *.zip
 *.vpkg
+*.msix
+*.appx
+*.msixupload
+*.cer
+*.pfx
+
+# the Xbox host's build output and the web bundle copied into it
+packages/build-xbox/shell/**/www
+packages/build-xbox/shell/**/bin
+packages/build-xbox/shell/**/obj
+packages/build-xbox/shell/**/AppPackages
+packages/build-xbox/shell/**/BundleArtifacts
+packages/build-xbox/shell/**/*.csproj.user
+packages/build-xbox/.cert
+packages/build-xbox/shell/**/Package.Build.appxmanifest
 
 # misc
 .DS_Store

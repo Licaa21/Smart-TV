@@ -1,0 +1,118 @@
+import {allowInsecureHost, bootData, exitApp, onShellMessage, postToShell} from '../../../platform-xbox/src/bridge';
+import {keepScreenOn, registerAppStateObserver, setupXboxLifecycle} from '../../../platform-xbox/src/video';
+
+const hostSays = (type, payload) => window.dispatchEvent(new CustomEvent('moonfin:xbox', {detail: {v: 1, type, payload}}));
+
+describe('the Xbox bridge', () => {
+	let postMessage;
+
+	beforeEach(() => {
+		postMessage = jest.fn();
+		window.chrome = {webview: {postMessage}};
+	});
+
+	afterEach(() => {
+		delete window.__MOONFIN_XBOX__;
+		delete window.chrome;
+	});
+
+	const sent = (index = 0) => JSON.parse(postMessage.mock.calls[index][0]);
+
+	test('reads the boot data the host wrote, and only of its own version', () => {
+		expect(bootData()).toBeNull();
+		window.__MOONFIN_XBOX__ = {v: 1, ip: '192.168.1.30'};
+		expect(bootData().ip).toBe('192.168.1.30');
+		window.__MOONFIN_XBOX__ = {v: 2, ip: '192.168.1.30'};
+		expect(bootData()).toBeNull();
+	});
+
+	test('posts versioned messages to the host and says when there is none', () => {
+		delete window.chrome;
+		expect(exitApp()).toBe(false);
+		window.chrome = {webview: {postMessage}};
+		expect(allowInsecureHost('nas:8920')).toBe(true);
+		expect(sent()).toEqual({v: 1, type: 'ALLOW_INSECURE_HOST', payload: {host: 'nas:8920'}});
+		expect(postToShell('EXIT_APP')).toBe(true);
+	});
+
+	test('hands host messages of one type to the handler until removed', () => {
+		const handler = jest.fn();
+		const remove = onShellMessage('APP_STATE', handler);
+		hostSays('APP_STATE', {state: 'background'});
+		hostSays('KEY', {key: 'Play'});
+		window.dispatchEvent(new CustomEvent('moonfin:xbox', {detail: {v: 2, type: 'APP_STATE', payload: {state: 'active'}}}));
+		expect(handler).toHaveBeenCalledTimes(1);
+		expect(handler).toHaveBeenCalledWith({state: 'background'});
+		remove();
+		hostSays('APP_STATE', {state: 'active'});
+		expect(handler).toHaveBeenCalledTimes(1);
+	});
+
+	test('keeping the screen on is asked of the host', async () => {
+		await keepScreenOn(true);
+		await keepScreenOn(false);
+		expect(sent(0)).toEqual({v: 1, type: 'KEEP_DISPLAY_ACTIVE', payload: {active: true}});
+		expect(sent(1)).toEqual({v: 1, type: 'KEEP_DISPLAY_ACTIVE', payload: {active: false}});
+	});
+});
+
+describe('the Xbox lifecycle', () => {
+	test('turns a change in the host network report into the browser events, after the first word', () => {
+		const offline = jest.fn();
+		const online = jest.fn();
+		window.addEventListener('offline', offline);
+		window.addEventListener('online', online);
+		const remove = setupXboxLifecycle();
+		hostSays('NETWORK', {connected: true, ip: null});
+		hostSays('NETWORK', {connected: true, ip: null});
+		expect(offline).not.toHaveBeenCalled();
+		hostSays('NETWORK', {connected: false, ip: null});
+		expect(offline).toHaveBeenCalledTimes(1);
+		hostSays('NETWORK', {connected: true, ip: null});
+		expect(online).toHaveBeenCalledTimes(1);
+		remove();
+		hostSays('NETWORK', {connected: false, ip: null});
+		expect(offline).toHaveBeenCalledTimes(1);
+		window.removeEventListener('offline', offline);
+		window.removeEventListener('online', online);
+	});
+
+	test('raises the media remote and the system Back on the focused element as keys', () => {
+		const button = document.createElement('button');
+		document.body.appendChild(button);
+		button.focus();
+		const seen = [];
+		button.addEventListener('keydown', (e) => seen.push(e.keyCode));
+		const remove = setupXboxLifecycle();
+		hostSays('KEY', {key: 'Play'});
+		hostSays('KEY', {key: 'Pause'});
+		hostSays('KEY', {key: 'Back'});
+		hostSays('KEY', {key: 'Nonsense'});
+		expect(seen).toEqual([250, 19, 27]);
+		remove();
+		hostSays('KEY', {key: 'Play'});
+		expect(seen).toHaveLength(3);
+		button.remove();
+	});
+
+	test('tells the player of a trip to the background once, however many ways it hears of it', () => {
+		const foreground = jest.fn();
+		const background = jest.fn();
+		const remove = registerAppStateObserver(foreground, background);
+		const setHidden = (hidden) => {
+			Object.defineProperty(document, 'hidden', {value: hidden, configurable: true});
+			document.dispatchEvent(new Event('visibilitychange'));
+		};
+		hostSays('APP_STATE', {state: 'background'});
+		setHidden(true);
+		expect(background).toHaveBeenCalledTimes(1);
+		expect(foreground).not.toHaveBeenCalled();
+		setHidden(false);
+		hostSays('APP_STATE', {state: 'active'});
+		expect(foreground).toHaveBeenCalledTimes(1);
+		remove();
+		hostSays('APP_STATE', {state: 'background'});
+		expect(background).toHaveBeenCalledTimes(1);
+		delete document.hidden;
+	});
+});

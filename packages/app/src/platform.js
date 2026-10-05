@@ -21,11 +21,19 @@ export const isVega = () => {
 	return typeof window.__MOONFIN_VEGA__ !== 'undefined';
 };
 
+// The UWP host that shows the app in WebView2 on Xbox does the same.
+export const isXbox = () => {
+	if (process.env.REACT_APP_PLATFORM === 'xbox') return true;
+	if (typeof window === 'undefined') return false;
+	return typeof window.__MOONFIN_XBOX__ !== 'undefined';
+};
+
 export const getPlatform = () => {
 	if (process.env.REACT_APP_PLATFORM) return process.env.REACT_APP_PLATFORM;
 	if (isWebOS()) return 'webos';
 	if (isTizen()) return 'tizen';
 	if (isVega()) return 'vega';
+	if (isXbox()) return 'xbox';
 	return 'unknown';
 };
 
