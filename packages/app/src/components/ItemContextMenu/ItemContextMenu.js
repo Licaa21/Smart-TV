@@ -80,11 +80,13 @@ export const ItemMenuProvider = ({children, onPlay, onOpenItem, backRef}) => {
 		const sameServer = !item._serverUrl || item._serverUrl === serverUrl;
 		const canManageCollections = !(getServerType() === 'jellyfin' && sameServer) ||
 			Boolean(user?.Policy?.EnableCollectionManagement) || isAdmin;
+		const playlist = options?.playlist;
 		return itemMenuActions(item, {
 			isAdmin,
 			isJellyfin,
 			canManageCollections,
-			inCollection: Boolean(options?.collectionRemoval)
+			inCollection: Boolean(options?.collectionRemoval),
+			playlist: playlist ? {canManage: playlist.canManage, ...playlist.positionOf(item)} : null
 		});
 	}, [user, serverUrl]);
 
@@ -105,7 +107,7 @@ export const ItemMenuProvider = ({children, onPlay, onOpenItem, backRef}) => {
 		const actions = actionsFor(item, options);
 		if (!actions.length) return;
 		returnFocusRef.current = Spotlight.getCurrent();
-		setMenu({item, actions, collectionRemoval: options?.collectionRemoval || null});
+		setMenu({item, actions, collectionRemoval: options?.collectionRemoval || null, playlist: options?.playlist || null});
 	}, [actionsFor]);
 
 	const canOpen = useCallback((item, options) => actionsFor(item, options).length > 0, [actionsFor]);
@@ -118,12 +120,17 @@ export const ItemMenuProvider = ({children, onPlay, onOpenItem, backRef}) => {
 		if (dialog?.kind === 'removeConfirm') Spotlight.focus(`${MENU_ID}-confirm`);
 	}, [dialog]);
 
-	const run = useCallback(async (id, item, collectionRemoval) => {
+	const run = useCallback(async (id, item, collectionRemoval, playlist) => {
 		const api = getApiForItem(item) || activeApi;
 		const userData = item.UserData || {};
 		switch (id) {
+			// From a playlist row, Play means the playlist from that row on.
 			case 'play':
-				onPlay(item);
+				if (playlist) playlist.play(item);
+				else onPlay(item);
+				break;
+			case 'viewDetails':
+				onOpenItem(item);
 				break;
 			case 'watched':
 				await api.setWatched(item.Id, !userData.Played).catch(() => {});
@@ -152,6 +159,15 @@ export const ItemMenuProvider = ({children, onPlay, onOpenItem, backRef}) => {
 			case 'addToPlaylist':
 				setDialog({kind: 'playlist', item, api});
 				break;
+			case 'removeFromPlaylist':
+				playlist.remove(item);
+				break;
+			case 'moveUp':
+				playlist.move(item, -1);
+				break;
+			case 'moveDown':
+				playlist.move(item, 1);
+				break;
 			case 'refreshMetadata':
 				try {
 					await api.refreshItem(item.Id);
@@ -179,10 +195,10 @@ export const ItemMenuProvider = ({children, onPlay, onOpenItem, backRef}) => {
 
 	const handleSelect = useCallback((ev) => {
 		const id = ev.currentTarget.dataset.action;
-		const {item, collectionRemoval} = menu;
+		const {item, collectionRemoval, playlist} = menu;
 		setMenu(null);
 		restoreFocus();
-		run(id, item, collectionRemoval);
+		run(id, item, collectionRemoval, playlist);
 	}, [menu, restoreFocus, run]);
 
 	const closeMenu = useCallback(() => {

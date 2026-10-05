@@ -1,5 +1,7 @@
 import $L from '@enact/i18n/$L';
 
+import {SHOWS_EVERYTHING} from './detailSectionLayout';
+
 // A birthday is a calendar date, not a moment. Both servers send it anchored to
 // UTC, so reading it back in the viewer's zone moves it a day earlier for
 // anyone west of it. The parts are taken as written and rebuilt locally.
@@ -46,8 +48,10 @@ export const personDateLines = (birthValue, deathValue) => {
 
 // The filmography comes back as one list, and each kind of work gets its own
 // row. An episode of a series the person is billed on is already covered by
-// that series, so only the rest count as a guest appearance.
-export const splitFilmography = (items) => {
+// that series, so only the rest count as a guest appearance. Guest appearances
+// and music videos each have a switch in the detail sections setting, and a
+// hidden one comes back empty.
+export const splitFilmography = (items, showsSection = SHOWS_EVERYTHING) => {
 	const all = Array.isArray(items) ? items : [];
 	// The same title held twice, in two libraries or as two copies, is one card. The first is kept,
 	// which is the most recent since the list comes newest first.
@@ -63,13 +67,13 @@ export const splitFilmography = (items) => {
 	const titled = (item) => `${item.Type}|${item.Name || item.Id}|${item.ProductionYear || ''}`;
 	const movies = distinct(all.filter((item) => item.Type === 'Movie'), titled);
 	const series = distinct(all.filter((item) => item.Type === 'Series'), titled);
-	const musicVideos = distinct(all.filter((item) => item.Type === 'MusicVideo'), titled);
+	const musicVideos = showsSection('musicVideos') ? distinct(all.filter((item) => item.Type === 'MusicVideo'), titled) : [];
 	const seriesIds = new Set(series.map((item) => item.Id));
 	// A talk show can hold dozens of episodes with the same person, so a show gets one card.
-	const guestAppearances = distinct(
+	const guestAppearances = showsSection('guestAppearances') ? distinct(
 		all.filter((item) => item.Type === 'Episode' && (!item.SeriesId || !seriesIds.has(item.SeriesId))),
 		(item) => (item.SeriesName || item.SeriesId ? `show|${item.SeriesName || item.SeriesId}` : `episode|${item.Id}`)
-	);
+	) : [];
 
 	return {movies, series, guestAppearances, musicVideos};
 };

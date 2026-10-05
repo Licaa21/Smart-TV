@@ -88,6 +88,18 @@ describe('splitFilmography', () => {
 	test('nothing to split is four empty rows', () => {
 		expect(splitFilmography(null)).toEqual({movies: [], series: [], guestAppearances: [], musicVideos: []});
 	});
+
+	test('leaves out a kind of work the viewer switched off', () => {
+		const hidden = new Set(['guestAppearances', 'musicVideos']);
+		const {guestAppearances, musicVideos, movies} = splitFilmography([
+			item({Id: 'm1', Type: 'Movie'}),
+			item({Id: 'v1', Type: 'MusicVideo'}),
+			item({Id: 'e1', Type: 'Episode', SeriesId: 'other'})
+		], (id) => !hidden.has(id));
+		expect(movies.map((m) => m.Id)).toEqual(['m1']);
+		expect(guestAppearances).toEqual([]);
+		expect(musicVideos).toEqual([]);
+	});
 });
 
 describe('credits', () => {

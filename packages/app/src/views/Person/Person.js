@@ -1,6 +1,7 @@
 import {useState, useEffect, useCallback, useMemo} from 'react';
 import $L from '@enact/i18n/$L';
 import {useAuth} from '../../context/AuthContext';
+import {useSettings} from '../../context/SettingsContext';
 import {withoutBlockedItems} from '../../services/parentalControls';
 import MediaRow from '../../components/MediaRow';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -10,6 +11,7 @@ import usePersonSeerrCredits from '../../hooks/usePersonSeerrCredits';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import {getImageUrl} from '../../utils/helpers';
 import {personDateLines, splitFilmography} from '../../utils/personCredits';
+import {sectionVisibility} from '../../utils/detailSectionLayout';
 
 import css from './Person.module.less';
 
@@ -19,6 +21,10 @@ import css from './Person.module.less';
 // overview and tab bar all come from the shared PersonDetailShell.
 const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}) => {
 	const {api, serverUrl} = useAuth();
+	const {settings} = useSettings();
+	// The detail sections setting reaches this page too, since it stands in for the Details
+	// screen on a person under every style but Nouveau.
+	const showsSection = useMemo(() => sectionVisibility(settings.hiddenDetailSectionsTv), [settings.hiddenDetailSectionsTv]);
 	const [person, setPerson] = useState(null);
 	const [items, setItems] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -68,7 +74,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	}, [tmdbId, person, onSelectSeerrPerson]);
 
 	const syncedItems = useUserDataList(items);
-	const {movies, series, guestAppearances, musicVideos} = useMemo(() => splitFilmography(syncedItems), [syncedItems]);
+	const {movies, series, guestAppearances, musicVideos} = useMemo(() => splitFilmography(syncedItems, showsSection), [syncedItems, showsSection]);
 
 	// The backdrop of what they are best known for, which the credits know and the library does
 	// not. Without Seerr it is the best rated movie or series held here. Nothing is drawn until
@@ -108,18 +114,18 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 				<MediaRow title={`${$L('Music Videos')} (${musicVideos.length})`} items={musicVideos} serverUrl={serverUrl} cardType="portrait" onSelectItem={onSelectItem} rowId="person-music" />
 			)});
 		}
-		if (crewCredits.length > 0) {
+		if (showsSection('seerrPersonCrew') && crewCredits.length > 0) {
 			list.push({key: 'crew', label: $L('Crew Contributions (Seerr)'), content: (
 				<MediaRow title={`${$L('Crew Contributions (Seerr)')} (${crewCredits.length})`} items={crewCredits} serverUrl={serverUrl} cardType="portrait" onSelectItem={handleSelectCredit} rowId="person-crew" />
 			)});
 		}
-		if (appearances.length > 0) {
+		if (showsSection('seerrPersonAppearances') && appearances.length > 0) {
 			list.push({key: 'seerr', label: $L('Appearances (Seerr)'), content: (
 				<MediaRow title={`${$L('Appearances (Seerr)')} (${appearances.length})`} items={appearances} serverUrl={serverUrl} cardType="portrait" onSelectItem={handleSelectCredit} rowId="person-seerr" />
 			)});
 		}
 		return list;
-	}, [movies, series, guestAppearances, musicVideos, crewCredits, appearances, onSelectItem, handleSelectCredit, serverUrl]);
+	}, [movies, series, guestAppearances, musicVideos, crewCredits, appearances, showsSection, onSelectItem, handleSelectCredit, serverUrl]);
 
 	if (isLoading) {
 		return (
@@ -141,7 +147,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 		? getImageUrl(serverUrl, person.Id, 'Primary', {maxHeight: 450, quality: 90})
 		: null;
 	const dateLines = personDateLines(person.PremiereDate, person.EndDate);
-	const birthPlace = person.ProductionLocations?.[0];
+	const birthPlace = showsSection('birthplace') ? person.ProductionLocations?.[0] : null;
 	const showSeerrButton = Boolean(tmdbId && seerrEnabled && onSelectSeerrPerson);
 
 	const favoriteIcon = (
@@ -164,7 +170,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 			placeholderInitial={person.Name?.[0]}
 			name={person.Name}
 			metaLines={[...dateLines, birthPlace].filter(Boolean)}
-			overview={person.Overview}
+			overview={showsSection('biography') ? person.Overview : null}
 			actions={actions}
 			tabs={tabs}
 		/>

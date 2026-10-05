@@ -26,7 +26,7 @@ export const CONTENT_FOCUS_TARGETS = [
 	'details-primary-btn',
 	'details-favorite-btn',
 	'person-overview',
-	'person-favorite-btn',
+	'person-action-favorite',
 	'search-input',
 	'livetv-guide'
 ];

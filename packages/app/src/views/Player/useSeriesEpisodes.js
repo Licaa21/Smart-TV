@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as jellyfinApi from '../../services/jellyfinApi';
-import {withoutBlockedItems} from '../../services/parentalControls';
+import {subscribeParentalControls, withoutBlockedItems} from '../../services/parentalControls';
 import {browsableEpisodes, initialSeasonId, seasonIdOf, tagWithServerOf} from '../../utils/episodeBrowser';
 
 // What the browser last showed for each series, so opening it again draws at once from this and
@@ -133,9 +133,12 @@ const useSeriesEpisodes = ({item, enabled}) => {
 
 	// The blocked ratings of this moment, applied to what is held, so a rating blocked since a list
 	// was drawn does not show it again while the refresh is still on its way.
+	// A change to the blocked ratings while the browser is open is seen at once, without a refetch.
+	const [parentalVersion, setParentalVersion] = useState(0);
+	useEffect(() => subscribeParentalControls(() => setParentalVersion((version) => version + 1)), []);
 	const rating = item?.OfficialRating;
-	const visibleSeasons = useMemo(() => (seasons ? withoutBlockedItems(seasons, rating) : seasons), [seasons, rating]);
-	const visibleEpisodes = useMemo(() => (current?.items ? withoutBlockedItems(current.items, rating) : null), [current, rating]);
+	const visibleSeasons = useMemo(() => (seasons ? withoutBlockedItems(seasons, rating) : seasons), [seasons, rating, parentalVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+	const visibleEpisodes = useMemo(() => (current?.items ? withoutBlockedItems(current.items, rating) : null), [current, rating, parentalVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	return {
 		seasons: visibleSeasons,

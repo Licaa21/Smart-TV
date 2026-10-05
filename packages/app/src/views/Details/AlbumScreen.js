@@ -15,6 +15,7 @@ const AlbumScreen = ({
 	item,
 	serverUrl,
 	settings,
+	showsSection,
 	posterUrl,
 	year,
 	genres,
@@ -34,7 +35,7 @@ const AlbumScreen = ({
 	return (
 		<>
 			<div className={css.seasonDetailHeader}>
-				{posterUrl && (
+				{showsSection('poster') && posterUrl && (
 					<div className={css.seasonDetailPoster}>
 						<img src={posterUrl} alt="" />
 						<PosterBadges userData={item.UserData} />

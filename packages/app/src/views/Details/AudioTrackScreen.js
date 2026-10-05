@@ -8,7 +8,7 @@ import {PosterBadges} from './DetailBadges';
 
 import css from './Details.module.less';
 
-const AudioTrackScreen = ({item, serverUrl, settings, posterUrl, year, runtime, onPlay, onToggleFavorite, onFocusRow}) => {
+const AudioTrackScreen = ({item, serverUrl, settings, showsSection, posterUrl, year, runtime, onPlay, onToggleFavorite, onFocusRow}) => {
 	const trackArtist = item.AlbumArtist || item.Artists?.[0] || '';
 	const albumName = item.Album || '';
 
@@ -30,20 +30,22 @@ const AudioTrackScreen = ({item, serverUrl, settings, posterUrl, year, runtime, 
 					</div>
 					{item.Overview && <p className={css.overview}>{item.Overview}</p>}
 				</div>
-				<div className={css.posterSection}>
-					<div className={css.poster}>
-						{posterUrl ? (
-							<img src={posterUrl} alt="" />
-						) : (
-							<div className={css.posterPlaceholder}>
-								<svg viewBox="0 -960 960 960" fill="currentColor">
-									<path d={DETAIL_ICON_PATHS.audio}/>
-								</svg>
-							</div>
-						)}
-						<PosterBadges userData={item.UserData} />
+				{showsSection('poster') && (
+					<div className={css.posterSection}>
+						<div className={css.poster}>
+							{posterUrl ? (
+								<img src={posterUrl} alt="" />
+							) : (
+								<div className={css.posterPlaceholder}>
+									<svg viewBox="0 -960 960 960" fill="currentColor">
+										<path d={DETAIL_ICON_PATHS.audio}/>
+									</svg>
+								</div>
+							)}
+							<PosterBadges userData={item.UserData} />
+						</div>
 					</div>
-				</div>
+				)}
 			</div>
 
 			<HorizontalContainer className={css.actionButtons} spotlightId="details-action-buttons">
