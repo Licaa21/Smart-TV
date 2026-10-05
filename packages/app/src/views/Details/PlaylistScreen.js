@@ -1,5 +1,7 @@
+import {useCallback} from 'react';
 import $L from '@enact/i18n/$L';
 
+import useItemMenuHold, {itemWithIdAt} from '../../hooks/useItemMenuHold';
 import {formatDuration, getImageUrl} from '../../utils/helpers';
 import {DETAIL_ICON_PATHS} from './detailIcons';
 import {SpottableDiv, HorizontalContainer} from './detailsSpottables';
@@ -20,9 +22,13 @@ const PlaylistScreen = ({
 	onToggleFavorite,
 	onItemSelect,
 	onItemKeyDown,
-	onFocusRow
+	onFocusRow,
+	playlistMenu
 }) => {
 	const playlistItemCount = playlistItems.length;
+	// Holding OK on a row opens its menu.
+	const rowAt = useCallback((target) => itemWithIdAt(playlistItems, 'data-playlist-item-id', target), [playlistItems]);
+	const menuHold = useItemMenuHold(rowAt, playlistMenu);
 	const totalDuration = playlistItems.reduce((sum, t) => sum + (t.RunTimeTicks || 0), 0);
 
 	return (
@@ -78,7 +84,7 @@ const PlaylistScreen = ({
 
 			<p className={css.playlistHint}>{$L('◀ ▶ to re-order · DEL to remove')}</p>
 
-			<div className={`${css.trackList} ${css.playlistItemsList}`} onKeyDown={onItemKeyDown}>
+			<div className={`${css.trackList} ${css.playlistItemsList}`} onKeyDown={onItemKeyDown} {...menuHold}>
 				{playlistItems.map((plItem, idx) => {
 					const plDuration = plItem.RunTimeTicks ? formatDuration(plItem.RunTimeTicks) : '';
 					const plArtist = plItem.AlbumArtist || plItem.Artists?.[0] || '';

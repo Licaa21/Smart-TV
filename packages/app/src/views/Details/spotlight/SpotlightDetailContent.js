@@ -44,7 +44,7 @@ const SpotlightDetailContent = (props) => {
 		albumTracks = [], artistAlbums = [], playlistItems = [], personMovies = [], personSeries = [],
 		filmography, loadMoreCollectionItems, collectionMenu,
 		onSelectItem, onSelectPerson, onSelectStudio, onSelectSeerrCard,
-		handleChapterSelect, handleExtraSelect, handleTrackPlay,
+		handleChapterSelect, handleExtraSelect, playTrack, playlistMenu,
 		onReorderPlaylistItem, onRemovePlaylistItem, canManagePlaylist, spotlightBackRef
 	} = props;
 
@@ -156,14 +156,15 @@ const SpotlightDetailContent = (props) => {
 		openStudio: onSelectStudio,
 		playFromChapter: handleChapterSelect,
 		playExtra: handleExtraSelect,
-		playTrack: handleTrackPlay,
+		playTrack,
+		playlistMenu,
 		reorderTrack: onReorderPlaylistItem,
 		removeTrack: onRemovePlaylistItem,
 		loadMoreCollectionItems,
 		collectionMenu
 	}), [
 		onSelectItem, onSelectSeerrCard, onSelectPerson, onSelectStudio, handleChapterSelect,
-		handleExtraSelect, handleTrackPlay, onReorderPlaylistItem, onRemovePlaylistItem,
+		handleExtraSelect, playTrack, playlistMenu, onReorderPlaylistItem, onRemovePlaylistItem,
 		loadMoreCollectionItems, collectionMenu
 	]);
 

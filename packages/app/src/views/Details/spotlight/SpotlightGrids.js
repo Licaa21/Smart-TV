@@ -170,6 +170,7 @@ const SpotlightSection = ({section, serverUrl, actions, seerr, firstSpotlightId}
 					isPlaylist={section.isPlaylist}
 					showAlbum={section.showAlbum}
 					manage={section.manage}
+					menuOptions={section.isPlaylist ? actions.playlistMenu : null}
 					onPlayTrack={actions.playTrack}
 					onReorder={actions.reorderTrack}
 					onRemove={actions.removeTrack}
