@@ -70,7 +70,8 @@ describe('the Xbox gamepad keys', () => {
 	test('keys that are already standard pass through untouched', () => {
 		const raw = press(button, 38, 'keydown', {key: 'ArrowUp'});
 		press(button, 65, 'keydown', {key: 'a'});
-		expect(seen.map((entry) => entry.keyCode)).toEqual([38, 65]);
+		press(button, 27, 'keydown', {key: 'Unidentified'});
+		expect(seen.map((entry) => entry.keyCode)).toEqual([38, 65, 27]);
 		expect(raw.defaultPrevented).toBe(false);
 	});
 

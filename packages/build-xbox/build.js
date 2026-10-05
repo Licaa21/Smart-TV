@@ -7,8 +7,8 @@
 // with the Visual Studio Build Tools and their UWP workload. Pass --no-msix to stop
 // once the web app is in place, which works on any system.
 //
-//   node build.js [--debug] [--no-msix] [--no-web] [--probe-clips] [--dev-url <url>]
-//   node build.js --probe [--debug] [--server <url>] [--emby <url>] [--image <url>] [--report <url>] [--media <label=url>]...
+//   node build.js [--debug] [--no-msix] [--no-web] [--probe-clips] [--dev-url <url>] [--install <console>]
+//   node build.js --probe [--debug] [--server <url>] [--emby <url>] [--image <url>] [--report <url>] [--media <label=url>]... [--install <console>]
 //
 // The app carries the device probe, which Settings opens for a signed in user, see
 // probe/probe.js. --probe-clips adds the test clips its playback run plays, made
@@ -25,6 +25,9 @@
 // --dev-url makes a Debug package that loads the app from a dev server (npm run
 // dev:xbox) instead of from the package, so changes show on the console as they are
 // saved.
+//
+// --install sends the package to a console in Developer Mode and starts it there,
+// see console.js.
 //
 // The package is signed with the certificate in MOONFIN_XBOX_PFX, its password in
 // MOONFIN_XBOX_PFX_PASSWORD. Without one a throwaway certificate is made and kept in
@@ -381,11 +384,21 @@ const buildMsix = (version) => {
 	const dependencies = path.join(path.dirname(built), 'Dependencies', 'x64');
 	if (fs.existsSync(dependencies)) console.log(`  Dependencies for sideloading: ${dependencies}`);
 	if (certificate.cer) console.log(`  Certificate it is signed with: ${certificate.cer}`);
+	return {file: path.join(ROOT_DIR, finalName), dependencies};
+};
+
+const installOnConsole = (address, {file, dependencies}) => {
+	console.log(`\n Installing on ${address}...`);
+	const consoleArgs = [path.join(__dirname, 'console.js'), address, 'install', file, dependencies];
+	if (flag('--probe')) consoleArgs.push('--probe');
+	if (spawnSync(process.execPath, consoleArgs, {stdio: 'inherit'}).status !== 0) throw new Error('The package was built but never reached the console');
 };
 
 try {
 	const appPkg = require(path.join(APP_DIR, 'package.json'));
 	if (flag('--dev-url') && !flag('--debug')) throw new Error('--dev-url only works with --debug, since a Release host loads nothing but its own package');
+	const consoleAddress = option('--install');
+	if (flag('--install') && (!consoleAddress || consoleAddress.startsWith('--') || flag('--no-msix'))) throw new Error('--install needs the address of a console, and has nothing to send it with --no-msix');
 
 	console.log(' Building Moonfin for Xbox...\n');
 	if (flag('--probe')) buildProbe();
@@ -397,7 +410,8 @@ try {
 	if (flag('--no-msix')) {
 		console.log(`\n Web app ready in ${WWW_DIR}. Run again without --no-msix on Windows with the Visual Studio Build Tools to build the package.`);
 	} else {
-		buildMsix(appPkg.version);
+		const built = buildMsix(appPkg.version);
+		if (consoleAddress) installOnConsole(consoleAddress, built);
 	}
 
 	console.log('\n Build complete!');

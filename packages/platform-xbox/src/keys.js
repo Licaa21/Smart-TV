@@ -5,6 +5,9 @@
 // than teach each one, a gamepad key is stopped on its way in and raised again on
 // the same element as the standard key it stands for. Arrows, Enter and Escape
 // arent in the table and pass through untouched.
+//
+// An Xbox One S already sends the left stick and B as arrows and Escape. Their
+// codes stay in the table for a console that sends them as they are.
 
 const UP = {keyCode: 38, key: 'ArrowUp', code: 'ArrowUp'};
 const DOWN = {keyCode: 40, key: 'ArrowDown', code: 'ArrowDown'};
