@@ -7,6 +7,7 @@ export const defaultSettings = {
 	forceDirectPlay: false,
 	experimentalTruehd: false,
 	forceCompatibleAv1Transcode: false,
+	dolbyVisionAsHdr10: false,
 	maxBitrate: 0,
 	audioLanguage: '',
 	subtitleLanguage: '',

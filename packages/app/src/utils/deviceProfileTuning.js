@@ -56,8 +56,11 @@ export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 	// Tizen's AV1 profile lists just 'av1'; other platforms join it with other
 	// codecs) forces those transcodes through the ts/hevc profile instead.
 	const dropAv1Transcode = settings.forceCompatibleAv1Transcode === true;
+	// A Dolby Vision file with an enhancement layer has an HDR10 base layer, which a set that reports HDR10
+	// but not Dolby Vision plays by itself. Left off, the server strips the layer and remuxes it.
+	const allowDoviEl = settings.dolbyVisionAsHdr10 === true && capabilities?.hdr10 === true;
 
-	if (!resolution && !channelCap && !dropAss && !dropPgs && !dropAv1Transcode) return profile;
+	if (!resolution && !channelCap && !dropAss && !dropPgs && !dropAv1Transcode && !allowDoviEl) return profile;
 
 	const tuned = {...profile};
 
@@ -106,6 +109,21 @@ export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 		const dropped = [...(dropAss ? ASS_FORMATS : []), ...(dropPgs ? PGS_FORMATS : [])];
 		tuned.SubtitleProfiles = (tuned.SubtitleProfiles || [])
 			.filter((subtitleProfile) => dropped.indexOf(subtitleProfile.Format) < 0);
+	}
+
+	if (allowDoviEl) {
+		const added = capabilities.hdr10Plus ? ['DOVIWithEL', 'DOVIWithELHDR10Plus'] : ['DOVIWithEL'];
+		tuned.CodecProfiles = (tuned.CodecProfiles || []).map((codecProfile) => {
+			if (codecProfile.Type !== 'Video' || codecProfile.Codec !== 'hevc') return codecProfile;
+			return {
+				...codecProfile,
+				Conditions: (codecProfile.Conditions || []).map((condition) => {
+					if (condition.Property !== 'VideoRangeType' || condition.Condition !== 'EqualsAny') return condition;
+					const present = String(condition.Value).split('|');
+					return {...condition, Value: present.concat(added.filter((type) => present.indexOf(type) < 0)).join('|')};
+				})
+			};
+		});
 	}
 
 	if (dropAv1Transcode) {
