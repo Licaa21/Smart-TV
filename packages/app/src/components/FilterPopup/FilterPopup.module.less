@@ -160,17 +160,19 @@
 	opacity: 0.8;
 }
 
-// Older sets shrink flex children to fit rather than scroll, so the grid keeps its own height.
+// Two columns, laid out with flex wrap since the older sets this app runs on have no CSS grid. Older
+// sets also shrink flex children to fit rather than scroll, so the block keeps its own height.
 .options {
-	display: grid;
+	display: flex;
+	flex-wrap: wrap;
 	flex-shrink: 0;
-	grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-	grid-gap: 12px;
+	margin-right: -12px;
 
-	// Whatever a screen hands in, from its own option rows to a search field, sits in one cell.
+	// Whatever a screen hands in, from its own option rows to a search field, sits in a column. A
+	// child that wants the whole row says so with its own width.
 	&.options > * {
-		width: 100%;
-		margin: 0;
+		width: calc(50% - 12px);
+		margin: 0 12px 12px 0;
 		box-sizing: border-box;
 	}
 }

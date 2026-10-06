@@ -1157,7 +1157,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 			<>
 				{renderClearGroup(facetKey, selected.length)}
 				{searchable && (
-					<div className={`${css.searchWrap} ${css.facetSearch}`} style={{gridColumn: '1 / -1'}}>
+					<div className={`${css.searchWrap} ${css.facetSearch}`} style={{width: 'calc(100% - 12px)'}}>
 						<svg className={css.searchIcon} viewBox="0 -960 960 960">
 							<path d={SEARCH_ICON} />
 						</svg>
@@ -1179,7 +1179,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 					value: option.value,
 					onToggle
 				}))}
-				{noMatches && <div className={css.facetNoResults} style={{gridColumn: '1 / -1'}}>{$L('No results')}</div>}
+				{noMatches && <div className={css.facetNoResults} style={{width: 'calc(100% - 12px)'}}>{$L('No results')}</div>}
 				{remaining > 0 && (
 					<FilterOption
 						key={`${facetKey}-more`}
