@@ -357,6 +357,9 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 	const [focusedItem, setFocusedItem] = useState(null);
 	const [requestsBadge, setRequestsBadge] = useState(cachedBadge.count);
 	const initialFocusDoneRef = useRef(false);
+	const rowsRef = useRef({});
+	// Set when the rows have taken long enough that focus goes to what is there rather than waiting.
+	const [gaveUpWaiting, setGaveUpWaiting] = useState(false);
 	const rowsContainerRef = useRef(null);
 
 	// Back on a scrolled discover list returns it to the first row before it leaves
@@ -410,7 +413,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 			return undefined;
 		}
 		let stale = false;
-		setIsLoading(true);
+		setIsLoading(Object.keys(rowsRef.current).length === 0);
 		const put = (patch) => {
 			if (stale) return;
 			setRows((prev) => ({...prev, ...patch}));
@@ -545,6 +548,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		});
 	}, [onSelectItem]);
 
+	rowsRef.current = rows;
 	const visibleRows = useMemo(() => {
 		const shown = getRowConfigs().filter(r => rows[r.id]?.length > 0);
 		shownRowIds = shown.map((row) => row.id);
@@ -593,26 +597,33 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		}
 	}, []);
 
-	// Focus goes to the row it was left on once, when the first rows are up. Rows that arrive after
-	// that are not allowed to pull it back.
+	// Focus goes to the row it was left on, or to the first row, once that row is up. Rows come in as
+	// they are answered, so it waits for it a few seconds and otherwise takes what is there. Rows that
+	// arrive after that are not allowed to pull it back.
 	useEffect(() => {
-		if (!isLoading && visibleRows.length > 0 && !initialFocusDoneRef.current) {
-			initialFocusDoneRef.current = true;
-			setTimeout(() => {
-				const savedIndex = lastFocusedRowId ? shownRowIds.indexOf(lastFocusedRowId) : -1;
-				if (savedIndex >= 0) {
-					const rowId = rowSpotlightId(savedIndex);
-					const card = cardToRestore(rowId, lastFocusedCardIndex);
-					if (!card || !Spotlight.focus(card)) {
-						Spotlight.focus(rowId);
-					}
-					keepRowInView(savedIndex);
-				} else {
-					Spotlight.focus(rowSpotlightId(0));
+		const timer = window.setTimeout(() => setGaveUpWaiting(true), 4000);
+		return () => window.clearTimeout(timer);
+	}, []);
+
+	useEffect(() => {
+		if (isLoading || visibleRows.length === 0 || initialFocusDoneRef.current) return;
+		const wanted = lastFocusedRowId || 'shortcuts';
+		if (!shownRowIds.includes(wanted) && !gaveUpWaiting) return;
+		initialFocusDoneRef.current = true;
+		setTimeout(() => {
+			const savedIndex = lastFocusedRowId ? shownRowIds.indexOf(lastFocusedRowId) : -1;
+			if (savedIndex >= 0) {
+				const rowId = rowSpotlightId(savedIndex);
+				const card = cardToRestore(rowId, lastFocusedCardIndex);
+				if (!card || !Spotlight.focus(card)) {
+					Spotlight.focus(rowId);
 				}
-			}, 100);
-		}
-	}, [isLoading, visibleRows.length, keepRowInView]);
+				keepRowInView(savedIndex);
+			} else {
+				Spotlight.focus(rowSpotlightId(0));
+			}
+		}, 100);
+	}, [isLoading, visibleRows.length, gaveUpWaiting, keepRowInView]);
 
 	if (!isEnabled) {
 		return (
