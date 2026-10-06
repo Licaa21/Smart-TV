@@ -59,7 +59,6 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 					const videoId = extractYouTubeIdFromUrl(trailerUrl);
 					if (videoId) {
 						setTrailerOverlay(videoId);
-						window.requestAnimationFrame(() => Spotlight.focus('trailer-close-btn'));
 						return;
 					}
 
