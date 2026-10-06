@@ -182,8 +182,8 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 
 ### Branches and updating
 
-- `main` mirrors upstream Moonfin and carries nothing of mine.
-- `daily` is the branch I use: upstream plus every change listed above. It's a normal long-lived branch, so my changes are committed on it directly.
+- `main` follows upstream Moonfin and differs from it only by this README, which is shown first on GitHub.
+- `daily` is the branch I build and use: upstream plus every change listed above. It's a normal long-lived branch, so my changes are committed on it directly.
 - To pick up upstream's latest, run `bash fork-tools/update-from-upstream.sh` on `daily`, then build as described in [Building](#building). The Tizen package is named after the version, for example `Moonfin_Tizen_Regular_2.9.0.wgt`.
 
 The only change I proposed upstream is the episode browser ([#494](https://github.com/Moonfin-Client/Smart-TV/pull/494)), which lives on its own branch while the pull request is open.
