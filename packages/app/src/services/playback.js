@@ -10,6 +10,7 @@ import {findNextInSeason, findNextSeason, findPreviousInSeason, findPreviousSeas
 import {videoRangeTypeOf} from '../utils/videoRange';
 import {getVolumeState, lastVolumeState} from './systemVolume';
 import {isVega} from '../platform';
+import {audioSettingsFor, hasAnimeLabel} from '../utils/animeAudio';
 
 export const PlayMethod = {
 	DirectPlay: 'DirectPlay',
@@ -955,6 +956,40 @@ const mapChapters = (chapters) => chapters.map((c, i) => ({
 	startPositionTicks: c.StartPositionTicks,
 	imageTag: c.ImageTag
 }));
+
+// Whether a title is anime, by the labels on it or on its series. An episode carries no genres of its
+// own on most servers, so the series is read once per server and kept. An item that came without
+// genres or tags and has no series is read itself.
+const animeBySeries = new Map();
+const ANIME_LOOKUP_WAIT_MS = 4000;
+export const isAnimeItem = async (item) => {
+	if (!item) return false;
+	if (hasAnimeLabel(item)) return true;
+	const lookupId = item.SeriesId || (item.Genres || item.Tags ? null : item.Id);
+	if (!lookupId) return false;
+	const key = `${item._serverUrl || ''}|${lookupId}`;
+	try {
+		if (!animeBySeries.has(key)) {
+			const lookup = getApiForItem(item).getItem(lookupId).then(hasAnimeLabel);
+			animeBySeries.set(key, lookup);
+			lookup.catch(() => animeBySeries.delete(key));
+		}
+		// Playback and the details screen wait on this, so a slow server does not hold them for long.
+		// The lookup carries on and is there for the next episode.
+		return await Promise.race([
+			animeBySeries.get(key),
+			new Promise((resolve) => setTimeout(() => resolve(false), ANIME_LOOKUP_WAIT_MS))
+		]);
+	} catch (e) {
+		return false;
+	}
+};
+
+// The settings an item's audio track is picked with. Nothing is looked up while no anime language is
+// set. The subtitle logic keeps the default settings, since foreign mode compares the audio with the
+// language the viewer understands, which anime does not change.
+export const audioSettingsForItem = async (settings, item) =>
+	settings?.animeAudioLanguage ? audioSettingsFor(settings, await isAnimeItem(item)) : settings;
 
 /**
  * Fetch chapters for an item. Chapters live on the Item object, not MediaSource.

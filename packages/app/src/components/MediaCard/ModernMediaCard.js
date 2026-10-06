@@ -6,7 +6,6 @@ import RatingsRow from '../RatingsRow';
 import {getImageUrl, toAbsoluteImageUrl} from '../../utils/helpers';
 import {useSettings} from '../../context/SettingsContext';
 import {getPlatform} from '../../platform';
-import {getPerfTier} from '../../utils/perfTier';
 import {isStaticLibraryCard, modernCardMetrics, getEpisodeLabels, getCardDisplayTitle} from './modernCardLayout';
 import SeerrIcon from '../icons/SeerrIcon';
 import {showsWatchedCheck} from '../../utils/playedState';
@@ -52,9 +51,8 @@ const getMetadataLine = (item) => {
 const EXPAND_MS = {extraSlow: 450, slow: 300, medium: 180, fast: 90, off: 0};
 const EXPAND_CURVE = 'cubic-bezier(0.65, 0, 0.35, 1)';
 
-// The lower tiers open the card instantly, as the rest of their effects go.
 const expandTransition = (speed) => {
-	const ms = getPerfTier() === 'high' ? EXPAND_MS[speed] || 0 : 0;
+	const ms = EXPAND_MS[speed] || 0;
 	return ms ? `width ${ms}ms ${EXPAND_CURVE}` : 'none';
 };
 

@@ -204,7 +204,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					: -1;
 				let audioPos = rememberedAudioPos;
 				if (audioPos < 0) {
-					const preferredAudio = selectPreferredAudioStream(initAudioStreams.map(fromServerAudio), settingsRef.current || {});
+					const audioSettings = await playback.audioSettingsForItem(settingsRef.current || {}, data);
+					const preferredAudio = selectPreferredAudioStream(initAudioStreams.map(fromServerAudio), audioSettings);
 					audioPos = preferredAudio ? initAudioStreams.findIndex(s => s.Index === preferredAudio.index) : -1;
 				}
 				if (audioPos < 0 && ms.DefaultAudioStreamIndex != null) {

@@ -900,6 +900,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			applyPendingTracksRef.current?.();
 			// a selection can be accepted and still not take, which leaves the wrong track playing
 			const pending = pendingTracksRef.current;
+			if (pending && pending.audioIndex != null && !pending.audioApplied) {
+				// nothing has landed, and no later pass is promised, so the log says why
+				serverLogger.playbackError('Audio: initial track not applied after play', {
+					jellyfinIndex: pending.audioIndex,
+					state: avplayGetState(),
+					expired: pending.deadline != null && Date.now() > pending.deadline,
+					avplayAudioTracks: summarizeAvplayTracks(avplayGetTracks(), 'AUDIO'),
+					playingAudioIndex: avplayGetCurrentTracks().find((t) => t.type === 'AUDIO')?.index
+				});
+			}
 			if (pending?.audioWanted != null) {
 				const playingIndex = avplayGetCurrentTracks().find((t) => t.type === 'AUDIO')?.index;
 				if (playingIndex != null && playingIndex !== pending.audioWanted) {
@@ -1562,13 +1572,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// A track remembered for the series stands in front of the language
 				// preferences, the same order the other clients take these in.
 				const rememberedAudio = await resolveSeriesAudio(item, result.audioStreams);
-				const preferredAudio = rememberedAudio || selectPreferredAudioStream(result.audioStreams, settings);
+				const audioSettings = rememberedAudio ? settings : await playback.audioSettingsForItem(settings, item);
+				const preferredAudio = rememberedAudio || selectPreferredAudioStream(result.audioStreams, audioSettings);
 				const serverAudio = result.audioStreams?.find(s => s.index === result.defaultAudioStreamIndex);
 				const fileDefaultAudio = result.audioStreams?.find(s => s.isDefault);
 				const autoAudio = preferredAudio || serverAudio || fileDefaultAudio;
 				serverLogger.playback('Audio: starting track chosen', {
 					picked: autoAudio ? `${autoAudio.index}:${autoAudio.language || '?'}:${autoAudio.codec || '?'}` : null,
 					because: rememberedAudio ? 'remembered for the series' : (preferredAudio ? 'language and codec settings' : (serverAudio ? 'server default' : 'file default')),
+					animeAudioPair: audioSettings !== settings,
 					codecOrderSaved: Array.isArray(settings.audioCodecOrder) && settings.audioCodecOrder.length > 0,
 					tracks: (result.audioStreams || []).map((s) => `${s.index}:${s.language || '?'}:${s.codec || '?'}:${s.channels || '?'}ch`)
 				});
@@ -1578,16 +1590,46 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// whole file and switches locally. The index stays on the options so a
 				// later renegotiation keeps it.
 				let audioNegotiated = false;
-				if (initialAudioIndex == null && autoAudio && !isLiveTV
-					&& result.playMethod !== playback.PlayMethod.DirectPlay
-					&& autoAudio.index !== result.selectedAudioStreamIndex) {
+				// Direct play opens on the file's first audio track. Moving to another one by the
+				// player only works for a codec the set decodes, and for any other it fails after
+				// the switch or is never applied, so the screen names a track the sound is not. The
+				// server builds those up front, the way a manual pick of one is handled.
+				const wantedAudio = initialAudioIndex != null
+					? result.audioStreams?.find((s) => s.index === initialAudioIndex)
+					: autoAudio;
+				let audioNeedsServer = false;
+				if (wantedAudio && !isLiveTV && result.playMethod === playback.PlayMethod.DirectPlay
+					&& result.audioStreams?.[0] && wantedAudio.index !== result.audioStreams[0].index) {
+					// a probe that cannot answer leaves it to the player, as it was before
+					audioNeedsServer = !(await playback.canPlayAudioStreamNatively({
+						Codec: wantedAudio.codec,
+						Profile: wantedAudio.profile,
+						Title: wantedAudio.title,
+						DisplayTitle: wantedAudio.displayTitle,
+						ChannelLayout: wantedAudio.channelLayout,
+						Channels: wantedAudio.channels
+					}).catch(() => true));
+					if (audioNeedsServer) {
+						serverLogger.playback('Audio: starting track needs the server, building it before play', {
+							jellyfinIndex: wantedAudio.index,
+							codec: wantedAudio.codec,
+							channelLayout: wantedAudio.channelLayout
+						});
+					}
+				}
+				if (!stillCurrent()) return;
+				if (wantedAudio && !isLiveTV
+					&& ((initialAudioIndex == null && result.playMethod !== playback.PlayMethod.DirectPlay
+						&& autoAudio.index !== result.selectedAudioStreamIndex) || audioNeedsServer)) {
 					try {
-						playbackInfoOptions.audioStreamIndex = autoAudio.index;
+						playbackInfoOptions.audioStreamIndex = wantedAudio.index;
+						if (audioNeedsServer) playbackInfoOptions.enableDirectPlay = false;
 						const renegotiated = await playback.getPlaybackInfo(item.Id, playbackInfoOptions);
 						if (!stillCurrent()) return;
 						result = renegotiated;
 						applyPlaybackResult(result);
-						audioNegotiated = true;
+						// Force Direct Play can keep it direct, and then the player has to switch
+						audioNegotiated = !audioNeedsServer || result.playMethod !== playback.PlayMethod.DirectPlay;
 					} catch (err) {
 						console.error('[Player] Audio track negotiation failed:', err);
 					}
@@ -1603,7 +1645,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// Direct play always sets the chosen track, since AVPlay can start on the
 				// first audio track whatever the file flags as default.
 				let pendingAudioIndex = null;
-				if (initialAudioIndex != null) {
+				if (initialAudioIndex != null && !audioNegotiated) {
 					pendingAudioIndex = initialAudioIndex;
 				} else if (!audioNegotiated && autoAudio
 					&& (result.playMethod === playback.PlayMethod.DirectPlay || autoAudio.index !== fileDefaultAudio?.index)) {
@@ -3561,6 +3603,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				{/* eslint-disable react/no-danger */}
 					<div
 						className={css.subtitleText}
+						data-subtitle-text="true"
 						style={getSubtitleTextStyle(subtitleStyleSettings)}
 						dangerouslySetInnerHTML={{__html: sanitizeSubtitleHtml(currentSubtitleText)}}
 					/>
