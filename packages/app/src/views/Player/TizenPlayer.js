@@ -309,6 +309,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const reloadAudioFromServerRef = useRef(null);
 	const activeNativeSubRef = useRef(null);
 	const trackConfirmTimerRef = useRef(null);
+	const audioVerifyTimerRef = useRef(null);
+	const selectedAudioIndexRef = useRef(null);
+	const audioStreamsRef = useRef([]);
+	// when the server last rebuilt the audio, which the check after play waits out
+	const audioReloadedAtRef = useRef(0);
+	// what the check after play compares against, the screen's own pick and the track list it names
+	selectedAudioIndexRef.current = selectedAudioIndex;
+	audioStreamsRef.current = audioStreams;
 	const currentUrlRef = useRef(null);
 	const suspendedRef = useRef(null);
 	const loadGenerationRef = useRef(0);
@@ -680,6 +688,62 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	applyPendingTracksRef.current = applyPendingTracks;
 
 	/**
+	 * Compares the track AVPlay is playing with the one the screen shows, whatever the start did to
+	 * get there. The first pass only reports, a second one a few seconds on asks the server for the
+	 * shown track when the two still differ, so the sound can never stay on a track the screen does
+	 * not name.
+	 */
+	const verifyAudioMatchesScreen = useCallback((pass) => {
+		audioVerifyTimerRef.current = null;
+		if (isUnmountedRef.current) return;
+		const session = playback.getCurrentSession();
+		// A remux carries only the track the server built it around, so only a file played whole has
+		// the full list to compare with. One server rebuild is all this asks for, since a reload that
+		// comes back as direct play again would only repeat.
+		if (!session || session.playMethod !== playback.PlayMethod.DirectPlay) return;
+		// the start leaves live TV, Force Direct Play and a SyncPlay group alone, and so does this
+		if (isLiveTV || settings.forceDirectPlay || isInGroupRef.current) return;
+		if (Date.now() - audioReloadedAtRef.current < 30000) return;
+		const avState = avplayGetState();
+		if (avState !== 'PLAYING' && avState !== 'PAUSED') return;
+		const wanted = selectedAudioIndexRef.current;
+		const streams = audioStreamsRef.current;
+		if (wanted == null || !streams.length) return;
+		let tizenIndex = null;
+		let playingIndex = null;
+		try {
+			tizenIndex = mapJellyfinTrackToTizen(avplayGetTracks(), streams, 'AUDIO', wanted);
+			playingIndex = avplayGetCurrentTracks().find((t) => t.type === 'AUDIO')?.index ?? null;
+		} catch (e) {
+			void e;
+		}
+		// AVPlay opens on the file's first track, so a pick that is that track needs no answer from it,
+		// and any other pick it cannot confirm is treated as not playing
+		const matches = tizenIndex != null && playingIndex != null
+			? tizenIndex === playingIndex
+			: wanted === streams[0]?.index;
+		serverLogger.playback('Audio: check after play', {
+			pass,
+			shownJellyfinIndex: wanted,
+			wantedTizenIndex: tizenIndex,
+			playingTizenIndex: playingIndex,
+			state: avplayGetState(),
+			matches
+		});
+		if (matches) return;
+		if (pass < 2) {
+			audioVerifyTimerRef.current = setTimeout(() => verifyAudioMatchesScreen(pass + 1), 3000);
+			return;
+		}
+		serverLogger.playbackError('Audio: playing track is not the one shown, asking the server for it', {
+			shownJellyfinIndex: wanted,
+			wantedTizenIndex: tizenIndex,
+			playingTizenIndex: playingIndex
+		});
+		reloadAudioFromServerRef.current?.(wanted);
+	}, [isLiveTV, settings.forceDirectPlay]);
+
+	/**
 	 * Shared open to play sequence used by the initial load and every stream
 	 * reload. Configures buffering and adaptive properties in IDLE, prepares,
 	 * then holds play until the first buffer fill so startup opens on a moving
@@ -893,6 +957,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 		// one confirmation pass, some firmware silently drops selections made
 		// this early in the session
+		if (audioVerifyTimerRef.current) clearTimeout(audioVerifyTimerRef.current);
+		audioVerifyTimerRef.current = setTimeout(() => verifyAudioMatchesScreen(1), 3000);
 		if (trackConfirmTimerRef.current) clearTimeout(trackConfirmTimerRef.current);
 		trackConfirmTimerRef.current = setTimeout(() => {
 			trackConfirmTimerRef.current = null;
@@ -923,7 +989,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				}
 			}
 		}, 4000);
-	}, [readyGate, isLiveTV, applyDisplayWindow, handleSubtitleChange, reassertNativeSubtitle, settings.videoStartDelay]);
+	}, [readyGate, isLiveTV, applyDisplayWindow, handleSubtitleChange, reassertNativeSubtitle, verifyAudioMatchesScreen, settings.videoStartDelay]);
 
 	/**
 	 * Start AVPlay playback for a given URL.
@@ -1272,6 +1338,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		isUnmountedRef.current = false;
 		return () => {
 			isUnmountedRef.current = true;
+			if (audioVerifyTimerRef.current) clearTimeout(audioVerifyTimerRef.current);
 			if (reloadRetryTimeoutRef.current) {
 				clearTimeout(reloadRetryTimeoutRef.current);
 				reloadRetryTimeoutRef.current = null;
@@ -1602,6 +1669,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const audioNeedsServer = Boolean(wantedAudio && !isLiveTV
 					&& result.playMethod === playback.PlayMethod.DirectPlay && !playbackInfoOptions.forceDirectPlay
 					&& result.audioStreams?.[0] && wantedAudio.index !== result.audioStreams[0].index);
+				serverLogger.playback('Audio: start decision', {
+					initialAudioIndex: initialAudioIndex ?? null,
+					wantedIndex: wantedAudio?.index ?? null,
+					firstIndex: result.audioStreams?.[0]?.index ?? null,
+					playMethod: result.playMethod,
+					forceDirectPlay: Boolean(playbackInfoOptions.forceDirectPlay),
+					isLiveTV: Boolean(isLiveTV),
+					needsServer: audioNeedsServer
+				});
 				if (audioNeedsServer) {
 					serverLogger.playback('Audio: starting track is not the first, building it on the server before play', {
 						jellyfinIndex: wantedAudio.index,
@@ -1961,6 +2037,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			if (trackConfirmTimerRef.current) {
 				clearTimeout(trackConfirmTimerRef.current);
 				trackConfirmTimerRef.current = null;
+			}
+			if (audioVerifyTimerRef.current) {
+				clearTimeout(audioVerifyTimerRef.current);
+				audioVerifyTimerRef.current = null;
 			}
 			useNativeSubtitleRef.current = false;
 			pendingSeekMsRef.current = null;
@@ -2525,6 +2605,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	// A remux built around the track, for when the set cannot switch to it by itself
 	const reloadAudioFromServer = useCallback(async (index) => {
+		audioReloadedAtRef.current = Date.now();
 		const generation = loadGenerationRef.current;
 		const currentPositionTicks = Math.floor(avplayGetCurrentTime() * 10000);
 		const result = await playback.changeAudioStream(index, currentPositionTicks);
@@ -2538,7 +2619,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// The automatic callers leave a group alone, since a local reload would pull this one out of step
 	reloadAudioFromServerRef.current = (index) => {
 		if (isInGroupRef.current) return;
-		reloadAudioFromServer(index).catch((err) => console.error('[Player] Failed to change audio:', err));
+		reloadAudioFromServer(index).catch((err) => {
+			// a failed reload does not hold the check back from asking again
+			audioReloadedAtRef.current = 0;
+			console.error('[Player] Failed to change audio:', err);
+		});
 	};
 
 	const applyAudioSelection = useCallback(async (index, shouldClose = true) => {
