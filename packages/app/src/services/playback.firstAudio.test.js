@@ -18,8 +18,9 @@ jest.mock('./deviceProfile', () => ({
 	getDeviceProfile: async () => ({}),
 	getDeviceCapabilities: async () => ({})
 }));
+const mockPlayMethod = jest.fn(() => 'DirectPlay');
 jest.mock('./video', () => ({
-	getPlayMethod: () => 'DirectPlay',
+	getPlayMethod: (...args) => mockPlayMethod(...args),
 	getMimeType: () => 'video/x-matroska',
 	isAudioStreamPlayable: () => true,
 	canRenderEmbeddedPgsInBand: () => false
@@ -43,17 +44,18 @@ const direct = (defaultAudio) => ({
 	PlaySessionId: 'direct',
 	MediaSources: [{Id: 'source', SupportsDirectPlay: true, SupportsDirectStream: true, Container: 'mkv', DefaultAudioStreamIndex: defaultAudio, MediaStreams: streams}]
 });
-const remux = (audio) => ({
+const remux = (audio, video = 'h264') => ({
 	PlaySessionId: 'remux',
 	MediaSources: [{
 		Id: 'source', SupportsDirectPlay: false, SupportsDirectStream: true, Container: 'mkv', DefaultAudioStreamIndex: audio,
-		TranscodingUrl: `/videos/ep-1/master.m3u8?AudioStreamIndex=${audio}`, MediaStreams: streams
+		TranscodingUrl: `/videos/ep-1/master.m3u8?AudioStreamIndex=${audio}&VideoCodec=${video}`, MediaStreams: streams
 	}]
 });
 
 beforeEach(async () => {
 	await playback.reportStop(0);
 	jest.clearAllMocks();
+	mockPlayMethod.mockImplementation(() => 'DirectPlay');
 	api.closeLiveStream.mockResolvedValue(null);
 	api.reportPlaybackStopped.mockResolvedValue(null);
 });
@@ -101,7 +103,56 @@ describe('direct play and the audio track', () => {
 		api.getPlaybackInfo.mockResolvedValueOnce(direct(6)).mockResolvedValueOnce({PlaySessionId: 'none', MediaSources: []});
 		const result = await playback.getPlaybackInfo(episode.Id, {item: episode, audioStreamIndex: 6, directPlayOpensFirstAudio: true});
 		expect(result.playMethod).toBe('DirectPlay');
-		expect(serverLogger.playbackError).toHaveBeenCalledWith(expect.stringContaining('built nothing'), expect.any(Object));
+		expect(serverLogger.playback).toHaveBeenCalledWith(expect.stringContaining('asked the server'), expect.objectContaining({answer: null, videoCopied: false, kept: 'direct play'}));
+	});
+
+	test('an answer that re-encodes the picture is refused and the direct play stays', async () => {
+		mockPlayMethod.mockImplementation((source) => (source.SupportsDirectPlay ? 'DirectPlay' : 'Transcode'));
+		api.getPlaybackInfo.mockResolvedValueOnce(direct(6)).mockResolvedValueOnce(remux(6, 'hevc'));
+		const result = await playback.getPlaybackInfo(episode.Id, {item: episode, audioStreamIndex: 6, directPlayOpensFirstAudio: true});
+		expect(result.playMethod).toBe('DirectPlay');
+		expect(serverLogger.playback).toHaveBeenCalledWith(expect.stringContaining('asked the server'), expect.objectContaining({videoCopied: false, kept: 'direct play'}));
+	});
+
+	test('an answer that is direct play again has built nothing, and the direct play stays', async () => {
+		api.getPlaybackInfo.mockResolvedValueOnce(direct(6)).mockResolvedValueOnce(direct(6));
+		const result = await playback.getPlaybackInfo(episode.Id, {item: episode, audioStreamIndex: 6, directPlayOpensFirstAudio: true});
+		expect(result.playMethod).toBe('DirectPlay');
+		expect(serverLogger.playback).toHaveBeenCalledWith(expect.stringContaining('asked the server'), expect.objectContaining({kept: 'direct play'}));
+	});
+
+	test('a remux that names a video reason is a re-encode', async () => {
+		mockPlayMethod.mockImplementation((source) => (source.SupportsDirectPlay ? 'DirectPlay' : 'Transcode'));
+		const reencode = remux(6);
+		reencode.MediaSources[0].TranscodingUrl += '&TranscodeReasons=VideoBitrateNotSupported';
+		api.getPlaybackInfo.mockResolvedValueOnce(direct(6)).mockResolvedValueOnce(reencode);
+		const result = await playback.getPlaybackInfo(episode.Id, {item: episode, audioStreamIndex: 6, directPlayOpensFirstAudio: true});
+		expect(result.playMethod).toBe('DirectPlay');
+	});
+
+	test('the default subtitle being an image does not hand direct play back after a rebuild', async () => {
+		mockPlayMethod.mockImplementation((source) => (source.SupportsDirectPlay ? 'DirectPlay' : 'Transcode'));
+		const withPgs = (answer) => {
+			answer.MediaSources[0].DefaultSubtitleStreamIndex = 10;
+			answer.MediaSources[0].MediaStreams = [...streams, {Type: 'Subtitle', Index: 10, Codec: 'pgssub', IsTextSubtitleStream: false}];
+			return answer;
+		};
+		api.getPlaybackInfo
+			.mockResolvedValueOnce(withPgs(direct(6)))
+			.mockResolvedValueOnce(withPgs(remux(6)))
+			.mockResolvedValueOnce(withPgs(remux(6)));
+		await playback.getPlaybackInfo(episode.Id, {item: episode, audioStreamIndex: 6, directPlayOpensFirstAudio: true});
+		expect(api.getPlaybackInfo).toHaveBeenCalledTimes(3);
+		api.getPlaybackInfo.mock.calls.slice(1).forEach(([, body]) => expect(body.EnableDirectPlay).toBe(false));
+	});
+
+	test('going back to the first track is a direct play again, any other track is not', async () => {
+		api.getPlaybackInfo.mockResolvedValueOnce(direct(4)).mockResolvedValueOnce(direct(4)).mockResolvedValueOnce(direct(4)).mockResolvedValueOnce(remux(6));
+		await playback.getPlaybackInfo(episode.Id, {item: episode, directPlayOpensFirstAudio: true});
+		await playback.changeAudioStream(4, 0);
+		expect(api.getPlaybackInfo.mock.calls[1][1].EnableDirectPlay).toBe(true);
+		await playback.changeAudioStream(6, 0);
+		expect(api.getPlaybackInfo.mock.calls[api.getPlaybackInfo.mock.calls.length - 1][1].EnableDirectPlay).toBe(false);
 	});
 
 	test('a later reload of the same item keeps the rule through the session', async () => {
