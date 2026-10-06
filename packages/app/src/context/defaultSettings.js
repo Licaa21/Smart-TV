@@ -36,6 +36,8 @@ export const defaultSettings = {
 	subtitlePositionAbsoluteHdr: 90,
 	seekStep: 10,
 	fallbackAudioLanguage: '',
+	// A track picked by hand starts the series on it next time, ahead of the language settings. This device only.
+	rememberSeriesAudio: true,
 	// Anime has a language pair of its own. Empty follows the default one. Both stay on this device,
 	// the other clients have no such setting to sync them with.
 	animeAudioLanguage: '',

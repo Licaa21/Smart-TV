@@ -1034,10 +1034,15 @@ export const isAnimeItem = async (item) => {
 		}
 		// Playback and the details screen wait on this, so a slow server does not hold them for long.
 		// The lookup carries on and is there for the next episode.
-		return await Promise.race([
-			animeBySeries.get(key),
-			new Promise((resolve) => setTimeout(() => resolve(false), ANIME_LOOKUP_WAIT_MS))
-		]);
+		let timer;
+		try {
+			return await Promise.race([
+				animeBySeries.get(key),
+				new Promise((resolve) => { timer = setTimeout(() => resolve(false), ANIME_LOOKUP_WAIT_MS); })
+			]);
+		} finally {
+			clearTimeout(timer);
+		}
 	} catch (e) {
 		return false;
 	}
