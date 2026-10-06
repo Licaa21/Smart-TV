@@ -10,6 +10,8 @@ export const seasonalTitle = (holiday) => {
 		case 'halloween': return $L('Halloween');
 		case 'thanksgiving': return $L('Thanksgiving');
 		case 'christmas': return $L('Christmas Movies');
+		case 'lunarNewYear': return $L('Lunar New Year');
+		case 'diwali': return $L('Diwali');
 		default: return $L('Seasonal Row');
 	}
 };

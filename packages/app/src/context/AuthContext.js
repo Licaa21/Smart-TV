@@ -311,24 +311,26 @@ export const AuthProvider = ({children}) => {
 			jellyfinApi.setServerType(active.serverType || 'jellyfin');
 			jellyfinApi.setAuth(active.userId, active.accessToken);
 
-			// Update state
-			setServerUrl(active.url);
-			setServerName(active.name);
-			setAccessToken(active.accessToken);
-			setServerType(active.serverType || 'jellyfin');
-
-			// Get fresh user info
+			// The user is fetched before any state changes so it lands in the same render as
+			// the token. The home screen keys its stored rows on the user, and a render that
+			// had the new token with the old user read the old user's rows back under it.
+			let userInfo;
 			try {
-				const userInfo = await jellyfinApi.api.getUserConfiguration();
-				setUser(userInfo);
+				userInfo = await jellyfinApi.api.getUserConfiguration();
 				if (userInfo.PrimaryImageTag) {
 					await multiServerManager.updateServer(serverId, null, userId, {
 						primaryImageTag: userInfo.PrimaryImageTag
 					});
 				}
 			} catch (e) {
-				setUser({Id: active.userId, Name: active.username});
+				userInfo = {Id: active.userId, Name: active.username};
 			}
+
+			setServerUrl(active.url);
+			setServerName(active.name);
+			setAccessToken(active.accessToken);
+			setServerType(active.serverType || 'jellyfin');
+			setUser(userInfo);
 
 			// Update old auth format for compatibility
 			await saveToStorage('auth', {

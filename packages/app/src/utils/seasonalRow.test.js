@@ -23,7 +23,7 @@ describe('normalizeSeasonalHiddenHolidays', () => {
 	test('keeps only known holidays and refuses anything that is not a list', () => {
 		expect(normalizeSeasonalHiddenHolidays(['pride', 'bogus', 'easter'])).toEqual(['pride', 'easter']);
 		expect(normalizeSeasonalHiddenHolidays('pride')).toBeUndefined();
-		expect(SEASONAL_HOLIDAYS).toHaveLength(7);
+		expect(SEASONAL_HOLIDAYS).toHaveLength(9);
 	});
 });
 

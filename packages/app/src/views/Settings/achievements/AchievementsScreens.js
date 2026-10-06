@@ -1,6 +1,7 @@
 import {useCallback} from 'react';
 
 import * as achievementsApi from '../../../services/achievementsApi';
+import {useAchievements} from '../../../context/AchievementsContext';
 import {
 	AchievementsView, AchievementsBadgesView, AchievementsBadgeView, AchievementsQuestsView,
 	AchievementsLeaderboardView, AchievementsRecapView, AchievementsLibraryView,
@@ -19,6 +20,7 @@ export const ACHIEVEMENT_VIEWS = [
 
 const AchievementsScreens = ({view, badgeId, onOpen, onSelectItem}) => {
 	const {data: overview, loading, reload} = useLoadOnOpen(achievementsApi.loadOverview);
+	const {unlockToastsAvailable, socialAvailable} = useAchievements();
 
 	const openBadge = useCallback(
 		(id) => onOpen('achievementsBadge', `achievement-badge-${id}`, id),
@@ -65,7 +67,7 @@ const AchievementsScreens = ({view, badgeId, onOpen, onSelectItem}) => {
 		return <AchievementsLibraryView completion={overview ? overview.libraryCompletion : {}} />;
 	}
 
-	return <AchievementsView overview={overview} loading={loading} onReload={reload} onOpen={onOpen} />;
+	return <AchievementsView overview={overview} loading={loading} onReload={reload} onOpen={onOpen} unlockToastsAvailable={unlockToastsAvailable} socialAvailable={socialAvailable} />;
 };
 
 export default AchievementsScreens;

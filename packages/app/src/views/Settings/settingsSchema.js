@@ -373,7 +373,8 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.TOGGLE, key: 'showLibrariesInToolbar', label: () => $L('Show Libraries in Toolbar'), desc: () => $L('Show the libraries button in the navigation bar'), icon: 'video_library'},
 					{kind: KIND.OPTION, key: 'folderViewMode', label: () => $L('Enable Folder View'), options: getFolderViewModeOptions, fallback: () => $L('Per Library'), icon: 'folder'},
 					{kind: KIND.TOGGLE, key: 'showSeerrButton', label: (ctx) => $L('Show {seerrLabel} Button').replace('{seerrLabel}', ctx.seerrLabel), desc: () => $L('Show the Seerr button in the navigation bar'), when: whenSeerr, icon: 'seerr'},
-					{kind: KIND.TOGGLE, key: 'showServerMessagesButton', label: () => $L('Show messages button'), desc: () => $L('Adds a button to the menu for messages sent by your server admin'), icon: 'info'}
+					{kind: KIND.TOGGLE, key: 'showServerMessagesButton', label: () => $L('Show messages button'), desc: () => $L('Adds a button to the menu for messages sent by your server admin'), icon: 'info'},
+					{kind: KIND.TOGGLE, key: 'showFriendsButton', label: () => $L('Show friends button'), desc: () => $L('Friends and chat from the Achievement Badges plugin'), icon: 'groups', when: (ctx) => ctx.achievements.socialAvailable}
 				]
 			},
 			{
@@ -976,6 +977,16 @@ export const SETTINGS_SCHEMA = [
 				// A screen of its own rather than a page of settings rows.
 				opensView: 'achievements',
 				when: (ctx) => ctx.achievements.available,
+				rows: []
+			},
+			{
+				id: 'friends',
+				icon: 'groups',
+				section: () => $L('General'),
+				label: () => $L('Friends'),
+				description: () => $L("See who's online and chat with people on this server"),
+				opensView: 'friends',
+				when: (ctx) => ctx.achievements.socialAvailable,
 				rows: []
 			},
 			{

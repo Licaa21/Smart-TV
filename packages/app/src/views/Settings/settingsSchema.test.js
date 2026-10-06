@@ -19,7 +19,7 @@ const ctx = {
 	settings: defaultSettings,
 	capabilities: {tizenVersionDisplay: '7.0', firmwareVersion: '1.0'},
 	seerr: {isEnabled: true, pluginInfo: {version: '1', settingsSyncEnabled: true, seerrEnabled: true}},
-	achievements: {available: true, leaderboardEnabled: true, questsEnabled: true},
+	achievements: {available: true, leaderboardEnabled: true, questsEnabled: true, socialAvailable: true},
 	seerrLabel: 'Seerr',
 	isSeerr: true,
 	hasMultipleServers: false,

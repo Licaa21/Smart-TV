@@ -68,6 +68,25 @@ const RARITY_COLORS = {
 export const rarityColor = (rarity) =>
 	RARITY_COLORS[String(rarity || '').trim().toLowerCase()] || RARITY_COLORS.common;
 
+const RARITY_RANKS = {uncommon: 1, rare: 2, epic: 3, legendary: 4, mythic: 5};
+
+const rarityRank = (rarity) => RARITY_RANKS[String(rarity || '').trim().toLowerCase()] || 0;
+
+// The plugin's own unlock notification settings for the user, the ones jellyfin-web follows too.
+// `allows` says whether a badge of that rarity clears the minimum, ranked the way the plugin
+// ranks them.
+export const parseUnlockToastSettings = (json) => {
+	const minimumRarity = asString(json.MinimumToastRarity).trim().toLowerCase() || 'all';
+	return {
+		enabled: json.EnableUnlockToasts !== false,
+		minimumRarity,
+		// One notification for everything a read turned up, rather than one each.
+		grouped: json.UnlockToastGrouping !== 'individual',
+		muteDuringPlayback: asBool(json.MuteToastsDuringPlayback),
+		allows: (rarity) => minimumRarity === 'all' || rarityRank(rarity) >= rarityRank(minimumRarity)
+	};
+};
+
 // The rank tier carries its own colour as the plugin wrote it. Six hex digits or the caller
 // keeps whatever it was going to use instead.
 export const parseHexColor = (value) => {
@@ -491,4 +510,133 @@ export const groupBadges = (badges, filter, otherLabel) => {
 		badges: grouped.get(category),
 		unlocked: grouped.get(category).filter((badge) => badge.unlocked).length
 	}));
+};
+
+// ---------- Friends and chat ----------
+
+// Jellyfin user ids arrive with and without their dashes depending on the route.
+export const sameUserId = (a, b) =>
+	String(a || '').replace(/-/g, '').toLowerCase() === String(b || '').replace(/-/g, '').toLowerCase();
+
+// The friends payloads use PascalCase, the chat ones camelCase.
+const parseSocialUser = (json) => ({
+	userId: asString(json.UserId ?? json.userId),
+	userName: asString(json.UserName ?? json.userName)
+});
+
+const parseFriendMedia = (value) => (isObject(value)
+	? {id: asString(value.Id), name: asString(value.Name), seriesName: nonEmpty(value.SeriesName)}
+	: null);
+
+export const parseFriend = (json) => ({
+	userId: asString(json.UserId),
+	userName: asString(json.UserName),
+	online: asBool(json.Online),
+	lastSeen: asDate(json.LastSeen),
+	nowPlaying: parseFriendMedia(json.NowPlaying),
+	lastWatched: parseFriendMedia(json.LastWatched)
+});
+
+export const parseFriendsList = (json) => {
+	const friends = mapList(json.Friends, parseFriend);
+	const incoming = mapList(json.Incoming, parseSocialUser);
+	const outgoing = mapList(json.Outgoing, parseSocialUser);
+	return {
+		friends,
+		incoming,
+		outgoing,
+		// The admin made everyone a friend, so there are no requests to send.
+		simpleMode: asBool(json.SimpleMode),
+		isFriend: (userId) => friends.some((friend) => sameUserId(friend.userId, userId)),
+		isPending: (userId) => [...incoming, ...outgoing].some((user) => sameUserId(user.userId, userId))
+	};
+};
+
+export const parsePublicProfile = (json) => ({
+	userName: asString(json.UserName),
+	unlocked: asInt(json.Unlocked),
+	total: asInt(json.Total),
+	score: asInt(json.Score),
+	bestWatchStreak: asInt(json.BestWatchStreak),
+	equipped: parseBadges(json.Equipped),
+	customTitle: nonEmpty(json.CustomTitle)
+});
+
+export const parseSocialUsers = (rows) => (Array.isArray(rows) ? rows : [])
+	.filter(isObject)
+	.map((user) => ({userId: asString(user.Id), userName: asString(user.Name)}))
+	.filter((user) => user.userId);
+
+// The friend settings among the plugin's preferences. Message notifications are on unless the
+// plugin says otherwise.
+export const parseSocialPrivacy = (json) => ({
+	appearOffline: asBool(json.AppearOffline),
+	hideNowPlaying: asBool(json.HideNowPlaying),
+	hideLastWatched: asBool(json.HideLastWatched),
+	messageNotifications: json.MessageNotifications !== false
+});
+
+export const applySocialPrivacy = (prefs, privacy) => ({
+	...prefs,
+	AppearOffline: privacy.appearOffline,
+	HideNowPlaying: privacy.hideNowPlaying,
+	HideLastWatched: privacy.hideLastWatched,
+	MessageNotifications: privacy.messageNotifications
+});
+
+export const parseThread = (json) => ({
+	conversationId: asString(json.conversationId),
+	isGroup: json.type === 'group',
+	name: asString(json.otherUserName),
+	participants: mapList(json.participants, parseSocialUser),
+	lastMessage: asString(json.lastMessage),
+	lastFromMe: asBool(json.lastFromMe),
+	lastAt: asDate(json.lastAt),
+	unreadCount: asInt(json.unreadCount),
+	hasAttachment: asBool(json.hasAttachment)
+});
+
+// The plugin previews a photo with no text as "[image]".
+export const threadIsPhoto = (thread) => thread.hasAttachment && (!thread.lastMessage || thread.lastMessage === '[image]');
+
+const idList = (value) => (Array.isArray(value) ? value.filter((id) => typeof id === 'string' && id) : []);
+
+export const parseConversation = (json) => {
+	const createdByUserId = asString(json.createdByUserId);
+	const adminIds = idList(json.adminIds);
+	const isOwner = (userId) => sameUserId(createdByUserId, userId);
+	return {
+		id: asString(json.id),
+		isGroup: json.type === 'group',
+		title: nonEmpty(json.title),
+		participantIds: idList(json.participantIds),
+		isOwner,
+		isAdmin: (userId) => isOwner(userId) || adminIds.some((id) => sameUserId(id, userId))
+	};
+};
+
+export const parseMessage = (json) => {
+	const fromUserId = asString(json.fromUserId);
+	const readBy = idList(json.readBy);
+	const readAt = asDate(json.readAt);
+	return {
+		id: asString(json.id),
+		fromUserId,
+		fromUserName: asString(json.fromUserName),
+		text: asString(json.text),
+		sentAt: asDate(json.sentAt),
+		editedAt: asDate(json.editedAt),
+		attachmentId: nonEmpty(json.attachmentId),
+		isRead: Boolean(readAt) || readBy.some((id) => !sameUserId(id, fromUserId))
+	};
+};
+
+// Whether a thread holds a message from someone else that wasnt there at the last read, the
+// open chat aside since that one is being read. A thread never seen before is new as a whole.
+export const threadHasNewFromOthers = (thread, before, openConversationId) => {
+	if (thread.lastFromMe || thread.unreadCount === 0) return false;
+	if (thread.conversationId === openConversationId) return false;
+	if (!before) return true;
+	return thread.unreadCount > before.unreadCount ||
+		(thread.lastAt && before.lastAt && thread.lastAt > before.lastAt);
 };

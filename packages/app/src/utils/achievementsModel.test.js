@@ -5,7 +5,8 @@ import {
 	parseWatchClock, parseServerStats, statsAreEmpty, parseCosmeticCatalog, buildCosmeticLoadout,
 	cosmeticsOf, equippedCosmetic, ownsCosmetic, wornAvatarIcon, wornTitle, cosmeticsAreEmpty,
 	wearingCosmetic, boughtCosmetic, COSMETIC_AVATAR, COSMETIC_RANK_TITLE,
-	parseHexColor, rarityColor, scoreForRarity
+	parseHexColor, rarityColor, scoreForRarity, parseUnlockToastSettings,
+	parseFriendsList, parseThread, parseMessage, parseConversation, threadHasNewFromOthers, sameUserId
 } from './achievementsModel';
 
 const badge = (over) => parseBadge({
@@ -43,6 +44,26 @@ describe('rarityColor', () => {
 		expect(rarityColor('Legendary')).toBe('#FF9800');
 		expect(rarityColor('mythic')).toBe('#E91E63');
 		expect(rarityColor('Transcendent')).toBe('#9AA5B1');
+	});
+});
+
+describe('parseUnlockToastSettings', () => {
+	test('reads the plugin flags, with everything on and ungrouped only when it says so', () => {
+		const settings = parseUnlockToastSettings({});
+		expect(settings.enabled).toBe(true);
+		expect(settings.minimumRarity).toBe('all');
+		expect(settings.grouped).toBe(true);
+		expect(settings.muteDuringPlayback).toBe(false);
+		expect(parseUnlockToastSettings({EnableUnlockToasts: false, UnlockToastGrouping: 'individual', MuteToastsDuringPlayback: true}))
+			.toMatchObject({enabled: false, grouped: false, muteDuringPlayback: true});
+	});
+
+	test('ranks rarities against the minimum the way the plugin does', () => {
+		const rare = parseUnlockToastSettings({MinimumToastRarity: 'Rare'});
+		expect(rare.allows('Common')).toBe(false);
+		expect(rare.allows('rare')).toBe(true);
+		expect(rare.allows('Legendary')).toBe(true);
+		expect(parseUnlockToastSettings({MinimumToastRarity: 'all'}).allows('Common')).toBe(true);
 	});
 });
 
@@ -471,5 +492,52 @@ describe('groupBadges', () => {
 	test('a badge with no category of its own goes in the named bucket', () => {
 		const groups = groupBadges([badges[3]], 'all', 'Elsewhere');
 		expect(groups[0].category).toBe('Elsewhere');
+	});
+});
+
+describe('friends and chat', () => {
+	test('matches user ids with and without their dashes', () => {
+		expect(sameUserId('ca44e8df-5139-4da3-bc13-5461b9ec62d8', 'CA44E8DF51394DA3BC135461B9EC62D8')).toBe(true);
+		expect(sameUserId('a', 'b')).toBe(false);
+	});
+
+	test('reads the friends list and answers who is a friend or pending', () => {
+		const list = parseFriendsList({
+			Friends: [{UserId: 'f1', UserName: 'Ada', Online: true, NowPlaying: {Id: 'm1', Name: 'Heat'}}],
+			Incoming: [{UserId: 'i1', UserName: 'Bob'}],
+			Outgoing: [{UserId: 'o1', UserName: 'Cy'}],
+			SimpleMode: false
+		});
+		expect(list.friends[0].nowPlaying.name).toBe('Heat');
+		expect(list.isFriend('F1')).toBe(true);
+		expect(list.isPending('o1')).toBe(true);
+		expect(list.isPending('f1')).toBe(false);
+	});
+
+	test('reads the camelCase chat payloads', () => {
+		const thread = parseThread({conversationId: 'c1', type: 'group', otherUserName: 'Crew', participants: [{userId: 'u1', userName: 'Ada'}], lastMessage: 'hi', lastFromMe: false, unreadCount: 2, hasAttachment: false});
+		expect(thread).toMatchObject({conversationId: 'c1', isGroup: true, name: 'Crew', unreadCount: 2});
+		expect(thread.participants[0].userName).toBe('Ada');
+
+		const group = parseConversation({id: 'c1', type: 'group', title: 'Crew', participantIds: ['u1', 'u2'], createdByUserId: 'u1', adminIds: ['u2']});
+		expect(group.isOwner('u1')).toBe(true);
+		expect(group.isAdmin('u2')).toBe(true);
+		expect(group.isAdmin('u3')).toBe(false);
+	});
+
+	test('a message counts as read once anyone but its sender read it', () => {
+		expect(parseMessage({id: 'm1', fromUserId: 'u1', text: 'hi', readBy: ['u1']}).isRead).toBe(false);
+		expect(parseMessage({id: 'm1', fromUserId: 'u1', text: 'hi', readBy: ['u1', 'u2']}).isRead).toBe(true);
+		expect(parseMessage({id: 'm1', fromUserId: 'u1', text: 'hi', readAt: '2026-10-05T10:00:00Z'}).isRead).toBe(true);
+	});
+
+	test('only a thread that grew since the last read, from someone else, outside the open chat, is new', () => {
+		const before = parseThread({conversationId: 'c1', unreadCount: 1, lastAt: '2026-10-05T10:00:00Z'});
+		const grown = parseThread({conversationId: 'c1', unreadCount: 2, lastAt: '2026-10-05T10:01:00Z'});
+		expect(threadHasNewFromOthers(grown, before, null)).toBe(true);
+		expect(threadHasNewFromOthers(grown, grown, null)).toBe(false);
+		expect(threadHasNewFromOthers(grown, before, 'c1')).toBe(false);
+		expect(threadHasNewFromOthers(parseThread({conversationId: 'c1', unreadCount: 2, lastFromMe: true}), before, null)).toBe(false);
+		expect(threadHasNewFromOthers(parseThread({conversationId: 'c2', unreadCount: 1}), undefined, null)).toBe(true);
 	});
 });

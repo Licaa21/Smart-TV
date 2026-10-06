@@ -12,6 +12,20 @@
 	z-index: 99999;
 	pointer-events: none;
 	animation: seerrToastIn 220ms ease-out;
+	display: flex;
+	align-items: center;
+}
+
+.icon {
+	width: 40px;
+	height: 40px;
+	margin-right: 18px;
+	flex-shrink: 0;
+	fill: var(--theme-accent, #00a4dc);
+}
+
+.text {
+	min-width: 0;
 }
 
 .title {

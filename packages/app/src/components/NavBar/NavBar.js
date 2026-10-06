@@ -5,9 +5,10 @@ import {useSettings} from '../../context/SettingsContext';
 import {useSeerr} from '../../context/SeerrContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import {useServerMessages} from '../../context/ServerMessagesContext';
+import {useAchievements} from '../../context/AchievementsContext';
 import SeerrIcon from '../icons/SeerrIcon';
 import SyncPlayIcon from '../icons/SyncPlayIcon';
-import {FavoritesIcon, GenresIcon, HomeIcon, LiveTvIcon, MessagesIcon, SearchIcon, SettingsIcon, ShuffleIcon} from '../icons/navIcons';
+import {FavoritesIcon, FriendsIcon, GenresIcon, HomeIcon, LiveTvIcon, MessagesIcon, SearchIcon, SettingsIcon, ShuffleIcon} from '../icons/navIcons';
 import useClock from '../../hooks/useClock';
 import {librariesForNav} from '../../utils/liveTvLibrary';
 import {isKidsMode} from '../../utils/kidsMode';
@@ -43,12 +44,14 @@ const NavBar = ({
 	onSelectLibrary,
 	onUserMenu,
 	onSyncPlay,
-	onMessages
+	onMessages,
+	onFriends
 }) => {
 	const {settings, activeTheme} = useSettings();
 	const {isEnabled: seerrEnabled, displayName} = useSeerr();
 	const {isInGroup} = useSyncPlay();
 	const {messages, unreadCount} = useServerMessages();
+	const {socialAvailable, badgeCount: friendsBadge} = useAchievements();
 	const [libraryMenuOpen, setLibraryMenuOpen] = useState(false);
 	const showClock = settings.showClock !== false;
 	const clock = useClock(showClock);
@@ -66,6 +69,9 @@ const NavBar = ({
 	const showLibraries = !kidsMode && settings.showLibrariesInToolbar !== false && navLibraries.length > 0;
 	// Only with something to show, so the menu never has a button that does nothing.
 	const showMessages = settings.showServerMessagesButton === true && messages.length > 0;
+	// Only where the Achievement Badges plugin has friends switched on, so it never takes a
+	// colour slot for a button that cant open.
+	const showFriends = !kidsMode && socialAvailable && settings.showFriendsButton === true;
 
 	const navPillStyle = useMemo(() => {
 		// The pill wears the overlay color at the chosen opacity, and only a theme
@@ -169,6 +175,10 @@ const NavBar = ({
 
 					{showMessages && (
 						<NavPillButton Icon={MessagesIcon} slot={nextSlot()} label={$L('Messages')} onClick={onMessages} spotlightId="navbar-messages" badge={unreadCount} />
+					)}
+
+					{showFriends && (
+						<NavPillButton Icon={FriendsIcon} slot={nextSlot()} label={$L('Friends')} onClick={onFriends} spotlightId="navbar-friends" badge={friendsBadge} />
 					)}
 
 					<NavPillButton Icon={SettingsIcon} slot={nextSlot()} label={$L('Settings')} onClick={onSettings} spotlightId="navbar-settings" />

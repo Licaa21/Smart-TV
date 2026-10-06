@@ -600,7 +600,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 			`.${detailsCss.episodeCard}`, `.${detailsCss.chapterCard}`, `.${detailsCss.extraCard}`,
 			`.${detailsCss.seasonPosterWrapper}`, `.${detailsCss.episodeNumber}`, `.${detailsCss.badge}`,
 			`.${detailsCss.trackItem}`, `.${detailsCss.actionBtn}`, `.${detailsCss.toast}`, `.${detailsCss.seasonEp}`,
-			`.${modernDetailCss.actionBtn}`, `.${modernDetailCss.actionPrimary}`, `.${modernDetailCss.upNextCard}`,
+			`.${modernDetailCss.actionBtn}`, `.${modernDetailCss.upNextCard}`,
 			`.${tabBarCss.tabBar}`, `.${tabBarCss.tab}`, `.${overviewCss.spottable}`,
 			`.${browseCss.featuredInfoBox}`, `.${browseCss.bannerCard}`, `.${browseCss.galleryActiveRight}`,
 			`.${browseCss.galleryPill}`, `.${browseCss.makdDots}`, `.${browseCss.featuredIndicators}`

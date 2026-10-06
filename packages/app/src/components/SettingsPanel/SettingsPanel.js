@@ -10,7 +10,7 @@ const PanelContainer = SpotlightContainerDecorator({
 	leaveFor: {left: '', right: '', up: '', down: ''}
 }, 'div');
 
-const SettingsPanel = ({onClose, onLibrariesChanged, onRunSetupWizard, onSelectItem}) => {
+const SettingsPanel = ({initialView, onClose, onLibrariesChanged, onRunSetupWizard, onSelectItem}) => {
 	const handleScrimClick = useCallback(() => {
 		onClose?.();
 	}, [onClose]);
@@ -21,6 +21,7 @@ const SettingsPanel = ({onClose, onLibrariesChanged, onRunSetupWizard, onSelectI
 			<PanelContainer className={css.panel} spotlightId="settings-panel-container">
 				<Settings
 					panelMode
+					initialView={initialView}
 					onBack={onClose}
 					onLibrariesChanged={onLibrariesChanged}
 					onRunSetupWizard={onRunSetupWizard}
