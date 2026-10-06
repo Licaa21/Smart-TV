@@ -1,7 +1,7 @@
 // The seasonal Home row follows the viewer's country. Moonbase decides the holiday, these are
 // the names it uses and the settings the clients share with it.
 
-export const SEASONAL_HOLIDAYS = ['newYear', 'valentines', 'easter', 'pride', 'halloween', 'thanksgiving', 'christmas'];
+export const SEASONAL_HOLIDAYS = ['newYear', 'valentines', 'easter', 'pride', 'halloween', 'thanksgiving', 'christmas', 'lunarNewYear', 'diwali'];
 
 // Only the countries Moonbase tells apart, plus Other for everyone else.
 export const SEASONAL_COUNTRY_OPTIONS = ['auto', 'US', 'CA', 'other'];

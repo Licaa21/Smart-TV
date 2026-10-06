@@ -5,9 +5,10 @@ import {useSettings} from '../../context/SettingsContext';
 import {useSeerr} from '../../context/SeerrContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import {useServerMessages} from '../../context/ServerMessagesContext';
+import {useAchievements} from '../../context/AchievementsContext';
 import SeerrIcon from '../icons/SeerrIcon';
 import SyncPlayIcon from '../icons/SyncPlayIcon';
-import {FavoritesIcon, GenresIcon, HomeIcon, LiveTvIcon, MessagesIcon, SearchIcon, SettingsIcon, ShuffleIcon} from '../icons/navIcons';
+import {FavoritesIcon, FriendsIcon, GenresIcon, HomeIcon, LiveTvIcon, MessagesIcon, SearchIcon, SettingsIcon, ShuffleIcon} from '../icons/navIcons';
 import useClock from '../../hooks/useClock';
 import {librariesForNav} from '../../utils/liveTvLibrary';
 import {isKidsMode} from '../../utils/kidsMode';
@@ -59,12 +60,14 @@ const Sidebar = ({
 	onSelectLibrary,
 	onUserMenu,
 	onSyncPlay,
-	onMessages
+	onMessages,
+	onFriends
 }) => {
 	const {settings, activeTheme} = useSettings();
 	const {isEnabled: seerrEnabled, displayName} = useSeerr();
 	const {isInGroup} = useSyncPlay();
 	const {messages, unreadCount} = useServerMessages();
+	const {socialAvailable, badgeCount: friendsBadge} = useAchievements();
 	// The nav bar has always honoured this; the sidebar rendered the clock
 	// whatever the setting said, and kept it ticking too.
 	const showClock = settings.showClock !== false;
@@ -82,6 +85,9 @@ const Sidebar = ({
 	const showLibraries = !kidsMode && settings.showLibrariesInToolbar !== false && navLibraries.length > 0;
 	// Only with something to show, so the rail never has a row that does nothing.
 	const showMessages = settings.showServerMessagesButton === true && messages.length > 0;
+	// Only where the Achievement Badges plugin has friends switched on, so it never takes a
+	// colour slot for a button that cant open.
+	const showFriends = !kidsMode && socialAvailable && settings.showFriendsButton === true;
 
 	const navStyle = useMemo(() => {
 		// The rail paints the overlay color on every theme. Only the top bar clears
@@ -176,6 +182,9 @@ const Sidebar = ({
 
 					{showMessages && (
 						<SidebarItem Icon={MessagesIcon} slot={nextSlot()} label={$L('Messages')} onClick={onMessages} spotlightId="navbar-messages" badge={unreadCount} />
+					)}
+					{showFriends && (
+						<SidebarItem Icon={FriendsIcon} slot={nextSlot()} label={$L('Friends')} onClick={onFriends} spotlightId="navbar-friends" badge={friendsBadge} />
 					)}
 
 					<SidebarItem Icon={SettingsIcon} slot={nextSlot()} label={$L('Settings')} onClick={onSettings} spotlightId="navbar-settings" />

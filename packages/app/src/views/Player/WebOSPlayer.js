@@ -631,6 +631,22 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 	}, []);
 
+	// The server pulls an embedded text track out of the file before it can answer, which
+	// takes a while on a big file and on Emby means reading the whole file through. So
+	// nothing waits on it: the video starts, or the menu closes, and the lines fill in once
+	// the track lands. Every later pick, item change and unmount bumps the generation,
+	// which drops an answer that arrives too late to be about the track on screen.
+	const loadTextTrack = useCallback((stream) => {
+		const generation = assInitGenRef.current;
+		setSubtitleTrackEvents(null);
+		playback.fetchSubtitleData(stream).then((data) => {
+			if (generation !== assInitGenRef.current) return;
+			setSubtitleTrackEvents(data?.TrackEvents || null);
+		}).catch((err) => {
+			console.error('[Player] Error fetching subtitle data:', err);
+		});
+	}, []);
+
 	useEffect(() => {
 		const init = async () => {
 			await initPlayerPlatform();
@@ -1065,17 +1081,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 							initAssRendererForStream(sub);
 						}
 					} else if (sub && sub.isTextBased) {
-						try {
-							const data = await playback.fetchSubtitleData(sub);
-							if (data && data.TrackEvents) {
-								setSubtitleTrackEvents(data.TrackEvents);
-							} else {
-								setSubtitleTrackEvents(null);
-							}
-						} catch (err) {
-							console.error('[Player] Error fetching subtitle data:', err);
-							setSubtitleTrackEvents(null);
-						}
+						loadTextTrack(sub);
 					} else if (sub && sub.isImageBased && settings.enablePgsRendering) {
 						await initPgsRendererForStream(sub);
 					} else {
@@ -1215,7 +1221,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			}
 		};
 	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [item, resume, onPlayNext, selectedQuality, settings.maxBitrate, settings.preferTranscode, settings.forceDirectPlay, settings.forceTruehdPassthrough, forceTranscode, settings.subtitleMode, settings.introAction, settings.outroAction, initialAudioIndex, initialSubtitleIndex, tuneRevision]);
+	}, [item, resume, onPlayNext, selectedQuality, settings.maxBitrate, settings.preferTranscode, settings.forceDirectPlay, settings.forceTruehdPassthrough, forceTranscode, settings.subtitleMode, settings.introAction, settings.outroAction, initialAudioIndex, initialSubtitleIndex, tuneRevision, loadTextTrack]);
 
 	// Another client can queue more while this plays, and what it puts behind this plays next.
 	useEffect(() => {
@@ -2417,16 +2423,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			} else if (stream && stream.isAss && supportsAssRenderer()) {
 				await initAssRendererForStream(stream);
 			} else if (stream && stream.isTextBased) {
-				try {
-					const data = await playback.fetchSubtitleData(stream);
-					if (data && data.TrackEvents) {
-						setSubtitleTrackEvents(data.TrackEvents);
-					} else {
-						setSubtitleTrackEvents(null);
-					}
-				} catch (err) {
-					setSubtitleTrackEvents(null);
-				}
+				loadTextTrack(stream);
 			} else if (stream && stream.isImageBased && settings.enablePgsRendering) {
 				await initPgsRendererForStream(stream);
 			} else {
@@ -2440,7 +2437,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (shouldClose) {
 			closeModal();
 		}
-	}, [item, subtitleStreams, closeModal, settings.enablePgsRendering, initAssRendererForStream, initPgsRendererForStream, reloadWithSubtitleIndex]);
+	}, [item, subtitleStreams, closeModal, settings.enablePgsRendering, initAssRendererForStream, initPgsRendererForStream, loadTextTrack, reloadWithSubtitleIndex]);
 
 	const handleOpenRemoteSubtitleSearch = useCallback(async () => {
 		if (!item?.Id) return;

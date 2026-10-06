@@ -77,6 +77,7 @@ import m70 from '../views/SeerrPerson/SeerrPerson.module.less';
 import m71 from '../views/SeerrRequests/SeerrRequests.module.less';
 import m72 from '../views/Settings/Settings.module.less';
 import m73 from '../views/Settings/achievements/Achievements.module.less';
+import m74 from '../views/Settings/friends/Friends.module.less';
 
 export const MODULES = {
 	'components/AccountModal/AccountModal.module.less': m0,
@@ -152,7 +153,8 @@ export const MODULES = {
 	'views/SeerrPerson/SeerrPerson.module.less': m70,
 	'views/SeerrRequests/SeerrRequests.module.less': m71,
 	'views/Settings/Settings.module.less': m72,
-	'views/Settings/achievements/Achievements.module.less': m73
+	'views/Settings/achievements/Achievements.module.less': m73,
+	'views/Settings/friends/Friends.module.less': m74
 };
 
 export const ACCENT_RULES = {
@@ -195,7 +197,6 @@ export const ACCENT_RULES = {
 		["views/Details/Details.module.less","",".{playlistItem}:focus","box-shadow","inset 0 0 0 2px rgba({rgb}, 0.6)"],
 		["views/Details/ExpandableOverview.module.less","",".{readMoreBtn}","color","{accent}"],
 		["views/Details/ModernDetailContent.module.less","",".{statusUpcoming}","background","{accent}"],
-		["views/Details/ModernDetailContent.module.less","",".{actionPrimary}","background-color","{accent}"],
 		["views/Details/ModernDetailContent.module.less","",".{actionGroup}","color","{accent}"],
 		["views/Details/ModernDetailContent.module.less","",".{actionGroup}","background-color","rgba({rgb}, 0.18)"],
 		["views/Details/ModernDetailContent.module.less","",".{upNextLabel}","color","{accent}"],
@@ -412,6 +413,7 @@ export const ACCENT_RULES = {
 		["components/SeerrIssueThread/SeerrIssueThread.module.less","",".{description}","border-left","5px solid {accent}"],
 		["components/SeerrIssueThread/SeerrIssueThread.module.less","",".{sendBtn}","background","{accent}"],
 		["components/SeerrNotificationToast/SeerrNotificationToast.module.less","",".{toast}","border-left","4px solid {accent}"],
+		["components/SeerrNotificationToast/SeerrNotificationToast.module.less","",".{icon}","fill","{accent}"],
 		["components/SeerrStatusChip/SeerrStatusChip.module.less","",".{approved}","border-color","{accent}"],
 		["components/ServerMessagesDialog/ServerMessagesDialog.module.less","",".{closeBtn}:focus","background","{accent}"],
 		["components/ServerMessagesDialog/ServerMessagesDialog.module.less","",".{button}:focus","background","{accent}"],
@@ -651,7 +653,12 @@ export const ACCENT_RULES = {
 		["views/Settings/Settings.module.less","",".{actionButton}:focus","border-color","{accent}"],
 		["views/Settings/Settings.module.less","",".{logFilter}:focus","background","{accent}"],
 		["views/Settings/Settings.module.less","",".{logFilter}:focus","border-color","{accent}"],
-		["views/Settings/Settings.module.less","",".{logFilterOn}","border-color","{accent}"]
+		["views/Settings/Settings.module.less","",".{logFilterOn}","border-color","{accent}"],
+		["views/Settings/friends/Friends.module.less","",".{avatar}","background","rgba({rgb}, 0.25)"],
+		["views/Settings/friends/Friends.module.less","",".{unread}","background","{accent}"],
+		["views/Settings/friends/Friends.module.less","",".{strong}","background","{accent}"],
+		["views/Settings/friends/Friends.module.less","",".{bubbleMine}","background","rgba({rgb}, 0.3)"],
+		["views/Settings/friends/Friends.module.less","",".{sender}","color","{accent}"]
 	],
 	skip: [
 		["views/Player/SkipSegmentOverlay.module.less","",".{button}:focus","border-color","{accent}"],

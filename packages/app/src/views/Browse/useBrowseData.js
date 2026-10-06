@@ -190,11 +190,14 @@ const useBrowseData = ({
 	// coming back must not, and it used to, because an effect runs when it first mounts
 	// as well as when what it watches changes, and this screen is built again every time
 	// it is returned to. Comparing against who the rows belong to tells the two apart.
+	// The user is part of that, since a switch can bring the token and the user in
+	// separate renders, and rows read in between still belong to the previous user.
+	const owner = `${accessToken}:${userId}`;
 	useEffect(() => {
-		if (memoryCache.owner === accessToken) return;
+		if (memoryCache.owner === owner) return;
 		clearMemoryCache();
-		memoryCache.owner = accessToken;
-	}, [accessToken]);
+		memoryCache.owner = owner;
+	}, [owner]);
 
 	useEffect(() => {
 		// detail.featured marks refreshes that change what the bar may hold, like hiding a library.

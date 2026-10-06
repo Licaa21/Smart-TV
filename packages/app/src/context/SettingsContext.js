@@ -867,8 +867,10 @@ export function SettingsProvider({children}) {
 			serverCredsRef.current = {serverUrl, token};
 
 			let adminDefaults = null;
+			let pluginAnswered = false;
 			try {
 				const ping = await moonfinPing(serverUrl, token);
+				pluginAnswered = ping?.installed !== false && ping?.settingsSyncEnabled !== false;
 				if (ping?.defaultSettings) adminDefaults = ping.defaultSettings;
 			} catch (e) { /* non-critical */ }
 
@@ -916,13 +918,13 @@ export function SettingsProvider({children}) {
 				});
 				// A viewer who has never synced has no envelope of their own, and they are
 				// exactly who the admin defaults are there to seed.
-				if (!adminDefaults) return 'empty';
+				if (!adminDefaults) return pluginAnswered ? 'empty' : 'unavailable';
 			}
 
 			const resolved = resolveFromEnvelope(serverData, adminDefaults);
 
 			const hasServerValues = resolved.tmdbApiKey !== undefined || SYNCABLE_KEYS.some(key => resolved[key] !== undefined);
-			if (!hasServerValues) return 'empty';
+			if (!hasServerValues) return pluginAnswered ? 'empty' : 'unavailable';
 			// A value the profile carries was chosen somewhere, on this device or
 			// another, so the setup wizard has nothing left to ask about it.
 			noteAnsweredSettings(SETUP_QUESTION_KEYS.filter((key) => resolved[key] !== undefined));
@@ -994,10 +996,13 @@ export function SettingsProvider({children}) {
 	}, []);
 
 	// Mirrors Moonfin-Core's syncOnLogin. The first time a server is seen it detects
-	// the plugin and, if it answers with a profile, turns sync on and pulls it. A
-	// reachable server without the plugin is marked so it isn't probed again, and a
-	// network failure is left unmarked to retry on the next login. After that first
-	// pass the pull only runs while the user keeps the plugin enabled.
+	// the plugin and, if it answers, turns sync on and pulls whatever profile it holds.
+	// A viewer who has never synced from any client has nothing stored yet, and the
+	// plugin is still there for ratings and the rest, which is why an empty profile
+	// counts the same as a full one. A reachable server without the plugin is marked
+	// so it isn't probed again, and a network failure is left unmarked to retry on
+	// the next login. After that first pass the pull only runs while the user keeps
+	// the plugin enabled.
 	const syncOnLogin = useCallback(async (serverUrl, token) => {
 		if (!serverUrl || !token) return;
 		// Known before any of the network work below, so a change made while that
@@ -1017,10 +1022,10 @@ export function SettingsProvider({children}) {
 				return;
 			}
 			const outcome = await syncFromServer(serverUrl, token);
-			if (outcome === 'applied') {
+			if (outcome === 'applied' || outcome === 'empty') {
 				updateSetting('useMoonfinPlugin', true);
 				await markServerSyncInitialized(serverUrl);
-			} else if (outcome === 'empty') {
+			} else if (outcome === 'unavailable') {
 				await markServerSyncInitialized(serverUrl);
 			}
 		} finally {

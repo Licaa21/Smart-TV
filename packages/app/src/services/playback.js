@@ -1154,7 +1154,9 @@ const volumeReport = () => {
 };
 
 // The request that ends the current session on its server, ready to send
-// without any help from the API client.
+// without any help from the API client. It names the live stream too, since no
+// other request follows it and the server only lets a tuner go when the stop
+// says which stream it held.
 const stopRequest = (positionTicks) => {
 	if (!currentSession) return null;
 
@@ -1166,12 +1168,14 @@ const stopRequest = (positionTicks) => {
 	serverUrl = serverUrl.trim().replace(/\/+$/, '');
 	if (!/^https?:\/\//i.test(serverUrl)) serverUrl = 'http://' + serverUrl;
 
+	const liveStreamId = currentSession.liveStreamClosed ? null : currentSession.liveStreamId;
 	return {
 		endpoint: `${serverUrl}/Sessions/Playing/Stopped?${jellyfinApi.getTokenParam(creds?.serverType)}=${encodeURIComponent(token)}`,
 		json: JSON.stringify({
 			ItemId: currentSession.itemId,
 			PlaySessionId: currentSession.playSessionId,
 			MediaSourceId: currentSession.mediaSourceId,
+			...(liveStreamId && {LiveStreamId: liveStreamId}),
 			PositionTicks: positionTicks || 0,
 			PlayMethod: currentSession.reportedPlayMethod || currentSession.playMethod,
 			AudioStreamIndex: currentSession.audioStreamIndex,
@@ -1263,11 +1267,7 @@ export const reportProgress = async (positionTicks, options = {}) => {
 	} catch (e) { void e; }
 };
 
-export const reportStopBeacon = (positionTicks) => {
-	const request = stopRequest(positionTicks);
-	if (!request) return false;
-	const {endpoint, json} = request;
-
+const sendStopRequest = ({endpoint, json}) => {
 	if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
 		try {
 			return navigator.sendBeacon(endpoint, new Blob([json], {type: 'application/json'}));
@@ -1288,6 +1288,17 @@ export const reportStopBeacon = (positionTicks) => {
 		void e;
 		return false;
 	}
+};
+
+export const reportStopBeacon = (positionTicks) => {
+	const request = stopRequest(positionTicks);
+	if (!request) return false;
+	const sent = sendStopRequest(request);
+	// The stop that went out named the live stream, so the server has let it go.
+	// A later stop must not close it again, since the server counts viewers and a
+	// second close on a stream shared with another set takes theirs as well.
+	if (sent) currentSession.liveStreamClosed = true;
+	return sent;
 };
 
 export const stopProgressReporting = () => {

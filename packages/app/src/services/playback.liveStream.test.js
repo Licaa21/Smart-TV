@@ -82,6 +82,60 @@ describe('live streams', () => {
 	});
 });
 
+// jsdom has no sendBeacon, so the stop goes out on the blocking request instead.
+describe('the stop beacon', () => {
+	let stops;
+	let status;
+	const RealXhr = window.XMLHttpRequest;
+
+	beforeEach(() => {
+		stops = [];
+		status = 200;
+		window.XMLHttpRequest = jest.fn(() => ({
+			open: jest.fn(),
+			setRequestHeader: jest.fn(),
+			send: (body) => stops.push(JSON.parse(body)),
+			get status() {
+				return status;
+			}
+		}));
+	});
+	afterEach(() => {
+		window.XMLHttpRequest = RealXhr;
+	});
+
+	test('a background stop names the live stream so the server lets the tuner go', async () => {
+		answerLive('live-a');
+		await playback.getPlaybackInfo(channel.Id, {item: channel});
+		playback.reportBackgroundStop(0);
+		expect(stops).toEqual([expect.objectContaining({PlaySessionId: 'session-live-a', LiveStreamId: 'live-a'})]);
+	});
+
+	test('a stop after a background stop leaves the stream alone', async () => {
+		answerLive('live-a');
+		await playback.getPlaybackInfo(channel.Id, {item: channel});
+		playback.reportBackgroundStop(0);
+		await playback.reportStop(0);
+		expect(api.closeLiveStream).not.toHaveBeenCalled();
+	});
+
+	test('a stop that never reached the server keeps the close for later', async () => {
+		answerLive('live-a');
+		await playback.getPlaybackInfo(channel.Id, {item: channel});
+		status = 500;
+		playback.reportBackgroundStop(0);
+		await playback.reportStop(0);
+		expect(api.closeLiveStream).toHaveBeenCalledWith('live-a');
+	});
+
+	test('a film has no stream to name', async () => {
+		answerMovie();
+		await playback.getPlaybackInfo(movie.Id, {item: movie});
+		playback.reportBackgroundStop(0);
+		expect(stops[0]).not.toHaveProperty('LiveStreamId');
+	});
+});
+
 describe('transcode preferences', () => {
 	const lastRequest = () => api.getPlaybackInfo.mock.calls[api.getPlaybackInfo.mock.calls.length - 1][1];
 
