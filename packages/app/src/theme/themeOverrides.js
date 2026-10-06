@@ -625,13 +625,22 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 
 // Creates or refreshes the injected style element. Appending on every call also
 // moves it back to the end of the head.
+// The stylesheet that is in the page, so an unchanged theme is not written and parsed again. Writing
+// it and moving the element restyles the whole document, and the app asks whenever any one of the
+// settings it is built from is touched.
+let appliedCss = null;
+
 export const applyThemeOverrides = (theme, options) => {
 	if (typeof document === 'undefined') return;
+	const css = buildThemeOverrideCss(theme, options);
 	let element = document.getElementById(STYLE_ELEMENT_ID);
+	if (element && css === appliedCss) return;
 	if (!element) {
 		element = document.createElement('style');
 		element.id = STYLE_ELEMENT_ID;
+		appliedCss = null;
 	}
-	element.textContent = buildThemeOverrideCss(theme, options);
+	element.textContent = css;
+	appliedCss = css;
 	document.head.appendChild(element);
 };

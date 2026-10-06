@@ -28,7 +28,7 @@
 .header {
 	display: flex;
 	align-items: center;
-	padding: 30px 48px 16px;
+	padding: 56px 48px 16px;
 	min-height: 80px;
 	
 	.backButton {
@@ -129,7 +129,7 @@
 	flex: 1;
 	overflow: visible;
 	position: relative;
-	padding: 20px 28px 0;
+	padding: 20px 87px 0;
 }
 
 .gridWrapper {
@@ -143,81 +143,7 @@
 .grid {
 	height: 100%;
 	overflow: visible !important;
-	padding: 10px 20px;
-}
-
-.itemCard {
-	position: relative;
-	box-sizing: border-box;
-	cursor: pointer;
-	background: transparent;
-
-	&:focus {
-		outline: none;
-		z-index: 10;
-
-		.itemBody {
-			transform: scale(1.05);
-		}
-
-		.poster {
-			border-color: var(--theme-focus-border-color, #ffffff);
-		}
-	}
-}
-
-.itemBody {
-	transition: transform 0.15s ease;
-}
-
-.posterWrapper {
-	position: relative;
-	width: 100%;
-	border-radius: 8px;
-	overflow: hidden;
-}
-
-.poster {
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-	border: 3px solid transparent;
-	border-radius: 8px;
-	transition: border-color 0.2s ease;
-	background: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.05);
-}
-
-.posterPlaceholder {
-	width: 100%;
-	height: 100%;
-	border: 3px solid transparent;
-	border-radius: 8px;
-	background: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.05);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.mediaTypeBadge {
-	position: absolute;
-	top: 8px;
-	left: 8px;
-	padding: 4px 10px;
-	border-radius: 12px;
-	font-size: 11px;
-	font-weight: 700;
-	letter-spacing: 0.5px;
-	text-transform: uppercase;
-	color: var(--theme-on-badge, #fff);
-	z-index: 2;
-}
-
-.movieBadge {
-	background: var(--theme-badge-movie, #2563eb);
-}
-
-.seriesBadge {
-	background: var(--theme-badge-show, #7c3aed);
+	padding: 10px 0;
 }
 
 .availabilityBadge {
@@ -280,20 +206,6 @@
 	}
 }
 
-.loadingPlaceholder {
-	width: 100%;
-	height: 270px;
-	border-radius: 8px;
-	background: linear-gradient(
-		90deg,
-		rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.05) 25%,
-		rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.1) 50%,
-		rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.05) 75%
-	);
-	background-size: 200% 100%;
-	animation: shimmer 1.5s infinite;
-}
-
 @keyframes shimmer {
 	0% {
 		background-position: 200% 0;
@@ -301,32 +213,6 @@
 	100% {
 		background-position: -200% 0;
 	}
-}
-
-.placeholderIcon {
-	width: 60px;
-	height: 60px;
-	fill: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.3);
-}
-
-.itemInfo {
-	padding: 8px 0 0;
-	background: transparent;
-}
-
-.itemName {
-	font-size: 16px;
-	font-weight: 500;
-	color: var(--theme-text-primary, #ffffff);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.itemYear {
-	font-size: 14px;
-	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.6));
-	margin-top: 4px;
 }
 
 .loading {
@@ -344,45 +230,6 @@
 	height: 100%;
 	font-size: 24px;
 	color: var(--theme-text-muted, rgba(255, 255, 255, 0.5));
-}
-
-.popupContent {
-	display: flex;
-	flex-direction: column;
-	padding: 30px 40px;
-	min-width: 350px;
-}
-
-// The sort and filter panel holds far more rows than fit a TV screen, so it
-// scrolls while the focused row is kept in view by spotlight.
-.popupScroll {
-	max-height: 70vh;
-	overflow-y: auto;
-	scrollbar-width: none;
-
-	// Older sets shrink flex children to fit the height rather than scrolling,
-	// which squeezes every row to a few pixels and piles the text on top of itself.
-	> * {
-		flex-shrink: 0;
-	}
-
-	&::-webkit-scrollbar {
-		display: none;
-		width: 0;
-	}
-}
-
-.popupOption {
-	width: 100%;
-	margin-top: 15px;
-}
-
-.modalTitle {
-	font-size: 32px;
-	font-weight: 600;
-	color: var(--theme-text-primary, #ffffff);
-	margin-bottom: 10px;
-	text-align: center;
 }
 
 :global(html[data-theme-id='neon_pulse']) {

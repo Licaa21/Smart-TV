@@ -6,8 +6,10 @@ import {useSeerr} from '../../context/SeerrContext';
 import {useSettings} from '../../context/SettingsContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import FilterPopup, {FilterOption} from '../../components/FilterPopup';
-import {useStorage} from '../../hooks/useStorage';
-import {IMAGE_SIZES, GRID_DIRECTIONS, capitalize, focusOverhang, horizontalCellPad} from '../../utils/gridChrome';
+import {getFromStorage} from '../../services/storage';
+import {focusOverhang, horizontalCellPad} from '../../utils/gridChrome';
+import {useAuth} from '../../context/AuthContext';
+import libraryCss from '../Library/Library.module.less';
 import * as seerrApi from '../../services/seerrApi';
 import {buildSeerrDiscoverParams, getSeerrSortOptions, getSeerrTvStatusOptions, getSeerrMinRatingOptions, getSeerrMinVoteOptions, getSeerrRuntimeOptions, getSeerrReleaseOptions, hasSeerrDiscoverFilters} from '../../utils/seerrBrowseFilters';
 import {browseStateKey, readBrowseState, writeBrowseState} from './seerrBrowseState';
@@ -25,6 +27,8 @@ const getFilterOptions = () => (_filterOptions ??= [
 
 // The room the grid leaves at its sides, and the least gap kept between rows, as in the library.
 const GRID_INSET = 174;
+// A navbar down the left side takes this much more of the width.
+const SIDEBAR_INSET = 110;
 const MIN_ROW_GAP = 6;
 const MAX_PAGES = 25;
 
@@ -60,13 +64,50 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	});
 	const [initialLoadDone, setInitialLoadDone] = useState(false);
 	const [showFilterModal, setShowFilterModal] = useState(false);
-	const [showViewSettings, setShowViewSettings] = useState(false);
-	// How the grid is laid out, kept the way the library keeps its own.
-	const [imageSize, setImageSize] = useStorage('seerr_browse_imageSize', 'medium');
-	const [imageType, setImageType] = useStorage('seerr_browse_imageType', 'poster');
-	const [gridDirection, setGridDirection] = useStorage('seerr_browse_gridDirection', 'vertical');
-	const [cardText, setCardText] = useStorage('seerr_browse_cardText', 'on');
-	const showCardText = cardText !== 'off';
+	// The grid is laid out by the settings of the library it stands for, the movies library for movies and
+	// the shows library for shows, read here and changed only in that library, so a card is the same
+	// size and shape in both.
+	const {api} = useAuth();
+	const [layout, setLayout] = useState({size: 'medium', type: 'poster', direction: 'vertical', text: 'on'});
+	// The grid waits for the library's settings, so it is not drawn at the defaults and then again.
+	const [layoutLoaded, setLayoutLoaded] = useState(false);
+	useEffect(() => {
+		let cancelled = false;
+		const wanted = mediaType === 'tv' ? 'tvshows' : 'movies';
+		setLayoutLoaded(false);
+		const readLayout = async () => {
+			const defaults = {size: 'medium', type: 'poster', direction: 'vertical', text: 'on'};
+			try {
+				const views = await api.getLibraries();
+				const library = (views?.Items || []).find((candidate) => candidate.CollectionType === wanted);
+				if (!library) return defaults;
+				const [size, type, direction, text] = await Promise.all([
+					getFromStorage(`library_imageSize_${library.Id}`),
+					getFromStorage(`library_imageType_${library.Id}`),
+					getFromStorage(`library_gridDirection_${library.Id}`),
+					getFromStorage(`library_cardText_${library.Id}`)
+				]);
+				return {
+					size: size || defaults.size,
+					type: type || defaults.type,
+					direction: direction || defaults.direction,
+					text: text || defaults.text
+				};
+			} catch (err) {
+				return defaults;
+			}
+		};
+		readLayout().then((found) => {
+			if (cancelled) return;
+			setLayout(found);
+			setLayoutLoaded(true);
+		});
+		return () => { cancelled = true; };
+	}, [api, mediaType]);
+	const imageSize = layout.size;
+	const imageType = layout.type;
+	const gridDirection = layout.direction;
+	const showCardText = layout.text !== 'off';
 	const [sortBy, setSortBy] = useState(saved?.sortBy || 'popularity.desc');
 	const [genreIds, setGenreIds] = useState(saved?.genreIds || []);
 	const [tvStatuses, setTvStatuses] = useState(saved?.tvStatuses || []);
@@ -205,14 +246,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 
 	const handleCloseModal = useCallback(() => {
 		setShowFilterModal(false);
-		setShowViewSettings(false);
 	}, []);
-
-	const handleOpenViewSettings = useCallback(() => setShowViewSettings(true), []);
-	const handleSizeSelect = useCallback((ev) => setImageSize(ev.currentTarget.dataset.optionKey), [setImageSize]);
-	const handleTypeSelect = useCallback((ev) => setImageType(ev.currentTarget.dataset.optionKey), [setImageType]);
-	const handleDirectionSelect = useCallback((ev) => setGridDirection(ev.currentTarget.dataset.optionKey), [setGridDirection]);
-	const handleTextSelect = useCallback((ev) => setCardText(ev.currentTarget.dataset.optionKey), [setCardText]);
 
 	// The genre and language lists are only read once the panel opens, so a
 	// browse that never opens it costs nothing extra.
@@ -238,16 +272,15 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	useEffect(() => {
 		if (!backHandlerRef) return;
 		const handler = () => {
-			if (showFilterModal || showViewSettings) {
+			if (showFilterModal) {
 				setShowFilterModal(false);
-				setShowViewSettings(false);
 				return true;
 			}
 			return false;
 		};
 		backHandlerRef.current = handler;
 		return () => { if (backHandlerRef.current === handler) backHandlerRef.current = null; };
-	}, [backHandlerRef, showFilterModal, showViewSettings]);
+	}, [backHandlerRef, showFilterModal]);
 
 	const handleFilterSelect = useCallback((ev) => {
 		const key = ev.currentTarget?.dataset?.filterKey;
@@ -277,7 +310,8 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const textHeight = showCardText ? 61 : 0;
 	const cardHeight = posterHeight + textHeight;
 	// A focused card grows past its cell, so the cell is padded by what it grows into.
-	const cellPadX = horizontalCellPad(cardWidth, window.innerWidth - GRID_INSET);
+	const gridInset = GRID_INSET + (settings.navbarPosition === 'left' ? SIDEBAR_INSET : 0);
+	const cellPadX = horizontalCellPad(cardWidth, window.innerWidth - gridInset);
 	const cellPadY = Math.max(MIN_ROW_GAP, focusOverhang(cardHeight));
 	const gridItemSize = useMemo(
 		() => ({minWidth: cardWidth + cellPadX * 2, minHeight: cardHeight + cellPadY * 2}),
@@ -307,56 +341,46 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 
 		const title = mediaItem.title || mediaItem.name;
 		const year = mediaItem.releaseDate?.substring(0, 4) || mediaItem.firstAirDate?.substring(0, 4);
-		const itemMediaType = mediaItem.media_type || mediaItem.mediaType || mediaType;
 		const status = mediaItem.mediaInfo?.status;
 
 		return (
 			<SpottableDiv
 				{...rest}
-				className={css.itemCard}
+				className={libraryCss.itemCard}
 				style={{padding: cellPadding}}
 				onClick={handleItemClick}
 				data-index={index}
 			>
-				<div className={css.itemBody} style={{width: cardWidth}}>
-				<div className={css.posterWrapper} style={{height: posterHeight}}>
+				<div className={libraryCss.itemCardInner}>
 					{imageUrl ? (
 						<img
-							className={css.poster}
+							className={libraryCss.poster}
+							style={{height: posterHeight}}
 							src={imageUrl}
 							alt={title}
 							loading="lazy"
 						/>
 					) : (
-						<div className={css.posterPlaceholder}>
-							<svg viewBox="0 0 24 24" className={css.placeholderIcon}>
+						<div className={libraryCss.posterPlaceholder} style={{height: posterHeight}}>
+							<svg viewBox="0 0 24 24" className={libraryCss.placeholderIcon}>
 								<path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z" />
 							</svg>
 						</div>
 					)}
-					{/* Media type badge - top left */}
-					{itemMediaType && (
-						<div className={`${css.mediaTypeBadge} ${itemMediaType === 'movie' ? css.movieBadge : css.seriesBadge}`}>
-							{itemMediaType === 'movie' ? $L('Movie') : $L('Series')}
-						</div>
-					)}
-					{/* Availability badge - top right */}
+					{/* What Seerr knows of it: in the library, partly there or on its way. */}
 					{status && [3, 4, 5].includes(status) && (
 						<div className={`${css.availabilityBadge} ${css[`availability${status}`]}`} />
 					)}
-				</div>
-				{showCardText && (
-					<div className={css.itemInfo}>
-						<div className={css.itemName}>{title}</div>
-						{year && (
-							<div className={css.itemYear}>{year}</div>
-						)}
-					</div>
-				)}
+					{showCardText && (
+						<div className={libraryCss.cardText}>
+							<div className={libraryCss.cardTitle}>{title}</div>
+							{year && <div className={libraryCss.cardSubtitle}>{year}</div>}
+						</div>
+					)}
 				</div>
 			</SpottableDiv>
 		);
-	}, [handleItemClick, loadItems, mediaType, isWideImage, cardWidth, posterHeight, cellPadding, showCardText]);
+	}, [handleItemClick, loadItems, isWideImage, posterHeight, cellPadding, showCardText]);
 
 	const currentFilter = getFilterOptions().find(o => o.key === mediaType);
 
@@ -559,38 +583,6 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		}
 	];
 
-	// The grid settings the library has in its gear panel, listed down the left of the popup.
-	const choose = (options, value, onSelect) => options.map(([key, label]) => (
-		<FilterOption key={key} label={label} selected={value === key} onClick={onSelect} data-option-key={key} />
-	));
-	const sizeLabels = {small: $L('Small'), medium: $L('Medium'), large: $L('Large'), extraLarge: $L('Extra Large')};
-	const viewGroups = [
-		{
-			key: 'size',
-			title: $L('Image size'),
-			summary: sizeLabels[imageSize],
-			body: () => choose(IMAGE_SIZES.map((key) => [key, sizeLabels[key]]), imageSize, handleSizeSelect)
-		},
-		{
-			key: 'type',
-			title: $L('Image Type'),
-			summary: $L(capitalize(imageType)),
-			body: () => choose([['poster', $L('Poster')], ['thumbnail', $L('Thumbnail')]], imageType, handleTypeSelect)
-		},
-		{
-			key: 'direction',
-			title: $L('Grid direction'),
-			summary: $L(capitalize(gridDirection)),
-			body: () => choose(GRID_DIRECTIONS.map((key) => [key, $L(capitalize(key))]), gridDirection, handleDirectionSelect)
-		},
-		{
-			key: 'text',
-			title: $L('Titles under posters'),
-			summary: showCardText ? $L('On') : $L('Off'),
-			body: () => choose([['on', $L('On')], ['off', $L('Off')]], showCardText ? 'on' : 'off', handleTextSelect)
-		}
-	];
-
 	if (!item) {
 		return (
 			<div className={css.page}>
@@ -631,20 +623,10 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 						</svg>
 						{$L('Sort & Filter')}
 					</SpottableButton>
-					<SpottableButton
-						className={css.filterButton}
-						onClick={handleOpenViewSettings}
-						spotlightId="seerr-browse-view-btn"
-						aria-label={$L('Settings')}
-					>
-						<svg viewBox="0 -960 960 960">
-							<path d="m388-80-20-126q-19-7-40-19t-37-25l-118 54-93-164 108-79q-2-9-2.5-20.5T185-480q0-9 .5-20.5T188-521L80-600l93-164 118 54q16-13 37-25t40-18l20-127h184l20 126q19 7 40.5 18.5T669-710l118-54 93 164-108 77q2 10 2.5 21.5t.5 21.5q0 10-.5 21t-2.5 21l108 78-93 164-118-54q-16 13-36.5 25.5T592-206L572-80H388Zm48-60h88l14-112q33-8 62.5-25t53.5-41l106 46 40-72-94-69q4-17 6.5-33.5T715-480q0-17-2-33.5t-7-33.5l94-69-40-72-106 46q-23-26-52-43.5T538-708l-14-112h-88l-14 112q-34 7-63.5 24T306-642l-106-46-40 72 94 69q-4 17-6.5 33.5T245-480q0 17 2.5 33.5T254-413l-94 69 40 72 106-46q24 24 53.5 41t62.5 25l14 112Zm44-210q54 0 92-38t38-92q0-54-38-92t-92-38q-54 0-92 38t-38 92q0 54 38 92t92 38Zm0-130Z" />
-						</svg>
-					</SpottableButton>
 				</div>
 
 				<div className={css.gridContainer}>
-					{isLoading && items.length === 0 ? (
+					{(isLoading && items.length === 0) || !layoutLoaded ? (
 						<div className={css.loading}>
 							<LoadingSpinner />
 						</div>
@@ -668,15 +650,6 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 					)}
 				</div>
 			</div>
-
-			{showViewSettings && (
-				<FilterPopup
-					title={$L('Settings')}
-					spotlightId="seerr-view-popup"
-					groups={viewGroups}
-					onClose={handleCloseModal}
-				/>
-			)}
 
 			{showFilterModal && (
 				<FilterPopup

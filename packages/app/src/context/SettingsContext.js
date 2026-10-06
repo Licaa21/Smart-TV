@@ -1040,24 +1040,28 @@ export function SettingsProvider({children}) {
 		}
 	}, [syncFromServer, updateSetting]);
 
+	// One object until something in it changes. A fresh one on every render made every card, every row
+	// and the clock render again whenever this provider did, whatever they had memoized.
+	const contextValue = useMemo(() => ({
+		settings,
+		loaded,
+		initialSyncSettled,
+		availableThemes,
+		activeThemeId,
+		activeTheme,
+		updateSetting,
+		updateSettings,
+		selectThemeById,
+		resetSettings,
+		restoreSyncedDefaults,
+		syncFromServer,
+		syncOnLogin,
+		saveStoreTheme,
+		deleteStoreTheme
+	}), [settings, loaded, initialSyncSettled, availableThemes, activeThemeId, activeTheme, updateSetting, updateSettings, selectThemeById, resetSettings, restoreSyncedDefaults, syncFromServer, syncOnLogin, saveStoreTheme, deleteStoreTheme]);
+
 	return (
-		<SettingsContext.Provider value={{
-			settings,
-			loaded,
-			initialSyncSettled,
-			availableThemes,
-			activeThemeId,
-			activeTheme,
-			updateSetting,
-			updateSettings,
-			selectThemeById,
-			resetSettings,
-			restoreSyncedDefaults,
-			syncFromServer,
-			syncOnLogin,
-			saveStoreTheme,
-			deleteStoreTheme
-		}}>
+		<SettingsContext.Provider value={contextValue}>
 			{children}
 		</SettingsContext.Provider>
 	);

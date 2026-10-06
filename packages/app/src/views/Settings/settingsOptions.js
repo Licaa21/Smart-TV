@@ -73,10 +73,15 @@ export const getDetailButtonsMaxVisibleOptions = () => [
 	{value: -1, label: $L('All (Horizontal Scroll)')}
 ];
 
+// Ultra looks as it always has. Each step down gives up things first that are hard to see, and only
+// the last two give up the effects themselves. The stored values of the old three are kept.
 export const getPerformanceModeOptions = () => [
 	{ value: 'auto', label: $L('Auto') },
-	{ value: 'high', label: $L('High Quality') },
-	{ value: 'mid', label: $L('Balanced') },
+	{ value: 'ultra', label: $L('Ultra') },
+	{ value: 'high', label: $L('High') },
+	{ value: 'midhigh', label: $L('Medium-High') },
+	{ value: 'mid', label: $L('Medium') },
+	{ value: 'lowmid', label: $L('Low') },
 	{ value: 'low', label: $L('Performance') }
 ];
 

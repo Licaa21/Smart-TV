@@ -1,4 +1,5 @@
 import {useCallback, useRef, useEffect, useState, memo} from 'react';
+import {initialRowCount, grownRowCount, rememberedRowCount, rememberRowCount} from '../../utils/rowCap';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import Spotlight from '@enact/spotlight';
 import ModernMediaCard from '../MediaCard/ModernMediaCard';
@@ -41,6 +42,12 @@ const ModernMediaRow = ({
 	const scrollerRectRef = useRef(null);
 	const scrollTimeoutRef = useRef(null);
 	const rowElementRef = useRef(null);
+	// How many of the cards are drawn. Everything, except on the older sets, where the row starts short.
+	const [shownCount, setShownCount] = useState(() => (rowId ? rememberedRowCount(rowId) : null));
+	const limit = items ? Math.min(items.length, shownCount === null ? initialRowCount(items.length) : shownCount) : 0;
+	useEffect(() => {
+		if (rowId && shownCount !== null) rememberRowCount(rowId, shownCount);
+	}, [shownCount, rowId]);
 	const [focusedItemId, setFocusedItemId] = useState(null);
 	const platform = useRef(getPlatform()).current;
 
@@ -83,6 +90,16 @@ const ModernMediaRow = ({
 
 	const handleFocus = useCallback((e) => {
 		onFocus?.(rowIndex);
+		// The next cards are drawn as focus nears the end of those that are.
+		const grownCard = e.target.closest('.spottable');
+		if (grownCard && grownCard.parentNode && items && items.length > 0) {
+			const focusedIndex = Array.prototype.indexOf.call(grownCard.parentNode.children, grownCard);
+			setShownCount((current) => {
+				const count = Math.min(items.length, current === null ? initialRowCount(items.length) : current);
+				const grown = grownRowCount(count, focusedIndex, items.length);
+				return grown === count ? current : grown;
+			});
+		}
 
 		// A hovered card already sits under the cursor, so nudging the lane
 		// would only slide it away from the pointer.
@@ -109,7 +126,7 @@ const ModernMediaRow = ({
 				}
 			});
 		}
-	}, [onFocus, rowIndex]);
+	}, [onFocus, rowIndex, items]);
 
 	const handleBlur = useCallback((e) => {
 		const nextTarget = e.relatedTarget;
@@ -142,9 +159,9 @@ const ModernMediaRow = ({
 				Spotlight.move('left');
 			}
 		} else {
-			Spotlight.focus(`media-${keyPrefix}-${items[items.length - 1].Id}`);
+			Spotlight.focus(`media-${keyPrefix}-${items[limit - 1].Id}`);
 		}
-	}, [items, keyPrefix, settings.navbarPosition]);
+	}, [items, limit, keyPrefix, settings.navbarPosition]);
 
 	const handleWrapRight = useCallback((e) => {
 		e.preventDefault();
@@ -199,10 +216,10 @@ const ModernMediaRow = ({
 			{subtitle && <div className={css.subtitle}>{subtitle}</div>}
 			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus}>
 				<div className={css.items}>
-					{items.map((item, index) => {
+					{items.slice(0, limit).map((item, index) => {
 						const spotlightId = `media-${keyPrefix}-${item.Id}`;
 						const isFirst = index === 0;
-						const isLast = index === items.length - 1;
+						const isLast = index === limit - 1;
 						return (
 							<ModernMediaCard
 								key={`${keyPrefix}-${item.Id}-${index}`}

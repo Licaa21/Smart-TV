@@ -133,6 +133,12 @@
 	}
 }
 
+// Without the detail band the list starts below the floating navbar and is cut off there, so rows
+// that scroll up do not show through it.
+.rowsBelowNav {
+	margin-top: 130px;
+}
+
 // Content row - matches MediaRow
 .contentRow {
 	margin-bottom: 30px;
@@ -612,6 +618,12 @@
 .requestsPillBelowNav {
 	top: 124px;
 	right: 60px;
+}
+
+// With no detail band the rows run up to the navbar, so the pill sits on its line beside the clock.
+.requestsPillInBar {
+	top: 38px;
+	right: 180px;
 }
 
 .requestsPillBadge {

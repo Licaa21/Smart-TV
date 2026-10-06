@@ -1,4 +1,4 @@
-import {computePerfTier} from './perfTier';
+import {PERF_LEVELS, applyPerfTier, computePerfTier, getPerfLevelIndex, getPerfTier, perfClassesFor} from './perfTier';
 
 describe('computePerfTier', () => {
 	test('Tizen 2.4 WebKit (no Chrome token) is low', () => {
@@ -51,5 +51,47 @@ describe('computePerfTier', () => {
 		expect(computePerfTier('')).toBe('low');
 		expect(computePerfTier(undefined)).toBe('low');
 		expect(computePerfTier('Mozilla/5.0 Chrome/NaN')).toBe('low');
+	});
+});
+
+describe('performance levels', () => {
+	const rootClasses = () => document.documentElement.className.split(' ').filter((name) => name.indexOf('perf-') === 0);
+
+	afterEach(() => applyPerfTier(null));
+
+	test('are listed best looking first, with the old three keeping their values', () => {
+		expect(PERF_LEVELS).toEqual(['ultra', 'high', 'midhigh', 'mid', 'lowmid', 'low']);
+	});
+
+	test('Ultra drops nothing, and each step down adds only to what the one above dropped', () => {
+		expect(perfClassesFor(0)).toEqual([]);
+		expect(perfClassesFor(1)).toEqual(['perf-lite']);
+		expect(perfClassesFor(2)).toEqual(['perf-lite', 'perf-trim']);
+		expect(perfClassesFor(3)).toEqual(['perf-lite', 'perf-trim']);
+		expect(perfClassesFor(4)).toEqual(['perf-lite', 'perf-trim', 'perf-lean']);
+		expect(perfClassesFor(5)).toEqual(['perf-lite', 'perf-trim', 'perf-lean']);
+	});
+
+	test('the levels share the three engine tiers the stylesheets know', () => {
+		const tierOf = (level) => { applyPerfTier(level); return getPerfTier(); };
+		expect(['ultra', 'high', 'midhigh'].map(tierOf)).toEqual(['high', 'high', 'high']);
+		expect(['mid', 'lowmid'].map(tierOf)).toEqual(['mid', 'mid']);
+		expect(tierOf('low')).toBe('low');
+	});
+
+	test('picking a level sets its tier and extra classes on the page, and replaces the last ones', () => {
+		applyPerfTier('midhigh');
+		expect(rootClasses()).toEqual(['perf-high', 'perf-lite', 'perf-trim']);
+		expect(getPerfLevelIndex()).toBe(2);
+		applyPerfTier('low');
+		expect(rootClasses()).toEqual(['perf-low', 'perf-lite', 'perf-trim', 'perf-lean']);
+	});
+
+	test('anything that is not a level, such as Auto, goes back to the engine', () => {
+		applyPerfTier('low');
+		applyPerfTier(null);
+		expect(getPerfTier()).toBe(computePerfTier(navigator.userAgent));
+		applyPerfTier('balanced');
+		expect(getPerfTier()).toBe(computePerfTier(navigator.userAgent));
 	});
 });

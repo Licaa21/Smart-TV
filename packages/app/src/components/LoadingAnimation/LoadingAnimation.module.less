@@ -189,3 +189,9 @@
 	letter-spacing: 1.5px;
 	color: rgba(255, 255, 255, 0.59);
 }
+
+// From Low down the logo does not spin and the label does not pulse, which repaints gradient text.
+:global(.perf-lean) .logoSpin,
+:global(.perf-lean) .label {
+	animation: none;
+}
