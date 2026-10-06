@@ -1689,6 +1689,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					forceDirectPlay: Boolean(playbackInfoOptions.forceDirectPlay),
 					isLiveTV: Boolean(isLiveTV),
 					selectedAudioStreamIndex: result.selectedAudioStreamIndex ?? null,
+					transcodeReasons: result.mediaSource?.TranscodingUrl?.match(/[?&]TranscodeReasons=([^&]+)/i)?.[1] || null,
 					needsServer: audioNeedsServer
 				});
 				if (audioNeedsServer) {
@@ -1760,6 +1761,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					selectedAudioStreamIndex: result.selectedAudioStreamIndex,
 					transcodingContainer: result.mediaSource?.TranscodingContainer,
 					transcodingSubProtocol: result.mediaSource?.TranscodingSubProtocol,
+					// why the server did not direct play, when it did not
+					transcodeReasons: result.mediaSource?.TranscodingUrl?.match(/[?&]TranscodeReasons=([^&]+)/i)?.[1] || null,
 					// what the server was willing to offer, and whether Force Direct Play overrode it,
 					// so a report explains the play method
 					supportsDirectPlay: result.mediaSource?.SupportsDirectPlay,
