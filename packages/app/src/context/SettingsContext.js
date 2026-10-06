@@ -563,6 +563,11 @@ export function SettingsProvider({children}) {
 					stored.homeRowOverlay = stored.homeRowOverlay === 'on';
 					migrated = true;
 				}
+				if (stored.trickPlayEnabled === false && stored.trickPlayMode === undefined) {
+					// Was a switch before it became a choice of how the preview shows.
+					stored.trickPlayMode = 'disabled';
+					migrated = true;
+				}
 				const navbarColorKey = normalizeOverlayColorKey(stored.navbarColor);
 				if (navbarColorKey !== stored.navbarColor) {
 					// Was stored as a hex before it became a named color.

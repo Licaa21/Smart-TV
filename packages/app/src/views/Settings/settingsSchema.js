@@ -1,4 +1,5 @@
 import $L from '@enact/i18n/$L';
+import {isTrickplayOn} from '../../utils/trickplayLayout';
 
 import {
 	getAccentColorOptions,
@@ -71,6 +72,7 @@ import {
 	getUiScaleOptions,
 	getWatchedIndicatorOptions,
 	getZoomModeOptions,
+	getTrickplayModeOptions,
 	getRecentlyReleasedSeriesTypeOptions
 } from './settingsOptions';
 
@@ -128,6 +130,7 @@ const whenScreensaverLibrary = (ctx) => ctx.settings.screensaverEnabled && ctx.s
 const whenScreensaverComponent = (ctx) => ctx.settings.screensaverEnabled && ctx.settings.screensaverComponent !== 'none';
 const whenScreensaverStatic = (ctx) => whenScreensaverComponent(ctx) && ctx.settings.screensaverMovement === 'staticCorner';
 const whenLoadingAnimation = (ctx) => ctx.settings.loadingAnimationImage !== 'none';
+const whenTrickplay = (ctx) => isTrickplayOn(ctx.settings);
 // A Fire TV and an Xbox play through a browser video element with no passthrough of its own
 const inBrowserElement = (ctx) => ctx.isVega || ctx.isXbox;
 const whenPassthrough = (ctx) => ctx.settings.audioPassthroughMode === 'manual' && !inBrowserElement(ctx);
@@ -606,8 +609,12 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.TOGGLE, key: 'showDescriptionOnPause', label: () => $L('Show Description on Pause'), desc: () => $L('Dim video and show overview text while paused'), icon: 'pausecircle'},
 					{kind: KIND.NAV, id: 'progressBarTime', label: () => $L('Progress Bar Time'), desc: () => $L('Choose which time labels appear around the playback progress bar.'), icon: 'timer', action: (ctx) => ctx.actions.openScreen('playbackSyncPlay', 'playbackTime', 'setting-progressBarTime')},
 					{kind: KIND.OPTION, key: 'playerZoomMode', label: () => $L('Player Zoom Mode'), desc: () => $L('How video that does not match the screen shape is displayed'), options: getZoomModeOptions, fallback: () => $L('Fit'), icon: 'crop'},
-					{kind: KIND.TOGGLE, key: 'trickPlayEnabled', label: () => $L('Trick Play'), desc: () => $L('Show preview thumbnails when seeking'), icon: 'imagesearch'},
-					{kind: KIND.TOGGLE, key: 'trickPlayPauseWhileScrubbing', label: () => $L('Pause While Scrubbing'), desc: () => $L('Playback pauses while you seek and resumes when you press play. Turn this off to keep playing and jump straight to the new spot'), icon: 'pausecircle', when: (ctx) => ctx.settings.trickPlayEnabled !== false},
+					{kind: KIND.OPTION, key: 'trickPlayMode', label: () => $L('Trick Play'), desc: () => $L('Show preview thumbnails when seeking'), options: getTrickplayModeOptions, fallback: () => $L('Single Thumbnail'), icon: 'imagesearch'},
+					{kind: KIND.CUSTOM, id: 'trickplayPreview', render: 'trickplayPreview', when: whenTrickplay},
+					{kind: KIND.SLIDER, key: 'trickPlayPreviewScale', label: () => $L('Preview Size'), min: 10, max: 100, step: 5, format: percent, icon: 'photo_size_select_large', when: whenTrickplay},
+					{kind: KIND.SLIDER, key: 'trickPlayVerticalPosition', label: () => $L('Distance From Seekbar'), min: 0, max: 100, step: 5, format: percent, icon: 'swap_vert', when: whenTrickplay},
+					{kind: KIND.TOGGLE, key: 'trickPlayFollowScrub', label: () => $L('Follow Scrub Position'), desc: () => $L('Preview slides along the seekbar as you scrub, instead of staying centered'), icon: 'skip', when: whenTrickplay},
+					{kind: KIND.TOGGLE, key: 'trickPlayPauseWhileScrubbing', label: () => $L('Pause While Scrubbing'), desc: () => $L('Playback pauses while you seek and resumes when you press play. Turn this off to keep playing and jump straight to the new spot'), icon: 'pausecircle', when: whenTrickplay},
 					{kind: KIND.OPTION, key: 'resumeSubtractDuration', label: () => $L('Resume Rewind'), desc: () => $L('Rewind a little when resuming partially watched media'), options: getResumeRewindOptions, fallback: () => $L('Disabled'), icon: 'replay'},
 					{kind: KIND.SLIDER, key: 'unpauseRewind', label: () => $L('Unpause Rewind'), desc: () => $L('When resuming playback after pressing the pause button, how many seconds should be rewound?'), min: 0, max: 30, step: 5, format: (v) => (v === 0 ? $L('Off') : `${v}s`), icon: 'autoplay'},
 					{kind: KIND.OPTION, key: 'seekStep', label: () => $L('Seek Step'), desc: () => $L('How far each press moves while scrubbing the progress bar'), options: getSeekStepOptions, fallback: () => $L('10 seconds'), icon: 'skip'},

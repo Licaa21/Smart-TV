@@ -33,6 +33,7 @@ import {api as jellyfinApi, createApiForServer, getServerUrl} from '../../servic
 import PlayerControls, {usePlayerButtons} from './PlayerControls';
 import useLiveProgram from './useLiveProgram';
 import {hasTrickplayPreview} from '../../components/TrickplayPreview';
+import {isTrickplayOn} from '../../utils/trickplayLayout';
 import useChannelCarousel from './useChannelCarousel';
 import ChannelCarousel from './ChannelCarousel';
 import useSleepTimer from './useSleepTimer';
@@ -196,7 +197,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const {showBuffering, noteSeek} = useBufferingAnimation({
 		isBuffering,
 		isSeeking,
-		hasPreview: settings.trickPlayEnabled !== false && hasTrickplayPreview(item.Id, mediaSourceId)
+		hasPreview: isTrickplayOn(settings) && hasTrickplayPreview(item.Id, mediaSourceId)
 	});
 	const [hasTriedTranscode, setHasTriedTranscode] = useState(false);
 	const [focusRow, setFocusRow] = useState('bottom');
@@ -2406,7 +2407,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// commits it. The viewer can turn that off, and without a preview playback carries on.
 	const beginScrub = useCallback(() => {
 		if (scrubHoldRef.current.active || settings.trickPlayPauseWhileScrubbing === false ||
-			settings.trickPlayEnabled === false || isInGroup || !hasTrickplayPreview(item.Id, mediaSourceId)) return;
+			settings.trickPlayMode === 'disabled' || isInGroup || !hasTrickplayPreview(item.Id, mediaSourceId)) return;
 		const wasPlaying = avplayGetState() === 'PLAYING';
 		scrubHoldRef.current = {active: true, wasPlaying};
 		if (wasPlaying) {
@@ -2414,7 +2415,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			setIsPaused(true);
 			healthMonitorRef.current?.setPaused(true);
 		}
-	}, [settings.trickPlayPauseWhileScrubbing, settings.trickPlayEnabled, isInGroup, item.Id, mediaSourceId]);
+	}, [settings.trickPlayPauseWhileScrubbing, settings.trickPlayMode, isInGroup, item.Id, mediaSourceId]);
 
 	// One scrub step on from the pending target, or from where playback is when a scrub starts.
 	const scrubBy = useCallback((deltaSeconds) => {

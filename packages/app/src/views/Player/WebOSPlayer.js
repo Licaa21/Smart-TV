@@ -44,6 +44,7 @@ import PlayerControls, {usePlayerButtons} from './PlayerControls';
 import useLiveProgram from './useLiveProgram';
 import useMediaSession from './useMediaSession';
 import {hasTrickplayPreview} from '../../components/TrickplayPreview';
+import {isTrickplayOn} from '../../utils/trickplayLayout';
 import useChannelCarousel from './useChannelCarousel';
 import ChannelCarousel from './ChannelCarousel';
 import NextUpOverlay from './NextUpOverlay';
@@ -196,7 +197,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const {showBuffering, noteSeek} = useBufferingAnimation({
 		isBuffering,
 		isSeeking,
-		hasPreview: settings.trickPlayEnabled !== false && hasTrickplayPreview(item.Id, mediaSourceId)
+		hasPreview: isTrickplayOn(settings) && hasTrickplayPreview(item.Id, mediaSourceId)
 	});
 	const [hasTriedTranscode, setHasTriedTranscode] = useState(false);
 	const [focusRow, setFocusRow] = useState('bottom');
@@ -2203,7 +2204,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// commits it. The viewer can turn that off, and without a preview playback carries on.
 	const beginScrub = useCallback(() => {
 		if (scrubHoldRef.current.active || settings.trickPlayPauseWhileScrubbing === false ||
-			settings.trickPlayEnabled === false || isInGroup || !hasTrickplayPreview(item.Id, mediaSourceId)) return;
+			settings.trickPlayMode === 'disabled' || isInGroup || !hasTrickplayPreview(item.Id, mediaSourceId)) return;
 		const video = videoRef.current;
 		const wasPlaying = Boolean(video && !video.paused);
 		scrubHoldRef.current = {active: true, wasPlaying, ticks: null};
@@ -2211,7 +2212,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			video.pause();
 			healthMonitorRef.current?.setPaused(true);
 		}
-	}, [settings.trickPlayPauseWhileScrubbing, settings.trickPlayEnabled, isInGroup, item.Id, mediaSourceId]);
+	}, [settings.trickPlayPauseWhileScrubbing, settings.trickPlayMode, isInGroup, item.Id, mediaSourceId]);
 
 	// One scrub step on. A held scrub only moves its target, anything else seeks as it goes.
 	const scrubBy = useCallback((deltaSeconds) => {

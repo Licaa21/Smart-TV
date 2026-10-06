@@ -445,6 +445,13 @@ export const getMaxResolutionOptions = () => [
 	{ value: 'res2160p', label: $L('2160p (4K)') }
 ];
 
+export const getTrickplayModeOptions = () => [
+	{ value: 'disabled', label: $L('Disabled') },
+	{ value: 'single', label: $L('Single Thumbnail') },
+	{ value: 'strip', label: $L('Filmstrip') },
+	{ value: 'full', label: $L('Full Screen') }
+];
+
 export const getZoomModeOptions = () => [
 	{ value: 'fit', label: $L('Fit') },
 	{ value: 'autoCrop', label: $L('Auto Crop') },

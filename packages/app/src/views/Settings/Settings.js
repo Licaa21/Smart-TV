@@ -19,6 +19,7 @@ import {isTvKeyboardVisible} from '../../components/TVKeyboard/keyboardBus';
 import {isVega, isWebOS, isXbox} from '../../platform';
 import ClearDataDialog from '../../components/ClearDataDialog';
 import ScreensaverPreview from '../../components/Screensaver/ScreensaverPreview';
+import TrickplaySettingsPreview from '../../components/TrickplayPreview/TrickplaySettingsPreview';
 import {LoadingAnimationPreview} from '../../components/LoadingAnimation';
 import {clearAllStorage} from '../../services/storage';
 import {clearImageCache} from '../../services/imageProxy';
@@ -1203,7 +1204,8 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		profileSync: renderProfileSync,
 		playbackTimePreview: renderPlaybackTimePreview,
 		screensaverPreview: renderScreensaverPreview,
-		loadingAnimationPreview: () => <LoadingAnimationPreview />
+		loadingAnimationPreview: () => <LoadingAnimationPreview />,
+		trickplayPreview: () => <TrickplaySettingsPreview />
 	};
 
 	const rowDeps = {settings, updateSetting, toggleSetting, pushView, customRenderers};
