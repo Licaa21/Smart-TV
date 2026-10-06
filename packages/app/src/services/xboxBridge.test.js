@@ -1,4 +1,4 @@
-import {allowInsecureHost, bootData, exitApp, onShellMessage, postToShell} from '../../../platform-xbox/src/bridge';
+import {allowInsecureHost, askShell, bootData, exitApp, nativePlayerAvailable, onShellMessage, postToShell} from '../../../platform-xbox/src/bridge';
 import {getCountryCode} from '../../../platform-xbox/src/countryCode';
 import {keepScreenOn, registerAppStateObserver, setupXboxLifecycle} from '../../../platform-xbox/src/video';
 
@@ -62,6 +62,29 @@ describe('the Xbox bridge', () => {
 		await keepScreenOn(false);
 		expect(sent(0)).toEqual({v: 1, type: 'KEEP_DISPLAY_ACTIVE', payload: {active: true}});
 		expect(sent(1)).toEqual({v: 1, type: 'KEEP_DISPLAY_ACTIVE', payload: {active: false}});
+	});
+
+	test('a question carries an id and resolves with the answer that repeats it', async () => {
+		const asked = askShell('MEMORY', undefined);
+		const {id} = sent();
+		expect(typeof id).toBe('number');
+		window.dispatchEvent(new CustomEvent('moonfin:xbox', {detail: {v: 1, type: 'REPLY', id: id + 1, payload: {usage: 1}}}));
+		window.dispatchEvent(new CustomEvent('moonfin:xbox', {detail: {v: 1, type: 'REPLY', id, payload: {usage: 2}}}));
+		await expect(asked).resolves.toEqual({usage: 2});
+
+		const refused = askShell('DISPLAY_SET_FOR_MEDIA', {hdr: 'hlg'});
+		window.dispatchEvent(new CustomEvent('moonfin:xbox', {detail: {v: 1, type: 'REPLY', id: sent(1).id, error: 'Only hdr10 can be asked for'}}));
+		await expect(refused).rejects.toThrow('Only hdr10 can be asked for');
+
+		await expect(askShell('MEMORY', undefined, 5)).rejects.toThrow('MEMORY went unanswered');
+		delete window.chrome;
+		await expect(askShell('MEMORY')).rejects.toThrow('No host to ask');
+	});
+
+	test('says whether the host has the console player', () => {
+		expect(nativePlayerAvailable()).toBe(false);
+		window.__MOONFIN_XBOX__ = {v: 1, nativePlayer: {v: 1}};
+		expect(nativePlayerAvailable()).toBe(true);
 	});
 });
 

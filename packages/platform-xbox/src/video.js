@@ -1,14 +1,20 @@
-// Playback in WebView2 on Xbox.
+// Playback on Xbox.
 //
-// The WebView plays through a plain HTML5 video element, so the element, its
-// cleanup and the visibility handling are the webOS ones. What differs is which
-// files it can take as they are, and that the screen, the app's comings and
-// goings and the media remote are the host's to report.
+// The host has the console's own player behind the WebView, and that is what the
+// page's video element drives unless the viewer turns it off, see nativeVideo.js.
+// Otherwise the WebView plays through a plain HTML5 video element, and the element,
+// its cleanup and the visibility handling are the webOS ones. Either way the screen,
+// the app's comings and goings and the media remote are the host's to report.
 import {videoRangeTypeOf} from '@moonfin/app/src/utils/videoRange';
-import {getSharedVideoElement as sharedVideoElement} from '@moonfin/platform-webos/video';
+import {
+	getSharedVideoElement as sharedVideoElement,
+	cleanupVideoElement as cleanupWebVideoElement,
+	waitForDecoderRelease as waitForWebDecoderRelease
+} from '@moonfin/platform-webos/video';
 import {onShellMessage, postToShell} from './bridge';
 import {noteHevcRefusal} from './deviceProfile';
 import {pressOnFocused, raiseHostBack} from './keys';
+import {closeNativeVideo, getNativeVideoElement, isNativePlayerEnabled, isNativeVideoElement, noteNativeSource, placeNativeVideo} from './nativeVideo';
 
 export {giveControllerToGame} from './keys';
 
@@ -18,8 +24,6 @@ export const controllerIsOnlyRemote = true;
 export {
 	getMimeType,
 	canRenderEmbeddedPgsInBand,
-	cleanupVideoElement,
-	waitForDecoderRelease,
 	setupVisibilityHandler
 } from '@moonfin/platform-webos/video';
 
@@ -27,10 +31,18 @@ const H264_NAMES = ['h264', 'avc'];
 const HEVC_NAMES = ['hevc', 'h265', 'hev1', 'hvc1'];
 
 export const getSharedVideoElement = () => {
+	if (isNativePlayerEnabled()) return getNativeVideoElement();
 	const video = sharedVideoElement();
 	video.disableRemotePlayback = true;
 	return video;
 };
+
+// The console player's element is let go of through the host. Any other element,
+// like the one trailers play in, is the WebView's and is cleaned the webOS way.
+export const cleanupVideoElement = (video) => (isNativeVideoElement(video) ? closeNativeVideo(video) : cleanupWebVideoElement(video));
+
+// The WebView's decoder isnt in play with the console player, so there is nothing to wait for.
+export const waitForDecoderRelease = () => (isNativePlayerEnabled() ? Promise.resolve() : waitForWebDecoderRelease());
 
 // A suspended app is frozen and may be ended at any moment, so the player lets
 // go of playback and the user comes back to the details page.
@@ -41,15 +53,22 @@ const hasHevcVideo = (mediaSource) => {
 	return HEVC_NAMES.includes((video?.Codec || '').toLowerCase());
 };
 
-// A seek made before the first frame has shown never lands for HEVC here, though
-// one made after it does. So such a file is opened at its start and the player seeks
-// to the resume point once that frame is in.
-export const resumesAfterFirstFrame = hasHevcVideo;
+// In the WebView a seek made before the first frame has shown never lands for HEVC,
+// though one made after it does. So such a file is opened at its start and the player
+// seeks to the resume point once that frame is in. The console player opens at the
+// resume point itself, and this is where it learns what the next stream is.
+export const resumesAfterFirstFrame = (mediaSource) => {
+	if (isNativePlayerEnabled()) {
+		noteNativeSource(mediaSource);
+		return false;
+	}
+	return hasHevcVideo(mediaSource);
+};
 
-// A console whose decoder wont open an HEVC file says so in the error, and the
-// profile wants to know.
+// A console whose WebView decoder wont open an HEVC file says so in the error, and
+// the profile wants to know.
 export const notePlaybackError = (error, mediaSource, playMethod) => {
-	if (playMethod === 'Transcode' || !hasHevcVideo(mediaSource)) return;
+	if (isNativePlayerEnabled() || playMethod === 'Transcode' || !hasHevcVideo(mediaSource)) return;
 	if (!/DECODER_ERROR_NOT_SUPPORTED/.test(error?.message || '')) return;
 	noteHevcRefusal(mediaSource.Id);
 };
@@ -104,14 +123,15 @@ export const setupXboxLifecycle = () => {
 	};
 };
 
-// What was heard to play on a console. DTS and TrueHD arent here, since the WebView
-// plays the picture of such a file without a sound.
+// The console player decodes every common sound format itself. The WebView plays
+// the picture of a DTS or TrueHD file without a sound, so those arent offered there.
 export const getSupportedAudioCodecs = (capabilities) => {
 	const codecs = ['aac', 'mp3', 'flac', 'pcm_s16le', 'pcm_s24le'];
 	if (capabilities.ac3) codecs.push('ac3');
 	if (capabilities.eac3) codecs.push('eac3', 'ec3');
 	if (capabilities.opus) codecs.push('opus');
 	if (capabilities.vorbis) codecs.push('vorbis');
+	if (capabilities.dts) codecs.push('dts', 'truehd');
 	return codecs;
 };
 
@@ -121,8 +141,9 @@ export const isAudioStreamPlayable = (stream, capabilities) => {
 	return !codec || getSupportedAudioCodecs(capabilities).includes(codec);
 };
 
-// No MPEG-TS, Chromium cant open one, so the server remuxes it
+// Chromium cant open an MPEG-TS or WebM file, so the server remuxes those for it
 const VIDEO_CONTAINERS = ['mp4', 'm4v', 'mov', 'mkv', 'matroska'];
+const NATIVE_VIDEO_CONTAINERS = [...VIDEO_CONTAINERS, 'webm', 'ts', 'mpegts'];
 const AUDIO_CONTAINERS = ['mp3', 'aac', 'm4a', 'm4b', 'flac', 'wav', 'ogg', 'oga', 'opus'];
 
 const rangeOk = (videoStream, capabilities) => {
@@ -154,9 +175,10 @@ export const getPlayMethod = (mediaSource, capabilities, options = {}) => {
 
 	const videoCodec = (videoStream.Codec || '').toLowerCase();
 	const isHevc = HEVC_NAMES.includes(videoCodec);
+	const containers = capabilities.nativePlayer ? NATIVE_VIDEO_CONTAINERS : VIDEO_CONTAINERS;
 
 	const videoOk = !videoCodec || H264_NAMES.includes(videoCodec) || (isHevc && !!capabilities.hevc);
-	const containerOk = !container || containerParts.some((part) => VIDEO_CONTAINERS.includes(part));
+	const containerOk = !container || containerParts.some((part) => containers.includes(part));
 	const hdrOk = rangeOk(videoStream, capabilities);
 	// Only HEVC has the console's own decoder behind it, so nothing else goes past 1080p
 	const sizeOk = !videoStream.Width || videoStream.Width <= 1920 || (capabilities.uhd && isHevc);
@@ -168,7 +190,9 @@ export const getPlayMethod = (mediaSource, capabilities, options = {}) => {
 	return 'Transcode';
 };
 
-export const setDisplayWindow = async () => false;
+// The console player is put where the page laid its element out, so the subtitles
+// drawn over it line up. The WebView's element needs nothing.
+export const setDisplayWindow = async () => isNativePlayerEnabled() && placeNativeVideo();
 
 // Only the host can keep the console from dimming the screen. The page says
 // whether something is playing and the host holds or lets go of its request.

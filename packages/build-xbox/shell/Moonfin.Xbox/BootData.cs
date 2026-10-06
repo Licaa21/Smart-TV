@@ -41,6 +41,7 @@ namespace Moonfin.Xbox
             data.SetNamedValue("display", ReadDisplay());
             data.SetNamedValue("protection", await ReadProtectionAsync());
             data.SetNamedValue("webview", ReadWebView(webViewVersion));
+            data.SetNamedValue("nativePlayer", ReadNativePlayer());
             data.SetNamedValue("ip", NullableString(ReadIp()));
             data.SetNamedValue("country", NullableString(ReadCountry()));
             return data;
@@ -226,6 +227,14 @@ namespace Moonfin.Xbox
                 HostLog.Write("boot", "Protection query failed: " + ex.Message);
             }
             return null;
+        }
+
+        // Says the host has the console's player, and the version of what the page can ask of it.
+        private static JsonObject ReadNativePlayer()
+        {
+            var nativePlayer = new JsonObject();
+            nativePlayer.SetNamedValue("v", JsonValue.CreateNumberValue(1));
+            return nativePlayer;
         }
 
         private static JsonObject ReadWebView(string version)

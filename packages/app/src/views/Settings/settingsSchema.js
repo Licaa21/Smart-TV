@@ -625,6 +625,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.SECTION, id: 'decodingRendering', label: () => $L('Decoding & Rendering')},
 					{kind: KIND.TOGGLE, key: 'preferTranscode', label: () => $L('Prefer Transcoding'), desc: () => $L('Request transcoded streams when available'), icon: 'gear'},
 					{kind: KIND.TOGGLE, key: 'forceDirectPlay', label: () => $L('Force Direct Play'), desc: () => $L('Skip codec checks and always attempt DirectPlay (debug)'), icon: 'play'},
+					{kind: KIND.TOGGLE, key: 'xboxNativePlayer', label: () => $L('Console Video Player'), desc: () => $L("Play video through the console's own player for HEVC, 4K and HDR. Turn off to use the built-in web player. Takes effect on the next playback"), icon: 'play_circle', when: (ctx) => ctx.isXbox},
 					{kind: KIND.SECTION, id: 'transcodingLimits', label: () => $L('Transcoding Limits')},
 					{kind: KIND.OPTION, key: 'maxBitrate', label: () => $L('Max Streaming Bitrate'), desc: () => $L('Cap the streaming bitrate. Content above this threshold will be transcoded to fit.'), options: getBitrateOptions, fallback: () => $L('Auto (Recommended)'), icon: 'network_check'},
 					{kind: KIND.OPTION, key: 'maxVideoResolution', label: () => $L('Max Resolution'), desc: () => $L('Cap the video resolution. Content above this threshold will be transcoded to fit.'), options: getMaxResolutionOptions, fallback: () => $L('Auto'), icon: 'quality'}

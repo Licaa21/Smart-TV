@@ -197,3 +197,44 @@ describe('the Xbox play method', () => {
 		expect(getPlayMethod(song('opus', 'ogg'), bare)).toBe('Transcode');
 	});
 });
+
+describe('the profile with the console player', () => {
+	const nativeBoot = (over = {}) => boot({nativePlayer: {v: 1}, ...over});
+
+	afterEach(() => {
+		window.localStorage.removeItem('moonfin_settings');
+	});
+
+	test('takes HEVC from the host alone, whatever the WebView said or refused', async () => {
+		window.HTMLMediaElement.prototype.canPlayType.mockImplementation((type) => (/hvc1/.test(type) ? '' : canPlayType(type)));
+		window.localStorage.setItem('moonfin:xboxHevcRefusals', JSON.stringify(['a', 'b']));
+		const capabilities = await capabilitiesFor(nativeBoot());
+		expect(capabilities).toMatchObject({nativePlayer: true, hevc: true, uhd: true, hdr10: true, nativeHls: true, watchesDroppedFrames: false, dts: true, webm: true, ts: true});
+		expect(await capabilitiesFor(nativeBoot({protection: {hevc: false, uhd: true}}))).toMatchObject({hevc: false, uhd: false});
+		expect(await capabilitiesFor(nativeBoot({display: {hdr: []}}))).toMatchObject({hdr10: false});
+	});
+
+	test('offers what the player decodes itself and lets HDR10 through', async () => {
+		await capabilitiesFor(nativeBoot());
+		const profile = await getJellyfinDeviceProfile();
+		expect(profile.DirectPlayProfiles.find((entry) => entry.Container === 'mkv').AudioCodec).toContain('dts,truehd');
+		expect(profile.DirectPlayProfiles.some((entry) => entry.Container === 'webm')).toBe(true);
+		expect(profile.DirectPlayProfiles.some((entry) => entry.Container === 'ts')).toBe(true);
+		expect(profile.DirectPlayProfiles.some((entry) => entry.Container === 'hls')).toBe(true);
+		const range = profile.CodecProfiles.find((entry) => entry.Codec === 'hevc').Conditions.find((condition) => condition.Property === 'VideoRangeType');
+		expect(range.Value).toBe('SDR|HDR10|HDR10Plus');
+
+		const capabilities = await getDeviceCapabilities();
+		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'HDR10', Width: 3840}), capabilities)).toBe('DirectPlay');
+		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'HLG'}), capabilities)).toBe('Transcode');
+		expect(getPlayMethod({...video({Codec: 'h264'}), Container: 'ts'}, capabilities)).toBe('DirectPlay');
+		expect(getPlayMethod({...video({Codec: 'h264'}), Container: 'webm'}, capabilities)).toBe('DirectPlay');
+		expect(getPlayMethod(source({MediaStreams: [{Type: 'Video', Codec: 'h264', VideoRangeType: 'SDR', Width: 1920}, {Type: 'Audio', Codec: 'dts', Index: 1}]}), capabilities)).toBe('DirectPlay');
+	});
+
+	test('turned off, the WebView answers as before', async () => {
+		window.localStorage.setItem('moonfin_settings', JSON.stringify({xboxNativePlayer: false}));
+		window.HTMLMediaElement.prototype.canPlayType.mockImplementation((type) => (/hvc1/.test(type) ? '' : canPlayType(type)));
+		expect(await capabilitiesFor(nativeBoot())).toMatchObject({nativePlayer: false, hevc: false, hdr10: false, dts: false, webm: false, watchesDroppedFrames: true});
+	});
+});

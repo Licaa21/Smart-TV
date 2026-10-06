@@ -46,6 +46,7 @@ export const defaultSettings = {
 	playerZoomMode: 'fit',
 	mediaSegmentAutoHide: 'off',
 	cinemaModeEpisodesEnabled: false,
+	xboxNativePlayer: true,
 	trickPlayMode: 'single',
 	trickPlayPreviewScale: 30,
 	trickPlayVerticalPosition: 0,

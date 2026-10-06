@@ -52,6 +52,19 @@ namespace Moonfin.Xbox
             }
         }
 
+        public static bool DisplayHasHdr10()
+        {
+            try
+            {
+                HdmiDisplayInformation hdmi = HdmiDisplayInformation.GetForCurrentView();
+                return hdmi != null && hdmi.GetSupportedDisplayModes().Any(mode => mode.IsSmpte2084Supported);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         // Back to the mode the console was in, if this app took it out of it.
         public static async Task<bool> RestoreAsync()
         {

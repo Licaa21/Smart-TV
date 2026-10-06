@@ -4,6 +4,17 @@
       Background="#101010">
 
     <Grid>
+        <!-- The console's own player, under the WebView, which goes clear where video plays. -->
+        <Border x:Name="VideoBackdrop" Background="Black" Visibility="Collapsed" />
+        <MediaPlayerElement x:Name="VideoHost"
+                            AreTransportControlsEnabled="False"
+                            Stretch="Fill"
+                            IsHitTestVisible="False"
+                            IsTabStop="False"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Visibility="Collapsed" />
+
         <!-- The WebView goes in here once it is ready to take focus. -->
         <Grid x:Name="WebViewHost" />
 

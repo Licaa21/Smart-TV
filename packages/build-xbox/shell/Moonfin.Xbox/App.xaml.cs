@@ -34,8 +34,10 @@ namespace Moonfin.Xbox
 #endif
             Environment.SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", browserArguments);
 
-            // What shows while a page is loading, in the app's own background colour.
-            Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FF101010");
+            // The WebView paints nothing behind the page, so the console's player shows
+            // through wherever the page goes clear. The XAML page's background shows while
+            // a page loads.
+            Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00000000");
 
             // XAML apps are scaled up 2x on Xbox. Without that the page gets the whole
             // 1920 by 1080 at a scale of one.

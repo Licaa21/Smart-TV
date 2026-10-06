@@ -458,6 +458,61 @@
 			await wait(500);
 		}
 		report(playback, 'summary', `${passed} of ${unattended.length} played`, passed === unattended.length ? 'ok' : 'fail');
+		if (boot && boot.nativePlayer) await playAllNative();
+	};
+
+	// The same clips through the console's own player, which the app plays video with
+	// on a host that has one. The host decodes, so what is judged is what it reports:
+	// a stream that opened, played on for a few seconds and showed a picture.
+	const nativePlayer = boot && boot.nativePlayer ? section('Console player (what the host plays)') : null;
+	let nativeSession = 0;
+
+	const playClipNative = async ({label, url, video: hasVideo}) => {
+		report(nativePlayer, label, 'playing', 'wait');
+		const session = ++nativeSession;
+		const seen = {playing: false, error: null};
+		const listener = (e) => {
+			const message = e.detail;
+			if (!message || message.type !== 'PLAYER_EVENT' || !message.payload || message.payload.session !== session) return;
+			if (message.payload.event === 'playing') seen.playing = true;
+			if (message.payload.event === 'error') seen.error = message.payload.message;
+		};
+		window.addEventListener(PAGE_EVENT, listener);
+		const problems = [];
+		let state = null;
+		try {
+			await askShell('PLAYER_OPEN', {session, url: new URL(url, location.href).href, hls: false, startSeconds: 0, autoplay: true, volume: 1, muted: false}, CLIP_START_MS);
+			const rect = video.getBoundingClientRect();
+			toShell('PLAYER_SET_RECT', {session, x: rect.left, y: rect.top, width: rect.width, height: rect.height});
+			const started = Date.now();
+			while (!seen.playing && !seen.error && Date.now() - started < CLIP_START_MS) await wait(250);
+			if (seen.playing) await wait(CLIP_PLAY_MS);
+			state = await askShell('PLAYER_GET_STATE', {session}, 5000);
+			if (seen.error) problems.push(seen.error);
+			else if (!seen.playing) problems.push('never started playing');
+			else {
+				if (state.position < 2) problems.push(`time only reached ${state.position.toFixed(1)} s`);
+				if (hasVideo !== false && !(state.width > 0)) problems.push('no picture decoded');
+			}
+		} catch (e) {
+			problems.push(e.message);
+		}
+		window.removeEventListener(PAGE_EVENT, listener);
+		await askShell('PLAYER_CLOSE', {session}, 5000).catch(() => {});
+		const decoders = state ? [state.videoDecoder, state.audioDecoder].filter(Boolean).join(', ') : '';
+		const where = state ? `${state.width}x${state.height} t=${(state.position || 0).toFixed(1)}` : '';
+		report(nativePlayer, label, problems.length ? `FAIL ${problems.join(', ')} (${where})` : `plays ${where} ${decoders}`, problems.length ? 'fail' : 'ok');
+		return !problems.length;
+	};
+
+	const playAllNative = async () => {
+		let passed = 0;
+		for (let i = 0; i < unattended.length; i++) {
+			setStatus(`Playing test clip ${i + 1} of ${unattended.length} in the console player: ${unattended[i].label}`);
+			if (await playClipNative(unattended[i])) passed += 1;
+			await wait(500);
+		}
+		report(nativePlayer, 'summary', `${passed} of ${unattended.length} played`, passed === unattended.length ? 'ok' : 'fail');
 	};
 
 	const device = section('Device');
@@ -719,6 +774,7 @@
 
 	// For a debugger or a script to start the run without a controller.
 	window.PROBE_RUN = runAll;
+	window.PROBE_RUN_NATIVE = run('Console player', playAllNative);
 
 	moveFocus(0);
 })();

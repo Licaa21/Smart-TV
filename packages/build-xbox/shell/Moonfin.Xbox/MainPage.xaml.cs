@@ -26,7 +26,7 @@ namespace Moonfin.Xbox
     {
         // The page is served from the package under this name. It has no dot-local
         // ending, which WebView2 is slow to resolve.
-        private const string AppHost = "moonfin.internal";
+        public const string AppHost = "moonfin.internal";
 
         // Served over http so a server on the home network that only speaks http isnt
         // mixed content, which is how the app behaves on the TVs. The price is that the page
@@ -63,10 +63,14 @@ namespace Moonfin.Xbox
 
         private PlaybackSession playbackSession;
 
+        private readonly NativePlayer nativePlayer;
+
         public MainPage()
         {
             InitializeComponent();
             Current = this;
+
+            nativePlayer = new NativePlayer(VideoHost, VideoBackdrop, Dispatcher, SendToPage, authority => insecureHosts.Contains(authority));
 
             // Xbox keeps a border around the content for sets that cut the edges off. The web
             // app lays itself out for a TV already, so it is given the whole screen.
@@ -102,7 +106,6 @@ namespace Moonfin.Xbox
                 pageReady = false;
 
                 var view = new WebView2();
-                view.Background = new SolidColorBrush(Color.FromArgb(255, 16, 16, 16));
                 await view.EnsureCoreWebView2Async();
 
                 CoreWebView2 core = view.CoreWebView2;
@@ -216,6 +219,8 @@ namespace Moonfin.Xbox
             if (IsAppPage(args.Uri))
             {
                 pageReady = false;
+                // A page that loads afresh knows nothing of what the last one left playing.
+                _ = nativePlayer.CloseAsync();
                 return;
             }
             // Anything else would run in a WebView that has the bridge, so it never loads here.
@@ -305,6 +310,7 @@ namespace Moonfin.Xbox
 
             pageReady = false;
             SetDisplayActive(false);
+            _ = nativePlayer.CloseAsync();
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
             bool again = now - lastFailure < FailureWindow;
@@ -332,6 +338,7 @@ namespace Moonfin.Xbox
             WebView2 failed = webView;
             webView = null;
             pageReady = false;
+            _ = nativePlayer.CloseAsync();
             WebViewHost.Children.Clear();
             try
             {
@@ -408,6 +415,7 @@ namespace Moonfin.Xbox
                     break;
 
                 default:
+                    if (nativePlayer.Handle(message)) break;
                     HostLog.Write("bridge", "Unknown message " + message.Type);
                     Reply(message, null, "Unknown message " + message.Type);
                     break;
@@ -524,7 +532,7 @@ namespace Moonfin.Xbox
         }
 
         // The page that asked is there to hear the answer, loaded or not.
-        private void Reply(PageMessage message, IJsonValue payload, string error)
+        internal void Reply(PageMessage message, IJsonValue payload, string error)
         {
             if (message.Id.HasValue) RunScript(Bridge.ReplyScript(message.Id.Value, payload, error), true);
         }
@@ -586,6 +594,7 @@ namespace Moonfin.Xbox
         {
             SetDisplayActive(false);
             SendAppState(false);
+            await nativePlayer.CloseAsync();
             await DisplayModes.RestoreAsync();
 
             PlaybackSession session = playbackSession;

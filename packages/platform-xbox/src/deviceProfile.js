@@ -18,13 +18,19 @@
 // On the Series consoles the WebView says yes to HEVC every way it can be asked and
 // then turns the decoder away, so a console whose decoder has refused two different
 // files is taken at its word and offered H.264 from then on.
+//
+// With the console's own player none of the WebView's answers matter: HEVC goes by
+// the host's word alone, HDR10 by the display's, every common sound format is decoded
+// by the player itself, and WebM and MPEG-TS files are read as they are.
 import {bootData} from './bridge';
 import {modelName} from './deviceInfo';
+import {isNativePlayerEnabled} from './nativeVideo';
 
 const HEVC_REFUSALS_KEY = 'moonfin:xboxHevcRefusals';
 const HEVC_REFUSAL_LIMIT = 2;
 
 let cachedCapabilities = null;
+let cachedForNativePlayer = null;
 let probeElement = null;
 
 const canPlay = (type) => {
@@ -60,21 +66,27 @@ export const clearCapabilitiesCache = () => {
 export const detectXboxVersion = () => bootData()?.os?.version || '';
 
 export const getDeviceCapabilities = async () => {
-	if (cachedCapabilities) return cachedCapabilities;
+	const nativePlayer = isNativePlayerEnabled();
+	if (cachedCapabilities && cachedForNativePlayer === nativePlayer) return cachedCapabilities;
 
 	const protection = bootData()?.protection || {};
+	const display = bootData()?.display || {};
 	const version = detectXboxVersion();
-	const hevc = protection.hevc === true && canPlay('video/mp4; codecs="hvc1.1.6.L120.90"') && hevcRefusals().length < HEVC_REFUSAL_LIMIT;
+	const hevc = nativePlayer
+		? protection.hevc === true
+		: protection.hevc === true && canPlay('video/mp4; codecs="hvc1.1.6.L120.90"') && hevcRefusals().length < HEVC_REFUSAL_LIMIT;
 
+	cachedForNativePlayer = nativePlayer;
 	cachedCapabilities = {
 		modelName: modelName() || 'Xbox',
 		xboxVersionDisplay: version ? `Xbox OS ${version}` : 'Xbox OS',
+		nativePlayer,
 
 		// The page is laid out at 1080p whatever the display, so 4K is the host's to report
 		uhd: hevc && protection.uhd === true,
 		uhd8K: false,
 
-		hdr10: false,
+		hdr10: nativePlayer && Array.isArray(display.hdr) && display.hdr.includes('hdr10'),
 		hdr10Plus: false,
 		hlg: false,
 		dolbyVision: false,
@@ -83,24 +95,24 @@ export const getDeviceCapabilities = async () => {
 		av1: false,
 		vp9: false,
 
-		ac3: canPlay('audio/mp4; codecs="ac-3"'),
-		eac3: canPlay('audio/mp4; codecs="ec-3"'),
+		ac3: nativePlayer || canPlay('audio/mp4; codecs="ac-3"'),
+		eac3: nativePlayer || canPlay('audio/mp4; codecs="ec-3"'),
 		// The WebView plays a file with DTS or TrueHD in it without a sound, whatever it is asked
-		dts: false,
+		dts: nativePlayer,
 		flac: true,
-		opus: canPlay('audio/webm; codecs="opus"'),
-		vorbis: canPlay('audio/webm; codecs="vorbis"'),
+		opus: nativePlayer || canPlay('audio/webm; codecs="opus"'),
+		vorbis: nativePlayer || canPlay('audio/webm; codecs="vorbis"'),
 
 		mkv: true,
-		webm: false,
-		ts: false,
+		webm: nativePlayer,
+		ts: nativePlayer,
 
-		nativeHls: canPlay('application/vnd.apple.mpegurl'),
+		nativeHls: nativePlayer || canPlay('application/vnd.apple.mpegurl'),
 
 		// A console is often on a wireless link that carries a fraction of what it plays
 		fitsBitrateToLink: true,
-		// The console's HEVC decoder shows some files with a quarter of their frames missing
-		watchesDroppedFrames: true
+		// The WebView's HEVC decoder shows some files with a quarter of their frames missing
+		watchesDroppedFrames: !nativePlayer
 	};
 
 	return cachedCapabilities;
@@ -113,6 +125,7 @@ const buildAudioCodecs = (caps) => {
 	if (caps.ac3) codecs.push('ac3');
 	if (caps.eac3) codecs.push('eac3');
 	if (caps.opus) codecs.push('opus');
+	if (caps.dts) codecs.push('dts', 'truehd');
 	return codecs;
 };
 
@@ -127,6 +140,8 @@ const buildDirectPlayProfiles = (caps) => {
 		{Container: 'mp4,m4v', Type: 'Video', VideoCodec: videoCodecs, AudioCodec: audioCodecs},
 		{Container: 'mkv', Type: 'Video', VideoCodec: videoCodecs, AudioCodec: mkvAudioCodecs},
 		{Container: 'mov', Type: 'Video', VideoCodec: videoCodecs, AudioCodec: 'aac'},
+		...(caps.webm ? [{Container: 'webm', Type: 'Video', VideoCodec: videoCodecs, AudioCodec: 'opus,vorbis'}] : []),
+		...(caps.ts ? [{Container: 'ts', Type: 'Video', VideoCodec: videoCodecs, AudioCodec: audioCodecs}] : []),
 		{Container: 'mp3', Type: 'Audio'},
 		{Container: 'flac', Type: 'Audio'},
 		{Container: 'aac', Type: 'Audio'},
@@ -181,7 +196,7 @@ export const getJellyfinDeviceProfile = async () => {
 			Codec: 'hevc',
 			Conditions: [
 				{Condition: 'EqualsAny', Property: 'VideoProfile', Value: 'main|main 10', IsRequired: false},
-				{Condition: 'EqualsAny', Property: 'VideoRangeType', Value: 'SDR', IsRequired: false},
+				{Condition: 'EqualsAny', Property: 'VideoRangeType', Value: caps.hdr10 ? 'SDR|HDR10|HDR10Plus' : 'SDR', IsRequired: false},
 				{Condition: 'LessThanEqual', Property: 'VideoLevel', Value: '153', IsRequired: false},
 				// A 1080p file is often marked with a 4K level, so the size is held by itself
 				...(caps.uhd ? [] : [{Condition: 'LessThanEqual', Property: 'Width', Value: '1920', IsRequired: false}])
