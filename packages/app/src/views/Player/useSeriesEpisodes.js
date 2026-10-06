@@ -13,7 +13,9 @@ const cache = new Map();
 
 export const clearSeriesEpisodesCache = () => cache.clear();
 
-const cacheKey = (serverUrl, seriesId) => `${serverUrl || ''}|${seriesId}`;
+// What is held belongs to one server and one viewer: the lists carry that viewer's watched marks and
+// blocked ratings, so another account, on the same server or another, must never be shown them.
+const cacheKey = (serverUrl, userId, seriesId) => `${serverUrl || ''}|${userId || ''}|${seriesId}`;
 
 /**
  * The seasons of the series that is playing, and the episodes of whichever one is selected.
@@ -32,7 +34,8 @@ const useSeriesEpisodes = ({item, enabled}) => {
 	itemRef.current = item;
 	const itemId = item?.Id;
 	const {_serverUrl: serverUrl, _serverAccessToken: token, _serverUserId: userId, _serverType: serverType} = item || {};
-	const key = cacheKey(serverUrl, seriesId);
+	// An episode that wasn't tagged with its server came from the one signed in right now.
+	const key = cacheKey(serverUrl || jellyfinApi.getServerUrl(), userId || jellyfinApi.getUserId(), seriesId);
 
 	const api = useMemo(() => {
 		if (serverUrl && token && userId) {
