@@ -6,6 +6,7 @@
 // The panel size is a limit too. The platform files describe the decoder and
 // never the screen, so a source wider than the panel is capped here even when
 // the user asked for no limit.
+import {audioChannelCap} from './audioChannelCap';
 
 const RESOLUTIONS = {
 	res480p: {width: 720, height: 480},
@@ -46,11 +47,7 @@ export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 	if (!profile) return profile;
 
 	const resolution = narrower(RESOLUTIONS[settings.maxVideoResolution], panelResolution(capabilities));
-	const channelCap = settings.downmixToStereo === true
-		? 2
-		: (typeof settings.maxAudioChannels === 'number' && settings.maxAudioChannels > 0
-			? settings.maxAudioChannels
-			: null);
+	const channelCap = audioChannelCap(settings);
 	const dropAss = settings.assDirectPlay === false;
 	const dropPgs = settings.enablePgsRendering === false;
 	// The Tizen AV1 transcoding profile copies the video stream untouched into

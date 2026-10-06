@@ -174,3 +174,30 @@ describe('codec order edge cases', () => {
 		expect(selectPreferredAudioStream([german, french], {preferDefaultAudioTrack: true, audioCodecOrder: ['truehd', 'ac3']})).toBe(german);
 	});
 });
+
+describe('selectPreferredAudioStream with a channel cap', () => {
+	const ac3Surround = {index: 3, language: 'eng', codec: 'ac3', channels: 6};
+	const ac3Stereo = {index: 4, language: 'eng', codec: 'ac3', channels: 2};
+	const truehd = {index: 2, language: 'eng', codec: 'truehd', channels: 8};
+
+	test('stereo cap takes the track that fits over the surround one of the same codec', () => {
+		expect(selectPreferredAudioStream([ac3Surround, ac3Stereo], {audioLanguage: 'eng', maxAudioChannels: 2})).toBe(ac3Stereo);
+		expect(selectPreferredAudioStream([ac3Surround, ac3Stereo], {audioLanguage: 'eng', downmixToStereo: true})).toBe(ac3Stereo);
+	});
+
+	test('with no cap the surround track still wins', () => {
+		expect(selectPreferredAudioStream([ac3Surround, ac3Stereo], {audioLanguage: 'eng'})).toBe(ac3Surround);
+		expect(selectPreferredAudioStream([ac3Surround, ac3Stereo], {audioLanguage: 'eng', maxAudioChannels: 'auto'})).toBe(ac3Surround);
+	});
+
+	test('the codec order still comes first', () => {
+		const flacStereo = {index: 5, language: 'eng', codec: 'flac', channels: 2};
+		expect(selectPreferredAudioStream([ac3Stereo, truehd, flacStereo], {audioLanguage: 'eng', maxAudioChannels: 2, audioCodecOrder: ['truehd', 'flac', 'ac3']})).toBe(truehd);
+	});
+
+	test('when nothing fits the nearest track goes first', () => {
+		const eac3 = {index: 6, language: 'eng', codec: 'ac3', channels: 8};
+		expect(selectPreferredAudioStream([eac3, ac3Surround], {audioLanguage: 'eng', maxAudioChannels: 2})).toBe(ac3Surround);
+	});
+});
+
