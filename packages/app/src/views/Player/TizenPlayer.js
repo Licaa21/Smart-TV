@@ -773,7 +773,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					eventType: typeof eventType === 'object' ? JSON.stringify(eventType).slice(0, 300) : String(eventType),
 					playerState: avplayGetState(),
 					selectedAudioStreamIndex: playback.getCurrentSession()?.audioStreamIndex,
-					playMethod: playback.getCurrentSession()?.playMethod
+					playMethod: playback.getCurrentSession()?.playMethod,
+					// which track AVPlay was on when it failed, to tell an undecodable start track from a bad switch
+					playingAudioIndex: avplayGetCurrentTracks().find((t) => t.type === 'AUDIO')?.index,
+					avplayAudioTracks: summarizeAvplayTracks(avplayGetTracks(), 'AUDIO')
 				});
 				handleErrorCallbackRef.current?.();
 			},
