@@ -203,6 +203,12 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	const badgeUnplayed = toCssColor(c.badgeUnplayed);
 	const badgeWatched = toCssColor(c.badgeWatched);
 	const onBadge = toCssColor(c.onBadge);
+	// The circle counting the unplayed episodes of a series is a badge color of the theme, which no
+	// accent reaches on its own. A surface that was given an accent draws it in that color instead,
+	// with ink chosen to read on it, so the circle matches the rest of the surface.
+	const countBadge = (accent, id) => (picked[id]
+		? `background: ${accent.css}; color: ${accent.on}; border-color: ${accent.on};`
+		: `background: ${badgeUnplayed}; color: ${onBadge}; border-color: ${onBadge};`);
 	const recordingActive = toCssColor(c.recordingActive);
 	const error = toCssColor(c.error || DEFAULT_ERROR_COLOR);
 	const statusAvailable = toCssColor(theme.semantic.statusAvailable);
@@ -274,6 +280,29 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	const settingsFocus = focusStyle('settingsFocus');
 	const detailsFocus = focusStyle('details');
 
+	// The toggle's "on" fill, the toggle's thumb once on, and the radio dot all draw from the
+	// Settings accent - same as any other accent-colored mark - but they sit on this row's own
+	// fill, which is a *different*, separately-pickable accent (Settings Focus). Pick the two
+	// the same, or just close, and the mark reads fine resting but all but disappears once the
+	// row focuses. Only matters once Settings Focus is actually picked away from the theme's
+	// own default fill - that default is the theme author's own choice to balance against the
+	// theme's own accent, not something to second-guess here. Nudged just enough to stay visible
+	// against both the resting list-item fill and the focused one when it is picked, left
+	// untouched otherwise - the same approach every other accent already gets against the
+	// surfaces it is drawn on.
+	const settingsMarkHex = picked.settingsFocus
+		? ensureVisible(settingsAccent.hex, [c.surface, settingsFocus.fillHex])
+		: settingsAccent.hex;
+	const settingsMark = toCssColor(settingsMarkHex);
+	const settingsMarkInk = readableInk(settingsMarkHex, c.onAccent);
+	const settingsMarkA = (alpha) => `rgba(${toRgbTriplet(settingsMarkHex)}, ${alpha})`;
+	// The icon box of a focused row is a tint of the Settings accent over the row's own fill. When the
+	// two are the same or close, white on white say, the box and its outline vanish, and the glyph
+	// with them if it took its color from the accent. The box takes the nudged mark color, and the
+	// glyph is inked against what the box really ends up as, so it reads whatever the picks are.
+	const focusedBoxFill = picked.settingsFocus ? blendOver(settingsMarkHex, settingsFocus.fillHex, 0.22) : null;
+	const focusedIconInk = focusedBoxFill ? `rgba(${inkOn(focusedBoxFill)}, 0.92)` : settingsFocus.soft;
+
 	const rules = [];
 	// Doubling the attribute keeps these rules winning ties against stylesheets
 	// injected after this one, whatever order the head ends up in.
@@ -327,12 +356,12 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${settingsCss.page}`, `background: ${background};`);
 	rule(`.${settingsCss.sectionTitle}`, `color: ${onBackground};`);
 	rule(`.${settingsCss.listItem}, .${settingsCss.sliderContainer}, .${settingsCss.themeCard}`, `background: ${surfaceA(0.82)}; border: 1px solid ${tileBorderColor};`);
-	const tileFocus = `background: ${settingsFocus.fill}; border-color: ${settingsAccent.a(0.72)}; box-shadow: ${tileGlow};`;
+	const tileFocus = `background: ${settingsFocus.fill}; border-color: ${settingsMarkA(0.72)}; box-shadow: ${tileGlow};`;
 	rule(`.${settingsCss.listItem}:focus, .${settingsCss.themeCard}:focus`, tileFocus);
 	// The older engines treat focus-within as a parse error that voids the whole
 	// rule, so it always stands alone instead of joining the selectors above.
 	rule(`.${settingsCss.sliderContainer}:focus-within`, tileFocus);
-	rule(`.${settingsCss.listItemSelected}, .${settingsCss.themeCardSelected}`, `border-color: ${settingsAccent.css};`);
+	rule(`.${settingsCss.listItemSelected}, .${settingsCss.themeCardSelected}`, `border-color: ${settingsMark};`);
 	rule(`.${settingsCss.listItemHeading}`, `color: ${onSurface};`);
 	rule(`.${settingsCss.listItemCaption}, .${settingsCss.listItemValue}, .${settingsCss.chevronIcon}, .${settingsCss.sliderValue}`, `color: ${os(0.7)};`);
 	rule(`.${settingsCss.sliderTitle}, .${settingsCss.themeCardName}, .${settingsCss.playbackTimeRow}`, `color: ${onSurface};`);
@@ -345,7 +374,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${settingsCss.themeCard}:focus .${settingsCss.themeCardDescription}`, `color: ${settingsFocus.soft};`);
 	rule(`.${settingsCss.sliderContainer}:focus-within .${settingsCss.sliderValue}`, `color: ${settingsFocus.soft};`);
 	rule(`.${settingsCss.listItemIcon}`, `background: ${settingsAccent.a(0.14)}; border: 1px solid ${settingsAccent.a(0.42)}; box-sizing: border-box; color: ${os(0.78)};`);
-	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemIcon}`, `background: ${settingsAccent.a(0.22)}; border-color: ${settingsAccent.a(0.64)}; color: ${settingsFocus.soft};`);
+	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemIcon}`, `background: ${settingsMarkA(0.22)}; border-color: ${settingsMarkA(0.64)}; color: ${focusedIconInk};`);
 	// An achievement row carries its own figures on the end, so they follow the tile rather than
 	// keeping a resting colour nobody can read once it lights up.
 	rule(`.${achievementsCss.points}, .${achievementsCss.progressText}`, `color: ${os(0.7)};`);
@@ -353,21 +382,6 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${achievementsCss.reward}`, `color: ${achievementsAccent.css};`);
 	rule(`.${settingsCss.listItem}:focus .${achievementsCss.points}, .${settingsCss.listItem}:focus .${achievementsCss.progressText}`, `color: ${settingsFocus.soft};`);
 	rule(`.${settingsCss.listItem}:focus .${achievementsCss.boardValue}, .${settingsCss.listItem}:focus .${achievementsCss.rankGutter}, .${settingsCss.listItem}:focus .${achievementsCss.reward}`, `color: ${settingsFocus.strong};`);
-	// The toggle's "on" fill, the toggle's thumb once on, and the radio dot all draw from the
-	// Settings accent - same as any other accent-colored mark - but they sit on this row's own
-	// fill, which is a *different*, separately-pickable accent (Settings Focus). Pick the two
-	// the same, or just close, and the mark reads fine resting but all but disappears once the
-	// row focuses. Only matters once Settings Focus is actually picked away from the theme's
-	// own default fill - that default is the theme author's own choice to balance against the
-	// theme's own accent, not something to second-guess here. Nudged just enough to stay visible
-	// against both the resting list-item fill and the focused one when it is picked, left
-	// untouched otherwise - the same approach every other accent already gets against the
-	// surfaces it is drawn on.
-	const settingsMarkHex = picked.settingsFocus
-		? ensureVisible(settingsAccent.hex, [c.surface, settingsFocus.fillHex])
-		: settingsAccent.hex;
-	const settingsMark = toCssColor(settingsMarkHex);
-	const settingsMarkInk = readableInk(settingsMarkHex, c.onAccent);
 	rule(`.${settingsCss.toggleTrack}`, `background: ${surfaceVariant};`);
 	rule(`.${settingsCss.toggleOn}`, `background: ${settingsMark};`);
 	rule(`.${settingsCss.toggleThumb}`, `background: ${onSurface};`);
@@ -392,7 +406,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${settingsCss.statusMessage}, .${settingsCss.authHint}, .${settingsCss.viewDescription}, .${settingsCss.viewCaption}, .${settingsCss.themeCardDescription}, .${settingsCss.themeStoreMessage}`, `color: ${os(0.7)};`);
 	rule(`.${settingsCss.statusError}`, `color: ${error};`);
 	rule(`.${settingsCss.loadingMessage}, .${settingsCss.integrationSpec}`, `color: ${os(0.45)};`);
-	rule(`.${settingsCss.themeCardCheck}, .${settingsCss.themeStoreCardAction}`, `color: ${settingsAccent.css};`);
+	rule(`.${settingsCss.themeCardCheck}, .${settingsCss.themeStoreCardAction}`, `color: ${settingsMark};`);
 	rule(`.${settingsCss.playbackTimePreview}`, `background: ${surface};`);
 	rule(`.${settingsCss.playbackTimeBar}`, `background: ${rangeTrack};`);
 	rule(`.${settingsCss.playbackTimeBarFill}`, `background: ${settingsFocus.bar};`);
@@ -423,7 +437,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${detailsCss.btnWrapper}:focus .${detailsCss.btnDetail}`, `color: ${onBackground};`);
 	rule(`.${detailsCss.btnLabel}, .${detailsCss.seasonName}, .${detailsCss.seasonEpTitle}, .${detailsCss.castName}, .${detailsCss.trackName}, .${detailsCss.trackTitle}`, `color: ${onSurface};`);
 	rule(`.${detailsCss.seasonCard}:focus .${detailsCss.seasonPosterWrapper}`, `border-color: ${focusColor};`);
-	rule(`.${detailsCss.unplayedCount}`, `background: ${badgeUnplayed}; color: ${onBadge}; border-color: ${onBadge};`);
+	rule(`.${detailsCss.unplayedCount}`, countBadge(detailsAccent, 'details'));
 	rule(`.${detailsCss.nextUpCard}`, `background: ${os(0.06)};`);
 	rule(`.${detailsCss.nextUpCard}:focus, .${detailsCss.episodeCard}:focus, .${detailsCss.castCard}:focus .${detailsCss.castImageWrapper}`, `border-color: ${focusColor};`);
 	rule(`.${detailsCss.chapterCard}:focus, .${detailsCss.extraCard}:focus`, `border-color: ${detailsAccent.a(0.5)};`);
@@ -557,7 +571,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		rule(`.${cardCss.progress}`, `background: ${homeAccent.css};`);
 		rule(`.${cardCss.watchedBadge}`, `background: ${badgeWatched}; border-color: ${onBadge};`);
 		rule(`.${cardCss.watchedBadge} svg`, `fill: ${onBadge}; stroke: ${onBadge};`);
-		rule(`.${cardCss.unplayedCount}`, `background: ${badgeUnplayed}; color: ${onBadge}; border-color: ${onBadge};`);
+		rule(`.${cardCss.unplayedCount}`, countBadge(homeAccent, 'home'));
 		rule(`.${cardCss.favoriteBadge}`, `background: ${recordingActive}; border-color: ${onBadge};`);
 		rule(`.${cardCss.favoriteBadge} svg`, `fill: ${onBadge}; stroke: ${onBadge};`);
 		rule(`.${cardCss.serverBadge}`, `background: ${surface}; color: ${onSurface};`);

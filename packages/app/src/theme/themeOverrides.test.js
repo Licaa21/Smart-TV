@@ -288,6 +288,53 @@ describe('per-surface accents', () => {
 			const lines = rulesFor({details: '#ffffff'});
 			expect(focusRule(lines, '.themeCard:focus')).not.toContain('background: rgb(255, 255, 255)');
 		});
+
+		describe('the circle counting the unplayed episodes of a series', () => {
+			const countRules = (accents) => rulesFor(accents).filter((line) => line.includes('.unplayedCount {'));
+
+			it('keeps the theme badge color until the surface was given an accent', () => {
+				const rules = countRules({});
+				expect(rules.length).toBeGreaterThan(0);
+				rules.forEach((rule) => expect(rule).toContain('background: rgb(0, 164, 220)'));
+			});
+
+			it('follows the Home accent on the cards, and the Details accent on the details screen', () => {
+				const home = countRules({home: '#ff8800'});
+				expect(home.some((rule) => rule.includes('background: rgb(255, 136, 0)'))).toBe(true);
+				expect(home.some((rule) => rule.includes('background: rgb(0, 164, 220)'))).toBe(true);
+				const details = countRules({details: '#ff8800'});
+				expect(details.some((rule) => rule.includes('background: rgb(255, 136, 0)'))).toBe(true);
+			});
+
+			it('writes dark ink on a white one', () => {
+				const white = countRules({home: '#ffffff'}).filter((rule) => rule.includes('background: rgb(255, 255, 255)'));
+				expect(white.length).toBeGreaterThan(0);
+				white.forEach((rule) => expect(rule).toContain('color: rgba(0, 0, 0, 0.92)'));
+			});
+		});
+
+		describe('the icon box on a focused Settings row', () => {
+			const iconRule = (accents) => rulesFor(accents).find((line) => line.includes('.listItem:focus .listItemIcon {'));
+
+			it('stays visible when the row focuses with the same white as the Settings accent', () => {
+				const rule = iconRule({settings: '#ffffff', settingsFocus: '#ffffff'});
+				expect(rule).toBeDefined();
+				// The tint and the outline are the nudged color, never white laid on a white row.
+				expect(rule).not.toContain('background: rgba(255, 255, 255');
+				expect(rule).not.toContain('border-color: rgba(255, 255, 255');
+				// And the glyph is dark ink on that light box.
+				expect(rule).toContain('color: rgba(0, 0, 0, 0.92)');
+			});
+
+			it('keeps the outline of the focused row itself visible on a white fill', () => {
+				const row = focusRule(rulesFor({settings: '#ffffff', settingsFocus: '#ffffff'}), '.themeCard:focus');
+				expect(row).not.toContain('border-color: rgba(255, 255, 255');
+			});
+
+			it('leaves the theme look alone when no Settings Focus was picked', () => {
+				expect(iconRule({settings: '#ff0000'})).toContain('background: rgba(255, 0, 0, 0.22)');
+			});
+		});
 	});
 });
 
