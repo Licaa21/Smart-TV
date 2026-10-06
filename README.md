@@ -183,5 +183,7 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 ### Branches and updating
 
 - `main` follows upstream Moonfin and differs from it only by this README, which is shown first on GitHub.
-- `daily` is the branch I build and use: upstream plus every change listed above. It's a normal long-lived branch, so my changes are committed on it directly.
-- To pick up upstream's latest, run `bash fork-tools/update-from-upstream.sh` on `daily`, then build as described in [Building](#building). The Tizen package is named after the version, for example `Moonfin_Tizen_Regular_2.9.0.wgt`.
+- `implement` is where my changes live. They are committed here and nowhere else.
+- `daily` is `main` merged with `implement`, and it is only used to build the app for daily use. Nothing is committed on it by hand.
+- `feature/episodeselector-skipperlayout-accentcolors` is the one change proposed upstream (the in-player episode browser, [#494](https://github.com/Moonfin-Client/Smart-TV/pull/494)).
+- To pick up upstream's latest, run `bash fork-tools/update-daily.sh` on `daily`, then `bash fork-tools/build-daily-wgt.sh`. The Tizen package is the regular build, named after the upstream one with `_Lica_Fork` added, for example `Moonfin_Tizen_Regular_2.9.0_Lica_Fork.wgt`.
