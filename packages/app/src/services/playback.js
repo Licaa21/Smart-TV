@@ -680,6 +680,43 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 
 	let playMethod = determinePlayMethod(mediaSource, capabilities, options, passthroughSettings);
 
+	// A set that opens a file on its first audio track whatever it is asked for cannot take direct play
+	// for any other track. The answer is then asked for again with direct play off, which builds the
+	// track, and every caller that names an audio track gets that, a reload, a fallback and a subtitle
+	// change included. The server calling a direct play "selected track 6" does not make it so.
+	const directPlayOpensFirstAudio = options.directPlayOpensFirstAudio ?? playing?.directPlayOpensFirstAudio ?? false;
+	// Force Direct Play is remembered with the session, since a reload or a subtitle change does not repeat it
+	const directPlayForced = Boolean(options.forceDirectPlay ?? playing?.directPlayForced);
+	if (directPlayOpensFirstAudio && !directPlayForced && options.audioStreamIndex != null
+		&& playMethod === PlayMethod.DirectPlay) {
+		const firstAudio = (mediaSource.MediaStreams || []).find((s) => s.Type === 'Audio');
+		if (firstAudio && firstAudio.Index !== options.audioStreamIndex) {
+			console.log('[playback] Direct play would open on audio track', firstAudio.Index, 'and not', options.audioStreamIndex, '- asking for it with direct play off');
+			const rebuilt = await api.getPlaybackInfo(itemId, {
+				DeviceProfile: deviceProfile,
+				StartTimeTicks: requestedStartTime,
+				AutoOpenLiveStream: true,
+				EnableDirectPlay: false,
+				EnableDirectStream: enableDirectStream,
+				EnableTranscoding: options.enableTranscoding !== false,
+				AudioStreamIndex: options.audioStreamIndex,
+				SubtitleStreamIndex: sentSubtitleStreamIndex,
+				MaxStreamingBitrate: maxBitrate,
+				MediaSourceId: options.mediaSourceId || mediaSource.Id
+			});
+			if (rebuilt.MediaSources?.length) {
+				playbackInfo = rebuilt;
+				mediaSource = rebuilt.MediaSources.find((source) => source.Id === mediaSource.Id) || rebuilt.MediaSources[0];
+				playMethod = determinePlayMethod(mediaSource, capabilities, options, passthroughSettings);
+			} else {
+				serverLogger.playbackError('Audio: the server built nothing for the chosen track, playing the file as it is', {
+					audioStreamIndex: options.audioStreamIndex,
+					firstAudioIndex: firstAudio.Index
+				});
+			}
+		}
+	}
+
 	// When we let the server pick the user's preferred subtitle (no explicit
 	// index) and it resolved to a bitmap track on a transcode, the server would
 	// burn it into the video, far too slow for a source the user never asked to
@@ -788,6 +825,8 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		maxBitrate: options.maxBitrate,
 		allowDirectPlay,
 		allowDirectStream,
+		directPlayOpensFirstAudio,
+		directPlayForced,
 		serverCredentials: creds
 	});
 
