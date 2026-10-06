@@ -1590,32 +1590,24 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// whole file and switches locally. The index stays on the options so a
 				// later renegotiation keeps it.
 				let audioNegotiated = false;
-				// Direct play opens on the file's first audio track. Moving to another one by the
-				// player only works for a codec the set decodes, and for any other it fails after
-				// the switch or is never applied, so the screen names a track the sound is not. The
-				// server builds those up front, the way a manual pick of one is handled.
+				// Direct play opens on the file's first audio track, and moving to another one by the
+				// player is not dependable on these sets: it can fail after the switch, or never be
+				// applied, so the screen names a track the sound is not. The server builds any other
+				// track up front and copies the picture. A manual pick still tries the player first when
+				// the set decodes the codec, but this start has to be right the first time. With Force
+				// Direct Play on the server cannot be asked, so the player switches as it always did.
 				const wantedAudio = initialAudioIndex != null
 					? result.audioStreams?.find((s) => s.index === initialAudioIndex)
 					: autoAudio;
-				let audioNeedsServer = false;
-				if (wantedAudio && !isLiveTV && result.playMethod === playback.PlayMethod.DirectPlay
-					&& result.audioStreams?.[0] && wantedAudio.index !== result.audioStreams[0].index) {
-					// a probe that cannot answer leaves it to the player, as it was before
-					audioNeedsServer = !(await playback.canPlayAudioStreamNatively({
-						Codec: wantedAudio.codec,
-						Profile: wantedAudio.profile,
-						Title: wantedAudio.title,
-						DisplayTitle: wantedAudio.displayTitle,
-						ChannelLayout: wantedAudio.channelLayout,
-						Channels: wantedAudio.channels
-					}).catch(() => true));
-					if (audioNeedsServer) {
-						serverLogger.playback('Audio: starting track needs the server, building it before play', {
-							jellyfinIndex: wantedAudio.index,
-							codec: wantedAudio.codec,
-							channelLayout: wantedAudio.channelLayout
-						});
-					}
+				const audioNeedsServer = Boolean(wantedAudio && !isLiveTV
+					&& result.playMethod === playback.PlayMethod.DirectPlay && !playbackInfoOptions.forceDirectPlay
+					&& result.audioStreams?.[0] && wantedAudio.index !== result.audioStreams[0].index);
+				if (audioNeedsServer) {
+					serverLogger.playback('Audio: starting track is not the first, building it on the server before play', {
+						jellyfinIndex: wantedAudio.index,
+						codec: wantedAudio.codec,
+						channelLayout: wantedAudio.channelLayout
+					});
 				}
 				if (!stillCurrent()) return;
 				if (wantedAudio && !isLiveTV
