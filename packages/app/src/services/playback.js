@@ -687,11 +687,11 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	const directPlayOpensFirstAudio = options.directPlayOpensFirstAudio ?? playing?.directPlayOpensFirstAudio ?? false;
 	// Force Direct Play is remembered with the session, since a reload or a subtitle change does not repeat it
 	const directPlayForced = Boolean(options.forceDirectPlay ?? playing?.directPlayForced);
+	let audioRebuilt = false;
 	if (directPlayOpensFirstAudio && !directPlayForced && options.audioStreamIndex != null
 		&& playMethod === PlayMethod.DirectPlay) {
 		const firstAudio = (mediaSource.MediaStreams || []).find((s) => s.Type === 'Audio');
 		if (firstAudio && firstAudio.Index !== options.audioStreamIndex) {
-			console.log('[playback] Direct play would open on audio track', firstAudio.Index, 'and not', options.audioStreamIndex, '- asking for it with direct play off');
 			const rebuilt = await api.getPlaybackInfo(itemId, {
 				DeviceProfile: deviceProfile,
 				StartTimeTicks: requestedStartTime,
@@ -704,15 +704,33 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 				MaxStreamingBitrate: maxBitrate,
 				MediaSourceId: options.mediaSourceId || mediaSource.Id
 			});
-			if (rebuilt.MediaSources?.length) {
+			const rebuiltSource = rebuilt.MediaSources?.length
+				? (rebuilt.MediaSources.find((source) => source.Id === mediaSource.Id) || rebuilt.MediaSources[0])
+				: null;
+			const rebuiltMethod = rebuiltSource
+				? determinePlayMethod(rebuiltSource, capabilities, options, passthroughSettings)
+				: null;
+			// Only an answer that copies the picture is worth it. A re-encode of the video, for a 4K or HDR
+			// file, a bitrate cap or Prefer Transcoding, costs far more than a track the player can try to
+			// switch to, so that one is refused and the direct play stays.
+			const transcodeReasons = rebuiltSource?.TranscodingUrl?.match(/[?&]TranscodeReasons=([^&]+)/i)?.[1] || null;
+			const videoCopied = Boolean(rebuiltSource)
+				&& (rebuiltMethod !== PlayMethod.Transcode || (isAudioOnlyRemuxTranscode(rebuiltSource) && !/video/i.test(transcodeReasons || '')));
+			// An answer that is direct play again, whatever was asked, has built nothing
+			const rebuiltUsable = videoCopied && rebuiltMethod !== PlayMethod.DirectPlay;
+			serverLogger.playback('Audio: direct play would open on the first track, asked the server for the chosen one', {
+				requestedIndex: options.audioStreamIndex,
+				firstAudioIndex: firstAudio.Index,
+				answer: rebuiltMethod,
+				videoCopied,
+				transcodeReasons,
+				kept: rebuiltUsable ? 'server answer' : 'direct play'
+			});
+			if (rebuiltUsable) {
 				playbackInfo = rebuilt;
-				mediaSource = rebuilt.MediaSources.find((source) => source.Id === mediaSource.Id) || rebuilt.MediaSources[0];
-				playMethod = determinePlayMethod(mediaSource, capabilities, options, passthroughSettings);
-			} else {
-				serverLogger.playbackError('Audio: the server built nothing for the chosen track, playing the file as it is', {
-					audioStreamIndex: options.audioStreamIndex,
-					firstAudioIndex: firstAudio.Index
-				});
+				mediaSource = rebuiltSource;
+				playMethod = rebuiltMethod;
+				audioRebuilt = true;
 			}
 		}
 	}
@@ -731,7 +749,8 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 				DeviceProfile: deviceProfile,
 				StartTimeTicks: requestedStartTime,
 				AutoOpenLiveStream: true,
-				EnableDirectPlay: enableDirectPlay,
+				// a rebuilt track stays built, direct play would open the file on its first one
+				EnableDirectPlay: enableDirectPlay && !audioRebuilt,
 				EnableDirectStream: enableDirectStream,
 				EnableTranscoding: options.enableTranscoding !== false,
 				AudioStreamIndex: audioStreamIndex,
@@ -1249,15 +1268,18 @@ export const getPreviousEpisode = async (item) => {
 export const changeAudioStream = async (streamIndex, currentPositionTicks) => {
 	if (!currentSession) return null;
 
-	// Always disable DirectPlay for audio switching. DirectPlay URLs serve the static
-	// container file and always play the default audio track regardless of AudioStreamIndex.
-	// DirectStream (server-side remux) is quality-identical but honors track selection.
+	// DirectPlay URLs serve the static container file and always play the default audio track
+	// regardless of AudioStreamIndex, so DirectPlay is disabled for audio switching. DirectStream
+	// (server-side remux) is quality-identical but honors track selection. Where the player is known to
+	// open a direct play on the file's first track, going back to that one needs no remux.
+	const firstAudio = (currentSession.mediaSource?.MediaStreams || []).find((s) => s.Type === 'Audio');
+	const backToFirst = currentSession.directPlayOpensFirstAudio && firstAudio?.Index === streamIndex;
 	const newInfo = await getPlaybackInfo(currentSession.itemId, {
 		...currentSession,
 		item: currentSessionItem(),
 		audioStreamIndex: streamIndex,
 		startPositionTicks: currentPositionTicks ?? currentSession.startPositionTicks,
-		enableDirectPlay: false
+		enableDirectPlay: backToFirst && currentSession.allowDirectPlay ? undefined : false
 	});
 
 	return newInfo;
