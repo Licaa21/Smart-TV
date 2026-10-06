@@ -1,5 +1,5 @@
 import {useCallback, useState, useRef, useEffect, memo} from 'react';
-import {initialRowCount, grownRowCount} from '../../utils/rowCap';
+import {initialRowCount, grownRowCount, rememberedRowCount, rememberRowCount} from '../../utils/rowCap';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import Spotlight from '@enact/spotlight';
 import Spottable from '@enact/spotlight/Spottable';
@@ -52,8 +52,11 @@ const MediaRow = ({
 	const scrollTimeoutRef = useRef(null);
 	const rowElementRef = useRef(null);
 	// How many of the cards are drawn. Everything, except on the older sets, where the row starts short.
-	const [shownCount, setShownCount] = useState(null);
+	const [shownCount, setShownCount] = useState(() => rememberedRowCount(rowId || title || rowIndex || ''));
 	const limit = items ? Math.min(items.length, shownCount === null ? initialRowCount(items.length) : shownCount) : 0;
+	useEffect(() => {
+		if (shownCount !== null) rememberRowCount(rowId || title || rowIndex || '', shownCount);
+	}, [shownCount, rowId, title, rowIndex]);
 
 	const keyPrefix = rowId || title || rowIndex || '';
 
@@ -78,21 +81,22 @@ const MediaRow = ({
 
 	const handleFocus = useCallback((e) => {
 		onFocus?.(rowIndex);
-
-		// A hovered card already sits under the cursor, so nudging the lane
-		// would only slide it away from the pointer.
-		if (Spotlight.getPointerMode()) return;
-
-		const card = e.target.closest('.spottable');
 		// The next cards are drawn as focus nears the end of those that are.
-		if (card && card.parentNode && items && items.length > 0) {
-			const focusedIndex = Array.prototype.indexOf.call(card.parentNode.children, card);
+		const grownCard = e.target.closest('.spottable');
+		if (grownCard && grownCard.parentNode && items && items.length > 0) {
+			const focusedIndex = Array.prototype.indexOf.call(grownCard.parentNode.children, grownCard);
 			setShownCount((current) => {
 				const count = Math.min(items.length, current === null ? initialRowCount(items.length) : current);
 				const grown = grownRowCount(count, focusedIndex, items.length);
 				return grown === count ? current : grown;
 			});
 		}
+
+		// A hovered card already sits under the cursor, so nudging the lane
+		// would only slide it away from the pointer.
+		if (Spotlight.getPointerMode()) return;
+
+		const card = e.target.closest('.spottable');
 		const scroller = scrollerRef.current;
 		if (card && scroller) {
 			if (scrollTimeoutRef.current) {

@@ -13,3 +13,11 @@ export const initialRowCount = (total) => (getPerfLevelIndex() >= 3 ? Math.min(t
 export const grownRowCount = (count, focusedIndex, total) => (
 	focusedIndex >= count - NEAR_END ? Math.min(total, count + ROW_STEP) : count
 );
+
+// How many cards each row had drawn when it went away. A row that comes back, as Home's do after a
+// detail screen, starts there, so the card focus is put back on is drawn.
+const drawn = {};
+export const rememberedRowCount = (rowKey) => (drawn[rowKey] === undefined ? null : drawn[rowKey]);
+export const rememberRowCount = (rowKey, count) => {
+	drawn[rowKey] = count;
+};

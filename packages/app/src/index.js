@@ -83,6 +83,12 @@ if (typeof Element !== 'undefined' && !Element.prototype.scrollTo) {
 	['keydown', 'keyup', 'click', 'mouseup', 'touchend'].forEach(function (name) {
 		document.addEventListener(name, schedulePatch, true);
 	});
+	// A knob dragged with a finger or a pressed button moves with the pointer.
+	['mousemove', 'touchmove'].forEach(function (name) {
+		document.addEventListener(name, function (e) {
+			if (name === 'touchmove' || e.buttons) schedulePatch();
+		}, true);
+	});
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', schedulePatch);
