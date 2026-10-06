@@ -66,7 +66,7 @@ const ROW_BOTTOM_MARGIN = 40;
 let shownRowIds = [];
 const rowSpotlightId = (rowIndex) => `discover-row-${shownRowIds[rowIndex]}`;
 
-let lastFocusedRowIndex = null;
+let lastFocusedRowId = null;
 let lastFocusedCardIndex = -1;
 
 // The poster cards are Home's own, in whichever style Home is set to, so they follow its card size,
@@ -428,7 +428,9 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 
 		seerrApi.trending().catch(() => empty).then((data) => {
 			paged('trending', data);
-			put({shortcuts: getShortcuts(data.results || [])});
+			// The studio and network rows need no request, but they are shown with the first row that
+			// does, so the screen is never up with only them and focus does not land on them.
+			put({shortcuts: getShortcuts(data.results || []), studios: MOVIE_STUDIOS, networks: STREAMING_NETWORKS});
 		});
 		seerrApi.trendingMovies(1).catch(() => empty).then((data) => paged('popularMovies', data));
 		seerrApi.trendingTv(1).catch(() => empty).then((data) => paged('popularTv', data));
@@ -436,7 +438,6 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		seerrApi.upcomingTv(1).catch(() => empty).then((data) => paged('upcomingTv', data));
 		seerrApi.getGenreSliderMovies().catch(() => []).then((genres) => put({genreMovies: genres || []}));
 		seerrApi.getGenreSliderTv().catch(() => []).then((genres) => put({genreTv: genres || []}));
-		put({studios: MOVIE_STUDIOS, networks: STREAMING_NETWORKS});
 
 		// Prefer the context user (Moonfin) or fall back to the API user. The requests are drawn as they
 		// come, and again once their missing details have been filled in.
@@ -451,7 +452,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		})();
 
 		return () => { stale = true; };
-	}, [isAuthenticated, contextUser]);
+	}, [isAuthenticated, contextUser?.seerrUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Load more items for a specific row
 	const loadMoreForRow = useCallback(async (rowId) => {
@@ -490,9 +491,9 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 			const newItems = data.results || [];
 			if (newItems.length > 0) {
 				setRows(prev => {
-					const existingIds = new Set(prev[rowId].map(item => item.id));
+					const existingIds = new Set((prev[rowId] || []).map(item => item.id));
 					const uniqueNew = newItems.filter(item => !existingIds.has(item.id));
-					return {...prev, [rowId]: [...prev[rowId], ...uniqueNew.slice(0, ITEMS_PER_PAGE)]};
+					return {...prev, [rowId]: [...(prev[rowId] || []), ...uniqueNew.slice(0, ITEMS_PER_PAGE)]};
 				});
 				setRowPages(prev => ({...prev, [rowId]: nextPage}));
 				setRowHasMore(prev => ({...prev, [rowId]: newItems.length >= 20}));
@@ -536,7 +537,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 
 	const handleSelectItem = useCallback((item, mediaType) => {
 		const type = mediaType || item.media_type || item.mediaType || (item.title ? 'movie' : 'tv');
-		lastFocusedCardIndex = focusedCardIndex(rowSpotlightId(lastFocusedRowIndex), document.activeElement);
+		lastFocusedCardIndex = focusedCardIndex(`discover-row-${lastFocusedRowId}`, document.activeElement);
 		onSelectItem?.({
 			mediaId: item.id,
 			mediaType: type,
@@ -586,8 +587,9 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 	const handleRowFocus = useCallback((rowIndex) => {
 		if (typeof rowIndex === 'number') {
 			// A card index only means anything in the row it came from.
-			if (rowIndex !== lastFocusedRowIndex) lastFocusedCardIndex = -1;
-			lastFocusedRowIndex = rowIndex;
+			const rowId = shownRowIds[rowIndex];
+			if (rowId !== lastFocusedRowId) lastFocusedCardIndex = -1;
+			lastFocusedRowId = rowId;
 		}
 	}, []);
 
@@ -597,13 +599,14 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		if (!isLoading && visibleRows.length > 0 && !initialFocusDoneRef.current) {
 			initialFocusDoneRef.current = true;
 			setTimeout(() => {
-				if (lastFocusedRowIndex !== null && lastFocusedRowIndex < visibleRows.length) {
-					const rowId = rowSpotlightId(lastFocusedRowIndex);
+				const savedIndex = lastFocusedRowId ? shownRowIds.indexOf(lastFocusedRowId) : -1;
+				if (savedIndex >= 0) {
+					const rowId = rowSpotlightId(savedIndex);
 					const card = cardToRestore(rowId, lastFocusedCardIndex);
 					if (!card || !Spotlight.focus(card)) {
 						Spotlight.focus(rowId);
 					}
-					keepRowInView(lastFocusedRowIndex);
+					keepRowInView(savedIndex);
 				} else {
 					Spotlight.focus(rowSpotlightId(0));
 				}
