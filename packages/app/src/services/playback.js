@@ -6,6 +6,7 @@ import {selectCompatibleAlternateAudio} from '../utils/alternateAudio';
 import {serverLogger} from './serverLogger';
 import {TEXT_SUBTITLE_CODECS, isAssSubtitleCodec, isPgsSubtitleCodec, isBurnInSubtitleCodec, isInBandSubtitleTrack} from '../utils/subtitleCodecs';
 import {applyProfileTuning} from '../utils/deviceProfileTuning';
+import {audioChannelCap} from '../utils/audioChannelCap';
 import {findNextInSeason, findNextSeason, findPreviousInSeason, findPreviousSeason, firstPlayableEpisode, lastPlayableEpisode} from '../utils/nextEpisode';
 import {videoRangeTypeOf} from '../utils/videoRange';
 import {getVolumeState, lastVolumeState} from './systemVolume';
@@ -438,6 +439,8 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	const storedSettings = (await getFromStorage('settings')) || {};
 	const passthroughSettings = await getPlaybackAudioSettings(options, storedSettings);
 	const profileOptions = {...options, passthroughSettings};
+	// A stereo cap leaves nothing to upmix to, so the upmix toggle has no effect while it is on
+	const urlOptions = audioChannelCap(storedSettings) === 2 ? {...options, stereoUpmixEnabled: false} : options;
 	const capabilities = await getDeviceCapabilities(profileOptions);
 
 	// Cross-server: use item's server if available
@@ -541,7 +544,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		const playMethod = mediaSource.TranscodingUrl
 			? PlayMethod.Transcode
 			: (mediaSource.SupportsDirectPlay ? PlayMethod.DirectPlay : PlayMethod.DirectStream);
-		const url = buildPlaybackUrl(itemId, mediaSource, playbackInfo.PlaySessionId, playMethod, creds, false, options);
+		const url = buildPlaybackUrl(itemId, mediaSource, playbackInfo.PlaySessionId, playMethod, creds, false, urlOptions);
 		const audioStreams = extractAudioStreams(mediaSource);
 		const subtitleStreams = extractSubtitleStreams(mediaSource, itemId, creds, storedSettings.assDirectPlay === false, null, playMethod);
 
@@ -826,7 +829,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	const hasAudioStream = (mediaSource.MediaStreams || []).some((s) => s.Type === 'Audio');
 	const streamInferredAudio = hasAudioStream && !hasVideoStream;
 	const isAudio = itemAudio || streamInferredAudio;
-	const url = buildPlaybackUrl(itemId, mediaSource, playbackInfo.PlaySessionId, playMethod, creds, isAudio, options);
+	const url = buildPlaybackUrl(itemId, mediaSource, playbackInfo.PlaySessionId, playMethod, creds, isAudio, urlOptions);
 
 	const audioStreams = extractAudioStreams(mediaSource);
 	const subtitleStreams = extractSubtitleStreams(mediaSource, itemId, creds, storedSettings.assDirectPlay === false, url, playMethod);
