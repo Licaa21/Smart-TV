@@ -304,6 +304,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const pendingTracksRef = useRef(null);
 	const lastTrackAttemptRef = useRef(0);
 	const applyPendingTracksRef = useRef(null);
+	const reloadAudioFromServerRef = useRef(null);
 	const activeNativeSubRef = useRef(null);
 	const trackConfirmTimerRef = useRef(null);
 	const currentUrlRef = useRef(null);
@@ -613,6 +614,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					const switched = playingIndex !== tizenIndex;
 					if (switched) avplaySelectTrack('AUDIO', tizenIndex);
 					pending.audioApplied = true;
+					pending.audioWanted = tizenIndex;
 					serverLogger.playback('Audio: initial track set', {
 						jellyfinIndex: pending.audioIndex,
 						tizenIndex,
@@ -641,7 +643,19 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					pending.audioApplied = true;
 				}
 			} catch (e) {
-				if (expired) pending.audioApplied = true;
+				if (!pending.audioFailure) {
+					pending.audioFailure = e?.message || String(e);
+					serverLogger.playbackError('Audio: initial track switch failed', {
+						jellyfinIndex: pending.audioIndex,
+						error: pending.audioFailure
+					});
+				}
+				if (expired) {
+					// the set refused every try, so the file keeps playing on AVPlays own track
+					// while the screen says another one is chosen. The server can build it.
+					pending.audioApplied = true;
+					reloadAudioFromServerRef.current?.(pending.audioIndex);
+				}
 			}
 		}
 
@@ -882,6 +896,20 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			trackConfirmTimerRef.current = null;
 			reassertNativeSubtitle();
 			applyPendingTracksRef.current?.();
+			// a selection can be accepted and still not take, which leaves the wrong track playing
+			const pending = pendingTracksRef.current;
+			if (pending?.audioWanted != null) {
+				const playingIndex = avplayGetCurrentTracks().find((t) => t.type === 'AUDIO')?.index;
+				if (playingIndex != null && playingIndex !== pending.audioWanted) {
+					serverLogger.playbackError('Audio: selected track did not take', {
+						jellyfinIndex: pending.audioIndex,
+						wantedIndex: pending.audioWanted,
+						playingIndex
+					});
+					pending.audioWanted = null;
+					reloadAudioFromServerRef.current?.(pending.audioIndex);
+				}
+			}
 		}, 4000);
 	}, [readyGate, isLiveTV, applyDisplayWindow, handleSubtitleChange, reassertNativeSubtitle, settings.videoStartDelay]);
 
@@ -2459,6 +2487,17 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		closeModal();
 	}, [startSleepTimer, closeModal]);
 
+	// A remux built around the track, for when the set cannot switch to it by itself
+	const reloadAudioFromServer = useCallback(async (index) => {
+		const currentPositionTicks = Math.floor(avplayGetCurrentTime() * 10000);
+		const result = await playback.changeAudioStream(index, currentPositionTicks);
+		if (result) {
+			console.log('[Player] Switching audio track via stream reload, resuming from', currentPositionTicks);
+			await restartFromResult(result, currentPositionTicks);
+		}
+	}, [restartFromResult]);
+	reloadAudioFromServerRef.current = reloadAudioFromServer;
+
 	const applyAudioSelection = useCallback(async (index, shouldClose = true) => {
 		setSelectedAudioIndex(index);
 		// Saved here rather than after the switch, because switching leaves by several
@@ -2500,18 +2539,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				}
 			}
 
-			const currentMs = avplayGetCurrentTime();
-			const currentPositionTicks = Math.floor(currentMs * 10000);
-
-			const result = await playback.changeAudioStream(index, currentPositionTicks);
-			if (result) {
-				console.log('[Player] Switching audio track via stream reload for', playMethod, '- resuming from', currentPositionTicks);
-				await restartFromResult(result, currentPositionTicks);
-			}
+			await reloadAudioFromServer(index);
 		} catch (err) {
 			console.error('[Player] Failed to change audio:', err);
 		}
-	}, [item, playMethod, closeModal, restartFromResult, audioStreams]);
+	}, [item, playMethod, closeModal, reloadAudioFromServer, audioStreams]);
 
 	// Track selection - using data attributes to avoid arrow functions in JSX
 	const handleSelectAudio = useCallback((e) => {
