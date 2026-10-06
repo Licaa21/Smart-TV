@@ -773,7 +773,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					eventType: typeof eventType === 'object' ? JSON.stringify(eventType).slice(0, 300) : String(eventType),
 					playerState: avplayGetState(),
 					selectedAudioStreamIndex: playback.getCurrentSession()?.audioStreamIndex,
-					playMethod: playback.getCurrentSession()?.playMethod
+					playMethod: playback.getCurrentSession()?.playMethod,
+					// which track AVPlay was on when it failed, to tell an undecodable start track from a bad switch
+					playingAudioIndex: avplayGetCurrentTracks().find((t) => t.type === 'AUDIO')?.index,
+					avplayAudioTracks: summarizeAvplayTracks(avplayGetTracks(), 'AUDIO')
 				});
 				handleErrorCallbackRef.current?.();
 			},
@@ -838,28 +841,6 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const startDelayMs = Math.max(0, Number(settings.videoStartDelay || 0) * 1000);
 		if (startDelayMs > 0) {
 			await new Promise((resolve) => setTimeout(resolve, startDelayMs));
-		}
-
-		// AVPlay opens on its own pick of audio track, which for a file with TrueHD first is one
-		// many sets cannot decode, and the failure comes before the switch made once PLAYING.
-		// Choosing the track now, while READY, lets it start on the right one where the firmware
-		// accepts that. Where it does not, the selection is dropped and the PLAYING one still runs.
-		const earlyAudio = pendingTracksRef.current;
-		if (earlyAudio && !earlyAudio.audioApplied && earlyAudio.audioIndex != null) {
-			try {
-				const tizenIndex = mapJellyfinTrackToTizen(avplayGetTracks(), earlyAudio.audioStreams, 'AUDIO', earlyAudio.audioIndex);
-				if (tizenIndex != null) {
-					avplaySelectTrack('AUDIO', tizenIndex);
-					serverLogger.playback('Audio: selected before play', {
-						jellyfinIndex: earlyAudio.audioIndex,
-						tizenIndex
-					});
-				}
-			} catch (earlyErr) {
-				serverLogger.playback('Audio: selection before play was refused', {
-					error: earlyErr?.message || String(earlyErr)
-				});
-			}
 		}
 
 		playIssued = true;
