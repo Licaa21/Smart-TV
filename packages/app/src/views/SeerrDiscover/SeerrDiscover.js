@@ -205,7 +205,8 @@ const DiscoverRow = memo(function DiscoverRow({
 	onRowInView,
 	spotlightId,
 	modern,
-	serverUrl
+	serverUrl,
+	rowSpacing
 }) {
 	const scrollerRef = useRef(null);
 	// A modern card opens up to show its details while it holds focus, which the row has to know.
@@ -317,7 +318,11 @@ const DiscoverRow = memo(function DiscoverRow({
 	}, [config.type, config.mediaType, items, onSelectItem, onSelectGenre, onSelectNetwork, onSelectStudio, onOpenShortcut, onFocusItem, handleCardFocus, focusedId, modern, serverUrl]);
 
 	return (
-		<div className={css.contentRow} data-row-index={rowIndex}>
+		<div
+			className={css.contentRow}
+			data-row-index={rowIndex}
+			style={typeof rowSpacing === 'number' ? {marginBottom: rowSpacing} : undefined}
+		>
 			<h2 className={css.rowTitle}>{config.title}</h2>
 			<div className={css.rowScroller} ref={scrollerRef}>
 				<RowContainer
@@ -349,6 +354,14 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 	const {serverUrl} = useAuth();
 	const {settings} = useSettings();
 	const useModernCards = settings.homeRowsStyle !== 'v1';
+	// Home puts the focused title's details above the rows only in its classic layout, and a modern
+	// card carries its own. With the band in the way a screen holds one row, so this follows Home.
+	const showDetailSection = !useModernCards && settings.homeRowOverlay !== false;
+	// The other clients size these sliders in their own units, so the stored value lands here as the
+	// space below each row, the way Home works it out.
+	const rowSpacing = settings.fullScreenRows ? null : useModernCards
+		? Math.max(0, Math.min(Math.max((settings.modernHomeRowsPadding ?? 460) - 400, -40), 200) - 34)
+		: Math.max(0, settings.classicHomeRowsPadding ?? 30);
 	const [rows, setRows] = useState({});
 	const [rowPages, setRowPages] = useState({});
 	const [rowHasMore, setRowHasMore] = useState({});
@@ -651,7 +664,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		<div className={css.container}>
 			{!isLoading && isAuthenticated && onOpenRequests && (
 				<SpottableDiv
-					className={`${css.requestsPill} ${settings.navbarPosition === 'left' ? '' : css.requestsPillBelowNav}`}
+					className={`${css.requestsPill} ${settings.navbarPosition === 'left' ? '' : (showDetailSection ? css.requestsPillBelowNav : css.requestsPillInBar)}`}
 					spotlightId="discover-requests-pill"
 					onClick={onOpenRequests}
 					onKeyDown={handleRequestsPillKeyDown}
@@ -664,8 +677,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 				<LoadingSpinner />
 			) : (
 				<div className={`${css.mainContent} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>
-					{/* Detail section for focused item - always present for consistent split view */}
-					<div className={css.detailSection}>
+					{showDetailSection && <div className={css.detailSection}>
 						{focusedItem && (focusedItem.title || focusedItem.name) ? (
 							<>
 								<h2 className={css.detailTitle}>{focusedItem.title || focusedItem.name}</h2>
@@ -686,8 +698,11 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 						) : (
 							<h2 className={css.detailTitle}>{$L('Discover')}</h2>
 						)}
-					</div>
-					<div className={css.rowsContainer} ref={rowsContainerRef}>
+					</div>}
+					<div
+						className={`${css.rowsContainer} ${showDetailSection || settings.navbarPosition === 'left' ? '' : css.rowsBelowNav}`}
+						ref={rowsContainerRef}
+					>
 						{visibleRows.map((config, index) => (
 							<DiscoverRow
 								key={config.id}
@@ -709,6 +724,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 								spotlightId={`discover-row-${config.id}`}
 								modern={useModernCards}
 								serverUrl={serverUrl}
+								rowSpacing={rowSpacing}
 							/>
 						))}
 					</div>
