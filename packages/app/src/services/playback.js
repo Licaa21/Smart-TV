@@ -815,6 +815,12 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		console.log('[playback] After forcing transcode - TranscodingUrl:', mediaSource.TranscodingUrl ? 'present' : 'none');
 	}
 
+	// A repair that no one asked for, like putting a wrong audio track right, is not worth a re-encode of
+	// the picture. It is refused before the session is replaced, so the stream that plays stays described.
+	if (options.refuseVideoReencode && playMethod === PlayMethod.Transcode && !isAudioOnlyRemuxTranscode(mediaSource)) {
+		throw Object.assign(new Error('The server would re-encode the picture'), {code: 'REENCODE_REFUSED'});
+	}
+
 	const itemAudio = options.item?.MediaType === 'Audio' || options.item?.Type === 'Audio';
 	const hasVideoStream = (mediaSource.MediaStreams || []).some((s) => s.Type === 'Video');
 	const hasAudioStream = (mediaSource.MediaStreams || []).some((s) => s.Type === 'Audio');
@@ -1270,7 +1276,7 @@ export const getPreviousEpisode = async (item) => {
 	}
 };
 
-export const changeAudioStream = async (streamIndex, currentPositionTicks) => {
+export const changeAudioStream = async (streamIndex, currentPositionTicks, {refuseVideoReencode = false} = {}) => {
 	if (!currentSession) return null;
 
 	// DirectPlay URLs serve the static container file and always play the default audio track
@@ -1284,7 +1290,8 @@ export const changeAudioStream = async (streamIndex, currentPositionTicks) => {
 		item: currentSessionItem(),
 		audioStreamIndex: streamIndex,
 		startPositionTicks: currentPositionTicks ?? currentSession.startPositionTicks,
-		enableDirectPlay: backToFirst && currentSession.allowDirectPlay ? undefined : false
+		enableDirectPlay: backToFirst && currentSession.allowDirectPlay ? undefined : false,
+		refuseVideoReencode
 	});
 
 	return newInfo;

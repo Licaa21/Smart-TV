@@ -155,6 +155,16 @@ describe('direct play and the audio track', () => {
 		expect(api.getPlaybackInfo.mock.calls[api.getPlaybackInfo.mock.calls.length - 1][1].EnableDirectPlay).toBe(false);
 	});
 
+	test('a repair is refused when the server would re-encode the picture, and the session stays', async () => {
+		mockPlayMethod.mockImplementation((source) => (source.SupportsDirectPlay ? 'DirectPlay' : 'Transcode'));
+		api.getPlaybackInfo.mockResolvedValueOnce(direct(4)).mockResolvedValueOnce(remux(6, 'hevc'));
+		await playback.getPlaybackInfo(episode.Id, {item: episode, directPlayOpensFirstAudio: true});
+		await expect(playback.changeAudioStream(6, 0, {refuseVideoReencode: true})).rejects.toMatchObject({code: 'REENCODE_REFUSED'});
+		// a manual pick takes whatever the server builds
+		api.getPlaybackInfo.mockResolvedValueOnce(remux(6, 'hevc'));
+		await expect(playback.changeAudioStream(6, 0)).resolves.toMatchObject({playMethod: 'Transcode'});
+	});
+
 	test('a later reload of the same item keeps the rule through the session', async () => {
 		api.getPlaybackInfo.mockResolvedValueOnce(direct(4)).mockResolvedValueOnce(direct(6)).mockResolvedValueOnce(remux(6));
 		await playback.getPlaybackInfo(episode.Id, {item: episode, directPlayOpensFirstAudio: true});

@@ -2637,11 +2637,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	}, [startSleepTimer, closeModal]);
 
 	// A remux built around the track, for when the set cannot switch to it by itself
-	const reloadAudioFromServer = useCallback(async (index) => {
+	const reloadAudioFromServer = useCallback(async (index, refuseVideoReencode = false) => {
 		audioReloadedAtRef.current = Date.now();
 		const generation = loadGenerationRef.current;
 		const currentPositionTicks = Math.floor(avplayGetCurrentTime() * 10000);
-		const result = await playback.changeAudioStream(index, currentPositionTicks);
+		const result = await playback.changeAudioStream(index, currentPositionTicks, {refuseVideoReencode});
 		// the player was left or moved on to another item while the server answered
 		if (isUnmountedRef.current || generation !== loadGenerationRef.current) return;
 		if (result) {
@@ -2652,11 +2652,17 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// The automatic callers leave a group alone, since a local reload would pull this one out of step
 	reloadAudioFromServerRef.current = (index) => {
 		if (isInGroupRef.current) return;
-		reloadAudioFromServer(index).catch((err) => {
+		// nobody asked for this one, so it is not worth a re-encode of the picture
+		reloadAudioFromServer(index, true).catch((err) => {
 			// a failed reload does not hold the check back from asking again
 			audioReloadedAtRef.current = 0;
 			audioVerifyAskedRef.current = false;
 			console.error('[Player] Failed to change audio:', err);
+			serverLogger.playbackError('Audio: putting the track right from the server did not happen', {
+				jellyfinIndex: index,
+				refused: err?.code === 'REENCODE_REFUSED',
+				error: err?.message || String(err)
+			});
 		});
 	};
 
