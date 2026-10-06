@@ -856,10 +856,6 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		} else {
 			avplayPlay();
 			setIsPaused(false);
-			// AVPlay opens on its own pick of audio track, TrueHD first in some files, and a set that
-			// cannot decode it fails within a second. The firmware refuses a selection while READY, so
-			// it is made the moment play is issued instead of at the first playback event.
-			applyPendingTracksRef.current?.();
 		}
 		if (pendingTracksRef.current) {
 			pendingTracksRef.current.deadline = Date.now() + 5000;
