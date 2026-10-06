@@ -158,7 +158,13 @@ namespace Moonfin.Xbox
                 core.NewWindowRequested += OnNewWindowRequested;
                 core.LaunchingExternalUriScheme += OnLaunchingExternalUriScheme;
                 core.ServerCertificateErrorDetected += OnServerCertificateError;
-                core.AddWebResourceRequestedFilter(CorsRelay.Filter, CoreWebView2WebResourceContext.All);
+                // Only what script asks for, which leaves the video element to fetch the
+                // muxed file from the same hosts by itself.
+                foreach (string filter in CorsRelay.Filters)
+                {
+                    core.AddWebResourceRequestedFilter(filter, CoreWebView2WebResourceContext.XmlHttpRequest);
+                    core.AddWebResourceRequestedFilter(filter, CoreWebView2WebResourceContext.Fetch);
+                }
                 core.WebResourceRequested += OnWebResourceRequested;
                 core.ProcessFailed += OnProcessFailed;
 

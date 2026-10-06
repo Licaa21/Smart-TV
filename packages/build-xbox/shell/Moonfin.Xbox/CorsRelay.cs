@@ -10,26 +10,46 @@ namespace Moonfin.Xbox
 {
     // Requests the page may read across origins although the far side doesnt say so.
     //
-    // On the TVs an app's page isnt held to CORS, and the app counts on that in one
-    // place: it asks YouTube's player API where a trailer's stream is, and YouTube
-    // answers without the header that would let a web page read the reply. The
-    // WebView here does hold the page to CORS, so that one request is made by the
-    // host instead and handed back with the header in place. Nothing else is
-    // relayed, and nothing of the user's goes along: no cookies, and only the
+    // On the TVs an app's page isnt held to CORS, and the app counts on that for
+    // trailers: it asks YouTube's player API where a trailer's stream is, then reads
+    // the stream's playlists and segments itself. YouTube answers none of those with
+    // the header that would let a web page read them, and the WebView here does hold
+    // the page to CORS, so the host makes those requests and hands them back with the
+    // header in place. Nothing of the user's goes along: no cookies, and only the
     // content type and user agent of what the page sent.
     internal static class CorsRelay
     {
         // What the WebView is told to bring here.
-        public const string Filter = "https://www.youtube.com/youtubei/v1/*";
+        public static readonly string[] Filters = { "https://www.youtube.com/youtubei/v1/*", "https://manifest.googlevideo.com/*", "https://*.googlevideo.com/videoplayback*" };
 
-        private const string AllowedPrefix = "https://www.youtube.com/youtubei/v1/";
+        private const string PlayerHost = "www.youtube.com";
+        private const string PlayerPath = "/youtubei/v1/";
+        private const string PlaylistHost = "manifest.googlevideo.com";
+        private const string SegmentHostSuffix = ".googlevideo.com";
+        private const string SegmentPath = "/videoplayback";
         private const uint MaxRequestBytes = 64 * 1024;
-        private const uint MaxResponseBytes = 4 * 1024 * 1024;
-        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
+        private const uint MaxResponseBytes = 24 * 1024 * 1024;
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
 
+        // Shared, so a trailer's segments reuse a connection instead of each opening its own.
+        private static readonly HttpClient Client = CreateClient();
+
+        private static HttpClient CreateClient()
+        {
+            var filter = new HttpBaseProtocolFilter();
+            filter.CookieUsageBehavior = HttpCookieUsageBehavior.NoCookies;
+            filter.CacheControl.ReadBehavior = HttpCacheReadBehavior.NoCache;
+            filter.CacheControl.WriteBehavior = HttpCacheWriteBehavior.NoCache;
+            return new HttpClient(filter);
+        }
+
+        // A filter's wildcard also matches inside a path, so the address is taken apart here.
         public static bool Handles(string address)
         {
-            return address != null && address.StartsWith(AllowedPrefix, StringComparison.OrdinalIgnoreCase);
+            if (!Uri.TryCreate(address, UriKind.Absolute, out Uri uri) || uri.Scheme != "https") return false;
+            if (uri.Host == PlayerHost) return uri.AbsolutePath.StartsWith(PlayerPath, StringComparison.Ordinal);
+            if (uri.Host == PlaylistHost) return true;
+            return uri.Host.EndsWith(SegmentHostSuffix, StringComparison.Ordinal) && uri.AbsolutePath.StartsWith(SegmentPath, StringComparison.Ordinal);
         }
 
         // Null when the request couldnt be relayed, which leaves it to the WebView.
@@ -37,39 +57,25 @@ namespace Moonfin.Xbox
         {
             try
             {
-                using (var filter = new HttpBaseProtocolFilter())
+                using (var outgoing = new HttpRequestMessage(new HttpMethod(request.Method), new Uri(request.Uri)))
+                using (var cancel = new CancellationTokenSource(Timeout))
                 {
-                    filter.CookieUsageBehavior = HttpCookieUsageBehavior.NoCookies;
-                    filter.CacheControl.ReadBehavior = HttpCacheReadBehavior.NoCache;
-                    filter.CacheControl.WriteBehavior = HttpCacheWriteBehavior.NoCache;
+                    string userAgent = Header(request, "User-Agent");
+                    if (userAgent != null) outgoing.Headers.TryAppendWithoutValidation("User-Agent", userAgent);
 
-                    using (var client = new HttpClient(filter))
-                    using (var outgoing = new HttpRequestMessage(new HttpMethod(request.Method), new Uri(request.Uri)))
-                    using (var cancel = new CancellationTokenSource(Timeout))
+                    IBuffer body = await ReadAsync(request.Content, MaxRequestBytes);
+                    if (body != null)
                     {
-                        string userAgent = Header(request, "User-Agent");
-                        if (userAgent != null) outgoing.Headers.TryAppendWithoutValidation("User-Agent", userAgent);
+                        var content = new HttpBufferContent(body);
+                        content.Headers.TryAppendWithoutValidation("Content-Type", Header(request, "Content-Type") ?? "text/plain;charset=UTF-8");
+                        outgoing.Content = content;
+                    }
 
-                        IBuffer body = await ReadAsync(request.Content, MaxRequestBytes);
-                        if (body != null)
-                        {
-                            var content = new HttpBufferContent(body);
-                            content.Headers.TryAppendWithoutValidation("Content-Type", Header(request, "Content-Type") ?? "text/plain;charset=UTF-8");
-                            outgoing.Content = content;
-                        }
-
-                        HttpResponseMessage answer = await client.SendRequestAsync(outgoing).AsTask(cancel.Token);
-                        IBuffer answerBody = await answer.Content.ReadAsBufferAsync().AsTask(cancel.Token);
-                        if (answerBody.Length > MaxResponseBytes) return null;
-
+                    using (HttpResponseMessage answer = await Client.SendRequestAsync(outgoing).AsTask(cancel.Token))
+                    {
                         var stream = new InMemoryRandomAccessStream();
-                        using (var writer = new DataWriter(stream))
-                        {
-                            writer.WriteBuffer(answerBody);
-                            await writer.StoreAsync();
-                            await writer.FlushAsync();
-                            writer.DetachStream();
-                        }
+                        await answer.Content.WriteToStreamAsync(stream).AsTask(cancel.Token);
+                        if (stream.Size > MaxResponseBytes) return null;
                         stream.Seek(0);
 
                         // The WebView wants the headers one to a line, and a reason even where
