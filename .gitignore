@@ -19,3 +19,25 @@ dist
 .DS_Store
 .vscode
 *.log
+
+# --- files a checkout of this fork collects, none of which belong in a branch ---
+# photos, screenshots and tester logs dropped in the repo root
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
+/*.webp
+/*.txt
+/*.log
+/screenshots/
+# local work areas, tool output and notes
+/local/
+.playwright-mcp/
+.remember/
+.claude/
+CLAUDE.md
+*.bundle
+# one folder per branch lives inside the main checkout
+/implement/
+/daily/
+/pr-*/
