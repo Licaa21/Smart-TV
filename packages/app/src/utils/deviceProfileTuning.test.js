@@ -134,23 +134,23 @@ describe('applyProfileTuning', () => {
 
 		it('stays out of the list while the setting is off', () => {
 			const original = hevc();
-			expect(applyProfileTuning(original, {}, {hdr10: true})).toBe(original);
+			expect(applyProfileTuning(original, {}, {uhd8K: true, hdr10: true})).toBe(original);
 		});
 
 		it('is added for a set that reports HDR10 when the setting is on', () => {
-			expect(rangeTypes(applyProfileTuning(hevc(), {dolbyVisionAsHdr10: true}, {hdr10: true}))).toEqual(['SDR', 'HDR10', 'DOVIWithEL']);
-			expect(rangeTypes(applyProfileTuning(hevc(), {dolbyVisionAsHdr10: true}, {hdr10: true, hdr10Plus: true}))).toEqual(['SDR', 'HDR10', 'DOVIWithEL', 'DOVIWithELHDR10Plus']);
+			expect(rangeTypes(applyProfileTuning(hevc(), {dolbyVisionAsHdr10: true}, {uhd8K: true, hdr10: true}))).toEqual(['SDR', 'HDR10', 'DOVIWithEL']);
+			expect(rangeTypes(applyProfileTuning(hevc(), {dolbyVisionAsHdr10: true}, {uhd8K: true, hdr10: true, hdr10Plus: true}))).toEqual(['SDR', 'HDR10', 'DOVIWithEL', 'DOVIWithELHDR10Plus']);
 		});
 
 		it('is not added for a set with no HDR10 base to play', () => {
 			const original = hevc();
-			expect(applyProfileTuning(original, {dolbyVisionAsHdr10: true}, {hdr10: false})).toBe(original);
+			expect(applyProfileTuning(original, {dolbyVisionAsHdr10: true}, {uhd8K: true, hdr10: false})).toBe(original);
 			expect(applyProfileTuning(original, {dolbyVisionAsHdr10: true})).toBe(original);
 		});
 
 		it('is not listed twice', () => {
 			const withEl = {...hevc(), CodecProfiles: [{Type: 'Video', Codec: 'hevc', Conditions: [{Condition: 'EqualsAny', Property: 'VideoRangeType', Value: 'SDR|DOVIWithEL', IsRequired: false}]}]};
-			expect(rangeTypes(applyProfileTuning(withEl, {dolbyVisionAsHdr10: true}, {hdr10: true}))).toEqual(['SDR', 'DOVIWithEL']);
+			expect(rangeTypes(applyProfileTuning(withEl, {dolbyVisionAsHdr10: true}, {uhd8K: true, hdr10: true}))).toEqual(['SDR', 'DOVIWithEL']);
 		});
 	});
 });

@@ -217,7 +217,7 @@ const DetailActionButtons = ({
 				<div className={css.btnAction}>
 					<BtnIcon path={DETAIL_ICON_PATHS.series}/>
 				</div>
-				<span className={css.btnLabel}>{$L('Series')}</span>
+				<span className={css.btnLabel}>{$L({key: 'Series button', value: 'Series'})}</span>
 			</SpottableDiv>
 		)},
 		{id: 'playlist', when: true, render: () => (
