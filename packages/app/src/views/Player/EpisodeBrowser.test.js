@@ -33,6 +33,12 @@ jest.mock('../../utils/spotlightContainers', () => {
 jest.mock('@enact/spotlight', () => ({__esModule: true, default: {focus: jest.fn(() => true), getPointerMode: () => false}}));
 jest.mock('../../services/jellyfinApi', () => ({getServerUrl: () => 'http://server'}));
 
+// Each row asks the server for its own pills, which is not what these tests are about.
+jest.mock('../../components/AnimeMarkerPills', () => {
+	const React = require('react');
+	return {AnimeEpisodePills: ({episode: row, serverUrl}) => React.createElement('span', {'data-pills': row.Id, 'data-server': serverUrl})};
+});
+
 let mockSettings;
 jest.mock('../../context/SettingsContext', () => ({useSettings: () => ({settings: mockSettings})}));
 
@@ -65,6 +71,14 @@ beforeEach(() => {
 const open = (props = {}) => render(<EpisodeBrowser item={item} onSelect={jest.fn()} onClose={jest.fn()} {...props} />);
 
 describe('EpisodeBrowser', () => {
+	it('gives every episode row its anime pills, asked of the server the episode came from', () => {
+		mockEpisodes.episodes[1] = {...mockEpisodes.episodes[1], _serverUrl: 'http://other'};
+		open();
+		expect(count('[data-pills]')).toBe(3);
+		expect(document.querySelector('[data-pills="e1"]').getAttribute('data-server')).toBe('http://server');
+		expect(document.querySelector('[data-pills="e2"]').getAttribute('data-server')).toBe('http://other');
+	});
+
 	it('lists the series, its seasons and each episode with its season, number, title and description', () => {
 		open();
 		expect(screen.getByText('The Show')).toBeTruthy();
