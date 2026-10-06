@@ -1,5 +1,5 @@
-# One branch per open pull request, in the order they are merged into fork/daily.
-# 497 carries 494, so 494 goes first. Add a line when a PR is opened and remove it once it is merged upstream.
+# The branches merged into fork/daily, in this order. This fork is a personal build, so none of them need to be an open pull request.
+# fork/accent-skip-episode-full is the whole of what PR 494 used to carry. The PR itself now holds only the episode browser.
 fix/av1-fmp4-fallback
 fix/tizen-avplay-restore-black-screen
 fork/accent-skip-episode-full
