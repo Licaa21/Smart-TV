@@ -180,8 +180,10 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 - **Diagnostic log:** the in-app log keeps its recent non-network lines across restarts, so a report still has them after the app reopens.
 - **Romanian:** strings added by this fork are translated by hand in `packages/app/resources/ro/strings.json`, since this fork has no Weblate project.
 
-### Building and updating
+### Branches and updating
 
-`fork/daily` is upstream `main` with the branches listed in `fork-tools/pr-branches.txt` merged on top. To refresh it after upstream moves, run `bash fork-tools/rebuild-daily.sh` and then build as described in [Building](#building). The Tizen package is named after the version, for example `Moonfin_Tizen_Regular_2.9.0.wgt`.
+- `main` mirrors upstream Moonfin and carries nothing of mine.
+- `daily` is the branch I use: upstream plus every change listed above. It's a normal long-lived branch, so my changes are committed on it directly.
+- To pick up upstream's latest, run `bash fork-tools/update-from-upstream.sh` on `daily`, then build as described in [Building](#building). The Tizen package is named after the version, for example `Moonfin_Tizen_Regular_2.9.0.wgt`.
 
-The only change I proposed upstream is the episode browser ([#494](https://github.com/Moonfin-Client/Smart-TV/pull/494)).
+The only change I proposed upstream is the episode browser ([#494](https://github.com/Moonfin-Client/Smart-TV/pull/494)), which lives on its own branch while the pull request is open.
