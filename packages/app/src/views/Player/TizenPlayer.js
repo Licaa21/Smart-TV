@@ -149,6 +149,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// as already under way, never sends the seek, and holds the others until
 	// the film catches up with them.
 	const groupHoldRef = useRef(isInGroup);
+	const isInGroupRef = useRef(isInGroup);
+	isInGroupRef.current = isInGroup;
 	// A seek the group commanded, until AVPlay reports it landed or the
 	// backstop stops waiting for it.
 	const groupSeekPendingRef = useRef(null);
@@ -2489,17 +2491,25 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	// A remux built around the track, for when the set cannot switch to it by itself
 	const reloadAudioFromServer = useCallback(async (index) => {
+		const generation = loadGenerationRef.current;
 		const currentPositionTicks = Math.floor(avplayGetCurrentTime() * 10000);
 		const result = await playback.changeAudioStream(index, currentPositionTicks);
+		// the player was left or moved on to another item while the server answered
+		if (isUnmountedRef.current || generation !== loadGenerationRef.current) return;
 		if (result) {
 			console.log('[Player] Switching audio track via stream reload, resuming from', currentPositionTicks);
 			await restartFromResult(result, currentPositionTicks);
 		}
 	}, [restartFromResult]);
-	reloadAudioFromServerRef.current = reloadAudioFromServer;
+	// The automatic callers leave a group alone, since a local reload would pull this one out of step
+	reloadAudioFromServerRef.current = (index) => {
+		if (isInGroupRef.current) return;
+		reloadAudioFromServer(index).catch((err) => console.error('[Player] Failed to change audio:', err));
+	};
 
 	const applyAudioSelection = useCallback(async (index, shouldClose = true) => {
 		setSelectedAudioIndex(index);
+		if (pendingTracksRef.current) pendingTracksRef.current.audioWanted = null;
 		// Saved here rather than after the switch, because switching leaves by several
 		// routes and the choice was made either way.
 		saveAudioPref(item, index, audioStreams || []);
