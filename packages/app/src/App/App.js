@@ -991,7 +991,10 @@ const AppContent = (props) => {
 		if (syncPlayDialogOpen && isSyncPlayInGroup && panelIndex === PANELS.PLAYER) closeSyncPlay();
 	}, [syncPlayDialogOpen, isSyncPlayInGroup, panelIndex, closeSyncPlay]);
 
-	const handlePlayNext = useCallback((item) => {
+	// Moving on to another item from inside the player. The next episode starts at the top, and
+	// one the viewer picked by hand from the episode browser passes `resume` so an episode they
+	// were part way through carries on from where it stopped.
+	const handlePlayNext = useCallback((item, options) => {
 		setPlayingItem(item);
 		setPlaybackOptions(prev => {
 			if (prev?.audioPlaylist?.some(t => t.Id === item.Id)) {
@@ -1005,17 +1008,28 @@ const AppContent = (props) => {
 			}
 			return null;
 		});
-		setIsResume(false);
+		setIsResume(options?.resume === true);
 	}, []);
 
 	const handlePlayerEnd = useCallback(() => {
+		// Episodes played on from inside the player (next episode, the episode browser) leave the
+		// episode page underneath on the one it was opened for, so back lands on the episode that
+		// was actually last playing. Only an episode page follows: a series or movie page stays put.
+		if (
+			panelHistory[panelHistory.length - 1] === PANELS.DETAILS &&
+			selectedItem?.Type === 'Episode' &&
+			playingItem?.Type === 'Episode' &&
+			playingItem.Id !== selectedItem.Id
+		) {
+			setSelectedItem(playingItem);
+		}
 		setIsPlayerPaused(false);
 		setPlayingItem(null);
 		setPlaybackOptions(null);
 		setIsResume(false);
 		handleBack();
 		window.dispatchEvent(new CustomEvent('moonfin:browseRefresh'));
-	}, [handleBack]);
+	}, [handleBack, panelHistory, selectedItem, playingItem]);
 
 	// The guide button on the live TV OSD always lands on the guide, not wherever
 	// playback was launched from. When the player was opened from the guide its
