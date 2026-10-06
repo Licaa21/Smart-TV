@@ -28,6 +28,7 @@ import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTi
 import {getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
+import {audioStartNeedsServer} from '../../utils/audioStartPlan';
 import {applyResumeRewind, skipBackSeconds, skipForwardSeconds, zoomInternalFromSetting, zoomSettingFromInternal} from '../../utils/playbackTuning';
 import {saveAudioPref, saveSubtitlePref} from '../../services/subtitlePrefs';
 import {resolveSeriesAudio} from './initialAudio';
@@ -1666,9 +1667,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const wantedAudio = initialAudioIndex != null
 					? result.audioStreams?.find((s) => s.index === initialAudioIndex)
 					: autoAudio;
-				const audioNeedsServer = Boolean(wantedAudio && !isLiveTV
-					&& result.playMethod === playback.PlayMethod.DirectPlay && !playbackInfoOptions.forceDirectPlay
-					&& result.audioStreams?.[0] && wantedAudio.index !== result.audioStreams[0].index);
+				const audioNeedsServer = audioStartNeedsServer({
+					wanted: wantedAudio,
+					audioStreams: result.audioStreams,
+					forceDirectPlay: playbackInfoOptions.forceDirectPlay,
+					isLiveTV
+				});
 				serverLogger.playback('Audio: start decision', {
 					initialAudioIndex: initialAudioIndex ?? null,
 					wantedIndex: wantedAudio?.index ?? null,
@@ -1676,6 +1680,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					playMethod: result.playMethod,
 					forceDirectPlay: Boolean(playbackInfoOptions.forceDirectPlay),
 					isLiveTV: Boolean(isLiveTV),
+					selectedAudioStreamIndex: result.selectedAudioStreamIndex ?? null,
 					needsServer: audioNeedsServer
 				});
 				if (audioNeedsServer) {
@@ -1696,8 +1701,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						if (!stillCurrent()) return;
 						result = renegotiated;
 						applyPlaybackResult(result);
-						// Force Direct Play can keep it direct, and then the player has to switch
-						audioNegotiated = !audioNeedsServer || result.playMethod !== playback.PlayMethod.DirectPlay;
+						// Direct play again, whatever was asked, leaves the switch to the player
+						audioNegotiated = result.playMethod !== playback.PlayMethod.DirectPlay;
+						serverLogger.playback('Audio: starting track negotiated', {
+							jellyfinIndex: wantedAudio.index,
+							playMethod: result.playMethod,
+							selectedAudioStreamIndex: result.selectedAudioStreamIndex,
+							leftToThePlayer: !audioNegotiated
+						});
 					} catch (err) {
 						console.error('[Player] Audio track negotiation failed:', err);
 					}
