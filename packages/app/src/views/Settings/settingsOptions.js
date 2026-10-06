@@ -396,6 +396,7 @@ export const getSubtitleModeOptions = () => [
 	{ value: 'default', label: $L('Flagged') },
 	{ value: 'always', label: $L('Always') },
 	{ value: 'foreign', label: $L('Foreign') },
+	{ value: 'preferred', label: $L('Preferred Languages') },
 	{ value: 'forced', label: $L('Forced') },
 	{ value: 'none', label: $L('None') }
 ];

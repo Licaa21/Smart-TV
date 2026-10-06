@@ -63,6 +63,9 @@ export const bestSubtitle = (streams, preferredLanguage, options = {}) => {
 		keep = (stream) => stream.isDefault === true ||
 			stream.isForced === true ||
 			(bothUnavailable && languageMatches(stream.language, 'eng'));
+	} else if (subtitleMode === 'preferred') {
+		// Only the two languages that were chosen, so a file with neither gets none.
+		keep = (stream) => languageMatches(stream.language, preferredLanguage) || languageMatches(stream.language, fallbackLanguage);
 	} else {
 		keep = () => true;
 	}
@@ -185,6 +188,10 @@ export const resolveInitialSubtitle = async (result, item, initialSubtitleIndex,
 
 	if (settings.subtitleMode === 'always') {
 		return pick('always') || null;
+	}
+
+	if (settings.subtitleMode === 'preferred') {
+		return pick('preferred') || null;
 	}
 
 	if (settings.subtitleMode === 'foreign') {
