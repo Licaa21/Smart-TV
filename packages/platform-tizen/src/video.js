@@ -952,7 +952,7 @@ export const avplaySelectTrack = (type, index) => {
 	if (!isAVPlayAvailable) return;
 	try {
 		// type: 'AUDIO' or 'TEXT' (subtitle), per Samsung AVPlayStreamType enum
-		// Requires PLAYING or PAUSED state (not READY)
+		// Documented for PLAYING or PAUSED. READY is tried before play and may throw on some firmware
 		webapis.avplay.setSelectTrack(type, index);
 		console.log(`[tizenVideo] Selected ${type} track index: ${index}`);
 	} catch (e) {

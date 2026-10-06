@@ -848,11 +848,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (earlyAudio && !earlyAudio.audioApplied && earlyAudio.audioIndex != null) {
 			try {
 				const tizenIndex = mapJellyfinTrackToTizen(avplayGetTracks(), earlyAudio.audioStreams, 'AUDIO', earlyAudio.audioIndex);
-				if (tizenIndex != null) avplaySelectTrack('AUDIO', tizenIndex);
-				serverLogger.playback('Audio: selected before play', {
-					jellyfinIndex: earlyAudio.audioIndex,
-					tizenIndex
-				});
+				if (tizenIndex != null) {
+					avplaySelectTrack('AUDIO', tizenIndex);
+					serverLogger.playback('Audio: selected before play', {
+						jellyfinIndex: earlyAudio.audioIndex,
+						tizenIndex
+					});
+				}
 			} catch (earlyErr) {
 				serverLogger.playback('Audio: selection before play was refused', {
 					error: earlyErr?.message || String(earlyErr)
