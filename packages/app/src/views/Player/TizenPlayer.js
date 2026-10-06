@@ -1705,14 +1705,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					try {
 						playbackInfoOptions.audioStreamIndex = wantedAudio.index;
 						// a pick made on the details screen was already asked of the server by the first request
-						if (audioNeedsServer) {
-							playbackInfoOptions.enableDirectPlay = false;
-							// the track is not worth a re-encode of the picture, so a 4K or HDR file keeps its direct play
-							playbackInfoOptions.refuseVideoReencode = true;
-						}
+						if (audioNeedsServer) playbackInfoOptions.enableDirectPlay = false;
 						// the same version the first answer chose, so the track index means the same stream
 						if (result.mediaSourceId) playbackInfoOptions.mediaSourceId = result.mediaSourceId;
-						const renegotiated = await playback.getPlaybackInfo(item.Id, playbackInfoOptions);
+						const renegotiated = await playback.getPlaybackInfo(item.Id, audioNeedsServer ? {...playbackInfoOptions, refuseVideoReencode: true} : playbackInfoOptions);
 						if (!stillCurrent()) return;
 						result = renegotiated;
 						applyPlaybackResult(result);
