@@ -1,4 +1,4 @@
-import {trimLogBuffer} from './logBuffer';
+import {persistableLines, restoreLines, trimLogBuffer} from './logBuffer';
 
 const request = (n) => ({category: 'Network', level: 'Debug', n});
 const other = (n) => ({category: 'Playback', level: 'Information', n});
@@ -25,5 +25,32 @@ describe('trimLogBuffer', () => {
 	test('leaves a buffer that fits alone', () => {
 		const buffer = [request(1), other(2)];
 		expect(trimLogBuffer(buffer, 5, isRequestLine)).toEqual([request(1), other(2)]);
+	});
+});
+
+describe('keeping the report across a restart', () => {
+	test('persists only the lines that are not requests, without the device block', () => {
+		const line = (n, extra = {}) => ({timestamp: `t${n}`, level: 'Information', category: 'Playback', message: `m${n}`, context: {}, ...extra});
+		const buffer = [request(1), line(2, {device: {big: 'block'}}), request(3), line(4)];
+		const kept = persistableLines(buffer, 10, isRequestLine);
+		expect(kept.map((e) => e.message)).toEqual(['m2', 'm4']);
+		expect(kept.every((e) => !('device' in e))).toBe(true);
+	});
+
+	test('keeps only the last lines when there are many', () => {
+		const buffer = Array.from({length: 8}, (_, i) => ({...other(i), message: `m${i}`, timestamp: `t${i}`}));
+		expect(persistableLines(buffer, 3, isRequestLine).map((e) => e.message)).toEqual(['m5', 'm6', 'm7']);
+	});
+
+	test('brings the lines back marked as from the previous run', () => {
+		const raw = JSON.stringify([{timestamp: 't1', level: 'Information', category: 'Playback', message: 'a', context: {x: 1}}]);
+		expect(restoreLines(raw)).toEqual([{timestamp: 't1', level: 'Information', category: 'Playback', message: 'a', context: {x: 1, previousRun: true}}]);
+	});
+
+	test('survives storage that is empty or broken', () => {
+		expect(restoreLines(null)).toEqual([]);
+		expect(restoreLines('not json')).toEqual([]);
+		expect(restoreLines('{"a":1}')).toEqual([]);
+		expect(restoreLines(JSON.stringify([{foo: 1}]))).toEqual([]);
 	});
 });
