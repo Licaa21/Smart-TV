@@ -1,4 +1,4 @@
-import {resolveInitialSubtitle, bestSubtitle} from './initialSubtitle';
+import {resolveInitialSubtitle, bestSubtitle, fromServerSubtitle} from './initialSubtitle';
 import {getItemSubtitlePref, getSeriesSubtitlePref} from '../../services/subtitlePrefs';
 
 jest.mock('../../services/subtitlePrefs', () => ({
@@ -251,5 +251,14 @@ describe('flagged candidates', () => {
 	test('English stays out when the chosen language is there to be flagged', () => {
 		const list = [{index: 1, language: 'eng'}, {index: 2, language: 'jpn'}];
 		expect(flagged(list, 'jpn')).toBeUndefined();
+	});
+});
+
+describe('fromServerSubtitle', () => {
+	test('carries what resolveInitialSubtitle reads, so details can ask it of a raw server record', async () => {
+		const raw = [{Index: 3, Language: 'eng', Codec: 'subrip'}, {Index: 4, Language: 'ron', Codec: 'subrip'}];
+		const resolved = {subtitleStreams: raw.map(fromServerSubtitle), defaultSubtitleStreamIndex: null};
+		const chosen = await resolveInitialSubtitle(resolved, {Id: 'ep3'}, undefined, {subtitleMode: 'always', subtitleLanguage: 'ron'}, null);
+		expect(chosen.index).toBe(4);
 	});
 });

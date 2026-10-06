@@ -2,8 +2,11 @@ import {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import $L from '@enact/i18n/$L';
 
 import * as playback from '../../services/playback';
+import serverLogger from '../../services/serverLogger';
 import {fetchTmdbSeasonRatings, resolveSeriesTmdbId, isRatingSourceAllowed} from '../../services/mdblistApi';
-import {getItemSubtitlePref, getSeriesSubtitlePref, getSeriesAudioPref} from '../../services/subtitlePrefs';
+import {getSeriesAudioPref} from '../../services/subtitlePrefs';
+import {fromServerSubtitle, resolveInitialSubtitle} from '../Player/initialSubtitle';
+import {fromServerAudio, selectPreferredAudioStream} from '../../utils/audioTrackSelection';
 import {fromServerStream, matchSeriesTrackIndex} from '../../utils/seriesTrackPrefs';
 import {findParentCollections} from './parentCollection';
 import {canScoreSeedLocally, getOnlineRecommendations, getRecommendations, mergeRecommendations} from '../../services/homeRecommendations';
@@ -184,14 +187,14 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			observeItem(data);
 
 			setItem(tagWithServerInfo(data));
-			setIsSeed(false);
 			setSelectedVersionIndex(0);
 			const ms = data.MediaSources?.[0];
 			if (ms) {
 				const initAudioStreams = ms.MediaStreams?.filter(s => s.Type === 'Audio') || [];
 				const initSubtitleStreams = ms.MediaStreams?.filter(s => s.Type === 'Subtitle') || [];
-				// A track remembered for the series shows as active, and only when there
-				// is none does the server's own default stand in.
+				// The track playback will start on, picked the way the player picks it: a track
+				// remembered for the series, then the audio language and codec order from
+				// Settings, and only when neither names one the server's own default.
 				const seriesAudioPref = data.SeriesId ? await getSeriesAudioPref(data.SeriesId) : undefined;
 				const matchedAudio = seriesAudioPref
 					? matchSeriesTrackIndex(initAudioStreams.map(fromServerStream), seriesAudioPref)
@@ -199,39 +202,38 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				const rememberedAudioPos = matchedAudio !== null && matchedAudio >= 0
 					? initAudioStreams.findIndex(s => s.Index === matchedAudio)
 					: -1;
-				if (rememberedAudioPos >= 0) {
-					setSelectedAudioIndex(rememberedAudioPos);
-				} else if (ms.DefaultAudioStreamIndex != null) {
-					const idx = initAudioStreams.findIndex(s => s.Index === ms.DefaultAudioStreamIndex);
-					if (idx >= 0) setSelectedAudioIndex(idx);
+				let audioPos = rememberedAudioPos;
+				if (audioPos < 0) {
+					const preferredAudio = selectPreferredAudioStream(initAudioStreams.map(fromServerAudio), settingsRef.current || {});
+					audioPos = preferredAudio ? initAudioStreams.findIndex(s => s.Index === preferredAudio.index) : -1;
 				}
-				// Show the remembered pick as active so it doesn't look like it needs
-				// reselecting. The per-item index restores the exact track, and an episode
-				// otherwise inherits its series' remembered language.
-				let savedSubtitlePos = null;
-				const savedItemIndex = await getItemSubtitlePref(itemId);
-				if (savedItemIndex !== undefined) {
-					if (savedItemIndex < 0) {
-						savedSubtitlePos = -1;
-					} else {
-						const pos = initSubtitleStreams.findIndex(s => s.Index === savedItemIndex);
-						if (pos >= 0) savedSubtitlePos = pos;
-					}
+				if (audioPos < 0 && ms.DefaultAudioStreamIndex != null) {
+					audioPos = initAudioStreams.findIndex(s => s.Index === ms.DefaultAudioStreamIndex);
 				}
-				if (savedSubtitlePos === null && data.SeriesId) {
-					const seriesPref = await getSeriesSubtitlePref(data.SeriesId);
-					const matched = seriesPref
-						? matchSeriesTrackIndex(initSubtitleStreams.map(fromServerStream), seriesPref)
-						: null;
-					if (matched === -1) {
-						savedSubtitlePos = -1;
-					} else if (matched !== null) {
-						const pos = initSubtitleStreams.findIndex(s => s.Index === matched);
-						if (pos >= 0) savedSubtitlePos = pos;
-					}
-				}
-				if (savedSubtitlePos !== null) {
-					setSelectedSubtitleIndex(savedSubtitlePos);
+				if (audioPos >= 0) setSelectedAudioIndex(audioPos);
+				// Ask the player's own question, so the button names the track playback will
+				// start on: the remembered pick for this episode or its series first, then
+				// the subtitle mode and languages from Settings. Asking only the saved picks
+				// and the server default left an episode nobody had played showing Off while
+				// playing it started on the preferred language.
+				const audioForSubtitle = initAudioStreams[Math.max(0, audioPos)];
+				const chosenSubtitle = await resolveInitialSubtitle(
+					{subtitleStreams: initSubtitleStreams.map(fromServerSubtitle), defaultSubtitleStreamIndex: ms.DefaultSubtitleStreamIndex},
+					data,
+					undefined,
+					settingsRef.current || {},
+					audioForSubtitle && {language: audioForSubtitle.Language}
+				);
+				serverLogger.playback('Details: subtitle button pick', {
+					itemId,
+					mode: settingsRef.current?.subtitleMode,
+					language: settingsRef.current?.subtitleLanguage,
+					serverDefault: ms.DefaultSubtitleStreamIndex ?? null,
+					tracks: initSubtitleStreams.map(s => `${s.Index}:${s.Language || '?'}${s.IsDefault ? ':default' : ''}${s.IsForced ? ':forced' : ''}`),
+					picked: chosenSubtitle === undefined ? 'undecided' : (chosenSubtitle ? chosenSubtitle.index : 'off')
+				});
+				if (chosenSubtitle !== undefined) {
+					setSelectedSubtitleIndex(chosenSubtitle ? initSubtitleStreams.findIndex(s => s.Index === chosenSubtitle.index) : -1);
 				} else if (ms.DefaultSubtitleStreamIndex != null) {
 					const idx = initSubtitleStreams.findIndex(s => s.Index === ms.DefaultSubtitleStreamIndex);
 					if (idx >= 0) setSelectedSubtitleIndex(idx);
@@ -248,6 +250,9 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				setCast(data.People);
 			}
 
+			// Still a seed until the picked tracks above are in, or the track buttons read their
+			// unset defaults (Subtitle: Off) for as long as the prefs take to come back.
+			setIsSeed(false);
 			setIsLoading(false);
 
 			// What an unrated season or episode is judged by, so blocking a series takes its

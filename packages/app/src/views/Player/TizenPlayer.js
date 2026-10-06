@@ -1641,11 +1641,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						await startAssRenderer(sub, stillCurrent);
 					} else if (action.type === 'text') {
 						try {
+							// Timed so a slow first load can be told from a slow client: the server
+							// converts a track on first request, and that wait is all in this fetch.
+							const fetchStartedAt = Date.now();
 							const data = await playback.fetchSubtitleData(sub);
+							const fetchMs = Date.now() - fetchStartedAt;
 							if (stillCurrent()) setSubtitleTrackEvents(data?.TrackEvents || null);
 							serverLogger.playback('Subtitle: fetched text track from server', {
 								stream: describeSubtitleStream(sub),
-								trackEvents: data?.TrackEvents?.length ?? 0
+								trackEvents: data?.TrackEvents?.length ?? 0,
+								fetchMs
 							});
 						} catch (err) {
 							console.error('[Player] Error fetching subtitle data:', err);

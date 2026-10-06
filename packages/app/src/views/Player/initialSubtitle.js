@@ -27,6 +27,21 @@ const formatPriority = (stream, {pgsDirectPlay, assDirectPlay}) => {
 	return 0;
 };
 
+// A raw server record in the shape the player holds, so the details screen can ask
+// resolveInitialSubtitle the same question the player will and show the same answer.
+export const fromServerSubtitle = (stream) => ({
+	index: stream?.Index,
+	codec: stream?.Codec,
+	language: stream?.Language || '',
+	title: stream?.Title || '',
+	displayTitle: stream?.DisplayTitle || '',
+	isExternal: stream?.IsExternal,
+	deliveryMethod: stream?.DeliveryMethod,
+	isForced: stream?.IsForced,
+	isDefault: stream?.IsDefault,
+	isHearingImpaired: stream?.IsHearingImpaired
+});
+
 const compare = (left, right) => (left === right ? 0 : (left ? -1 : 1));
 
 /**
