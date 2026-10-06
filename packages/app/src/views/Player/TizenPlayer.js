@@ -1701,10 +1701,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				if (!stillCurrent()) return;
 				if (wantedAudio && !isLiveTV
 					&& ((initialAudioIndex == null && result.playMethod !== playback.PlayMethod.DirectPlay
-						&& autoAudio.index !== result.selectedAudioStreamIndex) || audioNeedsServer)) {
+						&& autoAudio.index !== result.selectedAudioStreamIndex) || (audioNeedsServer && initialAudioIndex == null))) {
 					try {
 						playbackInfoOptions.audioStreamIndex = wantedAudio.index;
-						if (audioNeedsServer) playbackInfoOptions.enableDirectPlay = false;
+						// a pick made on the details screen was already asked of the server by the first request
+						if (audioNeedsServer) {
+							playbackInfoOptions.enableDirectPlay = false;
+							// the track is not worth a re-encode of the picture, so a 4K or HDR file keeps its direct play
+							playbackInfoOptions.refuseVideoReencode = true;
+						}
 						// the same version the first answer chose, so the track index means the same stream
 						if (result.mediaSourceId) playbackInfoOptions.mediaSourceId = result.mediaSourceId;
 						const renegotiated = await playback.getPlaybackInfo(item.Id, playbackInfoOptions);
