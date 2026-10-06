@@ -565,6 +565,7 @@ export const ACCENT_RULES = {
 		["views/Player/TizenPlayer.module.less","",".{liveBtn}:hover, .{liveBtn}:focus","border-color","{accent}"],
 		["views/Player/TizenPlayer.module.less","",".{progressFill}","background","{accent}"],
 		["views/Player/TizenPlayer.module.less","",".{seekIndicator}","background","{accent}"],
+		["views/Player/TizenPlayer.module.less","",".{progressBar}:focus .{seekIndicator}","box-shadow","0 0 0 4px rgba({rgb}, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4)"],
 		["views/Player/TizenPlayer.module.less","","html[data-theme-id='neon_pulse'] .{audioTrackTitle}, html[data-theme-id='neon_pulse'] .{audioTrackArtist}, html[data-theme-id='neon_pulse'] .{audioTrackAlbum}, html[data-theme-id='neon_pulse'] .{progressBar}, html[data-theme-id='neon_pulse'] .{progressFill}, html[data-theme-id='neon_pulse'] .{progressBar}:focus, html[data-theme-id='neon_pulse'] .{subtitleText}","text-shadow","0 0 2px rgba(0, 0, 0, 0.9), 0 0 10px rgba({rgb}, 0.45)"],
 		["views/Player/TizenPlayer.module.less","",".{lyricLineActive}","background","rgba({rgb}, 0.25)"],
 		["views/Player/TizenPlayer.module.less","",".{lyricLineActive}","border","1px solid rgba({rgb}, 0.6)"],

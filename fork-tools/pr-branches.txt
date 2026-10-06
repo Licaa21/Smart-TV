@@ -1,0 +1,20 @@
+# One branch per open pull request, in the order they are merged into fork/daily.
+# 497 carries 494, so 494 goes first. Add a line when a PR is opened and remove it once it is merged upstream.
+fix/av1-fmp4-fallback
+fix/tizen-avplay-restore-black-screen
+fork/accent-skip-episode-full
+feature/person-screen-redesign
+feature/details-rows-catalogue-ranking
+feature/trailer-back-to-close
+fix/details-track-buttons-start-track
+feature/audio-codec-priority
+feature/seekbar-focus-halo
+feature/anime-markers-all-details
+feature/search-home-cards
+fix/read-more-only-when-truncated
+feature/ch-fast-seek-previous-episode
+feature/seek-lands-when-scrubbing-stops
+fix/skip-prompt-autohide-new-episode
+feature/subtitle-mode-preferred-languages
+# Not a pull request: extra logging for the diagnostic report, kept for this fork only.
+fork/diagnostics
