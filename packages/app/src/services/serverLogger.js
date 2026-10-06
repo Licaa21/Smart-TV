@@ -2,6 +2,7 @@ import {getPlatform} from '../platform';
 import {resolvePlatformModule} from './platformModule';
 import {setNetworkLogSink} from '../utils/networkLogSink';
 import {redact, redactContext} from '../utils/logRedaction';
+import {trimLogBuffer} from '../utils/logBuffer';
 import {setSyncLogSink} from '../utils/syncLog';
 import {acceptsReports, clientLogRequest} from './clientLogUpload';
 
@@ -27,6 +28,7 @@ const APP_VERSION = packageJson.version;
 
 // Tracing every request fills this fast, but these sets have little memory to spare.
 const MAX_LOG_BUFFER = 500;
+const isRequestLine = (entry) => entry.category === LOG_CATEGORIES.NETWORK && entry.level === LOG_LEVELS.DEBUG;
 
 let isEnabled = false;
 let isRecording = false;
@@ -144,9 +146,7 @@ const log = async (level, category, message, context = {}, immediate = false) =>
 	};
 
 	logBuffer.push(entry);
-	if (logBuffer.length > MAX_LOG_BUFFER) {
-		logBuffer.shift();
-	}
+	trimLogBuffer(logBuffer, MAX_LOG_BUFFER, isRequestLine);
 	notify();
 
 	const consoleMethod = level === LOG_LEVELS.ERROR || level === LOG_LEVELS.FATAL ? 'error' : 'log';
