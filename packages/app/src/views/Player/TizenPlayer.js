@@ -1647,7 +1647,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// server computed defaultAudioStreamIndex, then the file default.
 				// A track remembered for the series stands in front of the language
 				// preferences, the same order the other clients take these in.
-				const rememberedAudio = await resolveSeriesAudio(item, result.audioStreams);
+				const rememberedAudio = await resolveSeriesAudio(item, result.audioStreams, settings.rememberSeriesAudio !== false);
 				const audioSettings = rememberedAudio ? settings : await playback.audioSettingsForItem(settings, item);
 				const preferredAudio = rememberedAudio || selectPreferredAudioStream(result.audioStreams, audioSettings);
 				const serverAudio = result.audioStreams?.find(s => s.index === result.defaultAudioStreamIndex);
@@ -1655,7 +1655,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const autoAudio = preferredAudio || serverAudio || fileDefaultAudio;
 				serverLogger.playback('Audio: starting track chosen', {
 					picked: autoAudio ? `${autoAudio.index}:${autoAudio.language || '?'}:${autoAudio.codec || '?'}` : null,
-					because: rememberedAudio ? 'remembered for the series' : (preferredAudio ? 'language and codec settings' : (serverAudio ? 'server default' : 'file default')),
+					because: initialAudioIndex != null ? 'picked on the details screen' : rememberedAudio ? 'remembered for the series' : (preferredAudio ? 'language and codec settings' : (serverAudio ? 'server default' : 'file default')),
 					animeAudioPair: audioSettings !== settings,
 					codecOrderSaved: Array.isArray(settings.audioCodecOrder) && settings.audioCodecOrder.length > 0,
 					tracks: (result.audioStreams || []).map((s) => `${s.index}:${s.language || '?'}:${s.codec || '?'}:${s.channels || '?'}ch`)
@@ -2660,12 +2660,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		});
 	};
 
-	const applyAudioSelection = useCallback(async (index, shouldClose = true) => {
+	const applyAudioSelection = useCallback(async (index, shouldClose = true, remember = true) => {
 		setSelectedAudioIndex(index);
 		if (pendingTracksRef.current) pendingTracksRef.current.audioWanted = null;
 		// Saved here rather than after the switch, because switching leaves by several
 		// routes and the choice was made either way.
-		saveAudioPref(item, index, audioStreams || []);
+		if (remember) saveAudioPref(item, index, audioStreams || []);
 		if (shouldClose) closeModal();
 
 		try {
@@ -2878,7 +2878,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		rewind: handleRewind,
 		fastForward: handleForward,
 		setAudioStream: (index) => {
-			if ((audioStreams || []).some((s) => s.index === index)) applyAudioSelection(index, false);
+			if ((audioStreams || []).some((s) => s.index === index)) applyAudioSelection(index, false, false);
 		},
 		setSubtitleStream: (index) => {
 			if (index === -1 || subtitleStreams.some((s) => s.index === index)) applySubtitleSelection(index, subtitleStreams, false);
