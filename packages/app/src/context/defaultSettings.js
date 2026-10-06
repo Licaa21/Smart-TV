@@ -38,6 +38,8 @@ export const defaultSettings = {
 	fallbackAudioLanguage: '',
 	preferDefaultAudioTrack: false,
 	preferAudioDescription: false,
+	// No audioCodecOrder until one is saved. Tracks then rank as they always did, by language and flags
+	// and channel count, and the codec page lists the codecs in their usual order to start from.
 	fallbackSubtitleLanguage: '',
 	preferSdhSubtitles: false,
 	// Seconds as a string, the shape the other clients sync for it.

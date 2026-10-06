@@ -95,3 +95,82 @@ describe('track labelling', () => {
 		expect(isAudioDescriptionAudioStream({displayTitle: 'German'})).toBe(false);
 	});
 });
+
+describe('audioCodecOrder', () => {
+	const truehd = track(1, 'eng', {codec: 'truehd', channels: 8});
+	const eac3 = track(2, 'eng', {codec: 'eac3', channels: 6});
+	const ac3 = track(3, 'eng', {codec: 'ac-3', channels: 6});
+	const aac = track(4, 'eng', {codec: 'aac', channels: 2});
+	const quality = ['truehd', 'dtshd', 'dts', 'eac3', 'ac3', 'flac', 'pcm', 'opus', 'aac', 'vorbis', 'mp3'];
+	const english = {audioLanguage: 'eng', audioCodecOrder: quality};
+
+	test('ranks tied tracks by the viewer codec order before channel count', () => {
+		expect(selectPreferredAudioStream([aac, ac3, eac3, truehd], english)).toBe(truehd);
+		expect(selectPreferredAudioStream([truehd, eac3, aac], {audioLanguage: 'eng', audioCodecOrder: ['aac', 'eac3', 'truehd']})).toBe(aac);
+		expect(selectPreferredAudioStream([truehd, ac3, eac3], {audioLanguage: 'eng', audioCodecOrder: ['ac3', 'eac3', 'truehd']})).toBe(ac3);
+	});
+
+	test('a codec the order leaves out ranks last, and spellings of one codec rank together', () => {
+		const dca = track(5, 'eng', {codec: 'dca', channels: 6});
+		const odd = track(6, 'eng', {codec: 'wmapro', channels: 8});
+		expect(selectPreferredAudioStream([odd, ac3, dca], english)).toBe(dca);
+		expect(selectPreferredAudioStream([odd, aac], english)).toBe(aac);
+	});
+
+	test('DTS-HD is told apart from the DTS core by its profile', () => {
+		const core = track(7, 'eng', {codec: 'dts', profile: 'DTS', channels: 6});
+		const hd = track(8, 'eng', {codec: 'dts', profile: 'DTS-HD MA', channels: 6});
+		expect(selectPreferredAudioStream([core, hd], english)).toBe(hd);
+		expect(selectPreferredAudioStream([hd, core], {audioLanguage: 'eng', audioCodecOrder: ['dts', 'dtshd']})).toBe(core);
+	});
+
+	test('the preferred language always beats the codec order', () => {
+		const ger = track(9, 'ger', {codec: 'aac'});
+		expect(selectPreferredAudioStream([truehd, ger], {...english, audioLanguage: 'deu'})).toBe(ger);
+		const gerTruehd = track(10, 'ger', {codec: 'truehd'});
+		expect(selectPreferredAudioStream([gerTruehd, ger, truehd], {...english, audioLanguage: 'deu'})).toBe(gerTruehd);
+	});
+
+	test('without an order the channel count decides, as before', () => {
+		expect(selectPreferredAudioStream([aac, eac3, truehd], {audioLanguage: 'eng'})).toBe(truehd);
+		expect(selectPreferredAudioStream([aac, ac3, eac3], {audioLanguage: 'eng'})).toBe(eac3);
+	});
+});
+
+describe('without a saved codec order', () => {
+	test('tracks rank by channel count alone, as before the setting existed', () => {
+		const tracks = [
+			{index: 0, language: 'eng', codec: 'ac3', channels: 6},
+			{index: 1, language: 'eng', codec: 'truehd', channels: 6}
+		];
+		expect(selectPreferredAudioStream(tracks, {audioLanguage: 'eng'})).toBe(tracks[0]);
+	});
+});
+
+describe('codec order edge cases', () => {
+	const make = (index, language, codec, channels = 6) => ({index, language, codec, channels});
+
+	test('a codec left out of the saved order ranks after every one named', () => {
+		const ac3 = make(0, 'eng', 'ac3');
+		const aac = make(1, 'eng', 'aac');
+		expect(selectPreferredAudioStream([ac3, aac], {audioLanguage: 'eng', audioCodecOrder: ['truehd', 'aac']})).toBe(aac);
+	});
+
+	test('an empty saved order is no order', () => {
+		const first = make(0, 'eng', 'ac3');
+		const second = make(1, 'eng', 'truehd');
+		expect(selectPreferredAudioStream([first, second], {audioLanguage: 'eng', audioCodecOrder: []})).toBe(first);
+	});
+
+	test('with no track in a named language the codec order does not pick the language', () => {
+		const german = make(0, 'ger', 'ac3');
+		const french = make(1, 'fre', 'truehd');
+		expect(selectPreferredAudioStream([german, french], {audioLanguage: 'jpn', audioCodecOrder: ['truehd', 'ac3']})).toBe(german);
+	});
+
+	test('preferring the default track does not let the codec order choose between languages', () => {
+		const german = {index: 0, language: 'ger', codec: 'ac3', channels: 6, isDefault: true};
+		const french = {index: 1, language: 'fre', codec: 'truehd', channels: 6, isDefault: true};
+		expect(selectPreferredAudioStream([german, french], {preferDefaultAudioTrack: true, audioCodecOrder: ['truehd', 'ac3']})).toBe(german);
+	});
+});

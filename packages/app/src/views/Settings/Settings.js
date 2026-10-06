@@ -789,7 +789,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	} = useHomeRowsEditor({api, settings, updateSetting, updateSettings, pushView, popView});
 
 	const {
-		tempButtons, buttonLayoutKind, openDetailButtons, openOsdButtons, openDetailMetadata,
+		tempButtons, buttonLayoutKind, openDetailButtons, openOsdButtons, openDetailMetadata, openAudioCodecs,
 		saveButtonLayout, resetButtonLayout, toggleLayoutButton, moveLayoutButton
 	} = useButtonLayoutEditor({settings, updateSettings, pushView, popView});
 
@@ -1084,6 +1084,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			openDiagnostics,
 			openPinCode,
 			openKidsMode,
+			openAudioCodecs,
 			openLibraries,
 			openLibraryOrder,
 			openParentalControls,
@@ -1113,6 +1114,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		serverVersion, availableThemes, activeThemeId, openThemes, openThemeStore, openHomeRows,
 		openDetailButtons, openOsdButtons, openDetailMetadata, openDetailSections, openDiagnostics,
 		openPinCode, openKidsMode, openLibraries, openLibraryOrder, openParentalControls, openQrLink, openRatingSources, openRowImageTypes, openExcludedGenres, openMediaBarLibraries,
+		openAudioCodecs,
 		openMediaBarCollections, openScreensaverLibraries, openScreensaverCollections, openScreensaverGenres,
 		openImdbLists, openSeasonalRow, openExternalTmdbLists, openExternalCalendars,
 		openExternalCustomRows, openSeerrHomeRows, openScreen, handleMoonfinToggle, onRunSetupWizard

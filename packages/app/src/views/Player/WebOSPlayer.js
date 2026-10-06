@@ -939,6 +939,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const preferredAudio = selectPreferredAudioStream(result.audioStreams, settings);
 				const serverAudio = result.audioStreams?.find(s => s.index === result.defaultAudioStreamIndex);
 				const autoAudio = rememberedAudio || preferredAudio || serverAudio || defaultAudio;
+				serverLogger.playback('Audio: starting track chosen', {
+					picked: autoAudio ? `${autoAudio.index}:${autoAudio.language || '?'}:${autoAudio.codec || '?'}` : null,
+					because: rememberedAudio ? 'remembered for the series' : (preferredAudio ? 'language and codec settings' : (serverAudio ? 'server default' : 'file default')),
+					codecOrderSaved: Array.isArray(settings.audioCodecOrder) && settings.audioCodecOrder.length > 0,
+					tracks: (result.audioStreams || []).map((s) => `${s.index}:${s.language || '?'}:${s.codec || '?'}:${s.channels || '?'}ch`)
+				});
 				const startingAudio = initialAudioIndex != null
 					? result.audioStreams?.find(s => s.index === initialAudioIndex)
 					: autoAudio;

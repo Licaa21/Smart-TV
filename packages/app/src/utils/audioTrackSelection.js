@@ -1,4 +1,5 @@
 import {languageMatches} from './audioLanguage';
+import {audioCodecKey} from './audioCodecs';
 import {streamTitleText} from './streamTitle';
 
 // Picks the audio track a fresh playback starts on, following the same order the
@@ -35,12 +36,18 @@ const trackTitle = (stream) => String(stream?.title || stream?.displayTitle || '
 
 const channelsOf = (stream) => (typeof stream?.channels === 'number' ? stream.channels : 0);
 
-// Surround beats stereo once language and the two flags have had their say. The
-// default flag moves above or below the channel count depending on whether the
-// viewer asked for default tracks.
+// A codec the viewer's order does not name ranks after every one it does.
+const codecRank = (stream, order) => {
+	const position = order.indexOf(audioCodecKey(stream));
+	return position < 0 ? order.length : position;
+};
+
+// The codec order and surround then settle what language and the two flags leave
+// tied. The default flag moves above or below them depending on whether the viewer
+// asked for default tracks.
 const rankAudioCandidates = (candidates, prefs) => {
 	if (candidates.length <= 1) return candidates[0];
-	const {preferDefaultAudioTrack, preferAudioDescription} = prefs;
+	const {preferDefaultAudioTrack, preferAudioDescription, codecOrder} = prefs;
 	return candidates.slice().sort((a, b) => {
 		if (preferAudioDescription) {
 			const aAd = isAudioDescriptionAudioStream(a);
@@ -51,6 +58,11 @@ const rankAudioCandidates = (candidates, prefs) => {
 			const aDefault = a.isDefault === true;
 			const bDefault = b.isDefault === true;
 			if (aDefault !== bDefault) return aDefault ? -1 : 1;
+		}
+		if (codecOrder) {
+			const aRank = codecRank(a, codecOrder);
+			const bRank = codecRank(b, codecOrder);
+			if (aRank !== bRank) return aRank - bRank;
 		}
 		const aChannels = channelsOf(a);
 		const bChannels = channelsOf(b);
@@ -83,7 +95,8 @@ const preferRemembered = (matches, prefs) => {
 /**
  * @param {Array} audioStreams - the audio tracks the source offers
  * @param {Object} [settings] - audioLanguage, fallbackAudioLanguage,
- *   preferDefaultAudioTrack, preferAudioDescription, and optionally
+ *   preferDefaultAudioTrack, preferAudioDescription, audioCodecOrder (codec ids, best
+ *   first; without one tracks rank by channel count alone), and optionally
  *   explicitAudioIndex, lastExplicitAudioIndex and lastExplicitAudioTitle
  * @returns {Object|null} the track to start on
  */
@@ -95,6 +108,7 @@ export const selectPreferredAudioStream = (audioStreams, settings = {}) => {
 		fallbackAudioLanguage,
 		preferDefaultAudioTrack = false,
 		preferAudioDescription = false,
+		audioCodecOrder,
 		explicitAudioIndex,
 		lastExplicitAudioIndex,
 		lastExplicitAudioTitle
@@ -116,13 +130,17 @@ export const selectPreferredAudioStream = (audioStreams, settings = {}) => {
 	const prefs = {
 		preferDefaultAudioTrack,
 		preferAudioDescription,
+		// The saved ids as they stand, so a codec left out ranks after every one that is named. An empty
+		// list is no order at all.
+		codecOrder: Array.isArray(audioCodecOrder) && audioCodecOrder.length ? audioCodecOrder : null,
 		lastIndex: lastExplicitAudioIndex,
 		lastTitle: lastExplicitAudioTitle ? String(lastExplicitAudioTitle).trim().toLowerCase() : ''
 	};
 
 	if (preferDefaultAudioTrack) {
 		const defaults = candidates.filter((stream) => stream.isDefault === true);
-		if (defaults.length) return rankAudioCandidates(defaults, prefs);
+		// The defaults can be in several languages, and the codec order must not pick between those.
+		if (defaults.length) return rankAudioCandidates(defaults, {...prefs, codecOrder: null});
 	}
 
 	for (const language of [audioLanguage, fallbackAudioLanguage, 'eng']) {
@@ -130,5 +148,7 @@ export const selectPreferredAudioStream = (audioStreams, settings = {}) => {
 		if (matches.length) return preferRemembered(matches, prefs);
 	}
 
-	return rankAudioCandidates(candidates, prefs);
+	// No track is in a language the viewer named, so the codec order has no language to settle
+	// ties inside of, and it must not decide which language plays.
+	return rankAudioCandidates(candidates, {...prefs, codecOrder: null});
 };
