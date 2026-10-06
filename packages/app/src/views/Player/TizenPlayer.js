@@ -840,28 +840,6 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			await new Promise((resolve) => setTimeout(resolve, startDelayMs));
 		}
 
-		// AVPlay opens on its own pick of audio track, which for a file with TrueHD first is one
-		// many sets cannot decode, and the failure comes before the switch made once PLAYING.
-		// Choosing the track now, while READY, lets it start on the right one where the firmware
-		// accepts that. Where it does not, the selection is dropped and the PLAYING one still runs.
-		const earlyAudio = pendingTracksRef.current;
-		if (earlyAudio && !earlyAudio.audioApplied && earlyAudio.audioIndex != null) {
-			try {
-				const tizenIndex = mapJellyfinTrackToTizen(avplayGetTracks(), earlyAudio.audioStreams, 'AUDIO', earlyAudio.audioIndex);
-				if (tizenIndex != null) {
-					avplaySelectTrack('AUDIO', tizenIndex);
-					serverLogger.playback('Audio: selected before play', {
-						jellyfinIndex: earlyAudio.audioIndex,
-						tizenIndex
-					});
-				}
-			} catch (earlyErr) {
-				serverLogger.playback('Audio: selection before play was refused', {
-					error: earlyErr?.message || String(earlyErr)
-				});
-			}
-		}
-
 		playIssued = true;
 		playbackMovingRef.current = false;
 		playIssuedAtRef.current = Date.now();
@@ -878,6 +856,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		} else {
 			avplayPlay();
 			setIsPaused(false);
+			// AVPlay opens on its own pick of audio track, TrueHD first in some files, and a set that
+			// cannot decode it fails within a second. The firmware refuses a selection while READY, so
+			// it is made the moment play is issued instead of at the first playback event.
+			applyPendingTracksRef.current?.();
 		}
 		if (pendingTracksRef.current) {
 			pendingTracksRef.current.deadline = Date.now() + 5000;
