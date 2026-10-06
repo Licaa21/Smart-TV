@@ -195,7 +195,9 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				// The track playback will start on, picked the way the player picks it: a track
 				// remembered for the series, then the audio language and codec order from
 				// Settings, and only when neither names one the server's own default.
-				const seriesAudioPref = data.SeriesId ? await getSeriesAudioPref(data.SeriesId) : undefined;
+				const seriesAudioPref = data.SeriesId && settingsRef.current?.rememberSeriesAudio !== false
+					? await getSeriesAudioPref(data.SeriesId)
+					: undefined;
 				const matchedAudio = seriesAudioPref
 					? matchSeriesTrackIndex(initAudioStreams.map(fromServerStream), seriesAudioPref)
 					: null;
@@ -204,7 +206,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					: -1;
 				let audioPos = rememberedAudioPos;
 				if (audioPos < 0) {
-					const preferredAudio = selectPreferredAudioStream(initAudioStreams.map(fromServerAudio), settingsRef.current || {});
+					const audioSettings = await playback.audioSettingsForItem(settingsRef.current || {}, data);
+					const preferredAudio = selectPreferredAudioStream(initAudioStreams.map(fromServerAudio), audioSettings);
 					audioPos = preferredAudio ? initAudioStreams.findIndex(s => s.Index === preferredAudio.index) : -1;
 				}
 				if (audioPos < 0 && ms.DefaultAudioStreamIndex != null) {

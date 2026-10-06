@@ -10,6 +10,7 @@ import {findNextInSeason, findNextSeason, findPreviousInSeason, findPreviousSeas
 import {videoRangeTypeOf} from '../utils/videoRange';
 import {getVolumeState, lastVolumeState} from './systemVolume';
 import {isVega} from '../platform';
+import {audioSettingsFor, hasAnimeLabel} from '../utils/animeAudio';
 
 export const PlayMethod = {
 	DirectPlay: 'DirectPlay',
@@ -679,6 +680,61 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 
 	let playMethod = determinePlayMethod(mediaSource, capabilities, options, passthroughSettings);
 
+	// A set that opens a file on its first audio track whatever it is asked for cannot take direct play
+	// for any other track. The answer is then asked for again with direct play off, which builds the
+	// track, and every caller that names an audio track gets that, a reload, a fallback and a subtitle
+	// change included. The server calling a direct play "selected track 6" does not make it so.
+	const directPlayOpensFirstAudio = options.directPlayOpensFirstAudio ?? playing?.directPlayOpensFirstAudio ?? false;
+	// Force Direct Play is remembered with the session, since a reload or a subtitle change does not repeat it
+	const directPlayForced = Boolean(options.forceDirectPlay ?? playing?.directPlayForced);
+	let audioRebuilt = false;
+	if (directPlayOpensFirstAudio && !directPlayForced && options.audioStreamIndex != null
+		&& playMethod === PlayMethod.DirectPlay) {
+		const firstAudio = (mediaSource.MediaStreams || []).find((s) => s.Type === 'Audio');
+		if (firstAudio && firstAudio.Index !== options.audioStreamIndex) {
+			const rebuilt = await api.getPlaybackInfo(itemId, {
+				DeviceProfile: deviceProfile,
+				StartTimeTicks: requestedStartTime,
+				AutoOpenLiveStream: true,
+				EnableDirectPlay: false,
+				EnableDirectStream: enableDirectStream,
+				EnableTranscoding: options.enableTranscoding !== false,
+				AudioStreamIndex: options.audioStreamIndex,
+				SubtitleStreamIndex: sentSubtitleStreamIndex,
+				MaxStreamingBitrate: maxBitrate,
+				MediaSourceId: options.mediaSourceId || mediaSource.Id
+			});
+			const rebuiltSource = rebuilt.MediaSources?.length
+				? (rebuilt.MediaSources.find((source) => source.Id === mediaSource.Id) || rebuilt.MediaSources[0])
+				: null;
+			const rebuiltMethod = rebuiltSource
+				? determinePlayMethod(rebuiltSource, capabilities, options, passthroughSettings)
+				: null;
+			// Only an answer that copies the picture is worth it. A re-encode of the video, for a 4K or HDR
+			// file, a bitrate cap or Prefer Transcoding, costs far more than a track the player can try to
+			// switch to, so that one is refused and the direct play stays.
+			const transcodeReasons = rebuiltSource?.TranscodingUrl?.match(/[?&]TranscodeReasons=([^&]+)/i)?.[1] || null;
+			const videoCopied = Boolean(rebuiltSource)
+				&& (rebuiltMethod !== PlayMethod.Transcode || (isAudioOnlyRemuxTranscode(rebuiltSource) && !/video/i.test(transcodeReasons || '')));
+			// An answer that is direct play again, whatever was asked, has built nothing
+			const rebuiltUsable = videoCopied && rebuiltMethod !== PlayMethod.DirectPlay;
+			serverLogger.playback('Audio: direct play would open on the first track, asked the server for the chosen one', {
+				requestedIndex: options.audioStreamIndex,
+				firstAudioIndex: firstAudio.Index,
+				answer: rebuiltMethod,
+				videoCopied,
+				transcodeReasons,
+				kept: rebuiltUsable ? 'server answer' : 'direct play'
+			});
+			if (rebuiltUsable) {
+				playbackInfo = rebuilt;
+				mediaSource = rebuiltSource;
+				playMethod = rebuiltMethod;
+				audioRebuilt = true;
+			}
+		}
+	}
+
 	// When we let the server pick the user's preferred subtitle (no explicit
 	// index) and it resolved to a bitmap track on a transcode, the server would
 	// burn it into the video, far too slow for a source the user never asked to
@@ -693,7 +749,8 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 				DeviceProfile: deviceProfile,
 				StartTimeTicks: requestedStartTime,
 				AutoOpenLiveStream: true,
-				EnableDirectPlay: enableDirectPlay,
+				// a rebuilt track stays built, direct play would open the file on its first one
+				EnableDirectPlay: enableDirectPlay && !audioRebuilt,
 				EnableDirectStream: enableDirectStream,
 				EnableTranscoding: options.enableTranscoding !== false,
 				AudioStreamIndex: audioStreamIndex,
@@ -758,6 +815,12 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		console.log('[playback] After forcing transcode - TranscodingUrl:', mediaSource.TranscodingUrl ? 'present' : 'none');
 	}
 
+	// A repair that no one asked for, like putting a wrong audio track right, is not worth a re-encode of
+	// the picture. It is refused before the session is replaced, so the stream that plays stays described.
+	if (options.refuseVideoReencode && playMethod === PlayMethod.Transcode && !isAudioOnlyRemuxTranscode(mediaSource)) {
+		throw Object.assign(new Error('The server would re-encode the picture'), {code: 'REENCODE_REFUSED'});
+	}
+
 	const itemAudio = options.item?.MediaType === 'Audio' || options.item?.Type === 'Audio';
 	const hasVideoStream = (mediaSource.MediaStreams || []).some((s) => s.Type === 'Video');
 	const hasAudioStream = (mediaSource.MediaStreams || []).some((s) => s.Type === 'Audio');
@@ -787,6 +850,8 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		maxBitrate: options.maxBitrate,
 		allowDirectPlay,
 		allowDirectStream,
+		directPlayOpensFirstAudio,
+		directPlayForced,
 		serverCredentials: creds
 	});
 
@@ -955,6 +1020,45 @@ const mapChapters = (chapters) => chapters.map((c, i) => ({
 	startPositionTicks: c.StartPositionTicks,
 	imageTag: c.ImageTag
 }));
+
+// Whether a title is anime, by the labels on it or on its series. An episode carries no genres of its
+// own on most servers, so the series is read once per server and kept. An item that came without
+// genres or tags and has no series is read itself.
+const animeBySeries = new Map();
+const ANIME_LOOKUP_WAIT_MS = 4000;
+export const isAnimeItem = async (item) => {
+	if (!item) return false;
+	if (hasAnimeLabel(item)) return true;
+	const lookupId = item.SeriesId || (item.Genres || item.Tags ? null : item.Id);
+	if (!lookupId) return false;
+	const key = `${item._serverUrl || ''}|${lookupId}`;
+	try {
+		if (!animeBySeries.has(key)) {
+			const lookup = getApiForItem(item).getItem(lookupId).then(hasAnimeLabel);
+			animeBySeries.set(key, lookup);
+			lookup.catch(() => animeBySeries.delete(key));
+		}
+		// Playback and the details screen wait on this, so a slow server does not hold them for long.
+		// The lookup carries on and is there for the next episode.
+		let timer;
+		try {
+			return await Promise.race([
+				animeBySeries.get(key),
+				new Promise((resolve) => { timer = setTimeout(() => resolve(false), ANIME_LOOKUP_WAIT_MS); })
+			]);
+		} finally {
+			clearTimeout(timer);
+		}
+	} catch (e) {
+		return false;
+	}
+};
+
+// The settings an item's audio track is picked with. Nothing is looked up while no anime language is
+// set. The subtitle logic keeps the default settings, since foreign mode compares the audio with the
+// language the viewer understands, which anime does not change.
+export const audioSettingsForItem = async (settings, item) =>
+	settings?.animeAudioLanguage ? audioSettingsFor(settings, await isAnimeItem(item)) : settings;
 
 /**
  * Fetch chapters for an item. Chapters live on the Item object, not MediaSource.
@@ -1172,18 +1276,22 @@ export const getPreviousEpisode = async (item) => {
 	}
 };
 
-export const changeAudioStream = async (streamIndex, currentPositionTicks) => {
+export const changeAudioStream = async (streamIndex, currentPositionTicks, {refuseVideoReencode = false} = {}) => {
 	if (!currentSession) return null;
 
-	// Always disable DirectPlay for audio switching. DirectPlay URLs serve the static
-	// container file and always play the default audio track regardless of AudioStreamIndex.
-	// DirectStream (server-side remux) is quality-identical but honors track selection.
+	// DirectPlay URLs serve the static container file and always play the default audio track
+	// regardless of AudioStreamIndex, so DirectPlay is disabled for audio switching. DirectStream
+	// (server-side remux) is quality-identical but honors track selection. Where the player is known to
+	// open a direct play on the file's first track, going back to that one needs no remux.
+	const firstAudio = (currentSession.mediaSource?.MediaStreams || []).find((s) => s.Type === 'Audio');
+	const backToFirst = currentSession.directPlayOpensFirstAudio && firstAudio?.Index === streamIndex;
 	const newInfo = await getPlaybackInfo(currentSession.itemId, {
 		...currentSession,
 		item: currentSessionItem(),
 		audioStreamIndex: streamIndex,
 		startPositionTicks: currentPositionTicks ?? currentSession.startPositionTicks,
-		enableDirectPlay: false
+		enableDirectPlay: backToFirst && currentSession.allowDirectPlay ? undefined : false,
+		refuseVideoReencode
 	});
 
 	return newInfo;

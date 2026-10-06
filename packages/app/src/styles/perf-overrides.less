@@ -6,7 +6,15 @@
 	--glass-tint: rgba(var(--theme-surface-rgb, 30, 30, 40), 0.92) !important;
 }
 
-// The last two levels also drop the text shadows and the idle looping animations.
-.perf-lean * {
+// The last two levels also drop the text shadows and the idle looping animations. The subtitles keep
+// theirs, since the shadow is a setting the viewer chose and the text has to stay readable over the
+// picture. The second rule hands the inline shadow down to the tags inside a subtitle line. It has to
+// stay after the first, which it ties on specificity, and it is written in two rules because the TVs'
+// old engines cannot take a complex selector inside :not().
+.perf-lean *:not([data-subtitle-text]) {
 	text-shadow: none !important;
+}
+
+.perf-lean [data-subtitle-text] * {
+	text-shadow: inherit !important;
 }

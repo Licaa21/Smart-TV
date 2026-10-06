@@ -190,6 +190,7 @@ const exportText = () => {
 `=== Moonfin for ${platformName} diagnostic report ===`,
 `Generated: ${getTimestamp()}`,
 `App Version: ${device?.appVersion || APP_VERSION}`,
+`Build: ${process.env.REACT_APP_BUILD_ID || 'unstamped'}`,
 `TV Version: ${device?.tvVersion || 'Unknown'}`,
 `Model: ${device?.modelName || 'Unknown'}`,
 `User Agent: ${device?.userAgent || 'Unknown'}`,

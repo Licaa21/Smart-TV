@@ -28,6 +28,7 @@ import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTi
 import {getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
+import {audioStartNeedsServer} from '../../utils/audioStartPlan';
 import {applyResumeRewind, skipBackSeconds, skipForwardSeconds, zoomInternalFromSetting, zoomSettingFromInternal} from '../../utils/playbackTuning';
 import {saveAudioPref, saveSubtitlePref} from '../../services/subtitlePrefs';
 import {resolveSeriesAudio} from './initialAudio';
@@ -309,6 +310,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const reloadAudioFromServerRef = useRef(null);
 	const activeNativeSubRef = useRef(null);
 	const trackConfirmTimerRef = useRef(null);
+	const audioVerifyTimerRef = useRef(null);
+	const selectedAudioIndexRef = useRef(null);
+	const audioStreamsRef = useRef([]);
+	// when the server last rebuilt the audio, which the check after play waits out
+	const audioReloadedAtRef = useRef(0);
+	// the check after play asks the server once for an item, whatever that comes back as
+	const audioVerifyAskedRef = useRef(false);
+	// what the check after play compares against, the screen's own pick and the track list it names
+	selectedAudioIndexRef.current = selectedAudioIndex;
+	audioStreamsRef.current = audioStreams;
 	const currentUrlRef = useRef(null);
 	const suspendedRef = useRef(null);
 	const loadGenerationRef = useRef(0);
@@ -680,6 +691,65 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	applyPendingTracksRef.current = applyPendingTracks;
 
 	/**
+	 * Compares the track AVPlay is playing with the one the screen shows, whatever the start did to
+	 * get there. The first pass only reports, a second one a few seconds on asks the server for the
+	 * shown track when the two still differ, so the sound can never stay on a track the screen does
+	 * not name.
+	 */
+	const verifyAudioMatchesScreen = useCallback((pass, lenient) => {
+		audioVerifyTimerRef.current = null;
+		if (isUnmountedRef.current) return;
+		const session = playback.getCurrentSession();
+		// A remux carries only the track the server built it around, so only a file played whole has
+		// the full list to compare with. One server rebuild is all this asks for, since a reload that
+		// comes back as direct play again would only repeat.
+		if (!session || session.playMethod !== playback.PlayMethod.DirectPlay) return;
+		// the start leaves live TV, Force Direct Play and a SyncPlay group alone, and so does this
+		if (isLiveTV || settings.forceDirectPlay || isInGroupRef.current) return;
+		if (audioVerifyAskedRef.current || Date.now() - audioReloadedAtRef.current < 30000) return;
+		const avState = avplayGetState();
+		if (avState !== 'PLAYING' && avState !== 'PAUSED') return;
+		const wanted = selectedAudioIndexRef.current;
+		const streams = audioStreamsRef.current;
+		if (wanted == null || !streams.length) return;
+		let tizenIndex = null;
+		let playingIndex = null;
+		try {
+			tizenIndex = mapJellyfinTrackToTizen(avplayGetTracks(), streams, 'AUDIO', wanted);
+			playingIndex = avplayGetCurrentTracks().find((t) => t.type === 'AUDIO')?.index ?? null;
+		} catch (e) {
+			void e;
+		}
+		// AVPlay opens on the file's first track, so a pick that is that track needs no answer from it,
+		// and any other pick it cannot confirm is treated as not playing
+		// A switch the viewer made is only judged on what AVPlay reports, since a track it will not name
+		// says nothing against it, while a start has the first track to fall back on
+		const matches = tizenIndex != null && playingIndex != null
+			? tizenIndex === playingIndex
+			: (lenient || wanted === streams[0]?.index);
+		serverLogger.playback('Audio: check after play', {
+			pass,
+			shownJellyfinIndex: wanted,
+			wantedTizenIndex: tizenIndex,
+			playingTizenIndex: playingIndex,
+			state: avplayGetState(),
+			matches
+		});
+		if (matches) return;
+		if (pass < 2) {
+			audioVerifyTimerRef.current = setTimeout(() => verifyAudioMatchesScreen(pass + 1, lenient), 3000);
+			return;
+		}
+		serverLogger.playbackError('Audio: playing track is not the one shown, asking the server for it', {
+			shownJellyfinIndex: wanted,
+			wantedTizenIndex: tizenIndex,
+			playingTizenIndex: playingIndex
+		});
+		audioVerifyAskedRef.current = true;
+		reloadAudioFromServerRef.current?.(wanted);
+	}, [isLiveTV, settings.forceDirectPlay]);
+
+	/**
 	 * Shared open to play sequence used by the initial load and every stream
 	 * reload. Configures buffering and adaptive properties in IDLE, prepares,
 	 * then holds play until the first buffer fill so startup opens on a moving
@@ -761,6 +831,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			deferredResumeSeekRef.current = null;
 			avplaySeek(ms).catch((e) => {
 				console.warn('[Player] Deferred resume seek failed:', e?.message || e);
+				serverLogger.playbackError('Playback: the resume position was refused by the stream', {resumeMs: ms, error: e?.message || String(e)});
 			});
 		};
 
@@ -893,6 +964,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 		// one confirmation pass, some firmware silently drops selections made
 		// this early in the session
+		if (audioVerifyTimerRef.current) clearTimeout(audioVerifyTimerRef.current);
+		audioVerifyTimerRef.current = setTimeout(() => verifyAudioMatchesScreen(1), 3000);
 		if (trackConfirmTimerRef.current) clearTimeout(trackConfirmTimerRef.current);
 		trackConfirmTimerRef.current = setTimeout(() => {
 			trackConfirmTimerRef.current = null;
@@ -900,6 +973,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			applyPendingTracksRef.current?.();
 			// a selection can be accepted and still not take, which leaves the wrong track playing
 			const pending = pendingTracksRef.current;
+			if (pending && pending.audioIndex != null && !pending.audioApplied) {
+				// nothing has landed, and no later pass is promised, so the log says why
+				serverLogger.playbackError('Audio: initial track not applied after play', {
+					jellyfinIndex: pending.audioIndex,
+					state: avplayGetState(),
+					expired: pending.deadline != null && Date.now() > pending.deadline,
+					avplayAudioTracks: summarizeAvplayTracks(avplayGetTracks(), 'AUDIO'),
+					playingAudioIndex: avplayGetCurrentTracks().find((t) => t.type === 'AUDIO')?.index
+				});
+			}
 			if (pending?.audioWanted != null) {
 				const playingIndex = avplayGetCurrentTracks().find((t) => t.type === 'AUDIO')?.index;
 				if (playingIndex != null && playingIndex !== pending.audioWanted) {
@@ -913,7 +996,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				}
 			}
 		}, 4000);
-	}, [readyGate, isLiveTV, applyDisplayWindow, handleSubtitleChange, reassertNativeSubtitle, settings.videoStartDelay]);
+	}, [readyGate, isLiveTV, applyDisplayWindow, handleSubtitleChange, reassertNativeSubtitle, verifyAudioMatchesScreen, settings.videoStartDelay]);
 
 	/**
 	 * Start AVPlay playback for a given URL.
@@ -1262,6 +1345,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		isUnmountedRef.current = false;
 		return () => {
 			isUnmountedRef.current = true;
+			if (audioVerifyTimerRef.current) clearTimeout(audioVerifyTimerRef.current);
 			if (reloadRetryTimeoutRef.current) {
 				clearTimeout(reloadRetryTimeoutRef.current);
 				reloadRetryTimeoutRef.current = null;
@@ -1527,7 +1611,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					audioStreamIndex: initialAudioIndex != null ? initialAudioIndex : undefined,
 					subtitleStreamIndex: initialSubtitleIndex != null ? initialSubtitleIndex : undefined,
 					isLiveTV,
-					stereoUpmixEnabled: settings.stereoUpmixEnabled
+					stereoUpmixEnabled: settings.stereoUpmixEnabled,
+					// AVPlay opens a direct play on the file's first audio track
+					directPlayOpensFirstAudio: true
 				};
 				let result = await playback.getPlaybackInfo(item.Id, playbackInfoOptions);
 				if (!stillCurrent()) return;
@@ -1561,14 +1647,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// server computed defaultAudioStreamIndex, then the file default.
 				// A track remembered for the series stands in front of the language
 				// preferences, the same order the other clients take these in.
-				const rememberedAudio = await resolveSeriesAudio(item, result.audioStreams);
-				const preferredAudio = rememberedAudio || selectPreferredAudioStream(result.audioStreams, settings);
+				const rememberedAudio = await resolveSeriesAudio(item, result.audioStreams, settings.rememberSeriesAudio !== false);
+				const audioSettings = rememberedAudio ? settings : await playback.audioSettingsForItem(settings, item);
+				const preferredAudio = rememberedAudio || selectPreferredAudioStream(result.audioStreams, audioSettings);
 				const serverAudio = result.audioStreams?.find(s => s.index === result.defaultAudioStreamIndex);
 				const fileDefaultAudio = result.audioStreams?.find(s => s.isDefault);
 				const autoAudio = preferredAudio || serverAudio || fileDefaultAudio;
 				serverLogger.playback('Audio: starting track chosen', {
 					picked: autoAudio ? `${autoAudio.index}:${autoAudio.language || '?'}:${autoAudio.codec || '?'}` : null,
-					because: rememberedAudio ? 'remembered for the series' : (preferredAudio ? 'language and codec settings' : (serverAudio ? 'server default' : 'file default')),
+					because: initialAudioIndex != null ? 'picked on the details screen' : rememberedAudio ? 'remembered for the series' : (preferredAudio ? 'language and codec settings' : (serverAudio ? 'server default' : 'file default')),
+					animeAudioPair: audioSettings !== settings,
 					codecOrderSaved: Array.isArray(settings.audioCodecOrder) && settings.audioCodecOrder.length > 0,
 					tracks: (result.audioStreams || []).map((s) => `${s.index}:${s.language || '?'}:${s.codec || '?'}:${s.channels || '?'}ch`)
 				});
@@ -1578,18 +1666,66 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// whole file and switches locally. The index stays on the options so a
 				// later renegotiation keeps it.
 				let audioNegotiated = false;
-				if (initialAudioIndex == null && autoAudio && !isLiveTV
-					&& result.playMethod !== playback.PlayMethod.DirectPlay
-					&& autoAudio.index !== result.selectedAudioStreamIndex) {
+				// Direct play opens on the file's first audio track, and moving to another one by the
+				// player is not dependable on these sets: it can fail after the switch, or never be
+				// applied, so the screen names a track the sound is not. The server builds any other
+				// track up front and copies the picture. A manual pick still tries the player first when
+				// the set decodes the codec, but this start has to be right the first time. With Force
+				// Direct Play on the server cannot be asked, so the player switches as it always did.
+				const wantedAudio = initialAudioIndex != null
+					? result.audioStreams?.find((s) => s.index === initialAudioIndex)
+					: autoAudio;
+				const audioNeedsServer = audioStartNeedsServer({
+					wanted: wantedAudio,
+					audioStreams: result.audioStreams,
+					forceDirectPlay: playbackInfoOptions.forceDirectPlay,
+					isLiveTV
+				});
+				serverLogger.playback('Audio: start decision', {
+					initialAudioIndex: initialAudioIndex ?? null,
+					wantedIndex: wantedAudio?.index ?? null,
+					firstIndex: result.audioStreams?.[0]?.index ?? null,
+					playMethod: result.playMethod,
+					forceDirectPlay: Boolean(playbackInfoOptions.forceDirectPlay),
+					isLiveTV: Boolean(isLiveTV),
+					selectedAudioStreamIndex: result.selectedAudioStreamIndex ?? null,
+					needsServer: audioNeedsServer
+				});
+				if (audioNeedsServer) {
+					serverLogger.playback('Audio: starting track is not the first, building it on the server before play', {
+						jellyfinIndex: wantedAudio.index,
+						codec: wantedAudio.codec,
+						channelLayout: wantedAudio.channelLayout
+					});
+				}
+				if (!stillCurrent()) return;
+				if (wantedAudio && !isLiveTV
+					&& ((initialAudioIndex == null && result.playMethod !== playback.PlayMethod.DirectPlay
+						&& autoAudio.index !== result.selectedAudioStreamIndex) || (audioNeedsServer && initialAudioIndex == null))) {
 					try {
-						playbackInfoOptions.audioStreamIndex = autoAudio.index;
-						const renegotiated = await playback.getPlaybackInfo(item.Id, playbackInfoOptions);
+						playbackInfoOptions.audioStreamIndex = wantedAudio.index;
+						// a pick made on the details screen was already asked of the server by the first request
+						if (audioNeedsServer) playbackInfoOptions.enableDirectPlay = false;
+						// the same version the first answer chose, so the track index means the same stream
+						if (result.mediaSourceId) playbackInfoOptions.mediaSourceId = result.mediaSourceId;
+						const renegotiated = await playback.getPlaybackInfo(item.Id, audioNeedsServer ? {...playbackInfoOptions, refuseVideoReencode: true} : playbackInfoOptions);
 						if (!stillCurrent()) return;
 						result = renegotiated;
 						applyPlaybackResult(result);
-						audioNegotiated = true;
+						// Direct play again, whatever was asked, leaves the switch to the player
+						audioNegotiated = result.playMethod !== playback.PlayMethod.DirectPlay;
+						serverLogger.playback('Audio: starting track negotiated', {
+							jellyfinIndex: wantedAudio.index,
+							playMethod: result.playMethod,
+							selectedAudioStreamIndex: result.selectedAudioStreamIndex,
+							leftToThePlayer: !audioNegotiated
+						});
 					} catch (err) {
 						console.error('[Player] Audio track negotiation failed:', err);
+						serverLogger.playbackError('Audio: starting track negotiation failed', {
+							jellyfinIndex: wantedAudio.index,
+							error: err?.message || String(err)
+						});
 					}
 				}
 
@@ -1603,7 +1739,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// Direct play always sets the chosen track, since AVPlay can start on the
 				// first audio track whatever the file flags as default.
 				let pendingAudioIndex = null;
-				if (initialAudioIndex != null) {
+				if (initialAudioIndex != null && !audioNegotiated) {
 					pendingAudioIndex = initialAudioIndex;
 				} else if (!audioNegotiated && autoAudio
 					&& (result.playMethod === playback.PlayMethod.DirectPlay || autoAudio.index !== fileDefaultAudio?.index)) {
@@ -1755,6 +1891,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					try {
 						const renegotiated = await playback.getPlaybackInfo(item.Id, {
 							...playbackInfoOptions,
+							audioStreamIndex: playbackInfoOptions.audioStreamIndex ?? wantedAudio?.index,
 							subtitleStreamIndex: burnInPendingSub.index
 						});
 						if (!stillCurrent()) return;
@@ -1763,6 +1900,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						burnInSubtitleRef.current = burnInPendingSub.index;
 					} catch (err) {
 						console.error('[Player] Burn in subtitle negotiation failed:', err);
+						serverLogger.playbackError('Subtitle: burn in negotiation failed', {
+							subtitleIndex: burnInPendingSub.index,
+							error: err?.message || String(err)
+						});
 					}
 				}
 
@@ -1928,6 +2069,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				clearTimeout(trackConfirmTimerRef.current);
 				trackConfirmTimerRef.current = null;
 			}
+			if (audioVerifyTimerRef.current) {
+				clearTimeout(audioVerifyTimerRef.current);
+				audioVerifyTimerRef.current = null;
+			}
+			audioVerifyAskedRef.current = false;
 			useNativeSubtitleRef.current = false;
 			pendingSeekMsRef.current = null;
 			landingScrubRef.current = null;
@@ -2212,6 +2358,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					enableDirectStream: false,
 					enableTranscoding: true,
 					mediaSourceId: mediaSourceId,
+					audioStreamIndex: selectedAudioIndexRef.current != null ? selectedAudioIndexRef.current : undefined,
 					item: item,
 					stereoUpmixEnabled: settings.stereoUpmixEnabled
 				});
@@ -2242,6 +2389,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				maxBitrate: selectedQuality || settings.maxBitrate,
 				mediaSourceId,
 				audioStreamIndex: selectedAudioIndex != null ? selectedAudioIndex : undefined,
+				directPlayOpensFirstAudio: true,
 				item,
 				stereoUpmixEnabled: settings.stereoUpmixEnabled
 			});
@@ -2490,10 +2638,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	}, [startSleepTimer, closeModal]);
 
 	// A remux built around the track, for when the set cannot switch to it by itself
-	const reloadAudioFromServer = useCallback(async (index) => {
+	const reloadAudioFromServer = useCallback(async (index, refuseVideoReencode = false) => {
+		audioReloadedAtRef.current = Date.now();
 		const generation = loadGenerationRef.current;
 		const currentPositionTicks = Math.floor(avplayGetCurrentTime() * 10000);
-		const result = await playback.changeAudioStream(index, currentPositionTicks);
+		const result = await playback.changeAudioStream(index, currentPositionTicks, {refuseVideoReencode});
 		// the player was left or moved on to another item while the server answered
 		if (isUnmountedRef.current || generation !== loadGenerationRef.current) return;
 		if (result) {
@@ -2504,15 +2653,26 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// The automatic callers leave a group alone, since a local reload would pull this one out of step
 	reloadAudioFromServerRef.current = (index) => {
 		if (isInGroupRef.current) return;
-		reloadAudioFromServer(index).catch((err) => console.error('[Player] Failed to change audio:', err));
+		// nobody asked for this one, so it is not worth a re-encode of the picture
+		reloadAudioFromServer(index, true).catch((err) => {
+			// a failed reload does not hold the check back from asking again
+			audioReloadedAtRef.current = 0;
+			audioVerifyAskedRef.current = false;
+			console.error('[Player] Failed to change audio:', err);
+			serverLogger.playbackError('Audio: putting the track right from the server did not happen', {
+				jellyfinIndex: index,
+				refused: err?.code === 'REENCODE_REFUSED',
+				error: err?.message || String(err)
+			});
+		});
 	};
 
-	const applyAudioSelection = useCallback(async (index, shouldClose = true) => {
+	const applyAudioSelection = useCallback(async (index, shouldClose = true, remember = true) => {
 		setSelectedAudioIndex(index);
 		if (pendingTracksRef.current) pendingTracksRef.current.audioWanted = null;
 		// Saved here rather than after the switch, because switching leaves by several
 		// routes and the choice was made either way.
-		saveAudioPref(item, index, audioStreams || []);
+		if (remember) saveAudioPref(item, index, audioStreams || []);
 		if (shouldClose) closeModal();
 
 		try {
@@ -2540,6 +2700,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					if (tizenAudioIndex != null) {
 						avplaySelectTrack('AUDIO', tizenAudioIndex);
 						playback.updateCurrentSession({audioStreamIndex: index});
+						// a switch inside the stream can fail or be dropped without a word, so it is checked
+						audioVerifyAskedRef.current = false;
+						if (audioVerifyTimerRef.current) clearTimeout(audioVerifyTimerRef.current);
+						audioVerifyTimerRef.current = setTimeout(() => verifyAudioMatchesScreen(1, true), 3000);
 						console.log('[Player] Switched audio track natively, jellyfinIndex:', index, 'tizenIndex:', tizenAudioIndex);
 						return;
 					}
@@ -2553,7 +2717,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		} catch (err) {
 			console.error('[Player] Failed to change audio:', err);
 		}
-	}, [item, playMethod, closeModal, reloadAudioFromServer, audioStreams]);
+	}, [item, playMethod, closeModal, reloadAudioFromServer, verifyAudioMatchesScreen, audioStreams]);
 
 	// Track selection - using data attributes to avoid arrow functions in JSX
 	const handleSelectAudio = useCallback((e) => {
@@ -2721,7 +2885,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		rewind: handleRewind,
 		fastForward: handleForward,
 		setAudioStream: (index) => {
-			if ((audioStreams || []).some((s) => s.index === index)) applyAudioSelection(index, false);
+			if ((audioStreams || []).some((s) => s.index === index)) applyAudioSelection(index, false, false);
 		},
 		setSubtitleStream: (index) => {
 			if (index === -1 || subtitleStreams.some((s) => s.index === index)) applySubtitleSelection(index, subtitleStreams, false);
@@ -3561,6 +3725,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				{/* eslint-disable react/no-danger */}
 					<div
 						className={css.subtitleText}
+						data-subtitle-text="true"
 						style={getSubtitleTextStyle(subtitleStyleSettings)}
 						dangerouslySetInnerHTML={{__html: sanitizeSubtitleHtml(currentSubtitleText)}}
 					/>

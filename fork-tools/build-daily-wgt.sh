@@ -6,6 +6,8 @@
 set -e
 cd "$(git rev-parse --show-toplevel)"
 [ "$(git branch --show-current)" = "daily" ] || { echo "Packages are only built on the daily branch."; exit 1; }
+# The commit the package is built from, printed in the diagnostic report so a log says which build made it
+export REACT_APP_BUILD_ID="$(git rev-parse --short HEAD)"
 npm run build:tizen
 for built in Moonfin_Tizen_Regular_*.wgt; do
   case "$built" in

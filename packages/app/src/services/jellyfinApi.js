@@ -497,7 +497,7 @@ export const api = {
 	getLocalTrailers: (itemId) => request(`/Items/${itemId}/LocalTrailers?userId=${currentUser}`),
 
 	getItemForDetail: (itemId) =>
-		request(`${userRoutes.item(itemId)}Fields=Overview,Genres,OfficialRating,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,ParentLogoItemId,ParentLogoImageTag,ProviderIds,RunTimeTicks,ProductionYear,Chapters,People,Studios,Taglines,RemoteTrailers,MediaSources,MediaSourceCount,CommunityRating,CriticRating`),
+		request(`${userRoutes.item(itemId)}Fields=Overview,Genres,Tags,OfficialRating,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,ParentLogoItemId,ParentLogoImageTag,ProviderIds,RunTimeTicks,ProductionYear,Chapters,People,Studios,Taglines,RemoteTrailers,MediaSources,MediaSourceCount,CommunityRating,CriticRating`),
 
 	getItemWithChapters: (itemId) => request(`${userRoutes.item(itemId)}Fields=Chapters`),
 
@@ -1023,7 +1023,7 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 
 		// UserData is named so a saved rating comes back when the title is reopened.
 		getItem: (itemId) =>
-			serverRequest(`${serverUserRoutes.item(itemId)}Fields=Overview,Genres,People,Studios,MediaSources,MediaStreams,ExternalUrls,ProviderIds,RemoteTrailers,Taglines,UserData`),
+			serverRequest(`${serverUserRoutes.item(itemId)}Fields=Overview,Genres,Tags,People,Studios,MediaSources,MediaStreams,ExternalUrls,ProviderIds,RemoteTrailers,Taglines,UserData`),
 
 		getItemMediaInfo: (itemId) =>
 			serverRequest(`${serverUserRoutes.item(itemId)}Fields=MediaSources,MediaStreams`),
