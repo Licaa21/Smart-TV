@@ -146,3 +146,42 @@ This project is licensed under the MPL 2.0 license. Some parts incorporate conte
    <strong>Moonfin for Smart TVs</strong> is an independent client and is not affiliated with the Jellyfin or Emby projects.<br>
    <a href="https://github.com/Moonfin-Client">Back to main Moonfin project</a>
 </p>
+
+---
+
+## About this fork
+
+This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Client/Smart-TV), modified by me ([Licaa21](https://github.com/Licaa21)) for my own use. Moonfin itself is made by **RadicalMuffinMan** and the Moonfin contributors, and all credit for the app belongs to them. This fork follows upstream `main` and adds the changes below on top. It isn't an official build, and the changes aren't promised to ever reach upstream.
+
+### What I added
+
+**Playback**
+- **Standby recovery on Tizen:** playback comes back after the TV sleeps, goes to the background or is powered off, instead of leaving a black screen.
+- **Force Compatible AV1 Transcode:** an opt-in setting that re-encodes AV1 to HEVC when transcoding, for Tizen sets that fail on AV1 over fragmented-MP4 HLS.
+- **Channel keys:** CH +/- seek far, by five times the seek step or 3% of the runtime, wherever focus is. Previous plays the previous episode, and the TV's own channel, guide and streaming-service keys no longer close the app.
+- **Seeking lands by itself:** a held seek is applied about half a second after you stop, without pressing OK.
+- **Episode browser:** an Episodes button in the player opens the current season on the playing episode, with season tabs, CH +/- to change season, and resume on pick. It can be arranged in Player Buttons.
+- **Skip prompt:** its auto-hide starts over for every episode, so it no longer vanishes early after Previous or Next.
+- **Seek bar:** the focused thumb is easier to see on Tizen.
+
+**Subtitles and audio**
+- **Preferred Languages** subtitle mode: your preferred language, then your secondary one, and off when neither is in the file.
+- **Audio Codec Priority:** rank codecs from best to worst, applied after your audio language.
+- **Details buttons:** the Audio and Subtitle buttons show the track playback will actually start on.
+
+**Look and layout**
+- **Accent colors:** a color per part of the app, or one for everything, with focus fills kept readable.
+- **Skip Intro/Recap/Credits editor:** capsule, rectangle and sweep layouts with position, size, colors and a live preview, plus card, banner and button layouts for the Next Episode prompt.
+- **Search:** results drawn with the Home cards and rows, best matches first, and a setting for which tab a search opens on when Seerr has results.
+- **Person pages:** redesigned with a portrait, backdrop and de-duplicated credits.
+- **Details:** action button rows ranked like Settings, "Read more" only when the text is cut off, anime marker pills on every layout, and a Press BACK to close hint on trailers.
+
+**Diagnostics and translations**
+- **Diagnostic log:** the in-app log keeps its recent non-network lines across restarts, so a report still has them after the app reopens.
+- **Romanian:** strings added by this fork are translated by hand in `packages/app/resources/ro/strings.json`, since this fork has no Weblate project.
+
+### Building and updating
+
+`fork/daily` is upstream `main` with the branches listed in `fork-tools/pr-branches.txt` merged on top. To refresh it after upstream moves, run `bash fork-tools/rebuild-daily.sh` and then build as described in [Building](#building). The Tizen package is named after the version, for example `Moonfin_Tizen_Regular_2.9.0.wgt`.
+
+The only change I proposed upstream is the episode browser ([#494](https://github.com/Moonfin-Client/Smart-TV/pull/494)).
