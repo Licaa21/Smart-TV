@@ -1605,7 +1605,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					audioStreamIndex: initialAudioIndex != null ? initialAudioIndex : undefined,
 					subtitleStreamIndex: initialSubtitleIndex != null ? initialSubtitleIndex : undefined,
 					isLiveTV,
-					stereoUpmixEnabled: settings.stereoUpmixEnabled
+					stereoUpmixEnabled: settings.stereoUpmixEnabled,
+					// AVPlay opens a direct play on the file's first audio track
+					directPlayOpensFirstAudio: true
 				};
 				let result = await playback.getPlaybackInfo(item.Id, playbackInfoOptions);
 				if (!stillCurrent()) return;
@@ -1697,6 +1699,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					try {
 						playbackInfoOptions.audioStreamIndex = wantedAudio.index;
 						if (audioNeedsServer) playbackInfoOptions.enableDirectPlay = false;
+						// the same version the first answer chose, so the track index means the same stream
+						if (result.mediaSourceId) playbackInfoOptions.mediaSourceId = result.mediaSourceId;
 						const renegotiated = await playback.getPlaybackInfo(item.Id, playbackInfoOptions);
 						if (!stillCurrent()) return;
 						result = renegotiated;
@@ -1711,6 +1715,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						});
 					} catch (err) {
 						console.error('[Player] Audio track negotiation failed:', err);
+						serverLogger.playbackError('Audio: starting track negotiation failed', {
+							jellyfinIndex: wantedAudio.index,
+							error: err?.message || String(err)
+						});
 					}
 				}
 
@@ -1876,6 +1884,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					try {
 						const renegotiated = await playback.getPlaybackInfo(item.Id, {
 							...playbackInfoOptions,
+							audioStreamIndex: playbackInfoOptions.audioStreamIndex ?? wantedAudio?.index,
 							subtitleStreamIndex: burnInPendingSub.index
 						});
 						if (!stillCurrent()) return;
@@ -1884,6 +1893,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						burnInSubtitleRef.current = burnInPendingSub.index;
 					} catch (err) {
 						console.error('[Player] Burn in subtitle negotiation failed:', err);
+						serverLogger.playbackError('Subtitle: burn in negotiation failed', {
+							subtitleIndex: burnInPendingSub.index,
+							error: err?.message || String(err)
+						});
 					}
 				}
 
@@ -2337,6 +2350,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					enableDirectStream: false,
 					enableTranscoding: true,
 					mediaSourceId: mediaSourceId,
+					audioStreamIndex: selectedAudioIndexRef.current != null ? selectedAudioIndexRef.current : undefined,
 					item: item,
 					stereoUpmixEnabled: settings.stereoUpmixEnabled
 				});
@@ -2367,6 +2381,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				maxBitrate: selectedQuality || settings.maxBitrate,
 				mediaSourceId,
 				audioStreamIndex: selectedAudioIndex != null ? selectedAudioIndex : undefined,
+				directPlayOpensFirstAudio: true,
 				item,
 				stereoUpmixEnabled: settings.stereoUpmixEnabled
 			});
