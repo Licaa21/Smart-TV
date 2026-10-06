@@ -1562,13 +1562,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// A track remembered for the series stands in front of the language
 				// preferences, the same order the other clients take these in.
 				const rememberedAudio = await resolveSeriesAudio(item, result.audioStreams);
-				const preferredAudio = rememberedAudio || selectPreferredAudioStream(result.audioStreams, settings);
+				const audioSettings = rememberedAudio ? settings : await playback.audioSettingsForItem(settings, item);
+				const preferredAudio = rememberedAudio || selectPreferredAudioStream(result.audioStreams, audioSettings);
 				const serverAudio = result.audioStreams?.find(s => s.index === result.defaultAudioStreamIndex);
 				const fileDefaultAudio = result.audioStreams?.find(s => s.isDefault);
 				const autoAudio = preferredAudio || serverAudio || fileDefaultAudio;
 				serverLogger.playback('Audio: starting track chosen', {
 					picked: autoAudio ? `${autoAudio.index}:${autoAudio.language || '?'}:${autoAudio.codec || '?'}` : null,
 					because: rememberedAudio ? 'remembered for the series' : (preferredAudio ? 'language and codec settings' : (serverAudio ? 'server default' : 'file default')),
+					animeAudioPair: audioSettings !== settings,
 					codecOrderSaved: Array.isArray(settings.audioCodecOrder) && settings.audioCodecOrder.length > 0,
 					tracks: (result.audioStreams || []).map((s) => `${s.index}:${s.language || '?'}:${s.codec || '?'}:${s.channels || '?'}ch`)
 				});

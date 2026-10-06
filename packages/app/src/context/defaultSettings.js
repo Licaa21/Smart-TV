@@ -36,6 +36,10 @@ export const defaultSettings = {
 	subtitlePositionAbsoluteHdr: 90,
 	seekStep: 10,
 	fallbackAudioLanguage: '',
+	// Anime has a language pair of its own. Empty follows the default one. Both stay on this device,
+	// the other clients have no such setting to sync them with.
+	animeAudioLanguage: '',
+	animeFallbackAudioLanguage: '',
 	preferDefaultAudioTrack: false,
 	preferAudioDescription: false,
 	// No audioCodecOrder until one is saved. Tracks then rank as they always did, by language and flags

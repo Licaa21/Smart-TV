@@ -394,6 +394,12 @@ export const getAudioLanguageOptions = () => [
 	{ value: 'vie', label: $L('Vietnamese') }
 ];
 
+// Anime's own language, where empty leaves it on the default one
+export const getAnimeAudioLanguageOptions = () => [
+	{ value: '', label: $L('Same as default') },
+	...getAudioLanguageOptions().slice(1)
+];
+
 export const getSubtitleLanguageOptions = () => [
 	{ value: '', label: $L('None') },
 	...getAudioLanguageOptions().slice(1)
