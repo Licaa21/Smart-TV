@@ -9,6 +9,7 @@ import {channelKeyStep} from '../../utils/channelKeys';
 import {keepFocusInView} from '../../utils/focusScroll';
 import {watchedPercent} from '../../utils/episodeBrowser';
 import {ActiveTabContainer, ModalContainer} from '../../utils/spotlightContainers';
+import {AnimeEpisodePills} from '../../components/AnimeMarkerPills';
 import {hidesMediaDescription} from '../Details/detailsMedia';
 import {WatchedCheckIcon} from '../Details/DetailBadges';
 import {SpottableButton, SpottableDiv} from './PlayerConstants';
@@ -73,6 +74,8 @@ const EpisodeRow = memo(({episode, serverUrl, isCurrent, hideOverview, onSelect}
 			<div className={css.body}>
 				<span className={css.number}>{episodeLine(episode)}</span>
 				<span className={css.title}>{episode.Name}</span>
+				{/* Filler, canon, recap and subbed or dubbed, when the server knows them for this series. */}
+				<AnimeEpisodePills episode={episode} serverUrl={episode._serverUrl || serverUrl} compact className={css.pills} />
 				{episode.Overview && !hideOverview && <p className={css.overview}>{episode.Overview}</p>}
 			</div>
 		</SpottableDiv>
