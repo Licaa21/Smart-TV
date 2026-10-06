@@ -53,6 +53,19 @@ describe('resolveInitialSubtitle', () => {
 		expect(picked).toBe(spa);
 	});
 
+	test('preferred languages mode takes the preferred language, then the secondary one', async () => {
+		const deu = {index: 5, language: 'deu'};
+		const settings = {subtitleMode: 'preferred', subtitleLanguage: 'deu', fallbackSubtitleLanguage: 'eng'};
+		expect(await resolveInitialSubtitle({subtitleStreams: [spa, eng, deu]}, item, undefined, settings)).toBe(deu);
+		expect(await resolveInitialSubtitle({subtitleStreams: [spa, eng]}, item, undefined, settings)).toBe(eng);
+	});
+
+	test('preferred languages mode leaves subtitles off when neither language is in the file', async () => {
+		const dan = {index: 6, language: 'dan'};
+		const settings = {subtitleMode: 'preferred', subtitleLanguage: 'deu', fallbackSubtitleLanguage: 'eng'};
+		expect(await resolveInitialSubtitle({subtitleStreams: [dan, spa]}, item, undefined, settings)).toBeNull();
+	});
+
 	test('forced mode prefers the chosen language over the first forced track', async () => {
 		const spaForced = {index: 5, language: 'spa', isForced: true};
 		const streams = [spaForced, engForced];

@@ -57,6 +57,7 @@ const subtitleModeDescription = (mode) => {
 	switch (mode) {
 		case 'always': return $L('Automatically loads and displays subtitles every time a video starts.');
 		case 'foreign': return $L('Automatically turns on subtitles if the default audio track is in a foreign language.');
+		case 'preferred': return $L('Turns on subtitles in your preferred language, or your secondary language when that is missing, and none when neither is there.');
 		case 'forced': return $L('Only loads subtitles explicitly tagged with the forced metadata flag.');
 		case 'none': return $L('Completely disables automatic subtitle loading.');
 		default: return $L("Plays tracks internally flagged in the media file's metadata as \"default\" or \"forced\".");
