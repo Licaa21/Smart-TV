@@ -68,6 +68,8 @@ const MinimalistEpisodes = ({
 			imageHeight={CARD_IMAGE_HEIGHT}
 			selectKey={episode.Id}
 			onSelect={handleSelect}
+			episode={episode}
+			serverUrl={serverUrl}
 		/>
 	), [serverUrl, settings, handleSelect]);
 

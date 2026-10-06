@@ -265,8 +265,17 @@
 	margin-top: 9px;
 }
 
+// The info row leaves 12px below it and this leaves 12px under the pills, so they sit exactly
+// midway between the metadata line and the ratings. A block of its own, because the pills as
+// inline content took the line box's spare height above them and sat right on the ratings.
+// Empty when the title has no markers, and then it takes no room at all.
 .detailMarkers {
-	margin-top: 9px;
+	display: flex;
+	margin-bottom: 12px;
+}
+
+.detailMarkers:empty {
+	display: none;
 }
 
 /* Media Badges */

@@ -684,6 +684,8 @@ const NouveauDetailContent = (props) => {
 				imageHeight={episodeImage}
 				isNextUp={Boolean(nextUpId) && episode.Id === nextUpId}
 				progress={played ? played / 100 : 0}
+				episode={episode}
+				serverUrl={effectiveServerUrl}
 				selectKey={episode.Id}
 				onArtworkSelect={onEpisodeArtwork}
 				onDetailsSelect={onEpisodeDetails}
