@@ -5,6 +5,8 @@ import $L from '@enact/i18n/$L';
 import Hls from 'hls.js';
 import * as playback from '../../services/playback';
 import {getImageUrl, getLogoUrl} from '../../utils/helpers';
+import {channelKeyStep} from '../../utils/channelKeys';
+import {channelSeekSeconds} from '../../utils/channelSeek';
 import {api as jellyfinApi, createApiForServer, getServerUrl} from '../../services/jellyfinApi';
 import AudioMode from './audio/AudioMode';
 import useAudioTransport from './audio/useAudioTransport';
@@ -192,6 +194,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const [remoteSubtitleError, setRemoteSubtitleError] = useState(null);
 	const [mediaSegments, setMediaSegments] = useState(null);
 	const [nextEpisode, setNextEpisode] = useState(null);
+	const [previousEpisode, setPreviousEpisode] = useState(null);
+	// The lookup behind previousEpisode and the item it was made for, so Previous can wait on it.
+	const previousLookupRef = useRef(null);
 	const [isSeeking, setIsSeeking] = useState(false);
 	const [seekPosition, setSeekPosition] = useState(0);
 	const [mediaSourceId, setMediaSourceId] = useState(null);
@@ -895,6 +900,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			resetPopups(); // eslint-disable-line no-use-before-define
 			setNextEpisode(null);
+			setPreviousEpisode(null);
+			previousLookupRef.current = null;
 
 			await waitForDecoderRelease();
 
@@ -1150,6 +1157,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						setNextEpisode(queued);
 					} else if (item.Type === 'Episode') {
 						playback.getNextEpisode(item).then(setNextEpisode);
+					}
+					if (item.Type === 'Episode') {
+						const lookup = playback.getPreviousEpisode(item);
+						previousLookupRef.current = {itemId: item.Id, promise: lookup};
+						lookup.then((previous) => {
+							if (!cancelled) setPreviousEpisode(previous);
+						});
 					}
 				}
 
@@ -1753,6 +1767,23 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		await playback.reportStop(positionRef.current);
 		onPlayNext(episode, options);
 	}, [onPlayNext, item.Id]);
+
+	// Previous steps back to the episode before this one, the way Next steps on. A movie, a first
+	// episode, or a lookup that found nothing restarts it, as before.
+	const handlePrevious = useCallback(async () => {
+		if (!isAudioMode) {
+			// A press that comes before the lookup has answered waits for it, and for the very item it was
+			// made for, rather than restarting the video.
+			const lookup = previousLookupRef.current;
+			const previous = previousEpisode || (lookup && lookup.itemId === item.Id ? await lookup.promise : null);
+			serverLogger.playback('Previous pressed', {from: item.Id, to: previous ? previous.Id : 'restart'});
+			if (previous) {
+				onPlayNextWithCleanup(previous);
+				return;
+			}
+		}
+		handlePrevTrack();
+	}, [isAudioMode, previousEpisode, item, onPlayNextWithCleanup, handlePrevTrack]);
 
 	const {carouselOpenRef, openCarousel, markChannelPlaying, carouselProps} = useChannelCarousel({
 		item, isLiveTV, liveTvChannels, sortBy: settings.liveTvChannelSortBy,
@@ -2619,7 +2650,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			if (!groupSeekTo(ticks)) seekToTicks(ticks);
 		},
 		next: () => (isAudioMode ? handleNextTrack() : handlePlayNextNow()),
-		previous: handlePrevTrack,
+		previous: handlePrevious,
 		rewind: handleRewind,
 		fastForward: handleForward,
 		setAudioStream: (index) => {
@@ -2670,6 +2701,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const newTicks = Math.floor(newTime * 10000000);
 		if (newTicks && !groupSeekTo(newTicks)) seekToTicks(newTicks);
 	}, [duration, seekToTicks, groupSeekTo]);
+
+	// A held key repeats several times a second, so the report gets one line a second of it.
+	const lastSeekLogRef = useRef(0);
+	const logSeekKey = useCallback((source, jumpSeconds) => {
+		const now = Date.now();
+		if (now - lastSeekLogRef.current < 1000) return;
+		lastSeekLogRef.current = now;
+		serverLogger.playback('Seek: long jump', {source, jumpSeconds, durationSeconds: Math.round(duration)});
+	}, [duration]);
 
 	const handleProgressKeyDown = useCallback((e) => {
 		if (!videoRef.current) return;
@@ -2782,13 +2822,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			case 'guide': handleOpenGuide(); break;
 			case 'next': handlePlayNextNow(); break;
 			case 'nextTrack': handleNextTrack(); break;
-			case 'prevTrack': handlePrevTrack(); break;
+			case 'prevTrack': handlePrevious(); break;
 			case 'shuffle': handleToggleShuffle(); break;
 			case 'repeat': handleToggleRepeat(); break;
 			case 'favorite': handleToggleFavorite(); break;
 			default: break;
 		}
-	}, [showControls, handlePlayPause, handleRewind, handleForward, openModal, handleOpenCast, handleToggleZoom, handleOpenGuide, openCarousel, handlePlayNextNow, handleNextTrack, handlePrevTrack, handleToggleShuffle, handleToggleRepeat, handleToggleFavorite]);
+	}, [showControls, handlePlayPause, handleRewind, handleForward, openModal, handleOpenCast, handleToggleZoom, handleOpenGuide, openCarousel, handlePlayNextNow, handleNextTrack, handlePrevious, handleToggleShuffle, handleToggleRepeat, handleToggleFavorite]);
 
 	const handleControlButtonClick = useCallback((e) => {
 		const action = e.currentTarget.dataset.action;
@@ -2999,6 +3039,22 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			if (carouselOpenRef.current) return;
 
 			if (handlePopupKeyDown(e)) return;
+
+			// Channel keys seek far, with the controls showing or not and wherever focus is, the way
+			// left and right seek with the controls hidden. Live TV and open panels leave them alone.
+			const channelStep = channelKeyStep(e);
+			if (channelStep && !activeModal) {
+				e.preventDefault();
+				e.stopPropagation();
+				if (!isLiveTV && !(isAudioMode && focusRow === 'panel')) {
+					showControls();
+					setFocusRow('progress');
+					const jump = channelStep * channelSeekSeconds(settings.seekStep, duration);
+					logSeekKey('channel key', jump);
+					scrubBy(jump);
+				}
+				return;
+			}
 
 			if (e.keyCode === KEYS.PLAY) {
 				e.preventDefault();

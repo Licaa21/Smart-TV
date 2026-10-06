@@ -15,6 +15,9 @@ import {useSettings} from '../../context/SettingsContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import * as syncPlayService from '../../services/syncPlay';
 import {KEYS, isBackKey} from '../../utils/keys';
+import {channelKeyStep} from '../../utils/channelKeys';
+import {blockedKeysReport} from '../../utils/blockedKeys';
+import {channelSeekSeconds} from '../../utils/channelSeek';
 import {isPreroll, nextInQueue, shouldAutoAdvance} from '../../utils/cinemaMode';
 import {driftMs, needsSeek, correctionOptions, DRIFT_CHECK_MS, GROUP_SEEK_SETTLE_TIMEOUT_MS} from '../../utils/syncDrift';
 import {createReadyGate} from '../../utils/syncReady';
@@ -219,6 +222,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const [remoteSubtitleError, setRemoteSubtitleError] = useState(null);
 	const [mediaSegments, setMediaSegments] = useState(null);
 	const [nextEpisode, setNextEpisode] = useState(null);
+	const [previousEpisode, setPreviousEpisode] = useState(null);
+	// The lookup behind previousEpisode and the item it was made for, so Previous can wait on it.
+	const previousLookupRef = useRef(null);
 	const [isSeeking, setIsSeeking] = useState(false);
 	const [seekPosition, setSeekPosition] = useState(0);
 	const [mediaSourceId, setMediaSourceId] = useState(null);
@@ -1032,6 +1038,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// ==============================
 	useEffect(() => {
 		const init = async () => {
+			serverLogger.playback('Keys: taken from the TV', {registered: blockedKeysReport.registered, offered: blockedKeysReport.offered.length});
 			await initTizenAPI();
 			await keepScreenOn(!isPaused);
 
@@ -1453,6 +1460,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			setCurrentSubtitleText(null);
 			setSelectedSubtitleIndex(-1);
 			setMediaSegments(null);
+			setPreviousEpisode(null);
+			previousLookupRef.current = null;
 			setVideoAspectRatio(null);
 			resetPopups(); // eslint-disable-line no-use-before-define
 
@@ -1766,6 +1775,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 							if (stillCurrent()) setNextEpisode(next);
 						});
 					}
+					if (item.Type === 'Episode') {
+						const lookup = playback.getPreviousEpisode(item);
+						previousLookupRef.current = {itemId: item.Id, promise: lookup};
+						lookup.then((previous) => {
+							if (stillCurrent()) setPreviousEpisode(previous);
+						});
+					}
 				}
 
 				// === Start AVPlay ===
@@ -1991,6 +2007,23 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		avplayReadyRef.current = false;
 		onPlayNext(episode, options);
 	}, [onPlayNext, stopTimeUpdatePolling, item.Id]);
+
+	// Previous steps back to the episode before this one, the way Next steps on. A movie, a first
+	// episode, or a lookup that found nothing restarts it, as before.
+	const handlePrevious = useCallback(async () => {
+		if (!isAudioMode) {
+			// A press that comes before the lookup has answered waits for it, and for the very item it was
+			// made for, rather than restarting the video.
+			const lookup = previousLookupRef.current;
+			const previous = previousEpisode || (lookup && lookup.itemId === item.Id ? await lookup.promise : null);
+			serverLogger.playback('Previous pressed', {from: item.Id, to: previous ? previous.Id : 'restart'});
+			if (previous) {
+				onPlayNextWithCleanup(previous);
+				return;
+			}
+		}
+		handlePrevTrack();
+	}, [isAudioMode, previousEpisode, item, onPlayNextWithCleanup, handlePrevTrack]);
 
 	const {carouselOpenRef, openCarousel, markChannelPlaying, carouselProps} = useChannelCarousel({
 		item, isLiveTV, liveTvChannels, sortBy: settings.liveTvChannelSortBy,
@@ -2603,7 +2636,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			}
 		},
 		next: () => (isAudioMode ? handleNextTrack() : handlePlayNextNow()),
-		previous: handlePrevTrack,
+		previous: handlePrevious,
 		rewind: handleRewind,
 		fastForward: handleForward,
 		setAudioStream: (index) => {
@@ -2685,6 +2718,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (scrubHoldRef.current.active) pendingSeekMsRef.current = newMs;
 		else scheduleDeferredSeek(newMs);
 	}, [noteViewerActivity, beginScrub, scheduleDeferredSeek]);
+
+	// A held key repeats several times a second, so the report gets one line a second of it.
+	const lastSeekLogRef = useRef(0);
+	const logSeekKey = useCallback((source, jumpSeconds) => {
+		const now = Date.now();
+		if (now - lastSeekLogRef.current < 1000) return;
+		lastSeekLogRef.current = now;
+		serverLogger.playback('Seek: long jump', {source, jumpSeconds, durationSeconds: Math.round(duration)});
+	}, [duration]);
 
 	// Progress bar keyboard control - deferred seeking
 	const handleProgressKeyDown = useCallback((e) => {
@@ -2795,13 +2837,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			case 'guide': handleOpenGuide(); break;
 			case 'next': handlePlayNextNow(); break;
 			case 'nextTrack': handleNextTrack(); break;
-			case 'prevTrack': handlePrevTrack(); break;
+			case 'prevTrack': handlePrevious(); break;
 			case 'shuffle': handleToggleShuffle(); break;
 			case 'repeat': handleToggleRepeat(); break;
 			case 'favorite': handleToggleFavorite(); break;
 			default: break;
 		}
-	}, [showControls, handlePlayPause, handleRewind, handleForward, openModal, handleOpenCast, handleToggleZoom, handleOpenGuide, openCarousel, handlePlayNextNow, handleNextTrack, handlePrevTrack, handleToggleShuffle, handleToggleRepeat, handleToggleFavorite]);
+	}, [showControls, handlePlayPause, handleRewind, handleForward, openModal, handleOpenCast, handleToggleZoom, handleOpenGuide, openCarousel, handlePlayNextNow, handleNextTrack, handlePrevious, handleToggleShuffle, handleToggleRepeat, handleToggleFavorite]);
 
 	const handleControlButtonClick = useCallback((e) => {
 		const action = e.currentTarget.dataset.action;
@@ -3193,6 +3235,23 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			}
 
 			if (handlePopupKeyDown(e)) return;
+
+			// Channel keys seek far, with the controls showing or not and wherever focus is, the way
+			// left and right seek with the controls hidden. Live TV and open panels leave them alone,
+			// and they never reach the TV.
+			const channelStep = channelKeyStep(e);
+			if (channelStep && !activeModal) {
+				e.preventDefault();
+				e.stopPropagation();
+				if (!isLiveTV && avplayReadyRef.current && !(isAudioMode && focusRow === 'panel')) {
+					showControls();
+					setFocusRow('progress');
+					const jump = channelStep * channelSeekSeconds(settings.seekStep, duration);
+					logSeekKey('channel key', jump);
+					scrubBy(jump);
+				}
+				return;
+			}
 
 			// Up during live playback opens the channel carousel, over the OSD or not.
 			if (isLiveTV && !activeModal && (key === 'ArrowUp' || e.keyCode === 38)) {
