@@ -34,6 +34,7 @@ export const waitForDecoderRelease = (...args) => impl.waitForDecoderRelease(...
 export const getSharedVideoElement = (...args) => impl.getSharedVideoElement(...args);
 export const leavesPlayerInBackground = () => !!impl.leavesPlayerInBackground;
 export const resumesAfterFirstFrame = (mediaSource) => !!impl.resumesAfterFirstFrame?.(mediaSource);
+export const notePlaybackError = (...args) => impl?.notePlaybackError?.(...args);
 export const controllerIsOnlyRemote = () => !!impl?.controllerIsOnlyRemote;
 
 // Only Xbox hands the page its controller as keys as well, which a game reading the

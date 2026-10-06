@@ -25,7 +25,8 @@ import {
 	setupVisibilityHandler,
 	setupPlatformLifecycle,
 	leavesPlayerInBackground,
-	resumesAfterFirstFrame
+	resumesAfterFirstFrame,
+	notePlaybackError
 } from '../../services/video';
 import {KEYS, isBackKey} from '../../utils/keys';
 import {useSettings} from '../../context/SettingsContext';
@@ -2019,6 +2020,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 
 		const session = playback.getCurrentSession();
+		notePlaybackError(video?.error, session?.mediaSource, playMethod);
 		const hasVideoStream = !!session?.mediaSource?.MediaStreams?.some((s) => s.Type === 'Video');
 		const isAudioOnlySession = !!session?.mediaSource && !hasVideoStream;
 		if (isAudioOnlySession) {

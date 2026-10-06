@@ -14,8 +14,15 @@
 // The WebView is given no hardware decoder there, so H.264 is decoded by the
 // processor and stays at 1080p. HEVC goes through the console's own decoder, and is
 // the only codec offered in 4K.
+//
+// On the Series consoles the WebView says yes to HEVC every way it can be asked and
+// then turns the decoder away, so a console whose decoder has refused two different
+// files is taken at its word and offered H.264 from then on.
 import {bootData} from './bridge';
 import {modelName} from './deviceInfo';
+
+const HEVC_REFUSALS_KEY = 'moonfin:xboxHevcRefusals';
+const HEVC_REFUSAL_LIMIT = 2;
 
 let cachedCapabilities = null;
 let probeElement = null;
@@ -23,6 +30,27 @@ let probeElement = null;
 const canPlay = (type) => {
 	if (!probeElement) probeElement = document.createElement('video');
 	return !!probeElement.canPlayType(type).replace(/no/, '');
+};
+
+const hevcRefusals = () => {
+	try {
+		const kept = JSON.parse(window.localStorage.getItem(HEVC_REFUSALS_KEY));
+		return Array.isArray(kept) ? kept : [];
+	} catch (e) {
+		return [];
+	}
+};
+
+export const noteHevcRefusal = (sourceId) => {
+	const refused = hevcRefusals();
+	if (!sourceId || refused.includes(sourceId)) return;
+	refused.push(sourceId);
+	try {
+		window.localStorage.setItem(HEVC_REFUSALS_KEY, JSON.stringify(refused));
+	} catch (e) {
+		// Without storage the console just doesnt remember
+	}
+	if (refused.length >= HEVC_REFUSAL_LIMIT) clearCapabilitiesCache();
 };
 
 export const clearCapabilitiesCache = () => {
@@ -36,7 +64,7 @@ export const getDeviceCapabilities = async () => {
 
 	const protection = bootData()?.protection || {};
 	const version = detectXboxVersion();
-	const hevc = protection.hevc === true && canPlay('video/mp4; codecs="hvc1.1.6.L120.90"');
+	const hevc = protection.hevc === true && canPlay('video/mp4; codecs="hvc1.1.6.L120.90"') && hevcRefusals().length < HEVC_REFUSAL_LIMIT;
 
 	cachedCapabilities = {
 		modelName: modelName() || 'Xbox',

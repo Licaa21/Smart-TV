@@ -7,6 +7,7 @@
 import {videoRangeTypeOf} from '@moonfin/app/src/utils/videoRange';
 import {getSharedVideoElement as sharedVideoElement} from '@moonfin/platform-webos/video';
 import {onShellMessage, postToShell} from './bridge';
+import {noteHevcRefusal} from './deviceProfile';
 import {pressOnFocused, raiseHostBack} from './keys';
 
 export {giveControllerToGame} from './keys';
@@ -35,12 +36,22 @@ export const getSharedVideoElement = () => {
 // go of playback and the user comes back to the details page.
 export const leavesPlayerInBackground = true;
 
+const hasHevcVideo = (mediaSource) => {
+	const video = (mediaSource?.MediaStreams || []).find((stream) => stream.Type === 'Video');
+	return HEVC_NAMES.includes((video?.Codec || '').toLowerCase());
+};
+
 // A seek made before the first frame has shown never lands for HEVC here, though
 // one made after it does. So such a file is opened at its start and the player seeks
 // to the resume point once that frame is in.
-export const resumesAfterFirstFrame = (mediaSource) => {
-	const video = (mediaSource?.MediaStreams || []).find((stream) => stream.Type === 'Video');
-	return HEVC_NAMES.includes((video?.Codec || '').toLowerCase());
+export const resumesAfterFirstFrame = hasHevcVideo;
+
+// A console whose decoder wont open an HEVC file says so in the error, and the
+// profile wants to know.
+export const notePlaybackError = (error, mediaSource, playMethod) => {
+	if (playMethod === 'Transcode' || !hasHevcVideo(mediaSource)) return;
+	if (!/DECODER_ERROR_NOT_SUPPORTED/.test(error?.message || '')) return;
+	noteHevcRefusal(mediaSource.Id);
 };
 
 // The page hears of its own visibility and the host of the app's, and one trip

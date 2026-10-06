@@ -1,5 +1,5 @@
 import {clearCapabilitiesCache, detectXboxVersion, getDeviceCapabilities, getDeviceName, getJellyfinDeviceProfile} from '../../../platform-xbox/src/deviceProfile';
-import {getPlayMethod, resumesAfterFirstFrame} from '../../../platform-xbox/src/video';
+import {getPlayMethod, notePlaybackError, resumesAfterFirstFrame} from '../../../platform-xbox/src/video';
 
 // Chromium with the HEVC decoder present
 const canPlayType = (type) => (/hvc1|avc1|mp4a|flac/.test(type) ? 'probably' : '');
@@ -41,6 +41,10 @@ beforeEach(() => {
 	jest.spyOn(console, 'log').mockImplementation(() => {});
 });
 
+afterEach(() => {
+	window.localStorage.removeItem('moonfin:xboxHevcRefusals');
+});
+
 afterAll(() => {
 	delete window.__MOONFIN_XBOX__;
 });
@@ -72,6 +76,23 @@ describe('the Xbox device profile', () => {
 		window.HTMLMediaElement.prototype.canPlayType.mockImplementation((type) => (/hvc1/.test(type) ? '' : canPlayType(type)));
 		expect(await capabilitiesFor(boot())).toMatchObject({hevc: false, uhd: false});
 		window.HTMLMediaElement.prototype.canPlayType.mockImplementation(canPlayType);
+	});
+
+	test('drops HEVC once the decoder has refused two different files', async () => {
+		const refusal = {code: 4, message: 'PipelineStatus::DECODER_ERROR_NOT_SUPPORTED: video decoder initialization failed with DecoderStatus::Codes::kUnsupportedConfig'};
+		const hevcFile = (id) => ({Id: id, MediaStreams: [{Type: 'Video', Codec: 'hevc'}]});
+		expect(await capabilitiesFor(boot())).toMatchObject({hevc: true});
+
+		notePlaybackError(refusal, hevcFile('a'), 'DirectPlay');
+		notePlaybackError(refusal, hevcFile('a'), 'DirectPlay');
+		notePlaybackError(refusal, {Id: 'b', MediaStreams: [{Type: 'Video', Codec: 'h264'}]}, 'DirectPlay');
+		notePlaybackError(refusal, hevcFile('c'), 'Transcode');
+		notePlaybackError({code: 2, message: 'network'}, hevcFile('d'), 'DirectPlay');
+		expect(await capabilitiesFor(boot())).toMatchObject({hevc: true, uhd: true});
+
+		notePlaybackError(refusal, hevcFile('e'), 'DirectStream');
+		expect(await getDeviceCapabilities()).toMatchObject({hevc: false, uhd: false});
+		expect((await getJellyfinDeviceProfile()).DirectPlayProfiles.find((entry) => entry.Container === 'mkv').VideoCodec).toBe('h264');
 	});
 
 	test('offers the sound formats the WebView says it plays, and never DTS', async () => {
