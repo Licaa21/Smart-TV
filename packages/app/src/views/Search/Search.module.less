@@ -21,15 +21,13 @@
 }
 
 /* Search Input Section */
+// Scrolls away with the page. Left stuck to the top it floated over the cards beneath it and sat
+// across the tab bar, and Home cards are tall enough that there is always something under it.
 .searchInputSection {
 	padding: 60px 0 30px;
-	background: linear-gradient(to bottom, var(--theme-background, rgba(10, 10, 10, 0.98)) 0%, transparent 100%);
 	display: flex;
 	justify-content: center;
-	position: -webkit-sticky;
-	position: sticky;
-	top: 0;
-	z-index: 10;
+	position: relative;
 }
 
 .searchInputWrapper {
@@ -238,8 +236,10 @@
 }
 
 /* Results Container */
+// Home rows pad themselves 60px in from the edge, so the rows reach back out over the padding
+// the results area adds to everything else.
 .resultsContainer {
-	margin-top: 8px;
+	margin: 8px -60px 0;
 }
 
 .resultRow {
@@ -281,7 +281,7 @@
 	width: max-content;
 }
 
-/* Grid tab */
+/* Games tab */
 .gridWrapper {
 	padding: 8px 0;
 }
@@ -310,18 +310,6 @@
 	}
 }
 
-.cardPoster {
-	width: 157px;
-}
-
-.cardWide {
-	width: 218px;
-}
-
-.cardSquare {
-	width: 218px;
-}
-
 .cardImg {
 	position: relative;
 	width: 100%;
@@ -331,40 +319,6 @@
 	overflow: hidden;
 	box-sizing: border-box;
 	transition: border-color 0.2s;
-}
-
-.imgPoster {
-	padding-top: 150%;
-}
-
-.imgWide {
-	padding-top: 56.25%;
-}
-
-.imgSquare {
-	padding-top: 100%;
-}
-
-.imgCircle {
-	border-radius: 50%;
-}
-
-.cardImage {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-}
-
-.cardPlaceholder {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
-	font-size: 40px;
-	color: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.2);
 }
 
 .windowPlaceholder {
@@ -383,11 +337,6 @@
 	padding-top: 134%;
 }
 
-.watchedBadge {
-	@import '../../styles/mixins.less';
-	.watched-badge(24px, 14px);
-}
-
 .cardTitle {
 	font-size: 15px;
 	font-weight: 600;
@@ -398,32 +347,7 @@
 	white-space: nowrap;
 }
 
-.cardSubtitle {
-	font-size: 13px;
-	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.6));
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-/* Server Badge for unified mode */
-.serverBadge {
-	position: absolute;
-	top: 8px;
-	right: 8px;
-	padding: 4px 8px;
-	background: rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.75);
-	border-radius: 4px;
-	font-size: 12px;
-	color: var(--theme-text-primary, #ffffff);
-	font-weight: 500;
-	max-width: 120px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	z-index: 5;
-}
-
 .recentList  { .flex-wrap-gap(12px); }
 .resultItems { .flex-row-gap(20px); }
-.grid        { .flex-wrap-gap(30px; 20px); }
+// Home cards carry their own title under the artwork, so the rows of a grid sit close.
+.grid        { .flex-wrap-gap(16px; 20px); }
