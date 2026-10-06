@@ -2092,6 +2092,20 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		currentIsPreroll: isPreroll(item)
 	});
 
+	// Fork only: says in the diagnostic report when the skip prompt came up, and when it was due but the
+	// controls were in the way, which is how a prompt that never shows can be told from one that was
+	// never raised.
+	const skipPromptStart = skipSegment ? skipSegment.start : null;
+	useEffect(() => {
+		if (skipPromptStart == null) return;
+		serverLogger.playback(controlsVisible ? 'Skip prompt: due, but the controls are showing' : 'Skip prompt: shown', {
+			itemId: item.Id,
+			type: skipSegment.type,
+			start: skipSegment.start,
+			end: skipSegment.end
+		});
+	}, [skipPromptStart, controlsVisible]); // eslint-disable-line react-hooks/exhaustive-deps
+
 	// ==============================
 	// Playback Event Handlers (via AVPlay listener refs)
 	// ==============================

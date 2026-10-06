@@ -2,6 +2,7 @@ import {getPlatform} from '../platform';
 import {resolvePlatformModule} from './platformModule';
 import {setNetworkLogSink} from '../utils/networkLogSink';
 import {redact, redactContext} from '../utils/logRedaction';
+import {PERSIST_KEY, PERSIST_MAX, persistableLines, restoreLines, trimLogBuffer} from '../utils/logBuffer';
 import {setSyncLogSink} from '../utils/syncLog';
 import {acceptsReports, clientLogRequest} from './clientLogUpload';
 
@@ -27,6 +28,7 @@ const APP_VERSION = packageJson.version;
 
 // Tracing every request fills this fast, but these sets have little memory to spare.
 const MAX_LOG_BUFFER = 500;
+const isRequestLine = (entry) => entry.category === LOG_CATEGORIES.NETWORK && entry.level === LOG_LEVELS.DEBUG;
 
 let isEnabled = false;
 let isRecording = false;
@@ -37,6 +39,28 @@ let deviceInfoLoader = null;
 let clientLogSupported = false;
 
 const listeners = new Set();
+
+// The report outlives a restart: what the last run logged comes back at the start of this one.
+let persistTimer = null;
+const persistNow = () => {
+	if (persistTimer) {
+		clearTimeout(persistTimer);
+		persistTimer = null;
+	}
+	try {
+		localStorage.setItem(PERSIST_KEY, JSON.stringify(persistableLines(logBuffer, PERSIST_MAX, isRequestLine)));
+	} catch { /* storage that is full or missing only costs the report its history */ }
+};
+const schedulePersist = () => {
+	if (!persistTimer) persistTimer = setTimeout(persistNow, 1500);
+};
+try {
+	logBuffer = restoreLines(localStorage.getItem(PERSIST_KEY));
+	if (typeof document !== 'undefined') {
+		document.addEventListener('visibilitychange', () => { if (document.hidden) persistNow(); });
+	}
+	if (typeof window !== 'undefined') window.addEventListener('pagehide', persistNow);
+} catch { /* no storage, no history */ }
 
 const notify = () => {
 	listeners.forEach((fn) => {
@@ -144,9 +168,8 @@ const log = async (level, category, message, context = {}, immediate = false) =>
 	};
 
 	logBuffer.push(entry);
-	if (logBuffer.length > MAX_LOG_BUFFER) {
-		logBuffer.shift();
-	}
+	trimLogBuffer(logBuffer, MAX_LOG_BUFFER, isRequestLine);
+	if (!isRequestLine(entry)) schedulePersist();
 	notify();
 
 	const consoleMethod = level === LOG_LEVELS.ERROR || level === LOG_LEVELS.FATAL ? 'error' : 'log';
@@ -257,6 +280,7 @@ export const serverLogger = {
 
 	clear: () => {
 		logBuffer = [];
+		try { localStorage.removeItem(PERSIST_KEY); } catch { /* nothing kept */ }
 		notify();
 	},
 
