@@ -19,6 +19,7 @@ import {PLAYLIST_SAMPLE_SIZE, groupPlaylists, playlistCategoryFromItems, playlis
 import {isScrolledAway} from '../../utils/quickReturn';
 import RatingsRow from '../../components/RatingsRow';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
+import FilterPopup, {FilterOption} from '../../components/FilterPopup';
 import {useStorage} from '../../hooks/useStorage';
 import {buildFilterParams, facetRows} from '../../utils/libraryFilters';
 import {foldForSearch} from '../../utils/accentFolding';
@@ -110,7 +111,6 @@ const FACET_PAGE = 50;
 
 const SEARCH_ICON = 'M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z';
 
-const CLEAR_GROUP_ICON = 'm580-465-43-43 183-232H305l-60-60h527q21 0 31 19t-4 36L580-465ZM813-61 560-314v114q0 17-11.5 28.5T520-160h-80q-17 0-28.5-11.5T400-200v-274L61-813l43-43 752 752-43 43ZM537-508Z';
 
 // Sorting is what the panel is opened for most of the time, so it is the one section
 // standing open when the panel arrives.
@@ -231,7 +231,6 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const [audioLanguageFilters, setAudioLanguageFilters] = useState([]);
 	const [subtitleLanguageFilters, setSubtitleLanguageFilters] = useState([]);
 	const [facetValues, setFacetValues] = useState(null);
-	const [expandedSection, setExpandedSection] = useState(SORT_SECTION);
 	const [facetLimit, setFacetLimit] = useState(FACET_PAGE);
 	const [facetQuery, setFacetQuery] = useState('');
 	const [musicContentType, setMusicContentType] = useState('albums');
@@ -842,13 +841,11 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		toggleFilterValue(setSubtitleLanguageFilters, ev.currentTarget.dataset.filterValue);
 	}, [toggleFilterValue]);
 
-	// A library can hold hundreds of tags or years, so every section collapses to its
-	// heading and only the one opened takes up the panel.
-	const handleSectionExpand = useCallback((ev) => {
-		const key = ev.currentTarget.dataset.sectionKey;
+	// Moving to another group puts a raised limit and a typed search back, so the next facet
+	// opens as short as the last one began.
+	const handleGroupChange = useCallback(() => {
 		setFacetLimit(FACET_PAGE);
 		setFacetQuery('');
-		setExpandedSection(prev => (prev === key ? null : key));
 	}, []);
 
 	const handleFacetShowMore = useCallback(() => {
@@ -869,11 +866,8 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		subtitles: setSubtitleLanguageFilters
 	}), []);
 
-	// The tile goes away once its group is empty, so focus moves to the heading first
-	// rather than being left on nothing.
 	const handleClearGroup = useCallback((ev) => {
 		const key = ev.currentTarget.dataset.sectionKey;
-		Spotlight.focus(`filter-section-${key}`);
 		filterGroupSetters[key]([]);
 	}, [filterGroupSetters]);
 
@@ -899,7 +893,6 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	// time the panel comes up, so putting the panel away starts it over.
 	useEffect(() => {
 		if (showSortPanel) return;
-		setExpandedSection(SORT_SECTION);
 		setFacetLimit(FACET_PAGE);
 		setFacetQuery('');
 	}, [showSortPanel]);
@@ -1102,65 +1095,45 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	};
 	const countLabel = (count) => (count > 0 ? String(count) : null);
 
-	// Every group in the panel is one of these. The body is a function so the closed
-	// ones cost nothing to keep on the list, which matters for the facets that run to
-	// hundreds of rows.
-	const renderSection = (key, title, summary, renderBody) => {
-		const expanded = expandedSection === key;
-		return (
-			<div className={css.filterSection}>
-				<SpottableButton
-					className={`${css.sectionHeader} ${expanded ? css.sectionHeaderOpen : ''}`}
-					onClick={handleSectionExpand}
-					data-section-key={key}
-					spotlightId={`filter-section-${key}`}
-				>
-					<svg viewBox="0 -960 960 960" className={`${css.sectionChevron} ${expanded ? css.sectionChevronOpen : ''}`}>
-						<path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z" />
-					</svg>
-					<span className={css.sectionHeaderLabel}>{title}</span>
-					{summary && <span className={css.sectionSummary}>{summary}</span>}
-				</SpottableButton>
-				{expanded && renderBody()}
-			</div>
-		);
-	};
+	// Every group in the popup is one of these. The body is a function so the groups that are not
+	// showing cost nothing to keep on the list, which matters for the facets that run to hundreds
+	// of rows.
+	const renderSection = (key, title, summary, renderBody) => ({key, title, summary, body: renderBody});
 
 	const renderClearGroup = (key, count) => count > 0 && (
-		<SpottableButton
-			className={`${css.sortOption} ${css.clearGroup}`}
+		<FilterOption
+			key={`${key}-clear`}
+			plain
+			label={$L('Clear')}
 			onClick={handleClearGroup}
 			data-section-key={key}
-			spotlightId={`filter-${key}-clear`}
-		>
-			<svg viewBox="0 -960 960 960" className={css.clearGroupIcon}>
-				<path d={CLEAR_GROUP_ICON} />
-			</svg>
-			<span className={css.sortOptionLabel}>{$L('Clear')}</span>
-		</SpottableButton>
+		/>
 	);
 
-	const renderCheckRow = ({key, label, checked, value, spotlightId, onToggle}) => (
-		<SpottableButton
+	const renderCheckRow = ({key, label, checked, value, onToggle}) => (
+		<FilterOption
 			key={key}
-			className={`${css.sortOption} ${checked ? css.sortOptionActive : ''}`}
+			multi
+			label={label}
+			selected={checked}
 			onClick={onToggle}
 			data-filter-value={value}
-			spotlightId={spotlightId}
-		>
-			<span className={css.checkboxSquare}>
-				{checked && (
-					<svg viewBox="0 0 24 24" className={css.checkIcon}>
-						<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-					</svg>
-				)}
-			</span>
-			<span className={css.sortOptionLabel}>{label}</span>
-		</SpottableButton>
+		/>
+	);
+
+	// A single pick, whose handler reads the key it was given from a data attribute.
+	const renderRadioRow = (key, label, selected, onSelect, dataName) => (
+		<FilterOption
+			key={key}
+			label={label}
+			selected={selected}
+			onClick={onSelect}
+			{...{[dataName]: key}}
+		/>
 	);
 
 	// Features, quality and source are fixed lists, each cleared on its own the way a facet is.
-	const renderOptionSection = (key, title, options, selected, onToggle, idPrefix) => renderSection(key, title, countLabel(selected.length), () => (
+	const renderOptionSection = (key, title, options, selected, onToggle) => renderSection(key, title, countLabel(selected.length), () => (
 		<>
 			{renderClearGroup(key, selected.length)}
 			{options.map((option) => renderCheckRow({
@@ -1168,7 +1141,6 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 				label: $L(option.label),
 				checked: selected.includes(option.key),
 				value: option.key,
-				spotlightId: `filter-${idPrefix}-${option.key}`,
 				onToggle
 			}))}
 		</>
@@ -1185,7 +1157,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 			<>
 				{renderClearGroup(facetKey, selected.length)}
 				{searchable && (
-					<div className={`${css.searchWrap} ${css.facetSearch}`}>
+					<div className={`${css.searchWrap} ${css.facetSearch}`} style={{gridColumn: '1 / -1'}}>
 						<svg className={css.searchIcon} viewBox="0 -960 960 960">
 							<path d={SEARCH_ICON} />
 						</svg>
@@ -1200,25 +1172,21 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 						/>
 					</div>
 				)}
-				{visible.map((option, index) => renderCheckRow({
+				{visible.map((option) => renderCheckRow({
 					key: option.value,
 					label: option.name,
 					checked: selected.includes(option.value),
 					value: option.value,
-					spotlightId: `filter-${facetKey}-${index}`,
 					onToggle
 				}))}
-				{noMatches && <div className={css.facetNoResults}>{$L('No results')}</div>}
+				{noMatches && <div className={css.facetNoResults} style={{gridColumn: '1 / -1'}}>{$L('No results')}</div>}
 				{remaining > 0 && (
-					<SpottableButton
-						className={css.sortOption}
+					<FilterOption
+						key={`${facetKey}-more`}
+						plain
+						label={$L('Show more ({count} left)').replace('{count}', remaining)}
 						onClick={handleFacetShowMore}
-						spotlightId={`filter-${facetKey}-more`}
-					>
-						<span className={css.sortOptionLabel}>
-							{$L('Show more ({count} left)').replace('{count}', remaining)}
-						</span>
-					</SpottableButton>
+					/>
 				)}
 			</>
 		));
@@ -1489,150 +1457,48 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 			</div>
 
 			{showSortPanel && (
-				<div className={css.sortPanelOverlay} onClick={handleCloseSortPanel}>
-					<PanelContainer
-						className={css.sortPanel}
-						onFocus={keepFocusInView}
-						spotlightId="sort-panel"
-						onClick={stopPropagation}
-					>
-						<h2 className={css.sortPanelTitle}>{$L('Sort & Filter')}</h2>
-
-						{renderSection(SORT_SECTION, $L('Sort By'), sortLabel, () => (
-							activeSortOptions.map((option, index) => (
-								<SpottableButton
-									key={option.key}
-									className={`${css.sortOption} ${sortKey === option.key ? css.sortOptionActive : ''}`}
-									onClick={handleSortSelect}
-									data-sort-key={option.key}
-									spotlightId={`sort-option-${index}`}
-								>
-									<span className={css.radioCircle}>
-										{sortKey === option.key && <span className={css.radioFill} />}
-									</span>
-									<span className={css.sortOptionLabel}>{$L(option.label)}</span>
-									{sortKey === option.key && (
-										<svg viewBox="0 -960 960 960" className={css.sortArrow}>
-											{(sortOrder || option.order) === 'Ascending'
-												? <path d="M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z" />
-												: <path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z" />}
-										</svg>
-									)}
-								</SpottableButton>
-							))
-						))}
-
-						{isMusicLibrary && renderSection('music', $L('Show'), chosenLabel(MUSIC_CONTENT_TYPES, musicContentType), () => (
-							MUSIC_CONTENT_TYPES.map((ct) => (
-								<SpottableButton
-									key={ct.key}
-									className={`${css.sortOption} ${musicContentType === ct.key ? css.sortOptionActive : ''}`}
-									onClick={handleMusicContentSelect}
-									data-content-key={ct.key}
-									spotlightId={`music-content-${ct.key}`}
-								>
-									<span className={css.radioCircle}>
-										{musicContentType === ct.key && <span className={css.radioFill} />}
-									</span>
-									<span className={css.sortOptionLabel}>{$L(ct.label)}</span>
-								</SpottableButton>
-							))
-						))}
-
-						{renderSection('favorites', $L('Filters'), favoritesOnly ? $L('Favorites') : null, () => (
-							<SpottableButton
-								className={`${css.sortOption} ${favoritesOnly ? css.sortOptionActive : ''}`}
-								onClick={handleToggleFavorites}
-								spotlightId="filter-favorites"
-							>
-								<span className={css.checkboxSquare}>
-									{favoritesOnly && (
-										<svg viewBox="0 0 24 24" className={css.checkIcon}>
-											<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-										</svg>
-									)}
-								</span>
-								<span className={css.sortOptionLabel}>{$L('Favorites Only')}</span>
-							</SpottableButton>
-						))}
-
-						{renderSection('played', $L('Played Status'), chosenLabel(PLAYED_FILTERS, playedFilter), () => (
-							PLAYED_FILTERS.map((option) => (
-								<SpottableButton
-									key={option.key}
-									className={`${css.sortOption} ${playedFilter === option.key ? css.sortOptionActive : ''}`}
-									onClick={handlePlayedFilterSelect}
-									data-played-key={option.key}
-									spotlightId={`filter-played-${option.key}`}
-								>
-									<span className={css.radioCircle}>
-										{playedFilter === option.key && <span className={css.radioFill} />}
-									</span>
-									<span className={css.sortOptionLabel}>{$L(option.label)}</span>
-								</SpottableButton>
-							))
-						))}
-
-						{renderSection('liked', $L('My Rating'), chosenLabel(LIKED_FILTERS, likedFilter), () => (
-							LIKED_FILTERS.map((option) => (
-								<SpottableButton
-									key={option.key}
-									className={`${css.sortOption} ${likedFilter === option.key ? css.sortOptionActive : ''}`}
-									onClick={handleLikedFilterSelect}
-									data-liked-key={option.key}
-									spotlightId={`filter-liked-${option.key}`}
-								>
-									<span className={css.radioCircle}>
-										{likedFilter === option.key && <span className={css.radioFill} />}
-									</span>
-									<span className={css.sortOptionLabel}>{$L(option.label)}</span>
-								</SpottableButton>
-							))
-						))}
-
-						{isSeriesLibrary && renderSection('series', $L('Series Status'), chosenLabel(SERIES_FILTERS, seriesFilter), () => (
-							supported(SERIES_FILTERS).map((option) => (
-								<SpottableButton
-									key={option.key}
-									className={`${css.sortOption} ${seriesFilter === option.key ? css.sortOptionActive : ''}`}
-									onClick={handleSeriesFilterSelect}
-									data-series-key={option.key}
-									spotlightId={`filter-series-${option.key}`}
-								>
-									<span className={css.radioCircle}>
-										{seriesFilter === option.key && <span className={css.radioFill} />}
-									</span>
-									<span className={css.sortOptionLabel}>{$L(option.label)}</span>
-								</SpottableButton>
-							))
-						))}
-
-						{showVideoFilters && renderOptionSection('features', $L('Features'), supported(FEATURE_FILTERS), featureFilters, handleFeatureToggle, 'feature')}
-
-						{showVideoFilters && renderOptionSection('quality', $L('Quality'), supported(QUALITY_FILTERS), qualityFilters, handleQualityToggle, 'quality')}
-
-						{showVideoFilters && renderOptionSection('source', $L('Source'), VIDEO_SOURCE_FILTERS, videoSourceFilters, handleVideoSourceToggle, 'source')}
-
-						{!genreFilter && renderFacetSection('genres', $L('Genres'), facetValues?.genres, genreFilters, handleGenreToggle)}
-						{renderFacetSection('ratings', $L('Parental Rating'), facetValues?.officialRatings, ratingFilters, handleRatingToggle)}
-						{renderFacetSection('tags', $L('Tags'), facetValues?.tags, tagFilters, handleTagToggle)}
-						{renderFacetSection('years', $L('Years'), facetValues?.years?.map(String), yearFilters, handleYearToggle)}
-						{renderFacetSection('audio', $L('Audio Language'), facetValues?.audioLanguages, audioLanguageFilters, handleAudioLanguageToggle)}
-						{renderFacetSection('subtitles', $L('Subtitle Language'), facetValues?.subtitleLanguages, subtitleLanguageFilters, handleSubtitleLanguageToggle)}
-
-						{hasActiveFilters && (
-							<div className={css.filterSection}>
-								<SpottableButton
-									className={css.sortOption}
-									onClick={handleClearFilters}
-									spotlightId="filter-clear"
-								>
-									<span className={css.sortOptionLabel}>{$L('Clear Filters')}</span>
-								</SpottableButton>
-							</div>
-						)}
-					</PanelContainer>
-				</div>
+				<FilterPopup
+					title={$L('Sort & Filter')}
+					spotlightId="sort-panel"
+					defaultGroup={SORT_SECTION}
+					groups={[
+						renderSection(SORT_SECTION, $L('Sort By'), sortLabel, () => (
+							activeSortOptions.map((option) => {
+								const active = sortKey === option.key;
+								const arrow = (sortOrder || option.order) === 'Ascending' ? ' ↑' : ' ↓';
+								return renderRadioRow(option.key, `${$L(option.label)}${active ? arrow : ''}`, active, handleSortSelect, 'data-sort-key');
+							})
+						)),
+						isMusicLibrary && renderSection('music', $L('Show'), chosenLabel(MUSIC_CONTENT_TYPES, musicContentType), () => (
+							MUSIC_CONTENT_TYPES.map((ct) => renderRadioRow(ct.key, $L(ct.label), musicContentType === ct.key, handleMusicContentSelect, 'data-content-key'))
+						)),
+						renderSection('favorites', $L('Filters'), favoritesOnly ? $L('Favorites') : null, () => (
+							<FilterOption multi label={$L('Favorites Only')} selected={favoritesOnly} onClick={handleToggleFavorites} />
+						)),
+						renderSection('played', $L('Played Status'), chosenLabel(PLAYED_FILTERS, playedFilter), () => (
+							PLAYED_FILTERS.map((option) => renderRadioRow(option.key, $L(option.label), playedFilter === option.key, handlePlayedFilterSelect, 'data-played-key'))
+						)),
+						renderSection('liked', $L('My Rating'), chosenLabel(LIKED_FILTERS, likedFilter), () => (
+							LIKED_FILTERS.map((option) => renderRadioRow(option.key, $L(option.label), likedFilter === option.key, handleLikedFilterSelect, 'data-liked-key'))
+						)),
+						isSeriesLibrary && renderSection('series', $L('Series Status'), chosenLabel(SERIES_FILTERS, seriesFilter), () => (
+							supported(SERIES_FILTERS).map((option) => renderRadioRow(option.key, $L(option.label), seriesFilter === option.key, handleSeriesFilterSelect, 'data-series-key'))
+						)),
+						showVideoFilters && renderOptionSection('features', $L('Features'), supported(FEATURE_FILTERS), featureFilters, handleFeatureToggle),
+						showVideoFilters && renderOptionSection('quality', $L('Quality'), supported(QUALITY_FILTERS), qualityFilters, handleQualityToggle),
+						showVideoFilters && renderOptionSection('source', $L('Source'), VIDEO_SOURCE_FILTERS, videoSourceFilters, handleVideoSourceToggle),
+						!genreFilter && renderFacetSection('genres', $L('Genres'), facetValues?.genres, genreFilters, handleGenreToggle),
+						renderFacetSection('ratings', $L('Parental Rating'), facetValues?.officialRatings, ratingFilters, handleRatingToggle),
+						renderFacetSection('tags', $L('Tags'), facetValues?.tags, tagFilters, handleTagToggle),
+						renderFacetSection('years', $L('Years'), facetValues?.years?.map(String), yearFilters, handleYearToggle),
+						renderFacetSection('audio', $L('Audio Language'), facetValues?.audioLanguages, audioLanguageFilters, handleAudioLanguageToggle),
+						renderFacetSection('subtitles', $L('Subtitle Language'), facetValues?.subtitleLanguages, subtitleLanguageFilters, handleSubtitleLanguageToggle)
+					]}
+					canClear={hasActiveFilters}
+					onClear={handleClearFilters}
+					onGroupChange={handleGroupChange}
+					onClose={handleCloseSortPanel}
+				/>
 			)}
 
 			{showSettingsPanel && (

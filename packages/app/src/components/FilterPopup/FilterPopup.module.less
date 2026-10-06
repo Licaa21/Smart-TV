@@ -1,0 +1,242 @@
+// A centered popup: the groups down the left, the options of the focused group in columns on the
+// right. Sized to the screen so a long list is wide rather than tall.
+
+.overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 2000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.62);
+}
+
+.popup {
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+	width: 1560px;
+	max-width: 94%;
+	height: 840px;
+	max-height: 90%;
+	padding: 28px 36px 32px;
+	border-radius: 24px;
+	background: rgba(var(--theme-surface-rgb, 20, 20, 40), 0.96);
+	border: 1px solid rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.1);
+	box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+	color: var(--theme-on-surface, #ffffff);
+}
+
+.popupSingle {
+	width: 860px;
+	height: auto;
+	max-height: 90%;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-shrink: 0;
+	margin-bottom: 20px;
+}
+
+.title {
+	margin: 0;
+	font-size: 38px;
+	font-weight: 700;
+}
+
+.headerActions {
+	display: flex;
+
+	> * + * {
+		margin-left: 16px;
+	}
+}
+
+.headerButton {
+	padding: 10px 28px;
+	font-size: 24px;
+	font-weight: 600;
+	color: var(--theme-on-surface, #ffffff);
+	background: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.1);
+	border: 2px solid transparent;
+	border-radius: 14px;
+	cursor: pointer;
+
+	&:focus {
+		background: var(--theme-accent, #00a4dc);
+		border-color: var(--theme-accent, #00a4dc);
+		color: var(--theme-on-accent, #ffffff);
+	}
+}
+
+.body {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
+.groups {
+	flex-shrink: 0;
+	width: 420px;
+	padding-right: 24px;
+	overflow-y: auto;
+	scrollbar-width: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+		width: 0;
+	}
+}
+
+.group {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	width: 100%;
+	box-sizing: border-box;
+	margin-bottom: 8px;
+	padding: 12px 20px;
+	text-align: left;
+	color: var(--theme-on-surface, #ffffff);
+	background: transparent;
+	border: 2px solid transparent;
+	border-radius: 14px;
+	cursor: pointer;
+}
+
+.groupActive {
+	background: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.1);
+}
+
+.group:focus {
+	background: var(--theme-accent, #00a4dc);
+	border-color: var(--theme-accent, #00a4dc);
+	color: var(--theme-on-accent, #ffffff);
+}
+
+.groupTitle {
+	font-size: 26px;
+	font-weight: 600;
+}
+
+.groupSummary {
+	margin-top: 2px;
+	font-size: 20px;
+	opacity: 0.7;
+}
+
+.pane {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+	padding-left: 28px;
+	border-left: 1px solid rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.1);
+	overflow-y: auto;
+	scrollbar-width: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+		width: 0;
+	}
+}
+
+.paneAlone {
+	padding-left: 0;
+	border-left: none;
+}
+
+.paneTitle {
+	flex-shrink: 0;
+	margin: 0 0 16px;
+	font-size: 28px;
+	font-weight: 600;
+	opacity: 0.8;
+}
+
+// Older sets shrink flex children to fit rather than scroll, so the grid keeps its own height.
+.options {
+	display: grid;
+	flex-shrink: 0;
+	grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+	grid-gap: 12px;
+
+	// Whatever a screen hands in, from its own option rows to a search field, sits in one cell.
+	&.options > * {
+		width: 100%;
+		margin: 0;
+		box-sizing: border-box;
+	}
+}
+
+.option {
+	display: flex;
+	align-items: center;
+	padding: 14px 20px;
+	font-size: 24px;
+	text-align: left;
+	color: var(--theme-on-surface, #ffffff);
+	background: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.07);
+	border: 2px solid transparent;
+	border-radius: 14px;
+	cursor: pointer;
+
+	&:focus {
+		background: var(--theme-accent, #00a4dc);
+		border-color: var(--theme-accent, #00a4dc);
+		color: var(--theme-on-accent, #ffffff);
+	}
+}
+
+.optionSelected {
+	background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.28);
+	border-color: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.7);
+}
+
+.optionLabel {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.radio,
+.checkbox {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 26px;
+	height: 26px;
+	margin-right: 16px;
+	box-sizing: border-box;
+	border: 2px solid currentColor;
+}
+
+.radio {
+	border-radius: 50%;
+}
+
+.checkbox {
+	border-radius: 6px;
+}
+
+.radioFill {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+.checkIcon {
+	width: 20px;
+	height: 20px;
+	fill: currentColor;
+}

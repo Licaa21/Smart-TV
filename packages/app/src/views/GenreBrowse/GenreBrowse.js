@@ -3,8 +3,6 @@ import $L from '@enact/i18n/$L';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import {VirtualGridList} from '@enact/sandstone/VirtualList';
-import Popup from '@enact/sandstone/Popup';
-import Button from '@enact/sandstone/Button';
 import {useAuth} from '../../context/AuthContext';
 import {useSettings} from '../../context/SettingsContext';
 import * as connectionPool from '../../services/connectionPool';
@@ -12,6 +10,7 @@ import useParentalFilter from '../../hooks/useParentalFilter';
 import useItemMenuHold, {cardIndexOf} from '../../hooks/useItemMenuHold';
 import {withoutBlocked} from '../../utils/parentalFilter';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import FilterPopup, {FilterOption} from '../../components/FilterPopup';
 import {getImageUrl, getBackdropId, getPrimaryImageId} from '../../utils/helpers';
 
 import css from './GenreBrowse.module.less';
@@ -508,51 +507,47 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 				</GridContainer>
 			</div>
 
-			<Popup
-				open={showSortModal}
-				onClose={handleCloseModal}
-				position="center"
-				scrimType="translucent"
-				noAutoDismiss
-			>
-				<div className={css.popupContent}>
-					<div className={css.modalTitle}>{$L('Sort By')}</div>
-					{SORT_OPTIONS.map((option) => (
-						<Button
-							key={option.key}
-							className={css.popupOption}
-							selected={sortBy === option.key}
-							onClick={handleSortSelect}
-							data-sort-key={option.key}
-						>
-							{$L(option.label)}
-						</Button>
-					))}
-				</div>
-			</Popup>
+			{showSortModal && (
+				<FilterPopup
+					title={$L('Sort By')}
+					spotlightId="genre-browse-sort-popup"
+					groups={[{
+						key: 'sort',
+						title: $L('Sort By'),
+						body: () => SORT_OPTIONS.map((option) => (
+							<FilterOption
+								key={option.key}
+								label={$L(option.label)}
+								selected={sortBy === option.key}
+								onClick={handleSortSelect}
+								data-sort-key={option.key}
+							/>
+						))
+					}]}
+					onClose={handleCloseModal}
+				/>
+			)}
 
-			<Popup
-				open={showFilterModal}
-				onClose={handleCloseModal}
-				position="center"
-				scrimType="translucent"
-				noAutoDismiss
-			>
-				<div className={css.popupContent}>
-					<div className={css.modalTitle}>{$L('Filter')}</div>
-					{FILTER_OPTIONS.map((option) => (
-						<Button
-							key={option.key}
-							className={css.popupOption}
-							selected={filterType === option.key}
-							onClick={handleFilterSelect}
-							data-filter-key={option.key}
-						>
-							{$L(option.label)}
-						</Button>
-					))}
-				</div>
-			</Popup>
+			{showFilterModal && (
+				<FilterPopup
+					title={$L('Filter')}
+					spotlightId="genre-browse-filter-popup"
+					groups={[{
+						key: 'filter',
+						title: $L('Filter'),
+						body: () => FILTER_OPTIONS.map((option) => (
+							<FilterOption
+								key={option.key}
+								label={$L(option.label)}
+								selected={filterType === option.key}
+								onClick={handleFilterSelect}
+								data-filter-key={option.key}
+							/>
+						))
+					}]}
+					onClose={handleCloseModal}
+				/>
+			)}
 		</div>
 	);
 };

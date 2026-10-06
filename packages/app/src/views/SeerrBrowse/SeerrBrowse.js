@@ -1,12 +1,11 @@
 import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import {VirtualGridList} from '@enact/sandstone/VirtualList';
-import Popup from '@enact/sandstone/Popup';
-import Button from '@enact/sandstone/Button';
 import $L from '@enact/i18n/$L';
 import {useSeerr} from '../../context/SeerrContext';
 import {useSettings} from '../../context/SettingsContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import FilterPopup, {FilterOption} from '../../components/FilterPopup';
 import * as seerrApi from '../../services/seerrApi';
 import {buildSeerrDiscoverParams, getSeerrSortOptions, getSeerrTvStatusOptions, getSeerrMinRatingOptions, getSeerrMinVoteOptions, getSeerrRuntimeOptions, getSeerrReleaseOptions, hasSeerrDiscoverFilters} from '../../utils/seerrBrowseFilters';
 import {browseStateKey, readBrowseState, writeBrowseState} from './seerrBrowseState';
@@ -68,7 +67,6 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const [released, setReleased] = useState(saved?.released || '');
 	const [filterGenres, setFilterGenres] = useState([]);
 	const [filterLanguages, setFilterLanguages] = useState([]);
-	const [languagesExpanded, setLanguagesExpanded] = useState(false);
 	const filterOptionsRequestedRef = useRef(false);
 
 	const backdropTimeoutRef = useRef(null);
@@ -416,9 +414,6 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		setReleased(ev.currentTarget?.dataset?.optionKey || '');
 	}, []);
 
-	const handleToggleLanguages = useCallback(() => {
-		setLanguagesExpanded((prev) => !prev);
-	}, []);
 
 	const handleClearFilters = useCallback(() => {
 		setGenreIds([]);
@@ -431,6 +426,133 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	}, []);
 
 	const filterState = {genreIds, tvStatuses, language, minRating, minVotes, runtime, released};
+
+	// Each group is one thing that can be set, listed on the left of the popup with what it is set
+	// to now, and its options show beside it in columns.
+	const optionLabel = (options, value) => (value ? options.find((option) => option.key === value)?.label : null);
+	const countOf = (list) => (list.length > 0 ? String(list.length) : null);
+	const singleOptions = (options, value, onSelect) => options.map((option) => (
+		<FilterOption
+			key={option.key || 'any'}
+			label={option.label}
+			selected={value === option.key}
+			onClick={onSelect}
+			data-option-key={option.key}
+		/>
+	));
+	const sortOptions = getSeerrSortOptions(mediaType);
+	const activeSort = sortOptions.find((option) => sortBy.startsWith(option.key + '.'));
+	const sortDirection = sortBy.endsWith('.asc') ? '↑' : '↓';
+	const filterGroups = [
+		showMediaTypeFilter && {
+			key: 'type',
+			title: $L('Media Type'),
+			summary: optionLabel(getFilterOptions(), mediaType),
+			body: () => getFilterOptions().map((option) => (
+				<FilterOption
+					key={option.key}
+					label={option.label}
+					selected={mediaType === option.key}
+					onClick={handleFilterSelect}
+					data-filter-key={option.key}
+				/>
+			))
+		},
+		{
+			key: 'sort',
+			title: $L('Sort By'),
+			summary: activeSort ? `${activeSort.label} ${sortDirection}` : null,
+			body: () => sortOptions.map((option) => {
+				const active = sortBy.startsWith(option.key + '.');
+				return (
+					<FilterOption
+						key={option.key}
+						label={active ? `${option.label} ${sortDirection}` : option.label}
+						selected={active}
+						onClick={handleSortSelect}
+						data-sort-key={option.key}
+					/>
+				);
+			})
+		},
+		filterGenres.length > 0 && {
+			key: 'genres',
+			title: $L('Genres'),
+			summary: countOf(genreIds),
+			body: () => filterGenres.map((genre) => (
+				<FilterOption
+					key={genre.id}
+					multi
+					label={genre.name}
+					selected={genreIds.includes(genre.id)}
+					onClick={handleGenreToggle}
+					data-genre-id={genre.id}
+				/>
+			))
+		},
+		mediaType === 'tv' && {
+			key: 'status',
+			title: $L('Series Status'),
+			summary: countOf(tvStatuses),
+			body: () => getSeerrTvStatusOptions().map((option) => (
+				<FilterOption
+					key={option.key}
+					multi
+					label={option.label}
+					selected={tvStatuses.includes(option.key)}
+					onClick={handleTvStatusToggle}
+					data-status-key={option.key}
+				/>
+			))
+		},
+		{
+			key: 'released',
+			title: $L('Released'),
+			summary: optionLabel(getSeerrReleaseOptions(), released),
+			body: () => singleOptions(getSeerrReleaseOptions(), released, handleReleasedSelect)
+		},
+		{
+			key: 'rating',
+			title: $L('Minimum Rating'),
+			summary: optionLabel(getSeerrMinRatingOptions(), minRating),
+			body: () => singleOptions(getSeerrMinRatingOptions(), minRating, handleMinRatingSelect)
+		},
+		{
+			key: 'votes',
+			title: $L('Minimum Votes'),
+			summary: optionLabel(getSeerrMinVoteOptions(), minVotes),
+			body: () => singleOptions(getSeerrMinVoteOptions(), minVotes, handleMinVotesSelect)
+		},
+		{
+			key: 'runtime',
+			title: $L('Runtime'),
+			summary: optionLabel(getSeerrRuntimeOptions(), runtime),
+			body: () => singleOptions(getSeerrRuntimeOptions(), runtime, handleRuntimeSelect)
+		},
+		filterLanguages.length > 0 && {
+			key: 'language',
+			title: $L('Original Language'),
+			summary: language ? filterLanguages.find((option) => option.code === language)?.name : null,
+			body: () => [
+				<FilterOption
+					key="any"
+					label={$L('Any')}
+					selected={language === ''}
+					onClick={handleLanguageSelect}
+					data-language-code=""
+				/>,
+				...filterLanguages.map((option) => (
+					<FilterOption
+						key={option.code}
+						label={option.name}
+						selected={language === option.code}
+						onClick={handleLanguageSelect}
+						data-language-code={option.code}
+					/>
+				))
+			]
+		}
+	];
 
 	if (!item) {
 		return (
@@ -511,169 +633,16 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 				</div>
 			</div>
 
-			<Popup
-				open={showFilterModal}
-				onClose={handleCloseModal}
-				position="center"
-				scrimType="translucent"
-				noAutoDismiss
-			>
-				<div className={`${css.popupContent} ${css.popupScroll}`}>
-					{showMediaTypeFilter && (
-						<>
-							<div className={css.modalTitle}>{$L('Media Type')}</div>
-							{getFilterOptions().map((option) => (
-								<Button
-									key={option.key}
-									className={css.popupOption}
-									selected={mediaType === option.key}
-									onClick={handleFilterSelect}
-									data-filter-key={option.key}
-								>
-									{option.label}
-								</Button>
-							))}
-						</>
-					)}
-					<div className={css.modalTitle}>{$L('Sort By')}</div>
-					{getSeerrSortOptions(mediaType).map((option) => {
-						const active = sortBy.startsWith(option.key + '.');
-						const direction = sortBy.endsWith('.asc') ? '↑' : '↓';
-						return (
-							<Button
-								key={option.key}
-								className={css.popupOption}
-								selected={active}
-								onClick={handleSortSelect}
-								data-sort-key={option.key}
-							>
-								{active ? `${option.label} ${direction}` : option.label}
-							</Button>
-						);
-					})}
-					{filterGenres.length > 0 && (
-						<>
-							<div className={css.modalTitle}>{$L('Genres')}</div>
-							{filterGenres.map((genre) => (
-								<Button
-									key={genre.id}
-									className={css.popupOption}
-									selected={genreIds.includes(genre.id)}
-									onClick={handleGenreToggle}
-									data-genre-id={genre.id}
-								>
-									{genre.name}
-								</Button>
-							))}
-						</>
-					)}
-					{mediaType === 'tv' && (
-						<>
-							<div className={css.modalTitle}>{$L('Series Status')}</div>
-							{getSeerrTvStatusOptions().map((option) => (
-								<Button
-									key={option.key}
-									className={css.popupOption}
-									selected={tvStatuses.includes(option.key)}
-									onClick={handleTvStatusToggle}
-									data-status-key={option.key}
-								>
-									{option.label}
-								</Button>
-							))}
-						</>
-					)}
-					<div className={css.modalTitle}>{$L('Released')}</div>
-					{getSeerrReleaseOptions().map((option) => (
-						<Button
-							key={option.key || 'any'}
-							className={css.popupOption}
-							selected={released === option.key}
-							onClick={handleReleasedSelect}
-							data-option-key={option.key}
-						>
-							{option.label}
-						</Button>
-					))}
-					<div className={css.modalTitle}>{$L('Minimum Rating')}</div>
-					{getSeerrMinRatingOptions().map((option) => (
-						<Button
-							key={option.key || 'any'}
-							className={css.popupOption}
-							selected={minRating === option.key}
-							onClick={handleMinRatingSelect}
-							data-option-key={option.key}
-						>
-							{option.label}
-						</Button>
-					))}
-					<div className={css.modalTitle}>{$L('Minimum Votes')}</div>
-					{getSeerrMinVoteOptions().map((option) => (
-						<Button
-							key={option.key || 'any'}
-							className={css.popupOption}
-							selected={minVotes === option.key}
-							onClick={handleMinVotesSelect}
-							data-option-key={option.key}
-						>
-							{option.label}
-						</Button>
-					))}
-					<div className={css.modalTitle}>{$L('Runtime')}</div>
-					{getSeerrRuntimeOptions().map((option) => (
-						<Button
-							key={option.key || 'any'}
-							className={css.popupOption}
-							selected={runtime === option.key}
-							onClick={handleRuntimeSelect}
-							data-option-key={option.key}
-						>
-							{option.label}
-						</Button>
-					))}
-					{filterLanguages.length > 0 && (
-						<>
-							<Button
-								className={css.popupOption}
-								onClick={handleToggleLanguages}
-							>
-								{`${$L('Original Language')} ${languagesExpanded ? '▴' : '▾'}`}
-							</Button>
-							{languagesExpanded && (
-								<>
-									<Button
-										className={css.popupOption}
-										selected={language === ''}
-										onClick={handleLanguageSelect}
-										data-language-code=""
-									>
-										{$L('Any')}
-									</Button>
-									{filterLanguages.map((option) => (
-										<Button
-											key={option.code}
-											className={css.popupOption}
-											selected={language === option.code}
-											onClick={handleLanguageSelect}
-											data-language-code={option.code}
-										>
-											{option.name}
-										</Button>
-									))}
-								</>
-							)}
-						</>
-					)}
-					{hasSeerrDiscoverFilters(filterState) && (
-						<Button
-							className={css.popupOption}
-							onClick={handleClearFilters}
-						>
-							{$L('Clear Filters')}
-						</Button>
-					)}
-				</div>
-			</Popup>
+			{showFilterModal && (
+				<FilterPopup
+					title={$L('Sort & Filter')}
+					spotlightId="seerr-filter-popup"
+					groups={filterGroups}
+					canClear={hasSeerrDiscoverFilters(filterState)}
+					onClear={handleClearFilters}
+					onClose={handleCloseModal}
+				/>
+			)}
 		</div>
 	);
 };

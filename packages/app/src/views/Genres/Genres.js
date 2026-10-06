@@ -14,6 +14,7 @@ import useSortSettingsPanels from '../../hooks/useSortSettingsPanels';
 import useItemMenuHold, {cardIndexOf} from '../../hooks/useItemMenuHold';
 import {capitalize, createGridKeyDown, createToolbarKeyDown, cycleValue, stopPropagation} from '../../utils/gridChrome';
 import {PanelContainer} from '../../utils/spotlightContainers';
+import FilterPopup, {FilterOption} from '../../components/FilterPopup';
 
 import css from './Genres.module.less';
 
@@ -401,66 +402,50 @@ const Genres = ({onSelectGenre, onHome, backHandlerRef}) => {
 			</div>
 
 			{showSortPanel && (
-				<div className={css.sortPanelOverlay} onClick={handleCloseSortPanel}>
-					<PanelContainer
-						className={css.sortPanel}
-						spotlightId="genres-sort-panel"
-						onClick={stopPropagation}
-					>
-						<h2 className={css.sortPanelTitle}>{$L('Sort & Filter')}</h2>
-
-						<div className={css.sortSection}>
-							<div className={css.sortSectionLabel}>{$L('Sort By')}</div>
-							{SORT_OPTIONS.map((option, index) => (
-								<SpottableButton
+				<FilterPopup
+					title={$L('Sort & Filter')}
+					spotlightId="genres-sort-panel"
+					groups={[
+						{
+							key: 'sort',
+							title: $L('Sort By'),
+							summary: currentSort ? $L(currentSort.label) : null,
+							body: () => SORT_OPTIONS.map((option) => (
+								<FilterOption
 									key={option.key}
-									className={`${css.sortOption} ${sortOrder === option.key ? css.sortOptionActive : ''}`}
+									label={$L(option.label)}
+									selected={sortOrder === option.key}
 									onClick={handleSortSelect}
 									data-sort-key={option.key}
-									spotlightId={`genre-sort-option-${index}`}
-								>
-									<span className={css.radioCircle}>
-										{sortOrder === option.key && <span className={css.radioFill} />}
-									</span>
-									<span className={css.sortOptionLabel}>{$L(option.label)}</span>
-								</SpottableButton>
-							))}
-						</div>
-
-						{libraries.length > 0 && (
-							<div className={css.filterSection}>
-								<div className={css.sortSectionLabel}>{$L('Library')}</div>
-								<SpottableButton
-									className={`${css.sortOption} ${!selectedLibrary ? css.sortOptionActive : ''}`}
+								/>
+							))
+						},
+						libraries.length > 0 && {
+							key: 'library',
+							title: $L('Library'),
+							summary: selectedLibrary ? selectedLibrary.Name : $L('All Libraries'),
+							body: () => [
+								<FilterOption
+									key="all"
+									label={$L('All Libraries')}
+									selected={!selectedLibrary}
 									onClick={handleLibrarySelect}
 									data-lib-index="all"
-									spotlightId="genre-lib-all"
-								>
-									<span className={css.radioCircle}>
-										{!selectedLibrary && <span className={css.radioFill} />}
-									</span>
-									<span className={css.sortOptionLabel}>{$L('All Libraries')}</span>
-								</SpottableButton>
-								{libraries.map((lib, index) => (
-									<SpottableButton
+								/>,
+								...libraries.map((lib, index) => (
+									<FilterOption
 										key={lib.Id + (lib._serverId || '')}
-										className={`${css.sortOption} ${selectedLibrary?.Id === lib.Id ? css.sortOptionActive : ''}`}
+										label={unifiedMode && lib._serverName ? `${lib.Name} (${lib._serverName})` : lib.Name}
+										selected={selectedLibrary?.Id === lib.Id}
 										onClick={handleLibrarySelect}
 										data-lib-index={index}
-										spotlightId={`genre-lib-${index}`}
-									>
-										<span className={css.radioCircle}>
-											{selectedLibrary?.Id === lib.Id && <span className={css.radioFill} />}
-										</span>
-										<span className={css.sortOptionLabel}>
-											{unifiedMode && lib._serverName ? `${lib.Name} (${lib._serverName})` : lib.Name}
-										</span>
-									</SpottableButton>
-								))}
-							</div>
-						)}
-					</PanelContainer>
-				</div>
+									/>
+								))
+							]
+						}
+					]}
+					onClose={handleCloseSortPanel}
+				/>
 			)}
 
 			{showSettingsPanel && (

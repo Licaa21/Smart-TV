@@ -1,17 +1,8 @@
 import {useCallback} from 'react';
 import $L from '@enact/i18n/$L';
-import Spottable from '@enact/spotlight/Spottable';
-import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
+
+import FilterPopup, {FilterOption} from '../../components/FilterPopup';
 import {MUSIC_FOCUS_IDS} from './musicFocus';
-
-import css from './MusicFilterPanel.module.less';
-
-const SpottableButton = Spottable('div');
-const PanelContainer = SpotlightContainerDecorator({
-	enterTo: 'last-focused',
-	restrict: 'self-only',
-	leaveFor: {left: '', right: '', up: '', down: ''}
-}, 'div');
 
 const MUSIC_SORT_CHOICES = [
 	{key: 'name', label: $L('Name')},
@@ -29,8 +20,6 @@ const MUSIC_ROW_TOGGLES = [
 	{key: 'displayAudioAlbums', label: $L('Albums')}
 ];
 
-const stopPropagation = (e) => e.stopPropagation();
-
 const MusicFilterPanel = ({settings, onUpdateSetting, onClose}) => {
 	const handleSortSelect = useCallback((e) => {
 		const key = e.currentTarget?.dataset?.sortKey;
@@ -42,51 +31,45 @@ const MusicFilterPanel = ({settings, onUpdateSetting, onClose}) => {
 		if (key) onUpdateSetting(key, !settings[key]);
 	}, [onUpdateSetting, settings]);
 
+	const shown = MUSIC_ROW_TOGGLES.filter((row) => settings[row.key]).length;
+
 	return (
-		<div className={css.overlay} onClick={onClose}>
-			<PanelContainer
-				className={css.panel}
-				spotlightId={MUSIC_FOCUS_IDS.panel}
-				onClick={stopPropagation}
-			>
-				<h2 className={css.title}>{$L('Sort & Filter')}</h2>
-
-				<div className={css.section}>
-					<div className={css.sectionLabel}>{$L('Sort By')}</div>
-					{MUSIC_SORT_CHOICES.map((option, index) => (
-						<SpottableButton
+		<FilterPopup
+			title={$L('Sort & Filter')}
+			spotlightId={MUSIC_FOCUS_IDS.panel}
+			groups={[
+				{
+					key: 'sort',
+					title: $L('Sort By'),
+					summary: MUSIC_SORT_CHOICES.find((option) => option.key === settings.audioSortOption)?.label,
+					body: () => MUSIC_SORT_CHOICES.map((option) => (
+						<FilterOption
 							key={option.key}
-							className={`${css.option} ${settings.audioSortOption === option.key ? css.optionActive : ''}`}
-							data-sort-key={option.key}
-							spotlightId={`music-sort-option-${index}`}
+							label={option.label}
+							selected={settings.audioSortOption === option.key}
 							onClick={handleSortSelect}
-						>
-							<span className={css.radio}>
-								{settings.audioSortOption === option.key && <span className={css.radioFill} />}
-							</span>
-							<span className={css.optionLabel}>{option.label}</span>
-						</SpottableButton>
-					))}
-				</div>
-
-				<div className={css.section}>
-					<div className={css.sectionLabel}>{$L('Show')}</div>
-					{MUSIC_ROW_TOGGLES.map((row) => (
-						<SpottableButton
+							data-sort-key={option.key}
+						/>
+					))
+				},
+				{
+					key: 'show',
+					title: $L('Show'),
+					summary: `${shown}/${MUSIC_ROW_TOGGLES.length}`,
+					body: () => MUSIC_ROW_TOGGLES.map((row) => (
+						<FilterOption
 							key={row.key}
-							className={`${css.option} ${settings[row.key] ? css.optionActive : ''}`}
-							data-row-key={row.key}
+							multi
+							label={row.label}
+							selected={Boolean(settings[row.key])}
 							onClick={handleToggle}
-						>
-							<span className={css.check}>
-								{settings[row.key] && <span className={css.checkMark} />}
-							</span>
-							<span className={css.optionLabel}>{row.label}</span>
-						</SpottableButton>
-					))}
-				</div>
-			</PanelContainer>
-		</div>
+							data-row-key={row.key}
+						/>
+					))
+				}
+			]}
+			onClose={onClose}
+		/>
 	);
 };
 

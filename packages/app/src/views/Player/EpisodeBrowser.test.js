@@ -36,7 +36,7 @@ jest.mock('../../services/jellyfinApi', () => ({getServerUrl: () => 'http://serv
 // Each row asks the server for its own pills, which is not what these tests are about.
 jest.mock('../../components/AnimeMarkerPills', () => {
 	const React = require('react');
-	return {AnimeEpisodePills: ({episode, serverUrl}) => React.createElement('span', {'data-pills': episode.Id, 'data-server': serverUrl})};
+	return {AnimeEpisodePills: ({episode: row, serverUrl}) => React.createElement('span', {'data-pills': row.Id, 'data-server': serverUrl})};
 });
 
 let mockSettings;

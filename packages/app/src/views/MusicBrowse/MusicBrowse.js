@@ -1,6 +1,5 @@
 import {useState, useCallback, useMemo, useEffect, useRef} from 'react';
 import $L from '@enact/i18n/$L';
-import Spotlight from '@enact/spotlight';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import MediaRow from '../../components/MediaRow';
@@ -104,19 +103,6 @@ const MusicBrowse = ({library, api, serverUrl, onSelectItem, onOpenGrid, onHome,
 		// also keeps focus clear of any row the settings change is about to remove.
 		focusNode(HEADER);
 	}, [focusNode]);
-
-	useEffect(() => {
-		if (!showFilter) return undefined;
-		let attempts = 0;
-		let raf = null;
-		const tryFocus = () => {
-			if (Spotlight.focus('music-sort-option-0')) return;
-			attempts += 1;
-			if (attempts < 6) raf = window.requestAnimationFrame(tryFocus);
-		};
-		raf = window.requestAnimationFrame(tryFocus);
-		return () => { if (raf) window.cancelAnimationFrame(raf); };
-	}, [showFilter]);
 
 	useEffect(() => {
 		if (!backHandlerRef) return undefined;

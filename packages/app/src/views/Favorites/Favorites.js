@@ -22,6 +22,7 @@ import useItemMenuHold, {cardIndexOf} from '../../hooks/useItemMenuHold';
 import {GRID_DIRECTIONS, IMAGE_SIZES, IMAGE_TYPES, LETTERS, capitalize, createGridKeyDown, createToolbarKeyDown, cycleValue, stopPropagation} from '../../utils/gridChrome';
 import {keepFocusInView} from '../../utils/focusScroll';
 import {PanelContainer} from '../../utils/spotlightContainers';
+import FilterPopup, {FilterOption} from '../../components/FilterPopup';
 
 import FocusedItemHud from './FocusedItemHud';
 import useFavoriteTabs from './useFavoriteTabs';
@@ -543,54 +544,42 @@ const Favorites = ({onSelectItem, onSelectPerson, onHome, backHandlerRef}) => {
 			</div>
 
 			{showSortPanel && (
-				<div className={css.sortPanelOverlay} onClick={handleCloseSortPanel}>
-					<PanelContainer
-						className={css.sortPanel}
-						spotlightId="fav-sort-panel"
-						onClick={stopPropagation}
-					>
-						<h2 className={css.sortPanelTitle}>{isHome ? $L('Sort By') : $L('Sort & Filter')}</h2>
-
-						<div className={css.sortSection}>
-							<div className={css.sortSectionLabel}>{$L('Sort By')}</div>
-							{SORT_OPTIONS.map((option, index) => (
-								<SpottableButton
+				<FilterPopup
+					title={isHome ? $L('Sort By') : $L('Sort & Filter')}
+					spotlightId="fav-sort-panel"
+					groups={[
+						{
+							key: 'sort',
+							title: $L('Sort By'),
+							summary: $L(SORT_OPTIONS.find((option) => option.key === sortKey)?.label || ''),
+							body: () => SORT_OPTIONS.map((option) => (
+								<FilterOption
 									key={option.key}
-									className={`${css.sortOption} ${sortKey === option.key ? css.sortOptionActive : ''}`}
+									label={$L(option.label)}
+									selected={sortKey === option.key}
 									onClick={handleSortSelect}
 									data-sort-key={option.key}
-									spotlightId={`fav-sort-option-${index}`}
-								>
-									<span className={css.radioCircle}>
-										{sortKey === option.key && <span className={css.radioFill} />}
-									</span>
-									<span className={css.sortOptionLabel}>{$L(option.label)}</span>
-								</SpottableButton>
-							))}
-						</div>
-
-						{/* The tabs are the type picker in the other layout. */}
-						{!isHome && (
-							<div className={css.filterSection}>
-								<div className={css.sortSectionLabel}>{$L('Type')}</div>
-								{TYPE_FILTERS.map((filter, index) => (
-									<SpottableButton
-										key={filter.key}
-										className={`${css.sortOption} ${typeFilterKey === filter.key ? css.sortOptionActive : ''}`}
-										onClick={handleTypeFilterSelect}
-										data-filter-key={filter.key}
-										spotlightId={`fav-filter-option-${index}`}
-									>
-										<span className={css.radioCircle}>
-											{typeFilterKey === filter.key && <span className={css.radioFill} />}
-										</span>
-										<span className={css.sortOptionLabel}>{$L(filter.label)}</span>
-									</SpottableButton>
-								))}
-							</div>
-						)}
-					</PanelContainer>
-				</div>
+								/>
+							))
+						},
+						// The tabs are the type picker in the other layout.
+						!isHome && {
+							key: 'type',
+							title: $L('Type'),
+							summary: $L(TYPE_FILTERS.find((filter) => filter.key === typeFilterKey)?.label || ''),
+							body: () => TYPE_FILTERS.map((filter) => (
+								<FilterOption
+									key={filter.key}
+									label={$L(filter.label)}
+									selected={typeFilterKey === filter.key}
+									onClick={handleTypeFilterSelect}
+									data-filter-key={filter.key}
+								/>
+							))
+						}
+					]}
+					onClose={handleCloseSortPanel}
+				/>
 			)}
 
 			{showSettingsPanel && (
