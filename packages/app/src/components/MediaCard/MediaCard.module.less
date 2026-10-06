@@ -346,3 +346,9 @@
 	pointer-events: none;
 	word-break: break-word;
 }
+
+// A permanent layer per card adds up to hundreds on a long row. Only the focused card needs one.
+:global(.perf-lite) .card:not(:focus) {
+	transform: none;
+	will-change: auto;
+}

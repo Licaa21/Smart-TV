@@ -5,3 +5,8 @@
 	// Without the blur a glass panel is just a weak tint, so put the opaque one back.
 	--glass-tint: rgba(var(--theme-surface-rgb, 30, 30, 40), 0.92) !important;
 }
+
+// The last two levels also drop the text shadows and the idle looping animations.
+.perf-lean * {
+	text-shadow: none !important;
+}

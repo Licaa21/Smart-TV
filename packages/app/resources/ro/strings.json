@@ -2140,5 +2140,8 @@
     "Sweep": "Baleiere",
     "Text Color": "Culoarea textului",
     "Turns on subtitles in your preferred language, or your secondary language when that is missing, and none when neither is there.": "Pornește subtitrările în limba preferată sau în limba secundară dacă prima lipsește, și niciuna dacă nu există nici una dintre ele.",
-    "Uncompressed": "Necomprimat"
+    "Uncompressed": "Necomprimat",
+    "High": "Ridicat",
+    "Low": "Scăzut",
+    "Medium-High": "Mediu-ridicat"
 }
