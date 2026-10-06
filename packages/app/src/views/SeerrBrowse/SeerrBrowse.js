@@ -6,7 +6,7 @@ import {useSeerr} from '../../context/SeerrContext';
 import {useSettings} from '../../context/SettingsContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import FilterPopup, {FilterOption} from '../../components/FilterPopup';
-import {useStorage} from '../../hooks/useStorage';
+import {getFromStorage} from '../../services/storage';
 import {focusOverhang, horizontalCellPad} from '../../utils/gridChrome';
 import {useAuth} from '../../context/AuthContext';
 import libraryCss from '../Library/Library.module.less';
@@ -27,6 +27,8 @@ const getFilterOptions = () => (_filterOptions ??= [
 
 // The room the grid leaves at its sides, and the least gap kept between rows, as in the library.
 const GRID_INSET = 174;
+// A navbar down the left side takes this much more of the width.
+const SIDEBAR_INSET = 110;
 const MIN_ROW_GAP = 6;
 const MAX_PAGES = 25;
 
@@ -66,21 +68,46 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	// the shows library for shows, read here and changed only in that library, so a card is the same
 	// size and shape in both.
 	const {api} = useAuth();
-	const [libraryId, setLibraryId] = useState('default');
+	const [layout, setLayout] = useState({size: 'medium', type: 'poster', direction: 'vertical', text: 'on'});
+	// The grid waits for the library's settings, so it is not drawn at the defaults and then again.
+	const [layoutLoaded, setLayoutLoaded] = useState(false);
 	useEffect(() => {
 		let cancelled = false;
 		const wanted = mediaType === 'tv' ? 'tvshows' : 'movies';
-		api.getLibraries().then((views) => {
-			const library = (views?.Items || []).find((candidate) => candidate.CollectionType === wanted);
-			if (!cancelled && library) setLibraryId(library.Id);
-		}).catch(() => {});
+		setLayoutLoaded(false);
+		const readLayout = async () => {
+			const defaults = {size: 'medium', type: 'poster', direction: 'vertical', text: 'on'};
+			try {
+				const views = await api.getLibraries();
+				const library = (views?.Items || []).find((candidate) => candidate.CollectionType === wanted);
+				if (!library) return defaults;
+				const [size, type, direction, text] = await Promise.all([
+					getFromStorage(`library_imageSize_${library.Id}`),
+					getFromStorage(`library_imageType_${library.Id}`),
+					getFromStorage(`library_gridDirection_${library.Id}`),
+					getFromStorage(`library_cardText_${library.Id}`)
+				]);
+				return {
+					size: size || defaults.size,
+					type: type || defaults.type,
+					direction: direction || defaults.direction,
+					text: text || defaults.text
+				};
+			} catch (err) {
+				return defaults;
+			}
+		};
+		readLayout().then((found) => {
+			if (cancelled) return;
+			setLayout(found);
+			setLayoutLoaded(true);
+		});
 		return () => { cancelled = true; };
 	}, [api, mediaType]);
-	const [imageSize] = useStorage(`library_imageSize_${libraryId}`, 'medium');
-	const [imageType] = useStorage(`library_imageType_${libraryId}`, 'poster');
-	const [gridDirection] = useStorage(`library_gridDirection_${libraryId}`, 'vertical');
-	const [cardText] = useStorage(`library_cardText_${libraryId}`, 'on');
-	const showCardText = cardText !== 'off';
+	const imageSize = layout.size;
+	const imageType = layout.type;
+	const gridDirection = layout.direction;
+	const showCardText = layout.text !== 'off';
 	const [sortBy, setSortBy] = useState(saved?.sortBy || 'popularity.desc');
 	const [genreIds, setGenreIds] = useState(saved?.genreIds || []);
 	const [tvStatuses, setTvStatuses] = useState(saved?.tvStatuses || []);
@@ -283,7 +310,8 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const textHeight = showCardText ? 61 : 0;
 	const cardHeight = posterHeight + textHeight;
 	// A focused card grows past its cell, so the cell is padded by what it grows into.
-	const cellPadX = horizontalCellPad(cardWidth, window.innerWidth - GRID_INSET);
+	const gridInset = GRID_INSET + (settings.navbarPosition === 'left' ? SIDEBAR_INSET : 0);
+	const cellPadX = horizontalCellPad(cardWidth, window.innerWidth - gridInset);
 	const cellPadY = Math.max(MIN_ROW_GAP, focusOverhang(cardHeight));
 	const gridItemSize = useMemo(
 		() => ({minWidth: cardWidth + cellPadX * 2, minHeight: cardHeight + cellPadY * 2}),
@@ -598,7 +626,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 				</div>
 
 				<div className={css.gridContainer}>
-					{isLoading && items.length === 0 ? (
+					{(isLoading && items.length === 0) || !layoutLoaded ? (
 						<div className={css.loading}>
 							<LoadingSpinner />
 						</div>

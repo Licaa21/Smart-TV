@@ -43,11 +43,11 @@ const ModernMediaRow = ({
 	const scrollTimeoutRef = useRef(null);
 	const rowElementRef = useRef(null);
 	// How many of the cards are drawn. Everything, except on the older sets, where the row starts short.
-	const [shownCount, setShownCount] = useState(() => rememberedRowCount(rowId || title || rowIndex || ''));
+	const [shownCount, setShownCount] = useState(() => (rowId ? rememberedRowCount(rowId) : null));
 	const limit = items ? Math.min(items.length, shownCount === null ? initialRowCount(items.length) : shownCount) : 0;
 	useEffect(() => {
-		if (shownCount !== null) rememberRowCount(rowId || title || rowIndex || '', shownCount);
-	}, [shownCount, rowId, title, rowIndex]);
+		if (rowId && shownCount !== null) rememberRowCount(rowId, shownCount);
+	}, [shownCount, rowId]);
 	const [focusedItemId, setFocusedItemId] = useState(null);
 	const platform = useRef(getPlatform()).current;
 
