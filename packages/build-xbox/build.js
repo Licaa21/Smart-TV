@@ -7,13 +7,20 @@
 // with the Visual Studio Build Tools and their UWP workload. Pass --no-msix to stop
 // once the web app is in place, which works on any system.
 //
-//   node build.js [--debug] [--no-msix] [--no-web] [--probe-clips] [--dev-url <url>] [--install <console>]
+//   node build.js [--debug] [--tester] [--store] [--no-msix] [--no-web] [--probe-clips] [--dev-url <url>] [--install <console>]
 //   node build.js --probe [--debug] [--server <url>] [--emby <url>] [--image <url>] [--report <url>] [--media <label=url>]... [--install <console>]
 //
 // The app carries the device probe, which Settings opens for a signed in user, see
 // probe/probe.js. --probe-clips adds the test clips its playback run plays, made
 // beforehand with probe/make-clips.js. They are some 70 MB, so a build for testers
 // takes them and an ordinary one doesnt.
+//
+// --tester makes the package to hand to testers. It takes the clips, and its version
+// counts up so it installs over the build they already have.
+//
+// --store makes the upload for the Microsoft Store, under the identity of the Store
+// product the desktop app is listed as. The Store signs what it publishes, so a
+// throwaway certificate of that publisher does here.
 //
 // --probe packages the probe page instead of the app, with the clips. It is a
 // package of its own name, so it installs beside the app rather than over it, and
@@ -51,6 +58,9 @@ const MANIFEST_PATH = path.join(HOST_DIR, 'Package.appxmanifest');
 const PROBE_DIR = path.join(__dirname, 'probe');
 const BUILD_MANIFEST = 'Package.Build.appxmanifest';
 
+// The Store product the package is submitted under, shared with the desktop app.
+const STORE_IDENTITY = {name: 'Moonfin.Moonfin', publisher: 'CN=4E670673-D47F-4792-94F7-65B4918F6E4C'};
+
 // Files the subtitle renderers load next to the page. The page has a real origin
 // here, so they are copied as they are.
 const LIBASS_DIR = path.join(ROOT_DIR, 'node_modules', 'libass-wasm', 'dist', 'js');
@@ -65,6 +75,7 @@ const PAGE_ASSETS = [
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
 const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : null);
+const bundlesClips = () => flag('--probe-clips') || flag('--tester');
 const everyOption = (name) => args.map((arg, index) => (arg === name ? args[index + 1] : null)).filter(Boolean);
 
 const run = (cmd, opts = {}) => {
@@ -184,8 +195,8 @@ const buildApp = (appPkg) => {
 	// Settings opens the probe once the user is signed in. Its test clips are large, so
 	// they only go along when asked for.
 	console.log('\n Adding the device probe...');
-	const probe = writeProbe(path.join(WWW_DIR, 'probe'), {assets: '../', clips: flag('--probe-clips')});
-	console.log(`  ${probe.bundled.length} test clips${flag('--probe-clips') ? '' : ' (pass --probe-clips to bundle them)'}`);
+	const probe = writeProbe(path.join(WWW_DIR, 'probe'), {assets: '../', clips: bundlesClips()});
+	console.log(`  ${probe.bundled.length} test clips${bundlesClips() ? '' : ' (pass --probe-clips to bundle them)'}`);
 
 	console.log('\n Pruning ilib locale data...');
 	require(path.join(ROOT_DIR, 'scripts', 'prune-ilib-locales.js'))(WWW_DIR);
@@ -249,9 +260,10 @@ const buildProbe = () => {
 
 // A console only takes a package over one it already has when the version went up,
 // and removing the old one first throws away the sign in and every setting. So each
-// Debug build, and any build sent to a console, counts the last part of its version
-// one higher. The count is kept beside the certificate, outside the repo.
-const countsVersionUp = () => flag('--debug') || flag('--install');
+// Debug build, and any build sent to a console or made for testers, counts the last
+// part of its version one higher. The count is kept beside the certificate, outside
+// the repo.
+const countsVersionUp = () => flag('--debug') || flag('--install') || flag('--tester');
 const nextRevision = () => {
 	const file = path.join(CERT_DIR, 'debug-revision.txt');
 	const last = fs.existsSync(file) ? Number(fs.readFileSync(file, 'utf8')) || 0 : 0;
@@ -261,14 +273,20 @@ const nextRevision = () => {
 	return next;
 };
 
-// A probe build needs another name and a build that counts its version up needs that
-// version, so those are made from a copy of the manifest, written fresh each build
-// and never committed. Null when the app's own manifest will do.
+// A probe build needs another name, a build that counts its version up needs that
+// version and a Store build needs the Store's identity, so those are made from a copy
+// of the manifest, written fresh each build and never committed. Null when the app's
+// own manifest will do.
 const writeBuildManifest = (version) => {
-	if (!flag('--probe') && !countsVersionUp()) return null;
+	if (!flag('--probe') && !flag('--store') && !countsVersionUp()) return null;
 	let manifest = fs.readFileSync(MANIFEST_PATH, 'utf8');
 	if (countsVersionUp()) {
 		manifest = manifest.replace(/(<Identity[^>]*?Version=")[^"]*(")/, `$1${version}.${nextRevision()}$2`);
+	}
+	if (flag('--store')) {
+		manifest = manifest
+			.replace(/(<Identity[^>]*?Name=")[^"]*(")/, `$1${STORE_IDENTITY.name}$2`)
+			.replace(/(<Identity[^>]*?Publisher=")[^"]*(")/, `$1${STORE_IDENTITY.publisher}$2`);
 	}
 	if (flag('--probe')) {
 		manifest = manifest
@@ -330,17 +348,18 @@ $certificate = $request.CreateSelfSigned([System.DateTimeOffset]::UtcNow.AddDays
 `;
 
 const signingCertificate = () => {
-	if (process.env.MOONFIN_XBOX_PFX) {
+	if (process.env.MOONFIN_XBOX_PFX && !flag('--store')) {
 		const pfx = path.resolve(process.env.MOONFIN_XBOX_PFX);
 		if (!fs.existsSync(pfx)) throw new Error(`MOONFIN_XBOX_PFX names ${pfx}, which does not exist`);
 		return {pfx, password: process.env.MOONFIN_XBOX_PFX_PASSWORD || ''};
 	}
 
-	const pfx = path.join(CERT_DIR, 'moonfin-xbox-dev.pfx');
-	const cer = path.join(CERT_DIR, 'moonfin-xbox-dev.cer');
-	const passwordFile = path.join(CERT_DIR, 'password.txt');
-	const subjectFile = path.join(CERT_DIR, 'subject.txt');
-	const subject = manifestPublisher();
+	const kind = flag('--store') ? 'store' : 'dev';
+	const pfx = path.join(CERT_DIR, `moonfin-xbox-${kind}.pfx`);
+	const cer = path.join(CERT_DIR, `moonfin-xbox-${kind}.cer`);
+	const passwordFile = path.join(CERT_DIR, `${kind}-password.txt`);
+	const subjectFile = path.join(CERT_DIR, `${kind}-subject.txt`);
+	const subject = flag('--store') ? STORE_IDENTITY.publisher : manifestPublisher();
 	const current = fs.existsSync(pfx) && fs.existsSync(passwordFile) && fs.existsSync(subjectFile) && fs.readFileSync(subjectFile, 'utf8') === subject;
 	if (!current) {
 		console.log(`\n Making a throwaway signing certificate for ${subject}...`);
@@ -385,7 +404,7 @@ const buildMsix = (version) => {
 		'-verbosity:minimal',
 		`-p:Configuration=${configuration}`,
 		'-p:Platform=x64',
-		'-p:UapAppxPackageBuildMode=SideloadOnly',
+		`-p:UapAppxPackageBuildMode=${flag('--store') ? 'StoreUpload' : 'SideloadOnly'}`,
 		`-p:AppxPackageDir=${PACKAGES_DIR}${path.sep}`,
 		'-p:AppxPackageSigningEnabled=true',
 		`-p:PackageCertificateKeyFile=${certificate.pfx}`
@@ -397,14 +416,16 @@ const buildMsix = (version) => {
 	// too, so it stays out of the command line and the log.
 	execFileSync(msbuild, msbuildArgs, {stdio: 'inherit', env: {...process.env, PackageCertificatePassword: certificate.password}});
 
-	const built = findFiles(PACKAGES_DIR, (name) => /^Moonfin\.Xbox(\.Probe)?_.*\.(msix|appx)$/.test(name))[0];
+	const extension = flag('--store') ? 'msixupload' : 'msix';
+	const packageName = flag('--store') ? /^Moonfin\.Xbox_.*\.msixupload$/ : /^Moonfin\.Xbox(\.Probe)?_.*\.(msix|appx)$/;
+	const built = findFiles(PACKAGES_DIR, (name) => packageName.test(name))[0];
 	if (!built) throw new Error(`No package found under ${PACKAGES_DIR}`);
 
-	const prefix = `Moonfin_Xbox_${flag('--probe') ? 'Probe_' : ''}${configuration === 'Debug' ? 'Debug_' : ''}`;
-	for (const file of fs.readdirSync(ROOT_DIR).filter((entry) => entry.startsWith(prefix) && /^\d+\.\d+\.\d+\.msix$/.test(entry.slice(prefix.length)))) {
+	const prefix = `Moonfin_Xbox_${flag('--probe') ? 'Probe_' : ''}${flag('--store') ? 'Store_' : ''}${configuration === 'Debug' ? 'Debug_' : ''}`;
+	for (const file of fs.readdirSync(ROOT_DIR).filter((entry) => entry.startsWith(prefix) && /^\d+\.\d+\.\d+\.msix(upload)?$/.test(entry.slice(prefix.length)))) {
 		fs.unlinkSync(path.join(ROOT_DIR, file));
 	}
-	const finalName = `${prefix}${version}.msix`;
+	const finalName = `${prefix}${version}.${extension}`;
 	fs.copyFileSync(built, path.join(ROOT_DIR, finalName));
 	console.log(`  ${finalName}`);
 
@@ -425,6 +446,7 @@ const installOnConsole = (address, {file, dependencies}) => {
 try {
 	const appPkg = require(path.join(APP_DIR, 'package.json'));
 	if (flag('--dev-url') && !flag('--debug')) throw new Error('--dev-url only works with --debug, since a Release host loads nothing but its own package');
+	if (flag('--store') && ['--debug', '--tester', '--probe', '--dev-url', '--install', '--no-msix'].some(flag)) throw new Error('--store makes the Release upload on its own, without the other build options');
 	const consoleAddress = option('--install');
 	if (flag('--install') && (!consoleAddress || consoleAddress.startsWith('--') || flag('--no-msix'))) throw new Error('--install needs the address of a console, and has nothing to send it with --no-msix');
 

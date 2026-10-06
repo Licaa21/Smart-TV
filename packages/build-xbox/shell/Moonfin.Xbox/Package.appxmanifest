@@ -23,7 +23,8 @@
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.26100.0" MaxVersionTested="10.0.26100.0" />
+    <!-- Only consoles, so the Store never offers this beside the desktop app. -->
+    <TargetDeviceFamily Name="Windows.Xbox" MinVersion="10.0.26100.0" MaxVersionTested="10.0.26100.0" />
   </Dependencies>
 
   <Resources>
