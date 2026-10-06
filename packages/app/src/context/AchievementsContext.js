@@ -1,4 +1,5 @@
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
+import {getPerfLevelIndex} from '../utils/perfTier';
 
 import * as achievementsApi from '../services/achievementsApi';
 import {sameUserId, threadHasNewFromOthers} from '../utils/achievementsModel';
@@ -17,6 +18,8 @@ const CLEARED = {
 // How often the friends list, the chats and newly unlocked badges are asked for. The plugin
 // gives each user 60 requests a minute across all of its routes, and a read is a few of them.
 const POLL_MS = 30000;
+// The older sets have little to spare, so from Medium down the social poll comes a quarter as often.
+const pollMs = () => (getPerfLevelIndex() >= 3 ? POLL_MS * 4 : POLL_MS);
 
 const NO_THREADS = [];
 
@@ -112,7 +115,7 @@ export const AchievementsProvider = ({children}) => {
 		const start = () => {
 			if (timer) return;
 			poll();
-			timer = setInterval(poll, POLL_MS);
+			timer = setInterval(poll, pollMs());
 		};
 		const stop = () => {
 			clearInterval(timer);

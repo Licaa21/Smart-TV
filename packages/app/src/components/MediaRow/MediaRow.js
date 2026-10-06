@@ -1,4 +1,5 @@
-import {useCallback, useRef, useEffect, memo} from 'react';
+import {useCallback, useState, useRef, useEffect, memo} from 'react';
+import {initialRowCount, grownRowCount} from '../../utils/rowCap';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import Spotlight from '@enact/spotlight';
 import Spottable from '@enact/spotlight/Spottable';
@@ -50,6 +51,9 @@ const MediaRow = ({
 	const scrollerRectRef = useRef(null);
 	const scrollTimeoutRef = useRef(null);
 	const rowElementRef = useRef(null);
+	// How many of the cards are drawn. Everything, except on the older sets, where the row starts short.
+	const [shownCount, setShownCount] = useState(null);
+	const limit = items ? Math.min(items.length, shownCount === null ? initialRowCount(items.length) : shownCount) : 0;
 
 	const keyPrefix = rowId || title || rowIndex || '';
 
@@ -80,6 +84,15 @@ const MediaRow = ({
 		if (Spotlight.getPointerMode()) return;
 
 		const card = e.target.closest('.spottable');
+		// The next cards are drawn as focus nears the end of those that are.
+		if (card && card.parentNode && items && items.length > 0) {
+			const focusedIndex = Array.prototype.indexOf.call(card.parentNode.children, card);
+			setShownCount((current) => {
+				const count = Math.min(items.length, current === null ? initialRowCount(items.length) : current);
+				const grown = grownRowCount(count, focusedIndex, items.length);
+				return grown === count ? current : grown;
+			});
+		}
 		const scroller = scrollerRef.current;
 		if (card && scroller) {
 			if (scrollTimeoutRef.current) {
@@ -98,7 +111,7 @@ const MediaRow = ({
 				}
 			});
 		}
-	}, [onFocus, rowIndex]);
+	}, [onFocus, rowIndex, items]);
 
 	const handleKeyDown = useCallback((e) => {
 		if (e.keyCode === KEYS.UP && onNavigateUp) {
@@ -120,9 +133,9 @@ const MediaRow = ({
 				Spotlight.move('left');
 			}
 		} else {
-			Spotlight.focus(`media-${keyPrefix}-${items[items.length - 1].Id}`);
+			Spotlight.focus(`media-${keyPrefix}-${items[limit - 1].Id}`);
 		}
-	}, [items, keyPrefix, settings.navbarPosition]);
+	}, [items, limit, keyPrefix, settings.navbarPosition]);
 
 	const handleWrapRight = useCallback((e) => {
 		e.preventDefault();
@@ -182,10 +195,10 @@ const MediaRow = ({
 								<span className={css.seeAllLabel}>{seeAllLabel}</span>
 							</SpottableDiv>
 						)}
-						{items.map((item, index) => {
+						{items.slice(0, limit).map((item, index) => {
 							const spotlightId = `media-${keyPrefix}-${item.Id}`;
 							const isFirst = index === 0;
-							const isLast = index === items.length - 1;
+							const isLast = index === limit - 1;
 
 							return (
 								<MediaCard

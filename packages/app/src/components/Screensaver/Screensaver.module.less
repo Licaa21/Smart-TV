@@ -283,3 +283,11 @@
 	87.5% { opacity: 0.146; }
 	100% { opacity: 0.5; }
 }
+
+// From Low down the background stands still: four looping layers, the largest wider than the screen.
+:global(.perf-lean) .gradientOrbit,
+:global(.perf-lean) .gradientFlash,
+:global(.perf-lean) .gradientAccent,
+:global(.perf-lean) .gradientAccentInner {
+	animation: none;
+}

@@ -1,7 +1,8 @@
 .shimmer {
 	animation: skeletonBreathe 1.3s ease-in-out infinite alternate;
 
-	:global(.perf-low) & {
+	:global(.perf-low) &,
+	:global(.perf-lean) & {
 		animation: none;
 	}
 }

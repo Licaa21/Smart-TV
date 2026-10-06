@@ -162,7 +162,8 @@
 	transition: width 0.25s ease;
 	border-radius: inherit;
 
-	:global(.perf-low) & {
+	:global(.perf-low) &,
+	:global(.perf-lean) & {
 		transition: none;
 	}
 }
@@ -311,10 +312,4 @@
 	text-transform: uppercase;
 	pointer-events: none;
 	word-break: break-word;
-}
-
-// A permanent layer per card adds up to hundreds on a long row. Only the focused card needs one.
-:global(.perf-lite) .card:not(:focus) {
-	transform: none;
-	will-change: auto;
 }

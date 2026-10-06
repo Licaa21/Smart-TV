@@ -53,9 +53,6 @@ import Screensaver from '../components/Screensaver';
 import SeasonalTheme from '../components/SeasonalTheme';
 import NoConnection from '../components/NoConnection/NoConnection';
 import SyncPlayDialog from '../components/SyncPlayDialog';
-import PhotoViewer from '../components/PhotoViewer';
-import ComicViewer from '../components/ComicViewer';
-import SettingsPanel from '../components/SettingsPanel';
 import ShuffleOverlay from '../components/ShuffleOverlay';
 import SpottableInput from '../components/SpottableInput/SpottableInput';
 import TVKeyboard from '../components/TVKeyboard/TVKeyboard';
@@ -86,6 +83,10 @@ const SeerrRequests = lazy(() => import('../views/SeerrRequests'));
 const SeerrBrowse = lazy(() => import('../views/SeerrBrowse'));
 const SeerrPerson = lazy(() => import('../views/SeerrPerson'));
 const SeerrCollection = lazy(() => import('../views/SeerrCollection'));
+// Only drawn once one is opened, so they are loaded then and not before the first paint.
+const PhotoViewer = lazy(() => import('../components/PhotoViewer'));
+const ComicViewer = lazy(() => import('../components/ComicViewer'));
+const SettingsPanel = lazy(() => import('../components/SettingsPanel'));
 const Games = lazy(() => import('../views/Games'));
 const GameSystem = lazy(() => import('../views/GameSystem'));
 const GameDetails = lazy(() => import('../views/GameDetails'));
@@ -1903,20 +1904,24 @@ const AppContent = (props) => {
 				backHandlerRef={serverMessagesBackRef}
 			/>
 			{photoViewerItem && (
-				<PhotoViewer
-					item={photoViewerItem}
-					items={photoViewerItems}
-					serverUrl={serverUrl}
-					onClose={handleClosePhotoViewer}
-				/>
+				<Suspense fallback={null}>
+					<PhotoViewer
+						item={photoViewerItem}
+						items={photoViewerItems}
+						serverUrl={serverUrl}
+						onClose={handleClosePhotoViewer}
+					/>
+				</Suspense>
 			)}
 			{comicViewerItem && (
-				<ComicViewer
-					item={comicViewerItem}
-					serverUrl={serverUrl}
-					accessToken={accessToken}
-					onClose={handleCloseComicViewer}
-				/>
+				<Suspense fallback={null}>
+					<ComicViewer
+						item={comicViewerItem}
+						serverUrl={serverUrl}
+						accessToken={accessToken}
+						onClose={handleCloseComicViewer}
+					/>
+				</Suspense>
 			)}
 			<Screensaver
 				visible={showScreensaver}
@@ -1953,13 +1958,15 @@ const AppContent = (props) => {
 				</div>
 			)}
 			{showSettingsPanel && (
-				<SettingsPanel
-					initialView={settingsInitialView}
-					onClose={handleCloseSettingsPanel}
-					onLibrariesChanged={fetchLibraries}
-					onRunSetupWizard={handleRunSetupWizard}
-					onSelectItem={handleSelectItemFromSettings}
-				/>
+				<Suspense fallback={null}>
+					<SettingsPanel
+						initialView={settingsInitialView}
+						onClose={handleCloseSettingsPanel}
+						onLibrariesChanged={fetchLibraries}
+						onRunSetupWizard={handleRunSetupWizard}
+						onSelectItem={handleSelectItemFromSettings}
+					/>
+				</Suspense>
 			)}
 			<TVKeyboard />
 		</div>

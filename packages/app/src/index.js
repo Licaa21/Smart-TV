@@ -69,15 +69,20 @@ if (typeof Element !== 'undefined' && !Element.prototype.scrollTo) {
 		}
 	}
 
+	// A slider only moves in answer to the remote or the pointer, so it is patched after those, once
+	// per frame, and not every frame for as long as the app is open.
 	let rafId;
 	function schedulePatch () {
 		if (rafId) return;
 		rafId = window.requestAnimationFrame(function () {
 			rafId = null;
 			patchSliderKnobs();
-			schedulePatch();
 		});
 	}
+
+	['keydown', 'keyup', 'click', 'mouseup', 'touchend'].forEach(function (name) {
+		document.addEventListener(name, schedulePatch, true);
+	});
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', schedulePatch);
