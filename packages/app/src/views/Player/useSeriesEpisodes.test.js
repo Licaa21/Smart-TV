@@ -4,8 +4,12 @@ import useSeriesEpisodes, {clearSeriesEpisodesCache} from './useSeriesEpisodes';
 
 const mockApi = {getSeasons: jest.fn(), getEpisodes: jest.fn()};
 const mockCreateApi = jest.fn(() => mockApi);
+// The server and viewer signed in right now, which an untagged episode belongs to.
+let mockSignedIn = {serverUrl: 'http://one', userId: 'user-a'};
 jest.mock('../../services/jellyfinApi', () => ({
 	get api() { return mockApi; },
+	getServerUrl: () => mockSignedIn.serverUrl,
+	getUserId: () => mockSignedIn.userId,
 	createApiForServer: (...args) => mockCreateApi(...args)
 }));
 // Ids blocked by the viewer's ratings at the moment, which can change after a list was fetched.
@@ -31,6 +35,7 @@ const episodesOf = (season) => ({
 
 beforeEach(() => {
 	mockBlockedIds = new Set();
+	mockSignedIn = {serverUrl: 'http://one', userId: 'user-a'};
 	clearSeriesEpisodesCache();
 	mockApi.getSeasons.mockReset().mockResolvedValue(seasons);
 	mockApi.getEpisodes.mockReset().mockImplementation((series, season) => Promise.resolve(episodesOf(season)));
@@ -38,6 +43,41 @@ beforeEach(() => {
 });
 
 describe('useSeriesEpisodes', () => {
+	it('does not show one account what another account saw, on the same server', async () => {
+		const {result: before, unmount} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+		await waitFor(() => expect(before.current.episodes).not.toBeNull());
+		unmount();
+
+		mockSignedIn = {serverUrl: 'http://one', userId: 'user-b'};
+		mockApi.getSeasons.mockReturnValue(new Promise(() => {}));
+		mockApi.getEpisodes.mockReturnValue(new Promise(() => {}));
+		const {result} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+		expect(result.current.seasons).toBeNull();
+		expect(result.current.episodes).toBeNull();
+	});
+
+	it('does not show one server what another server held for the same ids', async () => {
+		const {result: before, unmount} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+		await waitFor(() => expect(before.current.episodes).not.toBeNull());
+		unmount();
+
+		mockSignedIn = {serverUrl: 'http://two', userId: 'user-a'};
+		mockApi.getSeasons.mockReturnValue(new Promise(() => {}));
+		mockApi.getEpisodes.mockReturnValue(new Promise(() => {}));
+		const {result} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+		expect(result.current.seasons).toBeNull();
+		expect(result.current.episodes).toBeNull();
+	});
+
+	it('still draws from what the same account saw before', async () => {
+		const {result: before, unmount} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+		await waitFor(() => expect(before.current.episodes).not.toBeNull());
+		unmount();
+
+		const {result} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+		expect(result.current.episodes.map((e) => e.Id)).toEqual(['s2-a']);
+	});
+
 	it('fetches nothing until the browser is opened', () => {
 		renderHook(() => useSeriesEpisodes({item, enabled: false}));
 		expect(mockApi.getSeasons).not.toHaveBeenCalled();
