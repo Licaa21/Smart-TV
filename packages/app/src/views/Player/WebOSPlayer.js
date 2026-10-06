@@ -3338,6 +3338,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				>
 					<div
 						className={css.subtitleText}
+						data-subtitle-text="true"
 						style={getSubtitleTextStyle(subtitleStyleSettings)}
 						// eslint-disable-next-line react/no-danger
 						dangerouslySetInnerHTML={{__html: sanitizeSubtitleHtml(currentSubtitleText)}}
