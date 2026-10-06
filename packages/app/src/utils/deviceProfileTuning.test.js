@@ -124,4 +124,33 @@ describe('applyProfileTuning', () => {
 		expect(applyProfileTuning(original, {})).toBe(original);
 		expect(original.TranscodingProfiles).toHaveLength(3);
 	});
+
+	describe('Dolby Vision with an enhancement layer', () => {
+		const hevc = () => ({
+			...profile(),
+			CodecProfiles: [{Type: 'Video', Codec: 'hevc', Conditions: [{Condition: 'EqualsAny', Property: 'VideoRangeType', Value: 'SDR|HDR10', IsRequired: false}]}]
+		});
+		const rangeTypes = (tuned) => tuned.CodecProfiles[0].Conditions[0].Value.split('|');
+
+		it('stays out of the list while the setting is off', () => {
+			const original = hevc();
+			expect(applyProfileTuning(original, {}, {hdr10: true})).toBe(original);
+		});
+
+		it('is added for a set that reports HDR10 when the setting is on', () => {
+			expect(rangeTypes(applyProfileTuning(hevc(), {dolbyVisionAsHdr10: true}, {hdr10: true}))).toEqual(['SDR', 'HDR10', 'DOVIWithEL']);
+			expect(rangeTypes(applyProfileTuning(hevc(), {dolbyVisionAsHdr10: true}, {hdr10: true, hdr10Plus: true}))).toEqual(['SDR', 'HDR10', 'DOVIWithEL', 'DOVIWithELHDR10Plus']);
+		});
+
+		it('is not added for a set with no HDR10 base to play', () => {
+			const original = hevc();
+			expect(applyProfileTuning(original, {dolbyVisionAsHdr10: true}, {hdr10: false})).toBe(original);
+			expect(applyProfileTuning(original, {dolbyVisionAsHdr10: true})).toBe(original);
+		});
+
+		it('is not listed twice', () => {
+			const withEl = {...hevc(), CodecProfiles: [{Type: 'Video', Codec: 'hevc', Conditions: [{Condition: 'EqualsAny', Property: 'VideoRangeType', Value: 'SDR|DOVIWithEL', IsRequired: false}]}]};
+			expect(rangeTypes(applyProfileTuning(withEl, {dolbyVisionAsHdr10: true}, {hdr10: true}))).toEqual(['SDR', 'DOVIWithEL']);
+		});
+	});
 });
