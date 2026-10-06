@@ -66,7 +66,8 @@ const SeerrTileRow = ({
 	onNavigateUp,
 	onNavigateDown,
 	className,
-	registerRowRef
+	registerRowRef,
+	spotlightId: rowSpotlightId
 }) => {
 	const {settings} = useSettings();
 	const scrollerRef = useRef(null);
@@ -155,7 +156,7 @@ const SeerrTileRow = ({
 		<RowContainer
 			ref={rowElementRef}
 			className={`${css.row}${className ? ` ${className}` : ''}`}
-			spotlightId={`row-${rowIndex}`}
+			spotlightId={rowSpotlightId || `row-${rowIndex}`}
 			data-row-index={rowIndex}
 			onKeyDown={handleKeyDown}
 		>

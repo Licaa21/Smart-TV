@@ -94,7 +94,7 @@ export const normalizeMediaItem = (item) => {
 	};
 };
 
-const normalizeRequestItem = (request) => {
+export const normalizeRequestItem = (request) => {
 	const media = request.media || {};
 	const mediaType = request.type || media.mediaType || 'movie';
 	const poster = media.posterPath || media.poster_path;
@@ -131,7 +131,7 @@ export const SEERR_SHORTCUTS = [
 const TILE_STILL = 'w300';
 const BACKDROP_STILL = 'w780';
 
-const normalizeShortcutItem = (shortcut, backdrop) => ({
+export const normalizeShortcutItem = (shortcut, backdrop) => ({
 	Id: `seerr-shortcut-${shortcut.key}`,
 	Name: shortcut.name(),
 	_externalTileUrl: backdrop ? seerrApi.getImageUrl(backdrop, TILE_STILL) : null,
@@ -183,7 +183,7 @@ export const pickShortcutBackdrops = (shortcuts, results) => {
 	return picked;
 };
 
-const normalizeGenreItem = (genre, mediaType) => {
+export const normalizeGenreItem = (genre, mediaType) => {
 	// The duotone art gives every genre its own color, and the Genre type puts
 	// the name across the card the way the library genre row draws it.
 	const art = seerrGenreBackdrop(genre.id, genre.backdrops);
@@ -201,7 +201,7 @@ const normalizeGenreItem = (genre, mediaType) => {
 	};
 };
 
-const normalizeStudioItem = (studio) => ({
+export const normalizeStudioItem = (studio) => ({
 	Id: `seerr-studio-${studio.id}`,
 	Name: studio.name,
 	_externalLogoUrl: seerrApi.getImageUrl('/' + studio.logo, 'w185'),
@@ -210,7 +210,7 @@ const normalizeStudioItem = (studio) => ({
 	_seerrRaw: {studioId: studio.id, studioName: studio.name}
 });
 
-const normalizeNetworkItem = (network) => ({
+export const normalizeNetworkItem = (network) => ({
 	Id: `seerr-network-${network.id}`,
 	Name: network.name,
 	_externalLogoUrl: seerrApi.getImageUrl('/' + network.logo, 'w185'),
