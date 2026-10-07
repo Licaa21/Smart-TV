@@ -59,7 +59,8 @@ export const FocusBackdrop = memo(forwardRef(({serverUrl, active = true}, ref) =
 		() => (!active || settings.showHomeBackdrop === false || isLegacyBuild() ? '' : backdropUrlFor(item, serverUrl)),
 		[active, item, serverUrl, settings.showHomeBackdrop]
 	);
-	return <BackdropLayer targetUrl={url} blurAmount={settings.backdropBlurHome} />;
+	// With nothing to show it draws no scrim either, so it does not darken what a layer beneath it is showing
+	return <BackdropLayer targetUrl={url} blurAmount={settings.backdropBlurHome} scrimWhenEmpty={false} />;
 }));
 
 export default memo(ScreenBackdrop);

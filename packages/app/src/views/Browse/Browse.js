@@ -584,7 +584,7 @@ const Browse = ({
 					targetUrl={useModernRows && browseMode === 'rows' ? '' : targetBackdropUrl}
 					blurAmount={settings.backdropBlurHome}
 				/>
-				{useModernRows && <FocusBackdrop ref={focusBackdropRef} active={browseMode === 'rows'} />}
+				{useModernRows && <FocusBackdrop ref={focusBackdropRef} serverUrl={serverUrl} active={browseMode === 'rows'} />}
 
 				{featuredItems.length > 0 && showFeaturedBar !== false && (
 					settings.featuredBarStyle === 'aya' ? (
