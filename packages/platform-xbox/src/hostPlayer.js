@@ -12,6 +12,7 @@ export const pause = (session) => postToShell('PLAYER_PAUSE', {session});
 export const seek = (session, seconds) => postToShell('PLAYER_SEEK', {session, seconds});
 export const setVolume = (session, volume, muted) => postToShell('PLAYER_SET_VOLUME', {session, volume, muted});
 export const selectAudio = (session, index) => postToShell('PLAYER_SELECT_AUDIO', {session, index});
+export const selectSubtitle = (session, index) => postToShell('PLAYER_SELECT_SUBTITLE', {session, index});
 export const setRect = (session, rect) => postToShell('PLAYER_SET_RECT', {session, ...rect});
 
 // Calls back with every event the player pushes, and returns the remover.

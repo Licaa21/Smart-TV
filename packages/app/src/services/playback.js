@@ -1,6 +1,6 @@
 import * as jellyfinApi from './jellyfinApi';
 import {getDeviceProfile, getDeviceCapabilities} from './deviceProfile';
-import {getPlayMethod, getMimeType, isAudioStreamPlayable, canRenderEmbeddedPgsInBand} from './video';
+import {getPlayMethod, getMimeType, isAudioStreamPlayable, canRenderEmbeddedPgsInBand, rendersSubtitleInHost} from './video';
 import {getFromStorage} from './storage';
 import {selectCompatibleAlternateAudio} from '../utils/alternateAudio';
 import {serverLogger} from './serverLogger';
@@ -384,7 +384,11 @@ const extractSubtitleStreams = (mediaSource, itemId = null, creds = null, assBur
 			}
 			// Encode is the server saying the only way it can deliver this track is
 			// baked into the video, which is what a format left off the profile gets.
-			const isBurnIn = isBurnInSubtitleCodec(codec) || s.DeliveryMethod === 'Encode' ||
+			// A platform player that draws these bitmaps itself needs the file as it is,
+			// since a transcode carries no subtitle tracks.
+			const bitmapOnly = isBurnInSubtitleCodec(codec);
+			const hostRendered = bitmapOnly && !s.IsExternal && playMethod === PlayMethod.DirectPlay && rendersSubtitleInHost(codec);
+			const isBurnIn = (bitmapOnly && !hostRendered) || s.DeliveryMethod === 'Encode' ||
 				(assBurnsIn && isAssSubtitleCodec(codec));
 			return {
 				index: s.Index,
@@ -401,6 +405,7 @@ const extractSubtitleStreams = (mediaSource, itemId = null, creds = null, assBur
 				isAss: !assBurnsIn && isAssSubtitleCodec(codec),
 				isImageBased,
 				isBurnIn,
+				hostRendered,
 				// Bitmap tracks left in the container are AVPlay's to select. Text normally
 				// comes over the API because the profile asks the server to extract it, but a
 				// server that cant transcode cant extract either, and then the copy in the

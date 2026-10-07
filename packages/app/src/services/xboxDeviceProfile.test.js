@@ -223,6 +223,8 @@ describe('the profile with the console player', () => {
 		expect(profile.DirectPlayProfiles.some((entry) => entry.Container === 'hls')).toBe(true);
 		const range = profile.CodecProfiles.find((entry) => entry.Codec === 'hevc').Conditions.find((condition) => condition.Property === 'VideoRangeType');
 		expect(range.Value).toBe('SDR|HDR10|HDR10Plus|DOVIWithHDR10|DOVIWithHDR10Plus|DOVIWithEL|DOVIWithELHDR10Plus|DOVIInvalid');
+		expect(profile.SubtitleProfiles.find((entry) => entry.Format === 'dvdsub').Method).toBe('Embed');
+		expect(profile.SubtitleProfiles.find((entry) => entry.Format === 'pgssub').Method).toBe('External');
 
 		const capabilities = await getDeviceCapabilities();
 		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'HDR10', Width: 3840}), capabilities)).toBe('DirectPlay');
@@ -244,5 +246,6 @@ describe('the profile with the console player', () => {
 		window.localStorage.setItem('moonfin_settings', JSON.stringify({xboxNativePlayer: false}));
 		window.HTMLMediaElement.prototype.canPlayType.mockImplementation((type) => (/hvc1/.test(type) ? '' : canPlayType(type)));
 		expect(await capabilitiesFor(nativeBoot())).toMatchObject({nativePlayer: false, hevc: false, hdr10: false, dts: false, webm: false, watchesDroppedFrames: true});
+		expect((await getJellyfinDeviceProfile()).SubtitleProfiles.find((entry) => entry.Format === 'dvdsub').Method).toBe('Encode');
 	});
 });

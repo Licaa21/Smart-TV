@@ -22,6 +22,7 @@
 // With the console's own player none of the WebView's answers matter: HEVC goes by
 // the host's word alone, HDR10 by the display's, every common sound format is decoded
 // by the player itself, and WebM and MPEG-TS files are read as they are.
+import {isBurnInSubtitleCodec} from '@moonfin/app/src/utils/subtitleCodecs';
 import {bootData} from './bridge';
 import {modelName} from './deviceInfo';
 import {isNativePlayerEnabled} from './nativeVideo';
@@ -174,6 +175,10 @@ const SUBTITLE_PROFILES = [
 	{Format: 'dvbsub', Method: 'Encode'}
 ];
 
+// The console player draws the DVD and DVB bitmaps itself, so those stay in the file
+// instead of being burned in by the server
+const buildSubtitleProfiles = (caps) => SUBTITLE_PROFILES.map((profile) => (caps.nativePlayer && isBurnInSubtitleCodec(profile.Format) ? {...profile, Method: 'Embed'} : profile));
+
 // Every transcode is H.264 and AAC in TS segments, which hls.js plays wherever
 // the WebView has no HLS player of its own.
 const TRANSCODING_PROFILES = [
@@ -225,7 +230,7 @@ export const getJellyfinDeviceProfile = async () => {
 		DirectPlayProfiles: buildDirectPlayProfiles(caps),
 		TranscodingProfiles: TRANSCODING_PROFILES,
 		CodecProfiles: codecProfiles,
-		SubtitleProfiles: SUBTITLE_PROFILES,
+		SubtitleProfiles: buildSubtitleProfiles(caps),
 		ResponseProfiles: [
 			{Type: 'Video', Container: 'm4v', MimeType: 'video/mp4'},
 			{Type: 'Video', Container: 'mkv', MimeType: 'video/x-matroska'}

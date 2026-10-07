@@ -35,6 +35,10 @@ export const getSharedVideoElement = (...args) => impl.getSharedVideoElement(...
 export const leavesPlayerInBackground = () => !!impl.leavesPlayerInBackground;
 export const resumesAfterFirstFrame = (mediaSource) => !!impl.resumesAfterFirstFrame?.(mediaSource);
 export const notePlaybackError = (...args) => impl?.notePlaybackError?.(...args);
+// A platform whose own player draws a bitmap subtitle format the page cant, and the call
+// that picks the track by stream index, with -1 for none.
+export const rendersSubtitleInHost = (codec) => !!impl?.rendersSubtitleInHost?.(codec);
+export const showHostSubtitle = (video, index) => !!impl?.showHostSubtitle?.(video, index);
 export const controllerIsOnlyRemote = () => !!impl?.controllerIsOnlyRemote;
 
 // Only Xbox hands the page its controller as keys as well, which a game reading the

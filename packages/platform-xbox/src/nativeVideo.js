@@ -80,6 +80,7 @@ const createFacade = () => {
 		selectedTrack: -1,
 		volume: 1,
 		muted: false,
+		subtitle: -1,
 		autoplay: false,
 		playing: [],
 		closing: null
@@ -218,7 +219,7 @@ const createFacade = () => {
 		state.tracks = [];
 		state.selectedTrack = -1;
 		const hls = /^application\/(x-mpegurl|vnd\.apple\.mpegurl)$/i.test(video.type || '') || /\.m3u8(\?|$)/i.test(url);
-		hostPlayer.openStream(state.session, {url, hls, startSeconds, autoplay: !state.paused || state.autoplay, volume: state.volume, muted: state.muted}).catch((err) => {
+		hostPlayer.openStream(state.session, {url, hls, startSeconds, autoplay: !state.paused || state.autoplay, volume: state.volume, muted: state.muted, subtitle: state.subtitle}).catch((err) => {
 			onEvent({session: state.session, event: 'error', code: 2, message: err.message});
 		});
 	};
@@ -346,6 +347,12 @@ const createFacade = () => {
 		return Promise.race([state.closing, new Promise((resolve) => setTimeout(resolve, CLOSE_WAIT_MS))]);
 	};
 	video.sessionNative = () => state.session;
+	// Which of the file's subtitle tracks the host draws, kept across reopens of the stream
+	video.selectSubtitleNative = (index) => {
+		state.subtitle = Number.isInteger(index) ? index : -1;
+		if (state.session) hostPlayer.selectSubtitle(state.session, state.subtitle);
+		return true;
+	};
 	return video;
 };
 

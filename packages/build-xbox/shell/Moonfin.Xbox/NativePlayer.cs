@@ -54,6 +54,7 @@ namespace Moonfin.Xbox
         private IRandomAccessStream packagedStream;
         private HttpClient client;
         private double startSeconds;
+        private int wantsSubtitle = -1;
         private bool wantsPlay;
         private bool opened;
 
@@ -109,6 +110,9 @@ namespace Moonfin.Xbox
                 case "PLAYER_SELECT_AUDIO":
                     if (IsCurrent(message)) SelectAudio((int)message.Payload.GetNamedNumber("index", -1));
                     return true;
+                case "PLAYER_SELECT_SUBTITLE":
+                    if (IsCurrent(message)) SelectSubtitle((int)message.Payload.GetNamedNumber("index", -1));
+                    return true;
                 case "PLAYER_SET_RECT":
                     if (IsCurrent(message)) SetRect(message.Payload);
                     return true;
@@ -139,6 +143,7 @@ namespace Moonfin.Xbox
             session = payload.GetNamedNumber("session", 0);
             wantsPlay = payload.GetNamedBoolean("autoplay", false);
             startSeconds = payload.GetNamedNumber("startSeconds", 0);
+            wantsSubtitle = (int)payload.GetNamedNumber("subtitle", -1);
             player.Volume = payload.GetNamedNumber("volume", 1);
             player.IsMuted = payload.GetNamedBoolean("muted", false);
 
@@ -199,6 +204,8 @@ namespace Moonfin.Xbox
             // Marks HDR frames as HDR whatever mode the display is in when the file opens,
             // since the display is only switched once the file has.
             config.Video.HdrSupport = HdrSupport.Enabled;
+            // The page says which subtitle track shows, if any
+            config.Subtitles.AutoSelectForcedSubtitles = false;
             config.FFmpegOptions = new PropertySet
             {
                 {"reconnect", 1},
@@ -232,6 +239,7 @@ namespace Moonfin.Xbox
             ticker.Stop();
             opened = false;
             wantsPlay = false;
+            wantsSubtitle = -1;
             session = -1;
             try
             {
@@ -295,6 +303,32 @@ namespace Moonfin.Xbox
             item.AudioTracks.SelectedIndex = index;
         }
 
+        private void SelectSubtitle(int streamIndex)
+        {
+            wantsSubtitle = streamIndex;
+            if (opened) ApplySubtitle();
+        }
+
+        // Shows the file's subtitle track of that stream index, drawn by the player under
+        // the page, and hides every other one. The page draws text subtitles itself and
+        // hands over the bitmap ones it cant.
+        private void ApplySubtitle()
+        {
+            if (item == null) return;
+            TimedMetadataTrack wanted = null;
+            if (file != null)
+            {
+                foreach (SubtitleStreamInfo stream in file.SubtitleStreams)
+                {
+                    if (stream.StreamIndex == wantsSubtitle) wanted = stream.SubtitleTrack;
+                }
+            }
+            for (int i = 0; i < item.TimedMetadataTracks.Count; i++)
+            {
+                item.TimedMetadataTracks.SetPresentationMode((uint)i, item.TimedMetadataTracks[i] == wanted ? TimedMetadataTrackPresentationMode.PlatformPresented : TimedMetadataTrackPresentationMode.Disabled);
+            }
+        }
+
         // Where the page has laid its video out, in its own pixels, which are the screen's.
         private void SetRect(JsonObject payload)
         {
@@ -324,6 +358,7 @@ namespace Moonfin.Xbox
             }
 
             if (startSeconds > 0 && player.PlaybackSession.CanSeek) player.PlaybackSession.Position = TimeSpan.FromSeconds(startSeconds);
+            ApplySubtitle();
 
             JsonObject payload = Tracks();
             TimeSpan duration = player.PlaybackSession.NaturalDuration;

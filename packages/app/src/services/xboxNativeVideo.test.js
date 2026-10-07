@@ -1,5 +1,5 @@
 import {getSharedVideoElement as webOSVideoElement} from '../../../platform-webos/src/video';
-import {cleanupVideoElement, getSharedVideoElement, notePlaybackError, resumesAfterFirstFrame, setDisplayWindow, waitForDecoderRelease} from '../../../platform-xbox/src/video';
+import {cleanupVideoElement, getSharedVideoElement, notePlaybackError, rendersSubtitleInHost, resumesAfterFirstFrame, setDisplayWindow, showHostSubtitle, waitForDecoderRelease} from '../../../platform-xbox/src/video';
 import {isNativePlayerEnabled} from '../../../platform-xbox/src/nativeVideo';
 
 const SETTINGS_KEY = 'moonfin_settings';
@@ -273,5 +273,25 @@ describe('the video element backed by the console player', () => {
 
 		const other = document.createElement('video');
 		await expect(cleanupVideoElement(other)).resolves.toBeDefined();
+	});
+
+	test('a DVD subtitle track is the host player to draw, picked by its stream index', () => {
+		expect(rendersSubtitleInHost('dvdsub')).toBe(true);
+		expect(rendersSubtitleInHost('DVBSUB')).toBe(true);
+		expect(rendersSubtitleInHost('pgssub')).toBe(false);
+		expect(rendersSubtitleInHost('subrip')).toBe(false);
+
+		const video = getSharedVideoElement();
+		dropStream(video);
+		expect(showHostSubtitle(video, 5)).toBe(true);
+		expect(messages('PLAYER_SELECT_SUBTITLE')).toHaveLength(0);
+		const {session} = openStream(video).payload;
+		expect(lastOf('PLAYER_OPEN').payload.subtitle).toBe(5);
+		expect(showHostSubtitle(video, -1)).toBe(true);
+		expect(lastOf('PLAYER_SELECT_SUBTITLE').payload).toEqual({session, index: -1});
+		expect(showHostSubtitle(document.createElement('video'), 5)).toBe(false);
+
+		window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({xboxNativePlayer: false}));
+		expect(rendersSubtitleInHost('dvdsub')).toBe(false);
 	});
 });

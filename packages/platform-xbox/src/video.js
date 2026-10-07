@@ -5,6 +5,7 @@
 // Otherwise the WebView plays through a plain HTML5 video element, and the element,
 // its cleanup and the visibility handling are the webOS ones. Either way the screen,
 // the app's comings and goings and the media remote are the host's to report.
+import {isBurnInSubtitleCodec} from '@moonfin/app/src/utils/subtitleCodecs';
 import {videoRangeTypeOf} from '@moonfin/app/src/utils/videoRange';
 import {
 	getSharedVideoElement as sharedVideoElement,
@@ -42,6 +43,11 @@ export const getSharedVideoElement = () => {
 // The console player's element is let go of through the host. Any other element,
 // like the one trailers play in, is the WebView's and is cleaned the webOS way.
 export const cleanupVideoElement = (video) => (isNativeVideoElement(video) ? closeNativeVideo(video) : cleanupWebVideoElement(video));
+
+// DVD and DVB bitmap subtitles have no renderer in the page, and the console player draws
+// them itself out of a file it plays as it is.
+export const rendersSubtitleInHost = (codec) => isNativePlayerEnabled() && isBurnInSubtitleCodec(codec);
+export const showHostSubtitle = (video, index) => isNativeVideoElement(video) && video.selectSubtitleNative(index);
 
 // The WebView's decoder isnt in play with the console player, so there is nothing to wait for.
 export const waitForDecoderRelease = () => (isNativePlayerEnabled() ? Promise.resolve() : waitForWebDecoderRelease());

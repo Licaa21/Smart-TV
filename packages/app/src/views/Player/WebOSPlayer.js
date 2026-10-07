@@ -26,6 +26,7 @@ import {
 	setupPlatformLifecycle,
 	leavesPlayerInBackground,
 	resumesAfterFirstFrame,
+	showHostSubtitle,
 	notePlaybackError
 } from '../../services/video';
 import {KEYS, isBackKey} from '../../utils/keys';
@@ -1065,6 +1066,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					disposeAssRenderer(assRendererRef.current);
 					assRendererRef.current = null;
 					clearAssCanvas(assCanvasRef.current);
+					showHostSubtitle(videoRef.current, -1);
 
 					const supportsAss = sub && sub.isAss && supportsAssRenderer();
 					if (supportsAss) {
@@ -1078,6 +1080,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						} else {
 							initAssRendererForStream(sub);
 						}
+					} else if (sub && sub.hostRendered) {
+						showHostSubtitle(videoRef.current, sub.index);
+						setSubtitleTrackEvents(null);
 					} else if (sub && sub.isTextBased) {
 						loadTextTrack(sub);
 					} else if (sub && sub.isImageBased && settings.enablePgsRendering) {
@@ -1092,6 +1097,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const turnSubtitlesOff = () => {
 					setSelectedSubtitleIndex(-1);
 					setSubtitleTrackEvents(null);
+					showHostSubtitle(videoRef.current, -1);
 				};
 				if (initialSubtitleChoice === null) {
 					turnSubtitlesOff();
@@ -2387,6 +2393,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		disposeAssRenderer(assRendererRef.current);
 		assRendererRef.current = null;
 		clearAssCanvas(assCanvasRef.current);
+		showHostSubtitle(videoRef.current, -1);
 
 		if (index === -1) {
 			setSelectedSubtitleIndex(-1);
@@ -2424,6 +2431,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						console.error('[Player] Burn in subtitle reload failed:', err);
 					}
 				}
+			} else if (stream && stream.hostRendered) {
+				showHostSubtitle(videoRef.current, index);
+				setSubtitleTrackEvents(null);
 			} else if (stream && stream.isAss && supportsAssRenderer()) {
 				await initAssRendererForStream(stream);
 			} else if (stream && stream.isTextBased) {

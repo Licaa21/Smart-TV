@@ -30,12 +30,13 @@ namespace Moonfin.Xbox
     //   DISPLAY_GET_MODES    (answered with the display as in the boot data)
     //   DISPLAY_SET_FOR_MEDIA {hdr: "hdr10"} (answered with {ok, mode, reason})
     //   DISPLAY_RESTORE      (answered with {ok})
-    //   PLAYER_OPEN          {session, url, hls, startSeconds, autoplay, volume, muted} (answered with {ok})
+    //   PLAYER_OPEN          {session, url, hls, startSeconds, autoplay, volume, muted, subtitle} (answered with {ok})
     //   PLAYER_CLOSE         {session} (answered with {ok})
     //   PLAYER_PLAY, PLAYER_PAUSE {session}
     //   PLAYER_SEEK          {session, seconds}
     //   PLAYER_SET_VOLUME    {session, volume, muted}
     //   PLAYER_SELECT_AUDIO  {session, index}
+    //   PLAYER_SELECT_SUBTITLE {session, index}
     //   PLAYER_SET_RECT      {session, x, y, width, height}
     //   PLAYER_GET_STATE     (answered with where the player is)
     //
