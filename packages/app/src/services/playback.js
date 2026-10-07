@@ -472,23 +472,14 @@ export const canPlayAudioStreamNatively = async (stream, options = {}) => {
 	return isAudioStreamPlayable(stream, capabilities, passthroughSettings);
 };
 
-// The indexes of the audio streams the set decodes, for working out which track AVPlay opens a file on.
-// A stream the probe cannot answer for counts as decoded, as it did before.
-export const decodableAudioIndexes = async (audioStreams) => {
-	const decoded = await Promise.all((audioStreams || []).map((stream) => canPlayAudioStreamNatively({
-		Codec: stream.Codec ?? stream.codec,
-		Profile: stream.Profile ?? stream.profile,
-		Title: stream.Title ?? stream.title,
-		DisplayTitle: stream.DisplayTitle ?? stream.displayTitle,
-		ChannelLayout: stream.ChannelLayout ?? stream.channelLayout,
-		Channels: stream.Channels ?? stream.channels
-	}).catch(() => true)));
-	const indexes = new Set();
-	(audioStreams || []).forEach((stream, position) => {
-		if (decoded[position]) indexes.add(stream.Index ?? stream.index);
-	});
-	return indexes;
-};
+// The indexes of the audio streams the set decodes, worked out with the capabilities and passthrough settings the
+// request itself was made with, since a probe made on its own can answer from different ones. AVPlay opens a file
+// on the first of these.
+const decodableAudioOf = (mediaSource, capabilities, passthroughSettings) => new Set(
+	(mediaSource?.MediaStreams || [])
+		.filter((s) => s.Type === 'Audio' && isAudioStreamPlayable(s, capabilities, passthroughSettings))
+		.map((s) => s.Index)
+);
 
 export const getPlaybackInfo = async (itemId, options = {}) => {
 	const serverType = options.serverType || options.item?._serverType || jellyfinApi.getServerType();
@@ -751,7 +742,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	if (directPlayOpensFirstAudio && !directPlayForced && options.audioStreamIndex != null
 		&& playMethod === PlayMethod.DirectPlay) {
 		const fileAudio = (mediaSource.MediaStreams || []).filter((s) => s.Type === 'Audio');
-		const decodable = await decodableAudioIndexes(fileAudio);
+		const decodable = decodableAudioOf(mediaSource, capabilities, passthroughSettings);
 		const firstAudio = openingAudioStream(fileAudio, (s) => decodable.has(s.Index));
 		const wantedAudio = fileAudio.find((s) => s.Index === options.audioStreamIndex);
 		if (firstAudio && audioStartNeedsServer({wanted: wantedAudio, audioStreams: fileAudio, canDecode: (s) => decodable.has(s.Index), allowSameCodec: Boolean(options.switchInPlayer)})) {
@@ -908,6 +899,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		reportedPlayMethod,
 		startPositionTicks: options.startPositionTicks || 0,
 		capabilities,
+		decodableAudioIndexes: Array.from(decodableAudioOf(mediaSource, capabilities, passthroughSettings)),
 		audioStreamIndex: audioStreamIndex ?? mediaSource.DefaultAudioStreamIndex,
 		subtitleStreamIndex: requestedSubtitleStreamIndex,
 		maxBitrate: options.maxBitrate,
@@ -965,6 +957,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		isAudio,
 		runTimeTicks: mediaSource.RunTimeTicks,
 		audioStreams,
+		decodableAudioIndexes: Array.from(decodableAudioOf(mediaSource, capabilities, passthroughSettings)),
 		subtitleStreams,
 		chapters,
 		defaultAudioStreamIndex: mediaSource.DefaultAudioStreamIndex,
@@ -1347,7 +1340,7 @@ export const changeAudioStream = async (streamIndex, currentPositionTicks, {refu
 	// (server-side remux) is quality-identical but honors track selection. Where the player is known to
 	// open a direct play on the file's first track, going back to that one needs no remux.
 	const fileAudio = (currentSession.mediaSource?.MediaStreams || []).filter((s) => s.Type === 'Audio');
-	const decodable = await decodableAudioIndexes(fileAudio);
+	const decodable = new Set(currentSession.decodableAudioIndexes || []);
 	const firstAudio = openingAudioStream(fileAudio, (s) => decodable.has(s.Index));
 	const backToFirst = currentSession.directPlayOpensFirstAudio && firstAudio?.Index === streamIndex;
 	const newInfo = await getPlaybackInfo(currentSession.itemId, {
