@@ -163,11 +163,21 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 - **Episode browser:** an Episodes button in the player opens the current season on the playing episode, with season tabs, CH +/- to change season, and resume on pick. It can be arranged in Player Buttons.
 - **Skip prompt:** its auto-hide starts over for every episode, so it no longer vanishes early after Previous or Next.
 - **Seek bar:** the focused thumb is easier to see on Tizen.
+- **Direct play where the set allows it:**
+  - A file that opens on a track the TV cannot decode, such as TrueHD first, is played from the first track the TV can decode, and a pick in the same codec is switched by the player.
+  - A pick in another codec is built on the server with the video copied, the way a manual pick already was, so the screen and the sound agree.
+  - A check a few seconds after play rebuilds the track on the server when the one playing is not the one shown.
+  - A direct stream the server gives no address for is opened as a direct play.
+- **Play Dolby Vision Profile 7 as HDR10:** an opt-in setting that direct plays Dolby Vision files with an enhancement layer as plain HDR10 on sets that report HDR10.
+- **Allow Files With Many Streams:** an opt-in setting that lifts the 32 stream limit older Tizen sets are given, so a remux with dozens of subtitle tracks can direct play.
 
 **Subtitles and audio**
 - **Preferred Languages** subtitle mode: your preferred language, then your secondary one, and off when neither is in the file.
 - **Audio Codec Priority:** rank codecs from best to worst, applied after your audio language.
 - **Details buttons:** the Audio and Subtitle buttons show the track playback will actually start on.
+- **Anime audio language:** a language and a fallback of their own for anime, while everything else keeps the default pair.
+- **Prefer Stereo Tracks:** ranks a 2.0 track above a 5.1 one of the same language and codec without limiting what direct plays. Max Audio Channels at stereo does the same and also sends every 5.1 track through the server.
+- **Remember Audio Track per Series:** a switch for the stored pick, so it can be turned off and the language settings win again.
 
 **Look and layout**
 - **Accent colors:** a color per part of the app, or one for everything, with focus fills kept readable.
@@ -175,10 +185,14 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 - **Search:** results drawn with the Home cards and rows, best matches first, and a setting for which tab a search opens on when Seerr has results.
 - **Person pages:** redesigned with a portrait, backdrop and de-duplicated credits.
 - **Details:** action button rows ranked like Settings, "Read more" only when the text is cut off, anime marker pills on every layout, and a Press BACK to close hint on trailers.
+- **Seerr:** Discover drawn with the Home cards, rows and settings, and a browse grid that reads the Movies or TV Shows library's own size, shape and direction settings, so a card is the same in both.
+- **Sort and filter popups:** one shared popup, with the groups on the left and the options beside them.
+- **Performance levels:** Ultra, High, Medium-High, Medium, Low and Performance, with the lower ones turning off idle animations and drawing long rows in steps, so a slow TV stays responsive while looking almost the same.
+- **Settings in sub-pages:** the long Playback, Audio, Subtitles and Home pages open short lists of sub-pages, such as Seeking and Resume, Direct Play and Quality Limits, Audio Output and Passthrough, Subtitle Appearance and Row Style and Layout.
 
 **Diagnostics and translations**
-- **Diagnostic log:** the in-app log keeps its recent non-network lines across restarts, so a report still has them after the app reopens.
-- **Romanian:** strings added by this fork are translated by hand in `packages/app/resources/ro/strings.json`, since this fork has no Weblate project.
+- **Diagnostic log:** the in-app log keeps its recent non-network lines across restarts, so a report still has them after the app reopens. It also prints the commit the package was built from, why each start picked its audio track, the server's reason for not direct playing, and why a media load failed.
+- **Romanian:** strings added by this fork are translated by hand in `packages/app/resources/ro/strings.json`, since this fork has no Weblate project. The Series button on an episode's details reads Serial.
 
 ### Branches and updating
 
