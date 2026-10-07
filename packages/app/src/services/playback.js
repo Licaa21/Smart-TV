@@ -475,9 +475,13 @@ export const canPlayAudioStreamNatively = async (stream, options = {}) => {
 // The indexes of the audio streams the set decodes, worked out with the capabilities and passthrough settings the
 // request itself was made with, since a probe made on its own can answer from different ones. AVPlay opens a file
 // on the first of these.
+// TrueHD can be called playable by the capabilities while AVPlay still leaves it out of its own track list, as it
+// did on a Q67A that opened a TrueHD-first file on its AC3 track, so it is never counted as a track a file opens on.
+const NEVER_OPENED_ON = ['truehd', 'mlp'];
 const decodableAudioOf = (mediaSource, capabilities, passthroughSettings) => new Set(
 	(mediaSource?.MediaStreams || [])
-		.filter((s) => s.Type === 'Audio' && isAudioStreamPlayable(s, capabilities, passthroughSettings))
+		.filter((s) => s.Type === 'Audio' && NEVER_OPENED_ON.indexOf(String(s.Codec || '').toLowerCase()) < 0
+			&& isAudioStreamPlayable(s, capabilities, passthroughSettings))
 		.map((s) => s.Index)
 );
 
