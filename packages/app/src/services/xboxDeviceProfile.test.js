@@ -230,6 +230,11 @@ describe('the profile with the console player', () => {
 		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'DOVIWithHDR10', Width: 3840}), capabilities)).toBe('DirectPlay');
 		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'DOVIWithEL', Width: 3840}), capabilities)).toBe('DirectPlay');
 		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'DOVI', Width: 3840}), capabilities)).toBe('Transcode');
+		expect(profile.DirectPlayProfiles.find((entry) => entry.Container === 'mkv').VideoCodec).toBe('h264,hevc,mpeg2video,mpeg4,vc1');
+		expect(getPlayMethod(video({Codec: 'mpeg2video', Width: 720}), capabilities)).toBe('DirectPlay');
+		expect(getPlayMethod(video({Codec: 'vc1', Width: 1920}), capabilities)).toBe('DirectPlay');
+		expect(getPlayMethod(video({Codec: 'vc1', Width: 3840}), capabilities)).toBe('Transcode');
+		expect(getPlayMethod(video({Codec: 'mpeg2video'}), {...capabilities, nativePlayer: false})).toBe('Transcode');
 		expect(getPlayMethod({...video({Codec: 'h264'}), Container: 'ts'}, capabilities)).toBe('DirectPlay');
 		expect(getPlayMethod({...video({Codec: 'h264'}), Container: 'webm'}, capabilities)).toBe('DirectPlay');
 		expect(getPlayMethod(source({MediaStreams: [{Type: 'Video', Codec: 'h264', VideoRangeType: 'SDR', Width: 1920}, {Type: 'Audio', Codec: 'dts', Index: 1}]}), capabilities)).toBe('DirectPlay');

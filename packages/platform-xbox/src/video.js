@@ -29,6 +29,8 @@ export {
 
 const H264_NAMES = ['h264', 'avc'];
 const HEVC_NAMES = ['hevc', 'h265', 'hev1', 'hvc1'];
+// What the console player decodes besides H.264 and HEVC, none of it past 1080p
+const NATIVE_ONLY_NAMES = ['mpeg2video', 'mpeg4', 'vc1'];
 
 export const getSharedVideoElement = () => {
 	if (isNativePlayerEnabled()) return getNativeVideoElement();
@@ -175,7 +177,7 @@ export const getPlayMethod = (mediaSource, capabilities, options = {}) => {
 	const isHevc = HEVC_NAMES.includes(videoCodec);
 	const containers = capabilities.nativePlayer ? NATIVE_VIDEO_CONTAINERS : VIDEO_CONTAINERS;
 
-	const videoOk = !videoCodec || H264_NAMES.includes(videoCodec) || (isHevc && !!capabilities.hevc);
+	const videoOk = !videoCodec || H264_NAMES.includes(videoCodec) || (isHevc && !!capabilities.hevc) || (!!capabilities.nativePlayer && NATIVE_ONLY_NAMES.includes(videoCodec));
 	const containerOk = !container || containerParts.some((part) => containers.includes(part));
 	const hdrOk = rangeOk(videoStream, capabilities);
 	// Only HEVC has the console's own decoder behind it, so nothing else goes past 1080p

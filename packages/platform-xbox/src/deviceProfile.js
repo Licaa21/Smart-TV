@@ -122,7 +122,8 @@ export const getDeviceCapabilities = async () => {
 	return cachedCapabilities;
 };
 
-const buildVideoCodecs = (caps) => (caps.hevc ? ['h264', 'hevc'] : ['h264']);
+// The console player decodes the older disc and broadcast formats too, which the WebView has no decoder for
+const buildVideoCodecs = (caps) => ['h264', ...(caps.hevc ? ['hevc'] : []), ...(caps.nativePlayer ? ['mpeg2video', 'mpeg4', 'vc1'] : [])];
 
 const buildAudioCodecs = (caps) => {
 	const codecs = ['aac', 'mp3', 'flac'];
