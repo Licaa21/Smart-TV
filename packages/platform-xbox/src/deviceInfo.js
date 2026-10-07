@@ -10,7 +10,8 @@ export const getDeviceInfo = async () => {
 	const boot = bootData();
 	cached = {
 		platform: 'Xbox',
-		appVersion: process.env.REACT_APP_VERSION || '0.0.0',
+		// The package version carries the build number, which the web app's doesnt
+		appVersion: boot?.package?.version || process.env.REACT_APP_VERSION || '0.0.0',
 		userAgent: navigator.userAgent || 'Unknown',
 		screenSize: `${window.screen.width}x${window.screen.height}`,
 		tvVersion: boot?.os?.version ? `Xbox OS ${boot.os.version}` : 'Unknown',

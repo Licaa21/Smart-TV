@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Windows.ApplicationModel;
 using Windows.Data.Json;
 using Windows.Graphics.Display.Core;
 using Windows.Media.Protection;
@@ -41,6 +42,7 @@ namespace Moonfin.Xbox
             data.SetNamedValue("display", ReadDisplay());
             data.SetNamedValue("protection", await ReadProtectionAsync());
             data.SetNamedValue("webview", ReadWebView(webViewVersion));
+            data.SetNamedValue("package", ReadPackage());
             data.SetNamedValue("nativePlayer", ReadNativePlayer());
             data.SetNamedValue("ip", NullableString(ReadIp()));
             data.SetNamedValue("country", NullableString(ReadCountry()));
@@ -235,6 +237,16 @@ namespace Moonfin.Xbox
             var nativePlayer = new JsonObject();
             nativePlayer.SetNamedValue("v", JsonValue.CreateNumberValue(1));
             return nativePlayer;
+        }
+
+        // The package version, which counts up with every build and tells a report apart
+        // from one made on an earlier one.
+        private static JsonObject ReadPackage()
+        {
+            PackageVersion version = Package.Current.Id.Version;
+            var package = new JsonObject();
+            package.SetNamedValue("version", JsonValue.CreateStringValue(version.Major + "." + version.Minor + "." + version.Build + "." + version.Revision));
+            return package;
         }
 
         private static JsonObject ReadWebView(string version)
