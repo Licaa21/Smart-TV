@@ -7,6 +7,7 @@ import {serverLogger} from './serverLogger';
 import {TEXT_SUBTITLE_CODECS, isAssSubtitleCodec, isPgsSubtitleCodec, isBurnInSubtitleCodec, isInBandSubtitleTrack} from '../utils/subtitleCodecs';
 import {applyProfileTuning} from '../utils/deviceProfileTuning';
 import {audioChannelCap} from '../utils/audioChannelCap';
+import {audioStartNeedsServer, openingAudioStream} from '../utils/audioStartPlan';
 import {findNextInSeason, findNextSeason, findPreviousInSeason, findPreviousSeason, firstPlayableEpisode, lastPlayableEpisode} from '../utils/nextEpisode';
 import {videoRangeTypeOf} from '../utils/videoRange';
 import {getVolumeState, lastVolumeState} from './systemVolume';
@@ -459,6 +460,36 @@ const getAutoMaxBitrate = (capabilities) => {
 	return 40_000_000;
 };
 
+/**
+ * Whether the set can decode this audio stream as delivered. Negotiation checks this on
+ * open, but a mid playback track switch skips it, and handing AVPlay something it cant
+ * decode freezes the picture with no error. Ask before switching natively.
+ */
+export const canPlayAudioStreamNatively = async (stream, options = {}) => {
+	if (!stream) return false;
+	const capabilities = currentSession?.capabilities || await getDeviceCapabilities(options);
+	const passthroughSettings = await getPlaybackAudioSettings(options);
+	return isAudioStreamPlayable(stream, capabilities, passthroughSettings);
+};
+
+// The indexes of the audio streams the set decodes, for working out which track AVPlay opens a file on.
+// A stream the probe cannot answer for counts as decoded, as it did before.
+export const decodableAudioIndexes = async (audioStreams) => {
+	const decoded = await Promise.all((audioStreams || []).map((stream) => canPlayAudioStreamNatively({
+		Codec: stream.Codec ?? stream.codec,
+		Profile: stream.Profile ?? stream.profile,
+		Title: stream.Title ?? stream.title,
+		DisplayTitle: stream.DisplayTitle ?? stream.displayTitle,
+		ChannelLayout: stream.ChannelLayout ?? stream.channelLayout,
+		Channels: stream.Channels ?? stream.channels
+	}).catch(() => true)));
+	const indexes = new Set();
+	(audioStreams || []).forEach((stream, position) => {
+		if (decoded[position]) indexes.add(stream.Index ?? stream.index);
+	});
+	return indexes;
+};
+
 export const getPlaybackInfo = async (itemId, options = {}) => {
 	const serverType = options.serverType || options.item?._serverType || jellyfinApi.getServerType();
 	const storedSettings = (await getFromStorage('settings')) || {};
@@ -719,8 +750,11 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	let audioRebuilt = false;
 	if (directPlayOpensFirstAudio && !directPlayForced && options.audioStreamIndex != null
 		&& playMethod === PlayMethod.DirectPlay) {
-		const firstAudio = (mediaSource.MediaStreams || []).find((s) => s.Type === 'Audio');
-		if (firstAudio && firstAudio.Index !== options.audioStreamIndex) {
+		const fileAudio = (mediaSource.MediaStreams || []).filter((s) => s.Type === 'Audio');
+		const decodable = await decodableAudioIndexes(fileAudio);
+		const firstAudio = openingAudioStream(fileAudio, (s) => decodable.has(s.Index));
+		const wantedAudio = fileAudio.find((s) => s.Index === options.audioStreamIndex);
+		if (firstAudio && audioStartNeedsServer({wanted: wantedAudio, audioStreams: fileAudio, canDecode: (s) => decodable.has(s.Index), allowSameCodec: Boolean(options.switchInPlayer)})) {
 			const rebuilt = await api.getPlaybackInfo(itemId, {
 				DeviceProfile: deviceProfile,
 				StartTimeTicks: requestedStartTime,
@@ -1312,7 +1346,9 @@ export const changeAudioStream = async (streamIndex, currentPositionTicks, {refu
 	// regardless of AudioStreamIndex, so DirectPlay is disabled for audio switching. DirectStream
 	// (server-side remux) is quality-identical but honors track selection. Where the player is known to
 	// open a direct play on the file's first track, going back to that one needs no remux.
-	const firstAudio = (currentSession.mediaSource?.MediaStreams || []).find((s) => s.Type === 'Audio');
+	const fileAudio = (currentSession.mediaSource?.MediaStreams || []).filter((s) => s.Type === 'Audio');
+	const decodable = await decodableAudioIndexes(fileAudio);
+	const firstAudio = openingAudioStream(fileAudio, (s) => decodable.has(s.Index));
 	const backToFirst = currentSession.directPlayOpensFirstAudio && firstAudio?.Index === streamIndex;
 	const newInfo = await getPlaybackInfo(currentSession.itemId, {
 		...currentSession,
@@ -1666,18 +1702,6 @@ export const startHealthMonitoring = (onUnhealthy) => {
 };
 
 export const getCurrentSession = () => currentSession;
-
-/**
- * Whether the set can decode this audio stream as delivered. Negotiation checks this on
- * open, but a mid playback track switch skips it, and handing AVPlay something it cant
- * decode freezes the picture with no error. Ask before switching natively.
- */
-export const canPlayAudioStreamNatively = async (stream, options = {}) => {
-	if (!stream) return false;
-	const capabilities = currentSession?.capabilities || await getDeviceCapabilities(options);
-	const passthroughSettings = await getPlaybackAudioSettings(options);
-	return isAudioStreamPlayable(stream, capabilities, passthroughSettings);
-};
 
 /** Update currentSession track indices without a full reload (native track switch). */
 export const updateCurrentSession = (updates) => {

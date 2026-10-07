@@ -28,7 +28,7 @@ import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTi
 import {getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
-import {audioStartNeedsServer} from '../../utils/audioStartPlan';
+import {audioStartNeedsServer, openingAudioStream} from '../../utils/audioStartPlan';
 import {applyResumeRewind, skipBackSeconds, skipForwardSeconds, zoomInternalFromSetting, zoomSettingFromInternal} from '../../utils/playbackTuning';
 import {saveAudioPref, saveSubtitlePref} from '../../services/subtitlePrefs';
 import {resolveSeriesAudio} from './initialAudio';
@@ -308,6 +308,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const lastTrackAttemptRef = useRef(0);
 	const applyPendingTracksRef = useRef(null);
 	const reloadAudioFromServerRef = useRef(null);
+	// the track AVPlay opens the file on, which the check after play falls back to when it cannot name the playing one
+	const openingAudioIndexRef = useRef(null);
 	const activeNativeSubRef = useRef(null);
 	const trackConfirmTimerRef = useRef(null);
 	const audioVerifyTimerRef = useRef(null);
@@ -726,7 +728,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		// says nothing against it, while a start has the first track to fall back on
 		const matches = tizenIndex != null && playingIndex != null
 			? tizenIndex === playingIndex
-			: (lenient || wanted === streams[0]?.index);
+			: (lenient || wanted === (openingAudioIndexRef.current ?? streams[0]?.index));
 		serverLogger.playback('Audio: check after play', {
 			pass,
 			shownJellyfinIndex: wanted,
@@ -1613,7 +1615,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					isLiveTV,
 					stereoUpmixEnabled: settings.stereoUpmixEnabled,
 					// AVPlay opens a direct play on the file's first audio track
-					directPlayOpensFirstAudio: true
+					directPlayOpensFirstAudio: true,
+					// this start queues a native switch to the pick, which a reload does not
+					switchInPlayer: true
 				};
 				let result = await playback.getPlaybackInfo(item.Id, playbackInfoOptions);
 				if (!stillCurrent()) return;
@@ -1675,9 +1679,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const wantedAudio = initialAudioIndex != null
 					? result.audioStreams?.find((s) => s.index === initialAudioIndex)
 					: autoAudio;
+				// AVPlay opens on the first track the set decodes, which is not always the file's first
+				const decodableAudio = isLiveTV ? null : await playback.decodableAudioIndexes(result.audioStreams);
+				const canDecodeAudio = (s) => !decodableAudio || decodableAudio.has(s.index);
+				const openingAudio = openingAudioStream(result.audioStreams, canDecodeAudio);
+				openingAudioIndexRef.current = openingAudio?.index ?? null;
 				const audioNeedsServer = audioStartNeedsServer({
 					wanted: wantedAudio,
 					audioStreams: result.audioStreams,
+					canDecode: canDecodeAudio,
+					allowSameCodec: true,
 					forceDirectPlay: playbackInfoOptions.forceDirectPlay,
 					isLiveTV
 				});
@@ -1685,6 +1696,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					initialAudioIndex: initialAudioIndex ?? null,
 					wantedIndex: wantedAudio?.index ?? null,
 					firstIndex: result.audioStreams?.[0]?.index ?? null,
+					openingIndex: openingAudio?.index ?? null,
 					playMethod: result.playMethod,
 					forceDirectPlay: Boolean(playbackInfoOptions.forceDirectPlay),
 					isLiveTV: Boolean(isLiveTV),
