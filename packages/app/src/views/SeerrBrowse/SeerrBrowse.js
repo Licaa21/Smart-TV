@@ -9,6 +9,7 @@ import FilterPopup, {FilterOption} from '../../components/FilterPopup';
 import {getFromStorage} from '../../services/storage';
 import {focusOverhang, horizontalCellPad} from '../../utils/gridChrome';
 import {useAuth} from '../../context/AuthContext';
+import ScreenBackdrop from '../../components/ScreenBackdrop';
 import libraryCss from '../Library/Library.module.less';
 import * as seerrApi from '../../services/seerrApi';
 import {buildSeerrDiscoverParams, getSeerrSortOptions, getSeerrTvStatusOptions, getSeerrMinRatingOptions, getSeerrMinVoteOptions, getSeerrRuntimeOptions, getSeerrReleaseOptions, hasSeerrDiscoverFilters} from '../../utils/seerrBrowseFilters';
@@ -226,6 +227,15 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		scrollToRef.current({index, animate: false, focus: true});
 	}, [initialLoadDone]);
 
+	// the card focus is on, whose backdrop shows behind the grid
+	const [backdropItem, setBackdropItem] = useState(null);
+	const handleItemFocus = useCallback((ev) => {
+		const itemIndex = ev.currentTarget?.dataset?.index;
+		if (itemIndex === undefined) return;
+		const mediaItem = itemsRef.current[parseInt(itemIndex, 10)];
+		if (mediaItem) setBackdropItem(mediaItem);
+	}, []);
+
 	const handleItemClick = useCallback((ev) => {
 		const itemIndex = ev.currentTarget?.dataset?.index;
 		if (itemIndex === undefined) return;
@@ -349,6 +359,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 				className={libraryCss.itemCard}
 				style={{padding: cellPadding}}
 				onClick={handleItemClick}
+				onFocus={handleItemFocus}
 				data-index={index}
 			>
 				<div className={libraryCss.itemCardInner}>
@@ -380,7 +391,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 				</div>
 			</SpottableDiv>
 		);
-	}, [handleItemClick, loadItems, isWideImage, posterHeight, cellPadding, showCardText]);
+	}, [handleItemClick, handleItemFocus, loadItems, isWideImage, posterHeight, cellPadding, showCardText]);
 
 	const currentFilter = getFilterOptions().find(o => o.key === mediaType);
 
@@ -601,6 +612,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 
 	return (
 		<div className={`${css.page} ${settings.navbarPosition === 'left' ? css.pageLeftNav : ''}`}>
+			<ScreenBackdrop item={backdropItem} />
 			<div className={css.content}>
 				<div className={css.header}>
 					<div className={css.titleSection}>

@@ -25,27 +25,27 @@ export const classicCardSize = (shape, posterSize) => {
 // The wide artwork a row asked for, or null when the item carries none of it. Handing
 // back the url rather than a yes or no is what keeps the card shape and the picture it
 // ends up holding from ever disagreeing.
-const requestedArtwork = (item, imageType, serverUrl) => {
+export const requestedArtwork = (item, imageType, serverUrl, width = 400) => {
 	if (imageType === 'backdrop') {
 		if (item.BackdropImageTags?.length > 0) {
-			return getImageUrl(serverUrl, item.Id, 'Backdrop', {maxWidth: 400, quality: 80});
+			return getImageUrl(serverUrl, item.Id, 'Backdrop', {maxWidth: width, quality: 80});
 		}
 		if (item.ParentBackdropItemId) {
-			return getImageUrl(serverUrl, item.ParentBackdropItemId, 'Backdrop', {maxWidth: 400, quality: 80});
+			return getImageUrl(serverUrl, item.ParentBackdropItemId, 'Backdrop', {maxWidth: width, quality: 80});
 		}
 		if (item.ImageTags?.Thumb) {
-			return getImageUrl(serverUrl, item.Id, 'Thumb', {maxWidth: 400, quality: 80});
+			return getImageUrl(serverUrl, item.Id, 'Thumb', {maxWidth: width, quality: 80});
 		}
 	}
 	if (imageType === 'thumb') {
 		if (item.ImageTags?.Thumb) {
-			return getImageUrl(serverUrl, item.Id, 'Thumb', {maxWidth: 400, quality: 80});
+			return getImageUrl(serverUrl, item.Id, 'Thumb', {maxWidth: width, quality: 80});
 		}
 		if (item.ParentThumbItemId) {
-			return getImageUrl(serverUrl, item.ParentThumbItemId, 'Thumb', {maxWidth: 400, quality: 80});
+			return getImageUrl(serverUrl, item.ParentThumbItemId, 'Thumb', {maxWidth: width, quality: 80});
 		}
 		if (item.BackdropImageTags?.length > 0) {
-			return getImageUrl(serverUrl, item.Id, 'Backdrop', {maxWidth: 400, quality: 80});
+			return getImageUrl(serverUrl, item.Id, 'Backdrop', {maxWidth: width, quality: 80});
 		}
 	}
 	if (imageType === 'banner') {
@@ -61,10 +61,10 @@ const requestedArtwork = (item, imageType, serverUrl) => {
 	}
 	if (imageType === 'logo') {
 		if (item.ImageTags?.Logo) {
-			return getImageUrl(serverUrl, item.Id, 'Logo', {maxWidth: 400, quality: 80});
+			return getImageUrl(serverUrl, item.Id, 'Logo', {maxWidth: width, quality: 80});
 		}
 		if (item.ParentLogoItemId) {
-			return getImageUrl(serverUrl, item.ParentLogoItemId, 'Logo', {maxWidth: 400, quality: 80});
+			return getImageUrl(serverUrl, item.ParentLogoItemId, 'Logo', {maxWidth: width, quality: 80});
 		}
 	}
 	return null;
@@ -73,18 +73,18 @@ const requestedArtwork = (item, imageType, serverUrl) => {
 // The artwork an episode can show, each one carrying whether it is wide so the
 // card can take its shape from the picture it ended up with. An episode still is
 // its Primary image, episodes carry no Thumb tag of their own.
-const episodeArtwork = (item, serverUrl, imageType, useSeriesArt) => {
+export const episodeArtwork = (item, serverUrl, imageType, useSeriesArt, width = 400) => {
 	const wide = (url) => (url ? {url, wide: true} : null);
 	const seriesWide = item.ParentThumbItemId
-		? wide(getImageUrl(serverUrl, item.ParentThumbItemId, 'Thumb', {maxWidth: 400, quality: 80}))
+		? wide(getImageUrl(serverUrl, item.ParentThumbItemId, 'Thumb', {maxWidth: width, quality: 80}))
 		: item.ParentBackdropItemId
-			? wide(getImageUrl(serverUrl, item.ParentBackdropItemId, 'Backdrop', {maxWidth: 400, quality: 80}))
+			? wide(getImageUrl(serverUrl, item.ParentBackdropItemId, 'Backdrop', {maxWidth: width, quality: 80}))
 			: null;
 	const seriesPoster = item.SeriesId && item.SeriesPrimaryImageTag
 		? {url: getImageUrl(serverUrl, item.SeriesId, 'Primary', {maxHeight: 300, quality: 80}), wide: false}
 		: null;
 	const still = wide(item.ImageTags?.Primary
-		? getImageUrl(serverUrl, item.Id, 'Primary', {maxWidth: 400, quality: 80})
+		? getImageUrl(serverUrl, item.Id, 'Primary', {maxWidth: width, quality: 80})
 		: null);
 
 	if (!useSeriesArt) return still || seriesWide || seriesPoster;

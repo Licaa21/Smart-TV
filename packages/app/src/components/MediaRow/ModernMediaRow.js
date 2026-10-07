@@ -35,6 +35,7 @@ const ModernMediaRow = ({
 	loading,
 	titleWidth,
 	cardType,
+	rowImageType,
 	spotlightId: rowSpotlightId
 }) => {
 	const {settings} = useSettings();
@@ -183,7 +184,9 @@ const ModernMediaRow = ({
 		const {cardWidth, imageHeight} = modernCardMetrics({
 			posterSize: settings.homeRowsPosterSize,
 			platform,
-			isSquareItem: cardType === 'square'
+			isSquareItem: cardType === 'square',
+			// a row of wide artwork holds its cards at the wide width, so the placeholders do too
+			isStatic: Boolean(rowImageType) && rowImageType !== 'poster' && cardType !== 'square'
 		});
 		return (
 			<PlaceholderRow
@@ -235,6 +238,7 @@ const ModernMediaRow = ({
 								onSpotlightRight={isLast ? handleWrapRight : null}
 								isFocused={focusedItemId === item.Id}
 								isLibraryRow={rowId === 'library-tiles'}
+								rowImageType={rowImageType}
 							/>
 						);
 					})}
@@ -246,6 +250,7 @@ const ModernMediaRow = ({
 
 const areRowPropsEqual = (prev, next) => {
 	if (prev.rowId !== next.rowId) return false;
+	if (prev.rowImageType !== next.rowImageType) return false;
 	if (prev.title !== next.title) return false;
 	if (prev.serverUrl !== next.serverUrl) return false;
 	if (prev.rowIndex !== next.rowIndex) return false;

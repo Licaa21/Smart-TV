@@ -11,6 +11,7 @@ import {useSettings} from '../../context/SettingsContext';
 import seerrApi from '../../services/seerrApi';
 import {seerrGenreBackdrop} from '../../utils/seerrGenreArt';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import ScreenBackdrop from '../../components/ScreenBackdrop';
 import {KEYS} from '../../utils/keys';
 import hydrateRequestMediaItems from '../../utils/seerrHydration';
 import {STREAMING_NETWORKS, MOVIE_STUDIOS, SEERR_SHORTCUTS, pickShortcutBackdrops, normalizeMediaItem, normalizeRequestItem} from '../../utils/seerrHomeRows';
@@ -662,6 +663,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 
 	return (
 		<div className={css.container}>
+			<ScreenBackdrop item={focusedItem} />
 			{!isLoading && isAuthenticated && onOpenRequests && (
 				<SpottableDiv
 					className={`${css.requestsPill} ${settings.navbarPosition === 'left' ? '' : (showDetailSection ? css.requestsPillBelowNav : css.requestsPillInBar)}`}

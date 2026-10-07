@@ -1,0 +1,13 @@
+// Fills the screen behind the content and keeps the page colour under the picture, so a card with
+// no backdrop shows the plain background and not a hole.
+.host {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 0;
+	overflow: hidden;
+	pointer-events: none;
+	background: var(--theme-background, #0a0a0a);
+}
