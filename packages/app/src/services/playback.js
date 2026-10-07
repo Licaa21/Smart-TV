@@ -274,7 +274,19 @@ const buildPlaybackUrl = (itemId, mediaSource, playSessionId, playMethod, creden
 		isAudio
 	});
 
-	if (playMethod === PlayMethod.DirectPlay) {
+	// A direct stream the server gave no address for is the file as it is, which is the same address a direct
+	// play opens. The report names it, since it is the server answering with less than it promised.
+	const directStreamWithoutUrl = playMethod === PlayMethod.DirectStream
+		&& !mediaSource.DirectStreamUrl && !mediaSource.TranscodingUrl;
+	if (directStreamWithoutUrl) {
+		serverLogger.playbackError('Playback: the server offered a direct stream with no address, opening the file as it is', {
+			supportsDirectPlay: mediaSource.SupportsDirectPlay,
+			supportsDirectStream: mediaSource.SupportsDirectStream,
+			container
+		});
+	}
+
+	if (playMethod === PlayMethod.DirectPlay || directStreamWithoutUrl) {
 		// Build query string manually for Chromium 47 compat (no URLSearchParams)
 		const queryParts = [
 			'Static=true',
@@ -327,6 +339,14 @@ const buildPlaybackUrl = (itemId, mediaSource, playSessionId, playMethod, creden
 		return /api_?key=/i.test(url) ? url : `${url}&${jellyfinApi.getTokenParam(serverType)}=${apiKey}`;
 	}
 
+	serverLogger.playbackError('Playback: no playback address', {
+		playMethod,
+		supportsDirectPlay: mediaSource.SupportsDirectPlay,
+		supportsDirectStream: mediaSource.SupportsDirectStream,
+		hasDirectStreamUrl: Boolean(mediaSource.DirectStreamUrl),
+		hasTranscodingUrl: Boolean(mediaSource.TranscodingUrl),
+		container
+	});
 	throw new Error('No playback URL available');
 };
 

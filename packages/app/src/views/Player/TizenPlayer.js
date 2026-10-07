@@ -2017,6 +2017,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				console.log(`[Player] Loaded ${displayTitle} via ${result.playMethod} (AVPlay native)${isLiveTV ? ' [Live TV]' : ''}`);
 			} catch (err) {
 				console.error('[Player] Failed to load media:', err);
+				// the report only holds what is written to it, and a start that fails before any other line is logged
+				// leaves nothing there to read
+				serverLogger.playbackError('Playback: failed to load media', {
+					error: err?.message || String(err),
+					stack: String(err?.stack || '').split('\n').slice(0, 6).join(' | ')
+				});
 				// A pre-roll that cant even load gets skipped, not surfaced.
 				const skipTo = isPreroll(item) ? nextInQueue(videoQueueRef.current, item) : null;
 				if (stillCurrent()) {
