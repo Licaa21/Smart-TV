@@ -153,4 +153,22 @@ describe('applyProfileTuning', () => {
 			expect(rangeTypes(applyProfileTuning(withEl, {dolbyVisionAsHdr10: true}, {uhd8K: true, hdr10: true}))).toEqual(['SDR', 'DOVIWithEL']);
 		});
 	});
+
+	describe('the stream count limit', () => {
+		const limited = () => ({...profile(), ContainerProfiles: [{Type: 'Video', Conditions: [{Condition: 'LessThanEqual', Property: 'NumStreams', Value: '32', IsRequired: false}]}]});
+
+		it('stays while the setting is off', () => {
+			const original = limited();
+			expect(applyProfileTuning(original, {})).toBe(original);
+		});
+
+		it('is dropped when the setting is on', () => {
+			expect(applyProfileTuning(limited(), {allowManyStreams: true}).ContainerProfiles).toEqual([]);
+		});
+
+		it('leaves a profile that has no limit alone', () => {
+			const original = profile();
+			expect(applyProfileTuning(original, {allowManyStreams: true})).toBe(original);
+		});
+	});
 });

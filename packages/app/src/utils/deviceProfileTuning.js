@@ -60,7 +60,12 @@ export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 	// but not Dolby Vision plays by itself. Left off, the server strips the layer and remuxes it.
 	const allowDoviEl = settings.dolbyVisionAsHdr10 === true && capabilities?.hdr10 === true;
 
-	if (!resolution && !channelCap && !dropAss && !dropPgs && !dropAv1Transcode && !allowDoviEl) return profile;
+	// Older Tizen sets are kept to 32 streams in a file, which sends a remux with many subtitle tracks through the
+	// server. Dropping the limit lets the set try the file, and it is only there when the profile carries it.
+	const dropStreamLimit = settings.allowManyStreams === true
+		&& (profile.ContainerProfiles || []).some((container) => (container.Conditions || []).some((condition) => condition.Property === 'NumStreams'));
+
+	if (!resolution && !channelCap && !dropAss && !dropPgs && !dropAv1Transcode && !allowDoviEl && !dropStreamLimit) return profile;
 
 	const tuned = {...profile};
 
@@ -124,6 +129,11 @@ export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 				})
 			};
 		});
+	}
+
+	if (dropStreamLimit) {
+		tuned.ContainerProfiles = (tuned.ContainerProfiles || []).filter((container) =>
+			!(container.Conditions || []).some((condition) => condition.Property === 'NumStreams'));
 	}
 
 	if (dropAv1Transcode) {
