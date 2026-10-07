@@ -54,7 +54,6 @@ namespace Moonfin.Xbox
         private IRandomAccessStream packagedStream;
         private HttpClient client;
         private double startSeconds;
-        private bool wantsHdr10;
         private bool wantsPlay;
         private bool opened;
 
@@ -139,7 +138,6 @@ namespace Moonfin.Xbox
             Release();
             session = payload.GetNamedNumber("session", 0);
             wantsPlay = payload.GetNamedBoolean("autoplay", false);
-            wantsHdr10 = Bridge.NamedString(payload, "hdr") == "hdr10";
             startSeconds = payload.GetNamedNumber("startSeconds", 0);
             player.Volume = payload.GetNamedNumber("volume", 1);
             player.IsMuted = payload.GetNamedBoolean("muted", false);
@@ -198,6 +196,9 @@ namespace Moonfin.Xbox
             config.General.ReadAheadBufferSize = ReadAheadBytes;
             config.General.FastSeek = true;
             config.Video.VideoDecoderMode = VideoDecoderMode.Automatic;
+            // Marks HDR frames as HDR whatever mode the display is in when the file opens,
+            // since the display is only switched once the file has.
+            config.Video.HdrSupport = HdrSupport.Enabled;
             config.FFmpegOptions = new PropertySet
             {
                 {"reconnect", 1},
@@ -315,7 +316,7 @@ namespace Moonfin.Xbox
             opened = true;
             item.AudioTracksChanged += (sender, args) => OnUi(() => Push("audioTracks", Tracks()));
 
-            if (wantsHdr10 && DisplayModes.DisplayHasHdr10())
+            if (file?.CurrentVideoStream?.HasHdrMetadata == true && DisplayModes.DisplayHasHdr10())
             {
                 JsonObject answer = await DisplayModes.SetForHdr10Async();
                 answer.SetNamedValue("hdr", JsonValue.CreateStringValue("hdr10"));

@@ -28,7 +28,6 @@ const NETWORK_NO_SOURCE = 3;
 const PLAYS_NATIVELY = /^(application\/(x-mpegurl|vnd\.apple\.mpegurl)|video\/(mp4|x-matroska|quicktime|webm|mp2t)|audio\/)/i;
 
 let element = null;
-let hdrHint = null;
 
 // The console player plays unless the host doesnt have one or the viewer turned it off.
 export const isNativePlayerEnabled = () => {
@@ -42,13 +41,6 @@ export const isNativePlayerEnabled = () => {
 };
 
 export const isNativeVideoElement = (candidate) => !!candidate && candidate === element;
-
-// Remembers whether the player's next stream is HDR, so the host can switch the display for it.
-export const noteNativeSource = (mediaSource) => {
-	const video = (mediaSource?.MediaStreams || []).find((stream) => stream.Type === 'Video');
-	const range = (video?.VideoRangeType || '').toUpperCase();
-	hdrHint = range.includes('HDR') ? 'hdr10' : null;
-};
 
 const stripFragment = (url) => {
 	const match = /^(.*?)#t=([\d.]+)$/.exec(url || '');
@@ -226,7 +218,7 @@ const createFacade = () => {
 		state.tracks = [];
 		state.selectedTrack = -1;
 		const hls = /^application\/(x-mpegurl|vnd\.apple\.mpegurl)$/i.test(video.type || '') || /\.m3u8(\?|$)/i.test(url);
-		hostPlayer.openStream(state.session, {url, hls, startSeconds, autoplay: !state.paused || state.autoplay, volume: state.volume, muted: state.muted, hdr: hdrHint}).catch((err) => {
+		hostPlayer.openStream(state.session, {url, hls, startSeconds, autoplay: !state.paused || state.autoplay, volume: state.volume, muted: state.muted}).catch((err) => {
 			onEvent({session: state.session, event: 'error', code: 2, message: err.message});
 		});
 	};

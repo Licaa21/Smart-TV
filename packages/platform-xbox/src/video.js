@@ -14,7 +14,7 @@ import {
 import {onShellMessage, postToShell} from './bridge';
 import {noteHevcRefusal} from './deviceProfile';
 import {pressOnFocused, raiseHostBack} from './keys';
-import {closeNativeVideo, getNativeVideoElement, isNativePlayerEnabled, isNativeVideoElement, noteNativeSource, placeNativeVideo} from './nativeVideo';
+import {closeNativeVideo, getNativeVideoElement, isNativePlayerEnabled, isNativeVideoElement, placeNativeVideo} from './nativeVideo';
 
 export {giveControllerToGame} from './keys';
 
@@ -56,14 +56,8 @@ const hasHevcVideo = (mediaSource) => {
 // In the WebView a seek made before the first frame has shown never lands for HEVC,
 // though one made after it does. So such a file is opened at its start and the player
 // seeks to the resume point once that frame is in. The console player opens at the
-// resume point itself, and this is where it learns what the next stream is.
-export const resumesAfterFirstFrame = (mediaSource) => {
-	if (isNativePlayerEnabled()) {
-		noteNativeSource(mediaSource);
-		return false;
-	}
-	return hasHevcVideo(mediaSource);
-};
+// resume point itself.
+export const resumesAfterFirstFrame = (mediaSource) => !isNativePlayerEnabled() && hasHevcVideo(mediaSource);
 
 // A console whose WebView decoder wont open an HEVC file says so in the error, and
 // the profile wants to know.

@@ -271,11 +271,6 @@ describe('the video element backed by the console player', () => {
 		expect(window.localStorage.getItem('moonfin:xboxHevcRefusals')).toBeNull();
 		await expect(waitForDecoderRelease()).resolves.toBeUndefined();
 
-		const video = getSharedVideoElement();
-		expect(openStream(video).payload.hdr).toBe('hdr10');
-		resumesAfterFirstFrame({Id: 'b', MediaStreams: [{Type: 'Video', Codec: 'h264', VideoRangeType: 'SDR'}]});
-		expect(openStream(video).payload.hdr).toBeNull();
-
 		const other = document.createElement('video');
 		await expect(cleanupVideoElement(other)).resolves.toBeDefined();
 	});
