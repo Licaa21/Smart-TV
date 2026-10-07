@@ -12,6 +12,7 @@ import {isBackKey} from '../../utils/keys';
 import {isTvKeyboardVisible} from '../TVKeyboard/keyboardBus';
 
 import css from './SeerrIssueThread.module.less';
+import {appLocale} from '../../utils/appLocale';
 
 const ThreadContainer = SpotlightContainerDecorator({
 	enterTo: 'default-element',
@@ -24,7 +25,7 @@ const SpottableButton = Spottable('button');
 const formatDate = (dateStr) => {
 	if (!dateStr) return '';
 	try {
-		return new Date(dateStr).toLocaleDateString();
+		return new Date(dateStr).toLocaleDateString(appLocale());
 	} catch (e) {
 		return '';
 	}

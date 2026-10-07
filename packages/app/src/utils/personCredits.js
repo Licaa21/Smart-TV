@@ -1,6 +1,7 @@
 import $L from '@enact/i18n/$L';
 
 import {SHOWS_EVERYTHING} from './detailSectionLayout';
+import {appLocale} from './appLocale';
 
 // A birthday is a calendar date, not a moment. Both servers send it anchored to
 // UTC, so reading it back in the viewer's zone moves it a day earlier for
@@ -15,7 +16,7 @@ const parseDate = (value) => {
 export const formatPersonDate = (value) => {
 	const date = parseDate(value);
 	if (!date) return null;
-	return date.toLocaleDateString(undefined, {year: 'numeric', month: 'long', day: 'numeric'});
+	return date.toLocaleDateString(appLocale(), {year: 'numeric', month: 'long', day: 'numeric'});
 };
 
 export const personAge = (birthValue, deathValue) => {

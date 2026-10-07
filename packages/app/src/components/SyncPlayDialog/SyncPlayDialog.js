@@ -22,11 +22,12 @@ const GroupsContainer = SpotlightContainerDecorator({
 
 const SpottableButton = Spottable('button');
 
-const REPEAT_LABELS = {
+// Read when drawn, since the language is not picked yet when this file loads
+const getRepeatLabels = () => ({
 	RepeatNone: $L('Off'),
 	RepeatOne: $L('One'),
 	RepeatAll: $L('All')
-};
+});
 
 const REPEAT_CYCLE = ['RepeatNone', 'RepeatOne', 'RepeatAll'];
 
@@ -302,7 +303,7 @@ const GroupView = memo(({group, isLeaving, onLeave, playQueue, playQueueItem, pl
 						onClick={onToggleRepeat}
 						spotlightId="syncplay-repeat-btn"
 					>
-						{$L('Repeat')}: {REPEAT_LABELS[repeatMode] || $L('Off')}
+						{$L('Repeat')}: {getRepeatLabels()[repeatMode] || $L('Off')}
 					</SpottableButton>
 				</div>
 			)}

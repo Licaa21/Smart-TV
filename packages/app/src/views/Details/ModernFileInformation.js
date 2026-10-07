@@ -8,6 +8,7 @@ import {fileName, fileSizeLine, videoLines} from './nouveau/nouveauFooterFields'
 import useDetailPlaybackInfo from './useDetailPlaybackInfo';
 
 import css from './ModernFileInformation.module.less';
+import {appLocale} from '../../utils/appLocale';
 
 const SpottableDiv = Spottable('div');
 const Container = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'div');
@@ -20,7 +21,7 @@ const COLLAPSED_TRACKS = 2;
 const addedOn = (dateCreated) => {
 	const date = dateCreated ? new Date(dateCreated) : null;
 	if (!date || isNaN(date.getTime())) return null;
-	return date.toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
+	return date.toLocaleDateString(appLocale(), {year: 'numeric', month: 'short', day: 'numeric'});
 };
 
 // The rows are spottable though there's nothing to activate on most of them, since focus is how

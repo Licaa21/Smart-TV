@@ -3,13 +3,14 @@ import seerrApi from '../services/seerrApi';
 import {fetchCustomRow, constructSourceUrl} from '../services/externalRowsApi';
 import {fetchWithTimeout} from './fetchTimeout';
 import {seasonalTitle} from './seasonalTitles';
+import {appLocale} from './appLocale';
 
 const HOME_ROW_LIMIT = 20;
 const VALIDATE_TIMEOUT_MS = 45000;
 
 // The 13 TMDB chart presets. `type` is the literal TMDB API path the plugin
 // proxies (source=tmdb_chart).
-export const TMDB_PRESETS = [
+export const getTmdbPresets = () => [
 	{id: 'tmdb_popular_movies', title: $L('Popular Movies'), type: 'movie/popular'},
 	{id: 'tmdb_top_rated_movies', title: $L('Top Rated Movies'), type: 'movie/top_rated'},
 	{id: 'tmdb_now_playing_movies', title: $L('Now Playing Movies'), type: 'movie/now_playing'},
@@ -25,7 +26,7 @@ export const TMDB_PRESETS = [
 	{id: 'tmdb_trending_all_weekly', title: $L('Trending All (Weekly)'), type: 'trending/all/week'}
 ];
 
-export const IMDB_PRESETS = [
+const getImdbPresets = () => [
 	{id: 'imdb-top250-movies', title: $L('IMDb Top 250 Movies'), type: 'imdb_top_250_movies'},
 	{id: 'imdb-top250-tv', title: $L('IMDb Top 250 TV Shows'), type: 'imdb_top_250_tv_shows'},
 	{id: 'imdb-popular-movies', title: $L('IMDb Most Popular Movies'), type: 'imdb_most_popular_movies'},
@@ -37,8 +38,8 @@ export const IMDB_PRESETS = [
 // Descriptors for the preset toggle list. Custom rows and calendars are configured
 // separately and carry their own descriptors.
 export const getExternalHomeRowConfigs = () => ([
-	...TMDB_PRESETS.map((p) => ({...p, source: 'tmdb_chart', section: 'tmdb'})),
-	...IMDB_PRESETS.map((p) => ({...p, source: 'imdb', section: 'imdb'}))
+	...getTmdbPresets().map((p) => ({...p, source: 'tmdb_chart', section: 'tmdb'})),
+	...getImdbPresets().map((p) => ({...p, source: 'imdb', section: 'imdb'}))
 ]);
 
 const findPreset = (id) => getExternalHomeRowConfigs().find((c) => c.id === id) || null;
@@ -266,7 +267,7 @@ const formatCalendarDate = (dateStr) => {
 	if (!dateStr) return '';
 	const d = new Date(dateStr);
 	if (Number.isNaN(d.getTime())) return '';
-	return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+	return d.toLocaleDateString(appLocale(), {month: 'short', day: 'numeric'});
 };
 
 const arrGet = async (url) => {
