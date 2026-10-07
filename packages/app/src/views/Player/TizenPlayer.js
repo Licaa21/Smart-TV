@@ -1680,7 +1680,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					? result.audioStreams?.find((s) => s.index === initialAudioIndex)
 					: autoAudio;
 				// AVPlay opens on the first track the set decodes, which is not always the file's first
-				const decodableAudio = isLiveTV ? null : await playback.decodableAudioIndexes(result.audioStreams);
+				const decodableAudio = isLiveTV || !result.decodableAudioIndexes ? null : new Set(result.decodableAudioIndexes);
 				const canDecodeAudio = (s) => !decodableAudio || decodableAudio.has(s.index);
 				const openingAudio = openingAudioStream(result.audioStreams, canDecodeAudio);
 				openingAudioIndexRef.current = openingAudio?.index ?? null;
@@ -1697,6 +1697,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					wantedIndex: wantedAudio?.index ?? null,
 					firstIndex: result.audioStreams?.[0]?.index ?? null,
 					openingIndex: openingAudio?.index ?? null,
+					decodableIndexes: result.decodableAudioIndexes ?? null,
 					playMethod: result.playMethod,
 					forceDirectPlay: Boolean(playbackInfoOptions.forceDirectPlay),
 					isLiveTV: Boolean(isLiveTV),
