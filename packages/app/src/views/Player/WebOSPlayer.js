@@ -165,6 +165,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const [isPaused, setIsPaused] = useState(false);
 	// Mirrors isPaused for the hide timer, which fires outside the render cycle.
 	const isPausedRef = useRef(false);
+	const startPausedRef = useRef(startPaused);
 	isPausedRef.current = isPaused;
 	// The key handler is rebuilt every render, so the listener reaches it through this
 	// rather than being torn down and re-added every time playback state moves.
@@ -1170,9 +1171,6 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					}
 				}
 
-				// coming back from a person page, where it was paused it stays paused
-				if (startPaused && !isLiveTV) videoRef.current?.pause();
-
 				console.log(`[Player] Loaded ${displayTitle} via ${result.playMethod}${isLiveTV ? ' [Live TV]' : ''}`);
 			} catch (err) {
 				console.error('[Player] Failed to load media:', err);
@@ -1945,6 +1943,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	}, [liveRecovery]);
 
 	const handlePlaying = useCallback(() => {
+		// coming back from a person page, where it was paused it stays paused. Playback has to have started for
+		// the pause to take, so it is the first playing event that does it, and only once
+		if (startPausedRef.current && !isLiveTV) {
+			startPausedRef.current = false;
+			videoRef.current?.pause();
+		}
 		markChannelPlaying();
 		setIsBuffering(false);
 		stalledRef.current = false;
@@ -1961,7 +1965,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (isInGroup && !groupHoldRef.current) {
 			skipGovernorRef.current.onStart({nowMs: Date.now(), fromMs: positionRef.current / 10000});
 		}
-	}, [holdForGroup, isInGroup, markChannelPlaying, liveRecovery]);
+	}, [holdForGroup, isInGroup, isLiveTV, markChannelPlaying, liveRecovery]);
 
 	const handleEnded = useCallback(async () => {
 		if (sourceTransitionRef.current) {

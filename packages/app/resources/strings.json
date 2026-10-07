@@ -392,7 +392,7 @@
 	"Choose how many buttons stay on screen before the rest move into More Actions": "Choose how many buttons stay on screen before the rest move into More Actions",
 	"Choose sorting method for completed items": "Choose sorting method for completed items",
 	"Choose the artwork each classic home row uses. Default follows the global Home Rows Image Type.": "Choose the artwork each classic home row uses. Default follows the global Home Rows Image Type.",
-	"Choose the artwork per home row. Classic rows only, the modern layout picks its own.": "Choose the artwork per home row. Classic rows only, the modern layout picks its own.",
+	"Choose the artwork per home row. Classic rows only, the modern layout follows Home Rows Image Type.": "Choose the artwork per home row. Classic rows only, the modern layout follows Home Rows Image Type.",
 	"Choose the order of your libraries": "Choose the order of your libraries",
 	"Choose what is shown on the right side of the music progress bar.": "Choose what is shown on the right side of the music progress bar.",
 	"Choose which IMDb lists are active. Activating a list adds it to your Home Sections.": "Choose which IMDb lists are active. Activating a list adds it to your Home Sections.",

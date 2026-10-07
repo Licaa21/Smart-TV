@@ -496,7 +496,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.NAV, id: 'homeRowToggles', label: () => $L('Home Row Toggles'), desc: () => $L('Enable or disable library-based home row categories'), icon: 'tune', action: (ctx) => ctx.actions.openScreen('personalization', 'homeRowToggles', 'setting-homeRowToggles')},
 					{kind: KIND.TOGGLE, key: 'mergeRecentRowsByType', label: () => $L('Merge Recent Rows by Type'), desc: () => $L('Combine separate libraries of the same type for Recently Added and Recently Released home rows.'), icon: 'merge_type'},
 					{kind: KIND.OPTION, key: 'homeRowsImageType', label: () => $L('Home Rows Image Type'), desc: () => $L('The artwork rows use unless a row overrides it'), options: getImageTypeOptions, fallback: () => $L('Poster'), icon: 'picture'},
-					{kind: KIND.NAV, id: 'rowImageTypes', label: () => $L('Row Image Types'), desc: () => $L('Choose the artwork per home row. Classic rows only, the modern layout picks its own.'), icon: 'picture', when: (ctx) => ctx.settings.homeRowsStyle === 'v1', action: (ctx) => ctx.actions.openRowImageTypes()},
+					{kind: KIND.NAV, id: 'rowImageTypes', label: () => $L('Row Image Types'), desc: () => $L('Choose the artwork per home row. Classic rows only, the modern layout follows Home Rows Image Type.'), icon: 'picture', when: (ctx) => ctx.settings.homeRowsStyle === 'v1', action: (ctx) => ctx.actions.openRowImageTypes()},
 					{kind: KIND.NAV, id: 'externalHomeRows', label: () => $L('External Home Rows'), desc: () => $L('Set-up external sources for Home Rows (e.g., Seerr, IMDb, and more!)'), icon: 'link', action: (ctx) => ctx.actions.openScreen('integrations', 'externalRows', 'setting-externalHomeRows'), when: whenPlugin}
 				]
 			},
