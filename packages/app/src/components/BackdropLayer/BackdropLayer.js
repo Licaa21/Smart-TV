@@ -4,7 +4,7 @@ import css from './BackdropLayer.module.less';
 
 const BACKDROP_DEBOUNCE_MS = 500;
 
-const BackdropLayer = memo(({targetUrl, blurAmount, overlayOpacity}) => {
+const BackdropLayer = memo(({targetUrl, blurAmount, overlayOpacity, scrimWhenEmpty = true}) => {
 	const layerARef = useRef(null);
 	const layerBRef = useRef(null);
 	const activeLayerRef = useRef('a');
@@ -83,7 +83,7 @@ const BackdropLayer = memo(({targetUrl, blurAmount, overlayOpacity}) => {
 				className={css.globalBackdropImage}
 				style={layerStyle}
 			/>
-			<div className={css.globalBackdropOverlay} style={overlayStyle} />
+			{(scrimWhenEmpty || targetUrl) && <div className={css.globalBackdropOverlay} style={overlayStyle} />}
 		</div>
 	);
 });
