@@ -1,4 +1,4 @@
-import {audioStartNeedsServer} from './audioStartPlan';
+import {audioStartNeedsServer, openingAudioStream} from './audioStartPlan';
 
 const streams = [{index: 4, codec: 'flac'}, {index: 5, codec: 'truehd'}, {index: 6, codec: 'ac3'}];
 
@@ -20,3 +20,37 @@ describe('audioStartNeedsServer', () => {
 		expect(audioStartNeedsServer({wanted: streams[2]})).toBe(false);
 	});
 });
+
+describe('the track the set opens on', () => {
+	// AVPlay leaves TrueHD out of its list, so a file that starts on it opens on the next track
+	const truehdFirst = [{index: 5, codec: 'truehd'}, {index: 6, codec: 'ac3'}, {index: 7, codec: 'ac3'}];
+	const canDecode = (stream) => stream.codec !== 'truehd';
+
+	test('is the first track the set decodes, not the first in the file', () => {
+		expect(openingAudioStream(truehdFirst, canDecode).index).toBe(6);
+		expect(openingAudioStream(truehdFirst).index).toBe(5);
+		expect(openingAudioStream([{index: 5, codec: 'truehd'}], canDecode).index).toBe(5);
+		expect(openingAudioStream([], canDecode)).toBeNull();
+	});
+
+	test('a pick in the codec it opens on is left to the player', () => {
+		expect(audioStartNeedsServer({wanted: truehdFirst[2], audioStreams: truehdFirst, canDecode})).toBe(false);
+		expect(audioStartNeedsServer({wanted: truehdFirst[1], audioStreams: truehdFirst, canDecode})).toBe(false);
+	});
+
+	test('a pick in another codec is built on the server', () => {
+		const flacFirst = [{index: 4, codec: 'flac'}, {index: 6, codec: 'ac3'}];
+		expect(audioStartNeedsServer({wanted: flacFirst[1], audioStreams: flacFirst, canDecode})).toBe(true);
+	});
+
+	test('a pick the set cannot decode is built on the server', () => {
+		expect(audioStartNeedsServer({wanted: truehdFirst[0], audioStreams: truehdFirst, canDecode})).toBe(true);
+	});
+
+	test('the server and player shapes of a stream read the same', () => {
+		const serverShape = [{Index: 4, Codec: 'FLAC'}, {Index: 6, Codec: 'AC3'}];
+		expect(audioStartNeedsServer({wanted: serverShape[1], audioStreams: serverShape})).toBe(true);
+		expect(audioStartNeedsServer({wanted: serverShape[0], audioStreams: serverShape})).toBe(false);
+	});
+});
+

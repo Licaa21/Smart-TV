@@ -28,7 +28,7 @@ import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTi
 import {getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
-import {audioStartNeedsServer} from '../../utils/audioStartPlan';
+import {audioStartNeedsServer, openingAudioStream} from '../../utils/audioStartPlan';
 import {applyResumeRewind, skipBackSeconds, skipForwardSeconds, zoomInternalFromSetting, zoomSettingFromInternal} from '../../utils/playbackTuning';
 import {saveAudioPref, saveSubtitlePref} from '../../services/subtitlePrefs';
 import {resolveSeriesAudio} from './initialAudio';
@@ -1675,9 +1675,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const wantedAudio = initialAudioIndex != null
 					? result.audioStreams?.find((s) => s.index === initialAudioIndex)
 					: autoAudio;
+				// AVPlay opens on the first track the set decodes, which is not always the file's first
+				const decodableAudio = isLiveTV ? null : await playback.decodableAudioIndexes(result.audioStreams);
+				const canDecodeAudio = (s) => !decodableAudio || decodableAudio.has(s.index);
+				const openingAudio = openingAudioStream(result.audioStreams, canDecodeAudio);
 				const audioNeedsServer = audioStartNeedsServer({
 					wanted: wantedAudio,
 					audioStreams: result.audioStreams,
+					canDecode: canDecodeAudio,
 					forceDirectPlay: playbackInfoOptions.forceDirectPlay,
 					isLiveTV
 				});
@@ -1685,6 +1690,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					initialAudioIndex: initialAudioIndex ?? null,
 					wantedIndex: wantedAudio?.index ?? null,
 					firstIndex: result.audioStreams?.[0]?.index ?? null,
+					openingIndex: openingAudio?.index ?? null,
 					playMethod: result.playMethod,
 					forceDirectPlay: Boolean(playbackInfoOptions.forceDirectPlay),
 					isLiveTV: Boolean(isLiveTV),
