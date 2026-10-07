@@ -1,4 +1,4 @@
-import {memo, useMemo} from 'react';
+import {forwardRef, memo, useImperativeHandle, useMemo, useState} from 'react';
 
 import {useSettings} from '../../context/SettingsContext';
 import * as seerrApi from '../../services/seerrApi';
@@ -14,6 +14,8 @@ const isLegacyBuild = () => typeof document !== 'undefined' && document.document
 export const backdropUrlFor = (item, serverUrl) => {
 	if (!item) return '';
 	if (item._externalBackdropUrl) return item._externalBackdropUrl;
+	// a genre card draws on one of its own titles
+	if (item.Type === 'Genre' && item._representative) return backdropUrlFor(item._representative, serverUrl);
 	const tmdbPath = item.backdrop_path || item.backdropPath || item.media?.backdropPath;
 	if (tmdbPath) return seerrApi.getImageUrl(tmdbPath, 'w1280');
 	const backdropId = getBackdropId(item);
@@ -41,5 +43,23 @@ const ScreenBackdrop = ({item, serverUrl}) => {
 		</div>
 	);
 };
+
+/**
+ * The same backdrop for a screen whose rows must not re-render when focus moves. The focused item is held
+ * here, so only this layer redraws, and the screen hands each focus to setItem through the ref.
+ * @param {Object} props
+ * @param {string} [props.serverUrl]
+ * @param {boolean} [props.active] - false hides it, such as while a featured bar fills the screen
+ */
+export const FocusBackdrop = memo(forwardRef(({serverUrl, active = true}, ref) => {
+	const {settings} = useSettings();
+	const [item, setItem] = useState(null);
+	useImperativeHandle(ref, () => ({setItem}), []);
+	const url = useMemo(
+		() => (!active || settings.showHomeBackdrop === false || isLegacyBuild() ? '' : backdropUrlFor(item, serverUrl)),
+		[active, item, serverUrl, settings.showHomeBackdrop]
+	);
+	return <BackdropLayer targetUrl={url} blurAmount={settings.backdropBlurHome} />;
+}));
 
 export default memo(ScreenBackdrop);

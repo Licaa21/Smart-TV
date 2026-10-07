@@ -1,1 +1,1 @@
-export {default, backdropUrlFor} from './ScreenBackdrop';
+export {default, backdropUrlFor, FocusBackdrop} from './ScreenBackdrop';

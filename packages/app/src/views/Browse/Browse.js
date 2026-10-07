@@ -23,6 +23,7 @@ import AyaBanner from './AyaBanner';
 import BannerBar from './BannerBar';
 import BookshelfBar from './BookshelfBar';
 import BackdropLayer from '../../components/BackdropLayer';
+import {FocusBackdrop} from '../../components/ScreenBackdrop';
 import useBrowseData from './useBrowseData';
 import useSeerrRows from './useSeerrRows';
 import useExternalRows from './useExternalRows';
@@ -84,6 +85,8 @@ const Browse = ({
 	const unifiedMode = settings.unifiedLibraryMode && hasMultipleServers;
 	const isLegacy = typeof document !== 'undefined' && (' ' + document.documentElement.className + ' ').indexOf(' legacy ') >= 0;
 	const [focusedItemForBackdrop, setFocusedItemForBackdrop] = useState(null);
+	// The modern rows hand each focus to this layer, which holds the item itself so the page does not redraw
+	const focusBackdropRef = useRef(null);
 	const mainContentRef = useRef(null);
 
 	// Moving focus scrolls every scrollable ancestor, overflow hidden included,
@@ -542,7 +545,9 @@ const Browse = ({
 		pinMainScroll();
 		if (showTopInfoArea) {
 			detailSectionRef.current?.handleFocusItem(item);
-		} else if (!useModernRows) {
+		} else if (useModernRows) {
+			focusBackdropRef.current?.setItem(item);
+		} else {
 			// The info overlay used to be the only feed into the backdrop, so
 			// turning it off silently killed backdrops with it. Classic rows hand
 			// the item over directly when the overlay is not there to do it.
@@ -576,9 +581,10 @@ const Browse = ({
 		<div className={css.page}>
 			<div className={`${css.mainContent} ${navOffsetClass}`} ref={mainContentRef}>
 				<BackdropLayer
-					targetUrl={targetBackdropUrl}
+					targetUrl={useModernRows && browseMode === 'rows' ? '' : targetBackdropUrl}
 					blurAmount={settings.backdropBlurHome}
 				/>
+				{useModernRows && <FocusBackdrop ref={focusBackdropRef} active={browseMode === 'rows'} />}
 
 				{featuredItems.length > 0 && showFeaturedBar !== false && (
 					settings.featuredBarStyle === 'aya' ? (

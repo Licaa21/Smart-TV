@@ -1587,7 +1587,11 @@ const AppContent = (props) => {
 		panelIndex !== PANELS.ADD_USER &&
 		panelIndex !== PANELS.GENRES &&
 		panelIndex !== PANELS.FAVORITES &&
-		!(panelIndex === PANELS.DETAILS && ['Playlist', 'MusicAlbum', 'MusicArtist'].includes(selectedItem?.Type));
+		!(panelIndex === PANELS.DETAILS && ['Playlist', 'MusicAlbum', 'MusicArtist'].includes(selectedItem?.Type)) &&
+		// A person opened from the player's cast list has Back to the player and nothing else, since a navbar
+		// would let the viewer leave the video behind. The person screen reached from anywhere else keeps it.
+		!(panelHistory[panelHistory.length - 1] === PANELS.PLAYER &&
+			(panelIndex === PANELS.PERSON || (panelIndex === PANELS.DETAILS && selectedItem?.Type === 'Person')));
 
 	return (
 		<div className={css.app} {...props}>
