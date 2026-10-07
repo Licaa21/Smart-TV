@@ -571,6 +571,13 @@ const Browse = ({
 		}
 	}, [onFocusItemThemeMusic, onBlurItemThemeMusic, onUnfocusItemThemeMusic, showTopInfoArea, useModernRows, pinMainScroll]);
 
+	// A theme plays while its card is in focus. Focus leaving the rows for the navbar, the sidebar or the featured
+	// bar ends it, and focus moving from one card to another is left to handleFocusItem.
+	const handleRowsBlur = useCallback((e) => {
+		if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+		(onUnfocusItemThemeMusic || onBlurItemThemeMusic)?.();
+	}, [onUnfocusItemThemeMusic, onBlurItemThemeMusic]);
+
 	const navOffsetClass = settings.navbarPosition === 'left' ? css.sidebarOffset : css.topbarOffset;
 	const rowsClipClass = showTopInfoArea ? '' : css.rowsClipTop;
 
@@ -692,6 +699,7 @@ const Browse = ({
 				<div
 					ref={contentRowsRef}
 					className={`${css.contentRows} ${browseMode === 'rows' ? css.rowsMode : ''} ${rowsClipClass}`}
+					onBlur={handleRowsBlur}
 				>
 					{filteredRows.map((row, index) => {
 						if (row.isPlaceholder) {
