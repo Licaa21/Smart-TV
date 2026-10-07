@@ -556,7 +556,10 @@ const Browse = ({
 		}
 		// The theme belongs to the title. An episode or a season of a series plays the series' theme, so the
 		// Continue Watching and Next Up rows have one, and the next episode of the same show keeps it going.
-		const themeId = item?._external ? null
+		// A library title that a TMDB or Seerr row swapped in keeps its real Id, and so its theme. One that is only
+		// on TMDB or Seerr has no theme to fetch.
+		const notInLibrary = (item?._external || item?._seerr) && !item?._resolvedFromExternal;
+		const themeId = notInLibrary ? null
 			: (item?.Type === 'Movie' || item?.Type === 'Series') ? item.Id
 				: (item?.Type === 'Episode' || item?.Type === 'Season') ? item.SeriesId
 					: null;
