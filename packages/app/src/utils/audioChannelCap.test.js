@@ -1,4 +1,17 @@
-import {audioChannelCap} from './audioChannelCap';
+import {audioChannelCap, audioPickCap} from './audioChannelCap';
+
+describe('audioPickCap', () => {
+	test('prefers stereo on its own without capping the profile', () => {
+		expect(audioPickCap({preferStereoAudio: true})).toBe(2);
+		expect(audioChannelCap({preferStereoAudio: true})).toBeNull();
+	});
+
+	test('follows the cap when there is one', () => {
+		expect(audioPickCap({maxAudioChannels: 6, preferStereoAudio: true})).toBe(6);
+		expect(audioPickCap({downmixToStereo: true})).toBe(2);
+		expect(audioPickCap({})).toBeNull();
+	});
+});
 
 describe('audioChannelCap', () => {
 	test('downmix means stereo whatever the cap says', () => {

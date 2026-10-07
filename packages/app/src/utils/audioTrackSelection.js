@@ -1,7 +1,7 @@
 import {languageMatches} from './audioLanguage';
 import {audioCodecKey} from './audioCodecs';
 import {streamTitleText} from './streamTitle';
-import {audioChannelCap} from './audioChannelCap';
+import {audioPickCap} from './audioChannelCap';
 
 // Picks the audio track a fresh playback starts on, following the same order the
 // other clients follow: an explicit pick, then commentary and audio description
@@ -142,7 +142,7 @@ export const selectPreferredAudioStream = (audioStreams, settings = {}) => {
 		// The saved ids as they stand, so a codec left out ranks after every one that is named. An empty
 		// list is no order at all.
 		codecOrder: Array.isArray(audioCodecOrder) && audioCodecOrder.length ? audioCodecOrder : null,
-		channelCap: audioChannelCap(settings),
+		channelCap: audioPickCap(settings),
 		lastIndex: lastExplicitAudioIndex,
 		lastTitle: lastExplicitAudioTitle ? String(lastExplicitAudioTitle).trim().toLowerCase() : ''
 	};

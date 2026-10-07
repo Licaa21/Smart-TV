@@ -185,6 +185,10 @@ describe('selectPreferredAudioStream with a channel cap', () => {
 		expect(selectPreferredAudioStream([ac3Surround, ac3Stereo], {audioLanguage: 'eng', downmixToStereo: true})).toBe(ac3Stereo);
 	});
 
+	test('the stereo preference alone picks the track that fits', () => {
+		expect(selectPreferredAudioStream([ac3Surround, ac3Stereo], {audioLanguage: 'eng', preferStereoAudio: true})).toBe(ac3Stereo);
+	});
+
 	test('with no cap the surround track still wins', () => {
 		expect(selectPreferredAudioStream([ac3Surround, ac3Stereo], {audioLanguage: 'eng'})).toBe(ac3Surround);
 		expect(selectPreferredAudioStream([ac3Surround, ac3Stereo], {audioLanguage: 'eng', maxAudioChannels: 'auto'})).toBe(ac3Surround);
@@ -200,4 +204,3 @@ describe('selectPreferredAudioStream with a channel cap', () => {
 		expect(selectPreferredAudioStream([eac3, ac3Surround], {audioLanguage: 'eng', maxAudioChannels: 2})).toBe(ac3Surround);
 	});
 });
-
