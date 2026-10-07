@@ -2248,7 +2248,7 @@
     "Thanksgiving": "Kiitospäivä",
     "That didn't work. Try again in a moment.": "Se ei onnistunut. Yritä uudelleen hetken kuluttua.",
     "Unblock": "Poista esto",
-    "Unblock {name}?": "Poistetaanko {nimi}:n esto?",
+    "Unblock {name}?": "Poistetaanko {name}:n esto?",
     "United States": "Yhdysvallat",
     "Unlock notifications": "Avaa ilmoitukset",
     "Untick a holiday to hide its row.": "Poista lomapäivän valinta, jotta sen rivi piilotetaan.",
