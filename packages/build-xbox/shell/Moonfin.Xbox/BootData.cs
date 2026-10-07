@@ -5,12 +5,14 @@ using System.Linq;
 using System.Threading.Tasks;
 using Windows.ApplicationModel;
 using Windows.Data.Json;
+using Windows.Graphics.Display;
 using Windows.Graphics.Display.Core;
 using Windows.Media.Protection;
 using Windows.Networking;
 using Windows.Networking.Connectivity;
 using Windows.System.Profile;
 using Windows.System.UserProfile;
+using Windows.UI.Xaml;
 
 namespace Moonfin.Xbox
 {
@@ -155,6 +157,13 @@ namespace Moonfin.Xbox
                 display.SetNamedValue("width", JsonValue.CreateNumberValue(current.ResolutionWidthInRawPixels));
                 display.SetNamedValue("height", JsonValue.CreateNumberValue(current.ResolutionHeightInRawPixels));
                 display.SetNamedValue("refreshRate", JsonValue.CreateNumberValue(Math.Round(current.RefreshRate, 3)));
+                // The size the app is drawn at and how many of the display's pixels each of its
+                // pixels gets, which says whether the console scales the app up to the display
+                DisplayInformation info = DisplayInformation.GetForCurrentView();
+                display.SetNamedValue("scale", JsonValue.CreateNumberValue(info.RawPixelsPerViewPixel));
+                display.SetNamedValue("resolutionScale", JsonValue.CreateNumberValue((int)info.ResolutionScale));
+                display.SetNamedValue("appWidth", JsonValue.CreateNumberValue(Math.Round(Window.Current.Bounds.Width)));
+                display.SetNamedValue("appHeight", JsonValue.CreateNumberValue(Math.Round(Window.Current.Bounds.Height)));
 
                 var hdr = new JsonArray();
                 if (supported.Any(mode => mode.IsSmpte2084Supported)) hdr.Add(JsonValue.CreateStringValue("hdr10"));
