@@ -706,7 +706,8 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		}
 	}
 
-	let playMethod = determinePlayMethod(mediaSource, capabilities, options, passthroughSettings);
+	// the flag the server was asked with, which the session may have turned off since the request was made
+	let playMethod = determinePlayMethod(mediaSource, capabilities, {...options, enableDirectPlay}, passthroughSettings);
 
 	// A set that opens a file on its first audio track whatever it is asked for cannot take direct play
 	// for any other track. The answer is then asked for again with direct play off, which builds the
@@ -791,7 +792,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 				// Keep the resolved index so the player still renders it client-side.
 				mediaSource.DefaultSubtitleStreamIndex = resolvedSub.Index;
 				playbackInfo = noBurnInfo;
-				playMethod = determinePlayMethod(mediaSource, capabilities, options, passthroughSettings);
+				playMethod = determinePlayMethod(mediaSource, capabilities, {...options, enableDirectPlay: enableDirectPlay && !audioRebuilt}, passthroughSettings);
 			}
 		}
 	}
