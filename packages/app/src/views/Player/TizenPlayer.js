@@ -137,7 +137,7 @@ const renderInfoPlaybackRows = ({css: c}) => (
  * playback. AVPlay renders on a platform multimedia layer BEHIND the web engine;
  * the web layer must be transparent in the video area for the content to show through.
  */
-const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialSubtitleIndex, initialStartPositionTicks, initialQuality, forceTranscode, onEnded, onBack, onGuide, onPlayNext, onSelectPerson, audioPlaylist, videoQueue, liveTvChannels, onPausedChange}) => {
+const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialSubtitleIndex, initialStartPositionTicks, initialQuality, forceTranscode, onEnded, onBack, onGuide, onPlayNext, onSelectPerson, audioPlaylist, videoQueue, liveTvChannels, startPaused, onPausedChange}) => {
 	const {settings, updateSetting} = useSettings();
 	const {isInGroup, lastCommand} = useSyncPlay();
 	const syncPlayCommandRef = useRef(false);
@@ -2027,6 +2027,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// Start time update polling
 				startTimeUpdatePolling();
 
+				// coming back from a person page, where it was paused it stays paused
+				if (startPaused && !isLiveTV) {
+					try { avplayPause(); } catch (e) { void e; }
+					setIsPaused(true);
+				}
+
 				console.log(`[Player] Loaded ${displayTitle} via ${result.playMethod} (AVPlay native)${isLiveTV ? ' [Live TV]' : ''}`);
 			} catch (err) {
 				console.error('[Player] Failed to load media:', err);
@@ -3087,8 +3093,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			_serverType: item?._serverType,
 			_serverAccessToken: item?._serverAccessToken,
 			_serverUserId: item?._serverUserId
-		}, positionRef.current);
-	}, [closeModal, item, onSelectPerson]);
+		}, {
+			positionTicks: positionRef.current,
+			audioStreamIndex: selectedAudioIndex,
+			subtitleStreamIndex: selectedSubtitleIndex,
+			mediaSourceId,
+			paused: isPausedRef.current
+		});
+	}, [closeModal, item, onSelectPerson, selectedAudioIndex, selectedSubtitleIndex, mediaSourceId]);
 
 	const handleButtonAction = useCallback((action) => {
 		showControls();

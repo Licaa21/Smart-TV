@@ -8,6 +8,7 @@ import {useSettings} from '../../context/SettingsContext';
 import {getPlatform} from '../../platform';
 import {isStaticLibraryCard, modernCardMetrics, getEpisodeLabels, getCardDisplayTitle} from './modernCardLayout';
 import SeerrIcon from '../icons/SeerrIcon';
+import {requestedArtwork, episodeArtwork} from './MediaCard';
 import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
@@ -69,6 +70,7 @@ const ModernMediaCard = ({
 	onSpotlightRight,
 	isFocused = false,
 	isLibraryRow = false,
+	rowImageType,
 	menuOptions
 }) => {
 	const {settings} = useSettings();
@@ -88,8 +90,22 @@ const ModernMediaCard = ({
 
 	const isStaticMyMedia = isStaticLibraryCard(isLibraryRow, settings);
 
+	// The artwork the row asked for when it is not the poster. A card that has it is a wide one, the shape the
+	// library tiles already use, so it holds still and the picture is the one chosen.
+	const rowArtwork = useMemo(() => {
+		if (!item || item._external || !rowImageType || rowImageType === 'poster') return null;
+		if (item.Type === 'MusicAlbum' || item.Type === 'Audio' || item.Type === 'Genre') return null;
+		const width = modernCardMetrics({posterSize: settings.homeRowsPosterSize, platform, isSquareItem: false, isStatic: false}).expandedWidth;
+		const episodeArt = item.Type === 'Episode' && rowImageType !== 'banner'
+			? episodeArtwork(item, itemServerUrl, rowImageType, settings.useSeriesThumbnails, width)
+			: null;
+		if (episodeArt?.url) return episodeArt.url;
+		return requestedArtwork(item, rowImageType, itemServerUrl, width);
+	}, [item, rowImageType, itemServerUrl, platform, settings.homeRowsPosterSize, settings.useSeriesThumbnails]);
+
 	const imageUrl = useMemo(() => {
 		if (!item) return null;
+		if (rowArtwork) return rowArtwork;
 
 		const providerIds = item.ProviderIds || {};
 		const externalPoster = item._externalPosterUrl ||
@@ -218,7 +234,7 @@ const ModernMediaCard = ({
 		}
 
 		return null;
-	}, [item, itemServerUrl, isFocused, isStaticMyMedia, settings.useSeriesThumbnails]);
+	}, [item, itemServerUrl, isFocused, isStaticMyMedia, rowArtwork, settings.useSeriesThumbnails]);
 
 	const handleClick = useCallback(() => {
 		onSelect?.(item);
@@ -260,9 +276,9 @@ const ModernMediaCard = ({
 		posterSize: settings.homeRowsPosterSize,
 		platform,
 		isSquareItem,
-		isStatic: isStaticMyMedia
+		isStatic: isStaticMyMedia || Boolean(rowArtwork)
 	});
-	const canRenderExpanded = !isStaticMyMedia && !isSquareItem && (
+	const canRenderExpanded = !isStaticMyMedia && !rowArtwork && !isSquareItem && (
 		Boolean(metadata || item?.CommunityRating || (shouldShowOverview && overviewText)) ||
 		item?.Type === 'Genre' ||
 		item?.Type === 'CollectionFolder' ||

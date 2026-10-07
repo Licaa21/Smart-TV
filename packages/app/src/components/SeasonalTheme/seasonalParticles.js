@@ -5,7 +5,8 @@
 // never sees inline styles, so the Webkit names are written out for Chrome 38.
 
 // Each falling particle is one animated layer, and every layer adds to the compositor's
-// work, so the counts follow the performance tier.
+// work. The counts are the viewer's Density choice, and a tier can still be asked for by a
+// caller that wants fewer.
 export const FALL_COUNTS = {
 	low: {light: 8, normal: 14, heavy: 22},
 	mid: {light: 12, normal: 22, heavy: 32},

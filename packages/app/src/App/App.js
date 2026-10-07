@@ -1193,12 +1193,20 @@ const AppContent = (props) => {
 
 	// The player closes for a person, but Back from there comes to it again at the same place. The history holds the
 	// player's place so Back finds it, and where it was is kept in the ref.
-	const handleSelectPersonFromPlayer = useCallback((person, positionTicks) => {
+	const handleSelectPersonFromPlayer = useCallback((person, where = {}) => {
 		if (!person?.Id) return;
 		playerReturnRef.current = {
 			item: playingItem,
-			// 0 is a place too, so a seek back to the start is kept and not read as the saved resume point
-			options: {...(playbackOptions || {}), startPositionTicks: positionTicks ?? playbackOptions?.startPositionTicks},
+			// 0 is a place too, so a seek back to the start is kept and not read as the saved resume point. The tracks
+			// and version the viewer ended on stand in front of the ones it opened with, and a pause stays one.
+			options: {
+				...(playbackOptions || {}),
+				startPositionTicks: where.positionTicks ?? playbackOptions?.startPositionTicks,
+				audioStreamIndex: where.audioStreamIndex ?? playbackOptions?.audioStreamIndex,
+				subtitleStreamIndex: where.subtitleStreamIndex ?? playbackOptions?.subtitleStreamIndex,
+				mediaSourceId: where.mediaSourceId ?? playbackOptions?.mediaSourceId,
+				startPaused: Boolean(where.paused)
+			},
 			isResume,
 			// where the player's entry sits in the history, so only that entry brings it back
 			depth: panelHistory.length
@@ -1705,6 +1713,7 @@ const AppContent = (props) => {
 									audioPlaylist={playbackOptions?.audioPlaylist}
 									videoQueue={playbackOptions?.videoQueue}
 									liveTvChannels={playbackOptions?.liveTvChannels}
+									startPaused={playbackOptions?.startPaused}
 									onEnded={handlePlayerEnd}
 									onBack={handlePlayerEnd}
 									onGuide={handlePlayerGuide}

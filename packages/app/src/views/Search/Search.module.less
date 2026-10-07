@@ -1,6 +1,15 @@
 @import '../../styles/mixins.less';
 @import '../../styles/variables.less';
 
+// The page holds the backdrop behind the scrolling results, which would otherwise carry it off with them.
+.searchPage {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+}
+
 /* Search Container */
 .searchContainer {
 	position: absolute;
@@ -8,9 +17,9 @@
 	left: 0;
 	right: 0;
 	bottom: 0;
+	z-index: 1;
 	overflow-y: auto;
 	overflow-x: hidden;
-	background: var(--theme-background, #0a0a0a);
 	padding-top: 80px;
 }
 

@@ -31,6 +31,7 @@ import {
 	shouldMountSearchRow
 } from './searchWindow';
 
+import ScreenBackdrop from '../../components/ScreenBackdrop';
 import css from './Search.module.less';
 
 const SpottableButton = Spottable('button');
@@ -142,6 +143,8 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// The row in focus goes by id rather than position, so a row that arrives late
 	// above it doesn't move the mounted window off it.
 	const [activeRowId, setActiveRowId] = useState(null);
+	// the card focus is on, whose backdrop shows behind the results
+	const [backdropItem, setBackdropItem] = useState(null);
 	const [visibleCardCounts, setVisibleCardCounts] = useState({});
 	const [recentSearches, saveRecentSearches] = useStorage(RECENT_SEARCHES_KEY, []);
 
@@ -664,6 +667,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		});
 	}, []);
 
+	const handleRowItemFocus = useCallback((item) => {
+		growRow(item);
+		if (!pointerHover()) setBackdropItem(item);
+	}, [growRow]);
+
 	const handleRowFocus = useCallback((rowId, itemCount) => (e) => {
 		if (pointerHover()) return;
 		setActiveRowId(rowId);
@@ -774,7 +782,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 								rowImageType={settings.homeRowsImageType}
 								onSelectItem={row.kind === 'seerr' ? handleSelectSeerr : handleSelectJellyfin}
 								onFocus={handleHomeRowFocus}
-								onFocusItem={growRow}
+								onFocusItem={handleRowItemFocus}
 								onNavigateUp={handleRowNavigateUp}
 								onNavigateDown={handleRowNavigateDown}
 								showServerBadge={unifiedMode}
@@ -795,6 +803,8 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	};
 
 	return (
+		<div className={css.searchPage}>
+		<ScreenBackdrop item={backdropItem} serverUrl={serverUrl} />
 		<div ref={containerRef} className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>
 			<div className={css.searchInputSection} onFocus={scrollToTop}>
 				<div
@@ -881,6 +891,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 					renderContent()
 				)}
 			</div>
+		</div>
 		</div>
 	);
 };
