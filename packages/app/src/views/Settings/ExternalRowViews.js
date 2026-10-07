@@ -2,7 +2,7 @@
 import $L from '@enact/i18n/$L';
 
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
-import {TMDB_PRESETS} from '../../utils/externalHomeRows';
+import {getTmdbPresets} from '../../utils/externalHomeRows';
 import {withSeasonalRow} from '../../utils/homeLayout';
 import {SEASONAL_COUNTRY_OPTIONS, SEASONAL_HOLIDAYS} from '../../utils/seasonalRow';
 import {seasonalCountryLabel, seasonalTitle} from '../../utils/seasonalTitles';
@@ -22,7 +22,7 @@ export const ExternalTmdbListsView = ({enabledMap, onToggleRow}) => (
 		<div className={css.viewDescription}>
 			{$L('Choose which TMDB chart rows appear on the home screen.')}
 		</div>
-		{TMDB_PRESETS.map((cfg) => (
+		{getTmdbPresets().map((cfg) => (
 			<SpottableDiv
 				key={cfg.id}
 				className={css.listItem}

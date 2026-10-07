@@ -21,6 +21,7 @@ import {SpottableDiv} from '../settingsSpottables';
 
 import settingsCss from '../Settings.module.less';
 import css from './Achievements.module.less';
+import {appLocale} from '../../../utils/appLocale';
 
 const DEFAULT_ACCENT = '#00a4dc';
 
@@ -41,7 +42,7 @@ const shell = (color) => ({background: tint(color), borderColor: tint(color, 0.4
 const percent = (value) => `${Math.round(value * 100)}%`;
 
 const mediumDate = (date) =>
-	date.toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
+	date.toLocaleDateString(appLocale(), {year: 'numeric', month: 'short', day: 'numeric'});
 
 const Icon = ({name, className}) => (
 	<svg className={className} viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true" focusable="false">

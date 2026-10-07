@@ -3,6 +3,7 @@ import $L from '@enact/i18n/$L';
 import {getImageUrl} from '../../utils/helpers';
 import {KEYS} from '../../utils/keys';
 import css from './PhotoViewer.module.less';
+import {appLocale} from '../../utils/appLocale';
 
 const PhotoViewer = ({item, items, serverUrl, onClose}) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
@@ -115,7 +116,7 @@ const PhotoViewer = ({item, items, serverUrl, onClose}) => {
 	if (!currentPhoto) return null;
 
 	const photoDate = currentPhoto.PremiereDate || currentPhoto.DateCreated;
-	const formattedDate = photoDate ? new Date(photoDate).toLocaleDateString(undefined, {
+	const formattedDate = photoDate ? new Date(photoDate).toLocaleDateString(appLocale(), {
 		year: 'numeric', month: 'long', day: 'numeric'
 	}) : null;
 

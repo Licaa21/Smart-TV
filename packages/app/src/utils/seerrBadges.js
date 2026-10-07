@@ -5,6 +5,7 @@
 import $L from '@enact/i18n/$L';
 
 import {MEDIA_STATUS, REQUEST_STATUS} from './seerrStatus';
+import {appLocale} from './appLocale';
 
 export const getSeasonStatusLabel = (status) => {
 	switch (status) {
@@ -84,7 +85,7 @@ export const formatDate = (dateStr) => {
 	if (!dateStr) return null;
 	try {
 		const date = new Date(dateStr);
-		return date.toLocaleDateString(undefined, {year: 'numeric', month: 'long', day: 'numeric'});
+		return date.toLocaleDateString(appLocale(), {year: 'numeric', month: 'long', day: 'numeric'});
 	} catch {
 		return null;
 	}
@@ -95,7 +96,7 @@ export const formatDate = (dateStr) => {
 export const formatCurrency = (amount) => {
 	if (!amount || amount <= 0) return null;
 	try {
-		return new Intl.NumberFormat(undefined, {
+		return new Intl.NumberFormat(appLocale(), {
 			style: 'currency',
 			currency: 'USD',
 			minimumFractionDigits: 2,
