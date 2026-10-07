@@ -1655,6 +1655,7 @@ const AppContent = (props) => {
 								backHandlerRef={backHandlerRef}
 								onFocusItemThemeMusic={themeMusic.playThemeMusicDelayed}
 								onBlurItemThemeMusic={themeMusic.cancelDelayed}
+								onUnfocusItemThemeMusic={themeMusic.stopForFocus}
 								onLeaveThemeMusic={themeMusic.stopThemeMusic}
 							/>
 						</Panel>

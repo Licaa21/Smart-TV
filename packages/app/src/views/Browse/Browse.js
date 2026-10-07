@@ -52,6 +52,7 @@ const Browse = ({
 	isVisible = true,
 	onFocusItemThemeMusic,
 	onBlurItemThemeMusic,
+	onUnfocusItemThemeMusic,
 	onLeaveThemeMusic,
 	backHandlerRef
 }) => {
@@ -553,12 +554,19 @@ const Browse = ({
 			// the item over directly when the overlay is not there to do it.
 			setFocusedItemForBackdrop(item);
 		}
-		if (item?.Id && (item.Type === 'Movie' || item.Type === 'Series')) {
-			onFocusItemThemeMusic?.(item.Id);
+		// The theme belongs to the title. An episode or a season of a series plays the series' theme, so the
+		// Continue Watching and Next Up rows have one, and the next episode of the same show keeps it going.
+		const themeId = item?._external ? null
+			: (item?.Type === 'Movie' || item?.Type === 'Series') ? item.Id
+				: (item?.Type === 'Episode' || item?.Type === 'Season') ? item.SeriesId
+					: null;
+		if (themeId) {
+			onFocusItemThemeMusic?.(themeId);
 		} else {
-			onBlurItemThemeMusic?.();
+			// a card with no theme of its own ends the one the last card started
+			(onUnfocusItemThemeMusic || onBlurItemThemeMusic)?.();
 		}
-	}, [onFocusItemThemeMusic, onBlurItemThemeMusic, showTopInfoArea, useModernRows, pinMainScroll]);
+	}, [onFocusItemThemeMusic, onBlurItemThemeMusic, onUnfocusItemThemeMusic, showTopInfoArea, useModernRows, pinMainScroll]);
 
 	const navOffsetClass = settings.navbarPosition === 'left' ? css.sidebarOffset : css.topbarOffset;
 	const rowsClipClass = showTopInfoArea ? '' : css.rowsClipTop;
