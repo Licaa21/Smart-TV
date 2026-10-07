@@ -777,6 +777,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.SECTION, id: 'audioStream', label: () => $L('Audio Stream')},
 					{kind: KIND.OPTION, key: 'audioLanguage', label: () => $L('Default Audio Language'), options: getAudioLanguageOptions, fallback: () => $L('Auto'), icon: 'language'},
 					{kind: KIND.OPTION, key: 'fallbackAudioLanguage', label: () => $L('Fallback Audio Language'), desc: () => $L('Used when no track matches the default audio language'), options: getSubtitleLanguageOptions, fallback: () => $L('None'), icon: 'language'},
+					{kind: KIND.TOGGLE, key: 'preferStereoAudio', label: () => $L('Prefer Stereo Tracks'), desc: () => $L('Pick a 2.0 track over a 5.1 one of the same language and codec, for stereo speakers. Does not limit what direct plays'), icon: 'speakergroup'},
 					{kind: KIND.TOGGLE, key: 'preferDefaultAudioTrack', label: () => $L('Prefer Default Audio Track'), desc: () => $L('Pick the track the file marks as default before matching languages'), icon: 'audiotrack'},
 					{kind: KIND.TOGGLE, key: 'preferAudioDescription', label: () => $L('Prefer Audio Description Tracks'), desc: () => $L('Pick narrated tracks for the visually impaired when available'), icon: 'hearing'},
 					{kind: KIND.TOGGLE, key: 'rememberSeriesAudio', label: () => $L('Remember Audio Track per Series'), desc: () => $L('Start a series on the track you last picked in it, ahead of the language settings'), icon: 'audiotrack'},
