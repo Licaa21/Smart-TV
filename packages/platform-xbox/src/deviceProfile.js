@@ -29,6 +29,10 @@ import {isNativePlayerEnabled} from './nativeVideo';
 const HEVC_REFUSALS_KEY = 'moonfin:xboxHevcRefusals';
 const HEVC_REFUSAL_LIMIT = 2;
 
+// Dolby Vision over an HDR10 base layer plays as HDR10, the player decodes the base and
+// leaves the Dolby Vision data alone. Profile 5 has no such base and stays a transcode.
+const HDR10_RANGE_TYPES = 'SDR|HDR10|HDR10Plus|DOVIWithHDR10|DOVIWithHDR10Plus|DOVIWithEL|DOVIWithELHDR10Plus|DOVIInvalid';
+
 let cachedCapabilities = null;
 let cachedForNativePlayer = null;
 let probeElement = null;
@@ -47,6 +51,10 @@ const hevcRefusals = () => {
 	}
 };
 
+export const clearCapabilitiesCache = () => {
+	cachedCapabilities = null;
+};
+
 export const noteHevcRefusal = (sourceId) => {
 	const refused = hevcRefusals();
 	if (!sourceId || refused.includes(sourceId)) return;
@@ -57,10 +65,6 @@ export const noteHevcRefusal = (sourceId) => {
 		// Without storage the console just doesnt remember
 	}
 	if (refused.length >= HEVC_REFUSAL_LIMIT) clearCapabilitiesCache();
-};
-
-export const clearCapabilitiesCache = () => {
-	cachedCapabilities = null;
 };
 
 export const detectXboxVersion = () => bootData()?.os?.version || '';
@@ -196,7 +200,7 @@ export const getJellyfinDeviceProfile = async () => {
 			Codec: 'hevc',
 			Conditions: [
 				{Condition: 'EqualsAny', Property: 'VideoProfile', Value: 'main|main 10', IsRequired: false},
-				{Condition: 'EqualsAny', Property: 'VideoRangeType', Value: caps.hdr10 ? 'SDR|HDR10|HDR10Plus' : 'SDR', IsRequired: false},
+				{Condition: 'EqualsAny', Property: 'VideoRangeType', Value: caps.hdr10 ? HDR10_RANGE_TYPES : 'SDR', IsRequired: false},
 				{Condition: 'LessThanEqual', Property: 'VideoLevel', Value: '153', IsRequired: false},
 				// A 1080p file is often marked with a 4K level, so the size is held by itself
 				...(caps.uhd ? [] : [{Condition: 'LessThanEqual', Property: 'Width', Value: '1920', IsRequired: false}])

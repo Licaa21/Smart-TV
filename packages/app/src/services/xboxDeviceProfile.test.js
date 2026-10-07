@@ -222,11 +222,14 @@ describe('the profile with the console player', () => {
 		expect(profile.DirectPlayProfiles.some((entry) => entry.Container === 'ts')).toBe(true);
 		expect(profile.DirectPlayProfiles.some((entry) => entry.Container === 'hls')).toBe(true);
 		const range = profile.CodecProfiles.find((entry) => entry.Codec === 'hevc').Conditions.find((condition) => condition.Property === 'VideoRangeType');
-		expect(range.Value).toBe('SDR|HDR10|HDR10Plus');
+		expect(range.Value).toBe('SDR|HDR10|HDR10Plus|DOVIWithHDR10|DOVIWithHDR10Plus|DOVIWithEL|DOVIWithELHDR10Plus|DOVIInvalid');
 
 		const capabilities = await getDeviceCapabilities();
 		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'HDR10', Width: 3840}), capabilities)).toBe('DirectPlay');
 		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'HLG'}), capabilities)).toBe('Transcode');
+		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'DOVIWithHDR10', Width: 3840}), capabilities)).toBe('DirectPlay');
+		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'DOVIWithEL', Width: 3840}), capabilities)).toBe('DirectPlay');
+		expect(getPlayMethod(video({Codec: 'hevc', VideoRangeType: 'DOVI', Width: 3840}), capabilities)).toBe('Transcode');
 		expect(getPlayMethod({...video({Codec: 'h264'}), Container: 'ts'}, capabilities)).toBe('DirectPlay');
 		expect(getPlayMethod({...video({Codec: 'h264'}), Container: 'webm'}, capabilities)).toBe('DirectPlay');
 		expect(getPlayMethod(source({MediaStreams: [{Type: 'Video', Codec: 'h264', VideoRangeType: 'SDR', Width: 1920}, {Type: 'Audio', Codec: 'dts', Index: 1}]}), capabilities)).toBe('DirectPlay');

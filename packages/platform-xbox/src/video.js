@@ -146,9 +146,13 @@ const VIDEO_CONTAINERS = ['mp4', 'm4v', 'mov', 'mkv', 'matroska'];
 const NATIVE_VIDEO_CONTAINERS = [...VIDEO_CONTAINERS, 'webm', 'ts', 'mpegts'];
 const AUDIO_CONTAINERS = ['mp3', 'aac', 'm4a', 'm4b', 'flac', 'wav', 'ogg', 'oga', 'opus'];
 
+// Dolby Vision plays as its HDR10 base layer where there is one, profile 5 has none
+const HDR10_BASED_DOVI = ['DOVIWITHHDR10', 'DOVIWITHHDR10PLUS', 'DOVIWITHEL', 'DOVIWITHELHDR10PLUS', 'DOVIINVALID'];
+
 const rangeOk = (videoStream, capabilities) => {
 	const rangeType = (videoRangeTypeOf(videoStream) || '').toUpperCase();
 	if (!rangeType || rangeType === 'SDR') return true;
+	if (HDR10_BASED_DOVI.includes(rangeType)) return !!capabilities.hdr10;
 	if (rangeType.includes('DOVI') || rangeType.includes('DOLBY') || rangeType === 'DV') return false;
 	if (rangeType.includes('HLG')) return !!capabilities.hlg;
 	if (rangeType.includes('HDR')) return !!capabilities.hdr10;
