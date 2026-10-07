@@ -484,15 +484,7 @@ export const SETTINGS_SCHEMA = [
 				label: () => $L('Home Screen'),
 				description: () => $L('Sections, image types, overlays, and media previews'),
 				rows: [
-					{kind: KIND.SECTION, id: 'homeRowDisplay', label: () => $L('Home Row Display')},
-					{kind: KIND.OPTION, key: 'homeRowsStyle', label: () => $L('Row Type'), desc: () => $L('Classic keeps per-row image type and info overlay. Modern uses portrait-to-backdrop rows.'), options: getHomeRowsStyleOptions, fallback: () => $L('Modern'), icon: 'appscontents'},
-					{kind: KIND.TOGGLE, key: 'modernCardsOnMyMediaRow', label: () => $L('Modern cards on My Media row'), desc: () => $L('Display customizable posters that expand on focus. Disable to always show landscape thumbnail.'), icon: 'picture', when: (ctx) => ctx.settings.homeRowsStyle !== 'v1'},
-					{kind: KIND.OPTION, key: 'modernCardTransitionSpeed', label: () => $L('Modern Cards Transition Speed'), desc: () => $L('Adjusts animation speed when expanding focused modern cards'), options: getModernCardTransitionSpeedOptions, fallback: () => $L('Off'), icon: 'speed', when: (ctx) => ctx.settings.homeRowsStyle !== 'v1'},
-					{kind: KIND.TOGGLE, key: 'fullScreenRows', label: () => $L('Expanded Home Rows'), desc: () => $L('Limit home rows to 1 row per screen'), icon: 'aspectratio'},
-					{kind: KIND.TOGGLE, key: 'homeRowOverlay', label: () => $L('Home Row Info Overlay'), desc: () => $L('Show title and metadata for the focused item above classic rows'), icon: 'info', when: (ctx) => ctx.settings.homeRowsStyle === 'v1'},
-					{kind: KIND.OPTION, key: 'homeRowsPosterSize', label: () => $L('Home Row Card Display Size'), options: getPosterSizeOptions, fallback: () => $L('Default'), icon: 'photo_size_select_large'},
-					{kind: KIND.SLIDER, key: 'classicHomeRowsPadding', label: () => $L('Home Row Padding'), desc: () => $L('Vertical space between rows'), min: 10, max: 130, step: 20, format: pixels, icon: 'unfold_more', when: (ctx) => ctx.settings.homeRowsStyle === 'v1' && !ctx.settings.fullScreenRows && !ctx.settings.homeRowOverlay},
-					{kind: KIND.SLIDER, key: 'modernHomeRowsPadding', label: () => $L('Home Row Padding'), desc: () => $L('Vertical space between rows'), min: 360, max: 560, step: 20, format: pixels, icon: 'unfold_more', when: (ctx) => ctx.settings.homeRowsStyle !== 'v1' && !ctx.settings.fullScreenRows},
+					{kind: KIND.NAV, id: 'homeRowStylePage', label: () => $L('Row Style and Layout'), desc: () => $L('Home row style, card size, overlay and padding'), icon: 'aspectratio', action: (ctx) => ctx.actions.openScreen('personalization', 'homeRowStyle', 'setting-homeRowStylePage')},
 					{kind: KIND.SECTION, id: 'continueWatchingAndNextUp', label: () => $L('Continue Watching and Next Up')},
 					{kind: KIND.TOGGLE, key: 'mergeContinueWatchingNextUp', label: () => $L('Merge Continue Watching and Next Up'), desc: () => $L('Combine both rows into a single home section'), icon: 'merge_type'},
 					{kind: KIND.OPTION, key: 'nextUpMaxDays', label: () => $L('Max days in Next Up'), options: getNextUpMaxDaysOptions, fallback: () => $L('365 days'), desc: () => $L('How long a show stays in Next Up after you last watched it'), icon: 'calendarbusy'},
@@ -506,6 +498,24 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.OPTION, key: 'homeRowsImageType', label: () => $L('Home Rows Image Type'), desc: () => $L('The artwork rows use unless a row overrides it'), options: getImageTypeOptions, fallback: () => $L('Poster'), icon: 'picture'},
 					{kind: KIND.NAV, id: 'rowImageTypes', label: () => $L('Row Image Types'), desc: () => $L('Choose the artwork per home row. Classic rows only, the modern layout picks its own.'), icon: 'picture', when: (ctx) => ctx.settings.homeRowsStyle === 'v1', action: (ctx) => ctx.actions.openRowImageTypes()},
 					{kind: KIND.NAV, id: 'externalHomeRows', label: () => $L('External Home Rows'), desc: () => $L('Set-up external sources for Home Rows (e.g., Seerr, IMDb, and more!)'), icon: 'link', action: (ctx) => ctx.actions.openScreen('integrations', 'externalRows', 'setting-externalHomeRows'), when: whenPlugin}
+				]
+			},
+			{
+				id: 'homeRowStyle',
+				icon: 'aspectratio',
+				menu: false,
+				label: () => $L('Row Style and Layout'),
+				description: () => $L('Home row style, card size, overlay and padding'),
+				rows: [
+					{kind: KIND.SECTION, id: 'homeRowDisplay', label: () => $L('Home Row Display')},
+					{kind: KIND.OPTION, key: 'homeRowsStyle', label: () => $L('Row Type'), desc: () => $L('Classic keeps per-row image type and info overlay. Modern uses portrait-to-backdrop rows.'), options: getHomeRowsStyleOptions, fallback: () => $L('Modern'), icon: 'appscontents'},
+					{kind: KIND.TOGGLE, key: 'modernCardsOnMyMediaRow', label: () => $L('Modern cards on My Media row'), desc: () => $L('Display customizable posters that expand on focus. Disable to always show landscape thumbnail.'), icon: 'picture', when: (ctx) => ctx.settings.homeRowsStyle !== 'v1'},
+					{kind: KIND.OPTION, key: 'modernCardTransitionSpeed', label: () => $L('Modern Cards Transition Speed'), desc: () => $L('Adjusts animation speed when expanding focused modern cards'), options: getModernCardTransitionSpeedOptions, fallback: () => $L('Off'), icon: 'speed', when: (ctx) => ctx.settings.homeRowsStyle !== 'v1'},
+					{kind: KIND.TOGGLE, key: 'fullScreenRows', label: () => $L('Expanded Home Rows'), desc: () => $L('Limit home rows to 1 row per screen'), icon: 'aspectratio'},
+					{kind: KIND.TOGGLE, key: 'homeRowOverlay', label: () => $L('Home Row Info Overlay'), desc: () => $L('Show title and metadata for the focused item above classic rows'), icon: 'info', when: (ctx) => ctx.settings.homeRowsStyle === 'v1'},
+					{kind: KIND.OPTION, key: 'homeRowsPosterSize', label: () => $L('Home Row Card Display Size'), options: getPosterSizeOptions, fallback: () => $L('Default'), icon: 'photo_size_select_large'},
+					{kind: KIND.SLIDER, key: 'classicHomeRowsPadding', label: () => $L('Home Row Padding'), desc: () => $L('Vertical space between rows'), min: 10, max: 130, step: 20, format: pixels, icon: 'unfold_more', when: (ctx) => ctx.settings.homeRowsStyle === 'v1' && !ctx.settings.fullScreenRows && !ctx.settings.homeRowOverlay},
+					{kind: KIND.SLIDER, key: 'modernHomeRowsPadding', label: () => $L('Home Row Padding'), desc: () => $L('Vertical space between rows'), min: 360, max: 560, step: 20, format: pixels, icon: 'unfold_more', when: (ctx) => ctx.settings.homeRowsStyle !== 'v1' && !ctx.settings.fullScreenRows},
 				]
 			},
 			{
@@ -699,13 +709,33 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.OPTION, key: 'playerZoomMode', label: () => $L('Player Zoom Mode'), desc: () => $L('How video that does not match the screen shape is displayed'), options: getZoomModeOptions, fallback: () => $L('Fit'), icon: 'crop'},
 					{kind: KIND.TOGGLE, key: 'trickPlayEnabled', label: () => $L('Trick Play'), desc: () => $L('Show preview thumbnails when seeking'), icon: 'imagesearch'},
 					{kind: KIND.TOGGLE, key: 'trickPlayPauseWhileScrubbing', label: () => $L('Pause While Scrubbing'), desc: () => $L('Playback pauses while you seek and resumes when you press play. Turn this off to keep playing and jump straight to the new spot'), icon: 'pausecircle', when: (ctx) => ctx.settings.trickPlayEnabled !== false},
+					{kind: KIND.NAV, id: 'videoSeekingPage', label: () => $L('Seeking and Resume'), desc: () => $L('How far the buttons jump and how playback resumes'), icon: 'timer', action: (ctx) => ctx.actions.openScreen('playbackSyncPlay', 'videoSeeking', 'setting-videoSeekingPage')},
+					{kind: KIND.TOGGLE, key: 'showChapterMarkers', label: () => $L('Chapter Marks'), desc: () => $L('Mark where each chapter starts on the seek bar'), icon: 'straighten'},
+					{kind: KIND.NAV, id: 'osdButtons', label: () => $L('Player Buttons'), desc: () => $L('Choose which buttons the player shows'), icon: 'tune', action: (ctx) => ctx.actions.openOsdButtons()},
+					{kind: KIND.NAV, id: 'videoDirectPlayPage', label: () => $L('Direct Play and Quality Limits'), desc: () => $L('What the set decodes itself, and the bitrate and resolution caps'), icon: 'gear', action: (ctx) => ctx.actions.openScreen('playbackSyncPlay', 'videoDirectPlay', 'setting-videoDirectPlayPage')},
+				]
+			},
+			{
+				id: 'videoSeeking',
+				icon: 'timer',
+				menu: false,
+				label: () => $L('Seeking and Resume'),
+				description: () => $L('How far the buttons jump and how playback resumes'),
+				rows: [
 					{kind: KIND.OPTION, key: 'resumeSubtractDuration', label: () => $L('Resume Rewind'), desc: () => $L('Rewind a little when resuming partially watched media'), options: getResumeRewindOptions, fallback: () => $L('Disabled'), icon: 'replay'},
 					{kind: KIND.SLIDER, key: 'unpauseRewind', label: () => $L('Unpause Rewind'), desc: () => $L('When resuming playback after pressing the pause button, how many seconds should be rewound?'), min: 0, max: 30, step: 5, format: (v) => (v === 0 ? $L('Off') : `${v}s`), icon: 'autoplay'},
 					{kind: KIND.OPTION, key: 'seekStep', label: () => $L('Seek Step'), desc: () => $L('How far each press moves while scrubbing the progress bar'), options: getSeekStepOptions, fallback: () => $L('10 seconds'), icon: 'skip'},
 					{kind: KIND.OPTION, key: 'skipBackLength', label: () => $L('Skip Back Length'), desc: () => $L('How far the rewind button jumps'), options: getSkipLengthOptions, fallback: () => $L('10 seconds'), icon: 'rewind'},
 					{kind: KIND.OPTION, key: 'skipForwardLength', label: () => $L('Skip Forward Length'), desc: () => $L('How far the fast forward button jumps'), options: getSkipLengthOptions, fallback: () => $L('30 seconds'), icon: 'fifteenforward'},
-					{kind: KIND.TOGGLE, key: 'showChapterMarkers', label: () => $L('Chapter Marks'), desc: () => $L('Mark where each chapter starts on the seek bar'), icon: 'straighten'},
-					{kind: KIND.NAV, id: 'osdButtons', label: () => $L('Player Buttons'), desc: () => $L('Choose which buttons the player shows'), icon: 'tune', action: (ctx) => ctx.actions.openOsdButtons()},
+				]
+			},
+			{
+				id: 'videoDirectPlay',
+				icon: 'gear',
+				menu: false,
+				label: () => $L('Direct Play and Quality Limits'),
+				description: () => $L('What the set decodes itself, and the bitrate and resolution caps'),
+				rows: [
 					{kind: KIND.SECTION, id: 'decodingRendering', label: () => $L('Decoding & Rendering')},
 					{kind: KIND.TOGGLE, key: 'preferTranscode', label: () => $L('Prefer Transcoding'), desc: () => $L('Request transcoded streams when available'), icon: 'gear'},
 					{kind: KIND.TOGGLE, key: 'forceDirectPlay', label: () => $L('Force Direct Play'), desc: () => $L('Skip codec checks and always attempt DirectPlay (debug)'), icon: 'play'},
@@ -753,6 +783,16 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.OPTION, key: 'animeAudioLanguage', label: () => $L('Anime Audio Language'), desc: () => $L('Used for anime instead of the default audio language'), options: getAnimeAudioLanguageOptions, fallback: () => $L('Same as default'), icon: 'language'},
 					{kind: KIND.OPTION, key: 'animeFallbackAudioLanguage', label: () => $L('Anime Fallback Audio Language'), desc: () => $L('Used when no track matches the anime audio language'), options: getSubtitleLanguageOptions, fallback: () => $L('None'), icon: 'language', when: (ctx) => !!ctx.settings.animeAudioLanguage},
 					{kind: KIND.NAV, id: 'audioCodecOrder', label: () => $L('Audio Codec Priority'), desc: () => $L('Rank the codecs, used after your audio language when a file has several matching tracks'), icon: 'audiotrack', action: (ctx) => ctx.actions.openAudioCodecs()},
+					{kind: KIND.NAV, id: 'audioOutputPage', label: () => $L('Audio Output and Passthrough'), desc: () => $L('Channels, downmix and what is sent to a receiver untouched'), icon: 'settings_input_hdmi', action: (ctx) => ctx.actions.openScreen('playbackSyncPlay', 'audioOutput', 'setting-audioOutputPage')},
+				]
+			},
+			{
+				id: 'audioOutput',
+				icon: 'settings_input_hdmi',
+				menu: false,
+				label: () => $L('Audio Output and Passthrough'),
+				description: () => $L('Channels, downmix and what is sent to a receiver untouched'),
+				rows: [
 					{kind: KIND.SECTION, id: 'audioOutput', label: () => $L('Audio Output')},
 					{kind: KIND.OPTION, key: 'audioPassthroughMode', label: () => $L('Audio Passthrough'), desc: () => $L('Whether compressed audio is sent to your receiver untouched'), options: getPassthroughModeOptions, fallback: () => $L('Auto (match detected device support)'), icon: 'settings_input_hdmi', when: (ctx) => !ctx.isVega},
 					{kind: KIND.OPTION, key: 'maxAudioChannels', label: () => $L('Max Audio Channels'), desc: () => $L('Cap decoded audio at this channel count'), options: getMaxAudioChannelsOptions, fallback: () => $L('Auto Detect (Hardware Default)'), icon: 'speakergroup'},
@@ -780,6 +820,20 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.OPTION, key: 'subtitleLanguage', label: () => $L('Default Subtitle Language'), options: getSubtitleLanguageOptions, fallback: () => $L('None'), icon: 'language'},
 					{kind: KIND.OPTION, key: 'fallbackSubtitleLanguage', label: () => $L('Fallback Subtitle Language'), desc: () => $L('Used when no track matches the default subtitle language'), options: getSubtitleLanguageOptions, fallback: () => $L('None'), icon: 'language'},
 					{kind: KIND.TOGGLE, key: 'preferSdhSubtitles', label: () => $L('Prefer SDH subtitles'), desc: () => $L('Pick subtitles for the deaf and hard of hearing when available'), icon: 'hearing'},
+					{kind: KIND.NAV, id: 'subtitleAppearance', label: () => $L('Subtitle Appearance'), desc: () => $L('Size, position, colors, shadow and background'), icon: 'textinput', action: (ctx) => ctx.actions.openScreen('playbackSyncPlay', 'subtitleAppearance', 'setting-subtitleAppearance')},
+					{kind: KIND.SECTION, id: 'subtitleRendering', label: () => $L('Subtitle Rendering')},
+					{kind: KIND.TOGGLE, key: 'enablePgsRendering', label: () => $L('Direct play PGS subtitles'), desc: () => $L('Use client-side rendering for bitmap subtitles (PGS, DVB, DVD)'), icon: 'picture'},
+					{kind: KIND.TOGGLE, key: 'assDirectPlay', label: () => $L('Direct play ASS/SSA subtitles'), desc: () => $L('Render styled subtitles on this device instead of having the server burn them in'), icon: 'text_snippet'},
+					{kind: KIND.TOGGLE, key: 'waitForAssSubtitles', label: () => $L('Wait for ASS/SSA subtitles'), desc: () => $L('Hold the video until styled subtitles are ready so the first lines show'), icon: 'timer', when: (ctx) => ctx.isWebOS && ctx.settings.assDirectPlay !== false}
+				]
+			},
+			{
+				id: 'subtitleAppearance',
+				icon: 'textinput',
+				menu: false,
+				label: () => $L('Subtitle Appearance'),
+				description: () => $L('Size, position, colors, shadow and background'),
+				rows: [
 					{kind: KIND.SECTION, id: 'subtitleCustomization', label: () => $L('Subtitle Customization')},
 					{kind: KIND.OPTION, key: 'subtitleSize', label: () => $L('Subtitle Size'), options: getSubtitleSizeOptions, fallback: () => $L('Medium'), icon: 'textinput'},
 					{kind: KIND.OPTION, key: 'subtitlePosition', label: () => $L('Subtitle Position'), options: getSubtitlePositionOptions, fallback: () => $L('Bottom'), icon: 'arrowlargedown'},
@@ -793,10 +847,6 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.DIVIDER, id: 'background'},
 					{kind: KIND.OPTION, key: 'subtitleBackgroundColor', label: () => $L('Background Color'), options: getSubtitleBackgroundColorOptions, fallback: () => $L('Black'), icon: 'format_color_fill'},
 					{kind: KIND.SLIDER, key: 'subtitleBackground', label: () => $L('Background Opacity'), min: 0, max: 100, step: 5, format: percent, icon: 'opacity'},
-					{kind: KIND.SECTION, id: 'subtitleRendering', label: () => $L('Subtitle Rendering')},
-					{kind: KIND.TOGGLE, key: 'enablePgsRendering', label: () => $L('Direct play PGS subtitles'), desc: () => $L('Use client-side rendering for bitmap subtitles (PGS, DVB, DVD)'), icon: 'picture'},
-					{kind: KIND.TOGGLE, key: 'assDirectPlay', label: () => $L('Direct play ASS/SSA subtitles'), desc: () => $L('Render styled subtitles on this device instead of having the server burn them in'), icon: 'text_snippet'},
-					{kind: KIND.TOGGLE, key: 'waitForAssSubtitles', label: () => $L('Wait for ASS/SSA subtitles'), desc: () => $L('Hold the video until styled subtitles are ready so the first lines show'), icon: 'timer', when: (ctx) => ctx.isWebOS && ctx.settings.assDirectPlay !== false}
 				]
 			},
 			{
