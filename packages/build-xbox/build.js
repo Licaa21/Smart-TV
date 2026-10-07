@@ -12,11 +12,11 @@
 //
 // The app carries the device probe, which Settings opens for a signed in user, see
 // probe/probe.js. --probe-clips adds the test clips its playback run plays, made
-// beforehand with probe/make-clips.js. They are some 70 MB, so a build for testers
-// takes them and an ordinary one doesnt.
+// beforehand with probe/make-clips.js. They are some 70 MB, so no build takes them
+// unless asked.
 //
-// --tester makes the package to hand to testers. It takes the clips, and its version
-// counts up so it installs over the build they already have.
+// --tester makes the package to hand to testers. Its version counts up so it installs
+// over the build they already have.
 //
 // --store makes the upload for the Microsoft Store, under the identity of the Store
 // product the desktop app is listed as. The Store signs what it publishes, so a
@@ -75,7 +75,7 @@ const PAGE_ASSETS = [
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
 const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : null);
-const bundlesClips = () => flag('--probe-clips') || flag('--tester');
+const bundlesClips = () => flag('--probe-clips');
 const everyOption = (name) => args.map((arg, index) => (arg === name ? args[index + 1] : null)).filter(Boolean);
 
 const run = (cmd, opts = {}) => {
