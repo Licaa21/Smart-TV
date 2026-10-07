@@ -133,4 +133,19 @@ describe('useThemeMusic when focus moves on', () => {
 		});
 		expect(result.current.isPlaying()).toBe(false);
 	});
+
+	test('a theme still being fetched when focus moves on is called off', async () => {
+		let resolveSongs;
+		jellyfinApi.api.getThemeSongs.mockReturnValue(new Promise((resolve) => { resolveSongs = resolve; }));
+		FakeAudio.last = null;
+		const {result} = renderHook(() => useThemeMusic());
+		let started;
+		act(() => { started = result.current.playThemeMusic('item2'); });
+		act(() => result.current.stopForFocus());
+		await act(async () => {
+			resolveSongs({Items: [{Id: 'song2'}]});
+			await started;
+		});
+		expect(FakeAudio.last).toBeNull();
+	});
 });
