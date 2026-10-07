@@ -1,6 +1,7 @@
 import {memo, useCallback, useMemo, useRef, useEffect} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import {getImageUrl, toAbsoluteImageUrl} from '../../utils/helpers';
+import {externalArtwork} from '../../utils/externalArtwork';
 import {useSettings} from '../../context/SettingsContext';
 import {SeerrSeasonDot} from '../seerr/SeerrStatusBadge';
 import {showsWatchedCheck} from '../../utils/playedState';
@@ -115,7 +116,8 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 	// draws on one of its own items, so that is where its artwork has to be looked for.
 	const imageType = rowImageType || 'poster';
 	const artworkItem = (item.Type === 'Genre' && item._representative) || item;
-	const rowArtwork = requestedArtwork(artworkItem, imageType, itemServerUrl);
+	const externalRowArt = externalArtwork(item, imageType, itemServerUrl);
+	const rowArtwork = externalRowArt || requestedArtwork(artworkItem, imageType, itemServerUrl);
 	const isBanner = imageType === 'banner' && cardType !== 'square' && cardType !== 'circle';
 	// An episode is the one item the series switch speaks for, so its picture is
 	// picked here instead of taking whatever wide art the row asked for. A banner
@@ -133,6 +135,7 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 	const isSquare = !isBanner && (isCircle || cardType === 'square' || (cardType === 'portrait' && !isLandscape && (item.Type === 'MusicAlbum' || item.Type === 'MusicArtist' || item.Type === 'Audio')));
 
 	const imageUrl = useMemo(() => {
+		if (externalRowArt) return externalRowArt;
 		const providerIds = item.ProviderIds || {};
 		const externalPoster = item._externalPosterUrl ||
 			providerIds.SeerrPoster ||
@@ -186,7 +189,7 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 		// The card shows its lettered placeholder rather than guessing at a url the
 		// item already said it has nothing behind.
 		return null;
-	}, [isLandscape, item, itemServerUrl, rowArtwork, episodeArtUrl]);
+	}, [isLandscape, item, itemServerUrl, rowArtwork, externalRowArt, episodeArtUrl]);
 
 	const handleClick = useCallback(() => {
 		onSelect?.(item);

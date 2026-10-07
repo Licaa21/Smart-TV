@@ -9,6 +9,7 @@ import {getPlatform} from '../../platform';
 import {isStaticLibraryCard, modernCardMetrics, getEpisodeLabels, getCardDisplayTitle} from './modernCardLayout';
 import SeerrIcon from '../icons/SeerrIcon';
 import {requestedArtwork, episodeArtwork} from './MediaCard';
+import {externalArtwork} from '../../utils/externalArtwork';
 import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
@@ -93,7 +94,10 @@ const ModernMediaCard = ({
 	// The artwork the row asked for when it is not the poster. A card that has it is a wide one, the shape the
 	// library tiles already use, so it holds still and the picture is the one chosen.
 	const rowArtwork = useMemo(() => {
-		if (!item || item._external || !rowImageType || rowImageType === 'poster') return null;
+		if (!item || !rowImageType || rowImageType === 'poster') return null;
+		const externalArt = externalArtwork(item, rowImageType, itemServerUrl);
+		if (externalArt) return externalArt;
+		if (item._external) return null;
 		if (item.Type === 'MusicAlbum' || item.Type === 'Audio' || item.Type === 'Genre') return null;
 		// the My Media tiles draw their own artwork, and a library is no title with a backdrop of its own
 		if (isLibraryRow || item.Type === 'CollectionFolder' || item.isLibraryTile) return null;

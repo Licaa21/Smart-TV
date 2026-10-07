@@ -110,3 +110,27 @@ describe('useThemeMusic while the app is off screen', () => {
 		remove.mockRestore();
 	});
 });
+
+describe('useThemeMusic when focus moves on', () => {
+	beforeEach(() => {
+		jest.useFakeTimers();
+		jellyfinApi.api.getThemeSongs.mockResolvedValue({Items: [{Id: 'song1'}]});
+		window.Audio = FakeAudio;
+		setHidden(false);
+	});
+
+	afterEach(() => {
+		jest.useRealTimers();
+	});
+
+	test('a card with no theme ends the track the last card started', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		expect(result.current.isPlaying()).toBe(true);
+		act(() => {
+			result.current.stopForFocus();
+			jest.advanceTimersByTime(2000);
+		});
+		expect(result.current.isPlaying()).toBe(false);
+	});
+});
