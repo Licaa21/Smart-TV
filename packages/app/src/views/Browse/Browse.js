@@ -574,9 +574,12 @@ const Browse = ({
 	// A theme plays while its card is in focus. Focus leaving the rows for the navbar, the sidebar or the featured
 	// bar ends it, and focus moving from one card to another is left to handleFocusItem.
 	const handleRowsBlur = useCallback((e) => {
+		// Leaving for another screen is the other screen's call: opening Details moves focus off the card after
+		// Details has started its own theme, and that blur must not end it
+		if (!isVisible) return;
 		if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
 		(onUnfocusItemThemeMusic || onBlurItemThemeMusic)?.();
-	}, [onUnfocusItemThemeMusic, onBlurItemThemeMusic]);
+	}, [isVisible, onUnfocusItemThemeMusic, onBlurItemThemeMusic]);
 
 	const navOffsetClass = settings.navbarPosition === 'left' ? css.sidebarOffset : css.topbarOffset;
 	const rowsClipClass = showTopInfoArea ? '' : css.rowsClipTop;
