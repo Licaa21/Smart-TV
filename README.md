@@ -163,6 +163,7 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 - **Episode browser:** an Episodes button in the player opens the current season on the playing episode, with season tabs, CH +/- to change season, and resume on pick. It can be arranged in Player Buttons.
 - **Skip prompt:** its auto-hide starts over for every episode, so it no longer vanishes early after Previous or Next.
 - **Seek bar:** the focused thumb is easier to see on Tizen.
+- **Back to the player from a person:** opening a person from the cast and crew list closes the player, and Back from there returns to it at the same place, with the same audio and subtitle picks and still paused if it was. That person screen has no navbar, so the only way on is Back. A person opened from anywhere else keeps it.
 - **Direct play where the set allows it:**
   - A file that opens on a track the TV cannot decode, such as TrueHD first, is played from the first track the TV can decode, and a pick in the same codec is switched by the player.
   - A pick in another codec is built on the server with the video copied, the way a manual pick already was, so the screen and the sound agree.
@@ -187,12 +188,16 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 - **Details:** action button rows ranked like Settings, "Read more" only when the text is cut off, anime marker pills on every layout, and a Press BACK to close hint on trailers.
 - **Seerr:** Discover drawn with the Home cards, rows and settings, and a browse grid that reads the Movies or TV Shows library's own size, shape and direction settings, so a card is the same in both.
 - **Sort and filter popups:** one shared popup, with the groups on the left and the options beside them.
+- **Backdrops behind the cards:** the focused card's backdrop, dimmed and blurred, now sits behind the Modern home rows, Search and the Seerr Discover and Browse screens too. It follows the same Background Backdrops switch and blur amount as before.
+- **Home Rows Image Type in every row style:** Poster, Thumb, Backdrop, Banner and Logo now apply to the Modern rows as well as the Classic ones, and to the TMDB, IMDb, Seerr and Because you watched rows, which take their backdrop for the wide types.
+- **Theme music on Home:** episodes in Continue Watching and Next Up play their series' theme, a theme fades out when focus moves to a card without one, and moving back to the same card keeps it going.
+- **Seasonal effects:** the number of particles follows the Density setting alone, and the performance level no longer thins them out.
 - **Performance levels:** Ultra, High, Medium-High, Medium, Low and Performance, with the lower ones turning off idle animations and drawing long rows in steps, so a slow TV stays responsive while looking almost the same.
 - **Settings in sub-pages:** the long Playback, Audio, Subtitles and Home pages open short lists of sub-pages, such as Seeking and Resume, Direct Play and Quality Limits, Audio Output and Passthrough, Subtitle Appearance and Row Style and Layout.
 
 **Diagnostics and translations**
 - **Diagnostic log:** the in-app log keeps its recent non-network lines across restarts, so a report still has them after the app reopens. It also prints the commit the package was built from, why each start picked its audio track, the server's reason for not direct playing, and why a media load failed.
-- **Romanian:** strings added by this fork are translated by hand in `packages/app/resources/ro/strings.json`, since this fork has no Weblate project. The Series button on an episode's details reads Serial.
+- **Romanian:** strings added by this fork are translated by hand in `packages/app/resources/ro/strings.json`, since this fork has no Weblate project. Every English string now has a Romanian one, the strings the code used but never listed are added, and dates and prices follow the app's language and not the TV's. The Series button on an episode's details reads Serial.
 
 ### Branches and updating
 
