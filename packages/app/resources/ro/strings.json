@@ -1178,7 +1178,7 @@
     "Checking...": "Se verifică...",
     "Choose sorting method for completed items": "Alege metoda de sortare pentru elementele finalizate",
     "Choose the artwork each classic home row uses. Default follows the global Home Rows Image Type.": "Alege ilustrația folosită de fiecare rând clasic de pe ecranul principal. Implicit urmează tipul de imagine global pentru rândurile din ecranul principal.",
-    "Choose the artwork per home row. Classic rows only, the modern layout picks its own.": "Alege ilustrația pentru fiecare rând de pe ecranul principal. Doar pentru rândurile clasice; aspectul modern o alege singur.",
+    "Choose the artwork per home row. Classic rows only, the modern layout follows Home Rows Image Type.": "Alege ilustrația pentru fiecare rând de pe ecranul principal. Doar rândurile clasice; aspectul modern urmează setarea „Tipul de imagine pentru rândurile de pe ecranul principal”.",
     "Choose what is shown on the right side of the music progress bar.": "Alege ce se afișează în partea dreaptă a barei de progres pentru muzică.",
     "Choose which IMDb lists are active. Activating a list adds it to your Home Sections.": "Alege ce liste IMDb sunt active. Activarea unei liste o adaugă la Secțiunile ecranului principal.",
     "Choose which Seerr discover rows appear on the home screen.": "Alege ce rânduri de descoperire Seerr apar pe ecranul principal.",

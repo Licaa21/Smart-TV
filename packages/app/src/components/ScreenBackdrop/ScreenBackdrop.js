@@ -7,6 +7,8 @@ import BackdropLayer from '../BackdropLayer';
 
 import css from './ScreenBackdrop.module.less';
 
+const isLegacyBuild = () => typeof document !== 'undefined' && document.documentElement.classList.contains('legacy');
+
 // The wide picture of a focused card, whether it is a library item or one Seerr found on TMDB. Nothing
 // comes back for an item with no backdrop, and the layer then shows the plain page background.
 export const backdropUrlFor = (item, serverUrl) => {
@@ -29,7 +31,8 @@ export const backdropUrlFor = (item, serverUrl) => {
 const ScreenBackdrop = ({item, serverUrl}) => {
 	const {settings} = useSettings();
 	const url = useMemo(
-		() => (settings.showHomeBackdrop === false ? '' : backdropUrlFor(item, serverUrl)),
+		// Home and Favorites draw none on the legacy builds, and these screens follow them
+		() => (settings.showHomeBackdrop === false || isLegacyBuild() ? '' : backdropUrlFor(item, serverUrl)),
 		[item, serverUrl, settings.showHomeBackdrop]
 	);
 	return (

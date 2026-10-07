@@ -524,8 +524,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		}
 	}, [rowLoading, rowHasMore, rowPages]);
 
-	// The detail panel follows the card in focus. Home has no picture behind its rows and neither
-	// does this, so there is nothing else to repaint as focus moves.
+	// The detail panel and the backdrop behind the rows follow the card in focus.
 	const handleItemFocus = useCallback((item) => {
 		setFocusedItem(item);
 	}, []);

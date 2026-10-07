@@ -95,13 +95,19 @@ const ModernMediaCard = ({
 	const rowArtwork = useMemo(() => {
 		if (!item || item._external || !rowImageType || rowImageType === 'poster') return null;
 		if (item.Type === 'MusicAlbum' || item.Type === 'Audio' || item.Type === 'Genre') return null;
+		// the My Media tiles draw their own artwork, and a library is no title with a backdrop of its own
+		if (isLibraryRow || item.Type === 'CollectionFolder' || item.isLibraryTile) return null;
 		const width = modernCardMetrics({posterSize: settings.homeRowsPosterSize, platform, isSquareItem: false, isStatic: false}).expandedWidth;
-		const episodeArt = item.Type === 'Episode' && rowImageType !== 'banner'
-			? episodeArtwork(item, itemServerUrl, rowImageType, settings.useSeriesThumbnails, width)
-			: null;
-		if (episodeArt?.url) return episodeArt.url;
-		return requestedArtwork(item, rowImageType, itemServerUrl, width);
-	}, [item, rowImageType, itemServerUrl, platform, settings.homeRowsPosterSize, settings.useSeriesThumbnails]);
+		// a banner is five times as wide as it is tall, which a card in this frame would crop to nothing, so the
+		// card takes the backdrop for it
+		const type = rowImageType === 'banner' ? 'backdrop' : rowImageType;
+		if (item.Type === 'Episode') {
+			const episodeArt = episodeArtwork(item, itemServerUrl, type, settings.useSeriesThumbnails, width);
+			// a poster is not wide art, so an episode with only that stays a poster card
+			return episodeArt && episodeArt.wide ? episodeArt.url : null;
+		}
+		return requestedArtwork(item, type, itemServerUrl, width);
+	}, [item, rowImageType, isLibraryRow, itemServerUrl, platform, settings.homeRowsPosterSize, settings.useSeriesThumbnails]);
 
 	const imageUrl = useMemo(() => {
 		if (!item) return null;
@@ -324,7 +330,7 @@ const ModernMediaCard = ({
 							loading={eagerLoad ? 'eager' : 'lazy'}
 							width={cardWidth}
 							height={imageHeight}
-							style={{height: `${imageHeight}px`}}
+							style={{height: `${imageHeight}px`, ...(rowArtwork && rowImageType === 'logo' ? {objectFit: 'contain'} : null)}}
 						/>
 						{(item?.Type === 'Genre' || item?.Type === 'MusicGenre') && (
 							<>

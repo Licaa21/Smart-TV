@@ -308,6 +308,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const lastTrackAttemptRef = useRef(0);
 	const applyPendingTracksRef = useRef(null);
 	const reloadAudioFromServerRef = useRef(null);
+	// a pause from the person page is applied once, and a later reload plays
+	const startPausedRef = useRef(startPaused);
 	// the track AVPlay opens the file on, which the check after play falls back to when it cannot name the playing one
 	const openingAudioIndexRef = useRef(null);
 	const activeNativeSubRef = useRef(null);
@@ -2028,7 +2030,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				startTimeUpdatePolling();
 
 				// coming back from a person page, where it was paused it stays paused
-				if (startPaused && !isLiveTV) {
+				if (startPausedRef.current && !isLiveTV) {
+					startPausedRef.current = false;
 					try { avplayPause(); } catch (e) { void e; }
 					setIsPaused(true);
 				}

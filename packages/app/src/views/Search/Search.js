@@ -667,6 +667,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		});
 	}, []);
 
+	// a backdrop from the last search should not sit behind no results, the empty page or another tab
+	useEffect(() => {
+		setBackdropItem(null);
+	}, [query, activeTab]);
+
 	const handleRowItemFocus = useCallback((item) => {
 		growRow(item);
 		if (!pointerHover()) setBackdropItem(item);
@@ -767,7 +772,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 						}
 						const title = `${row.title} (${row.items.length})`;
 						if (!mounted) {
-							return <RowComponent key={row.id} loading title={title} cardType={row.cardType} rowSpacing={ROW_SPACING} />;
+							return <RowComponent key={row.id} loading title={title} cardType={row.cardType} rowImageType={settings.homeRowsImageType} rowSpacing={ROW_SPACING} />;
 						}
 						return (
 							<RowComponent
