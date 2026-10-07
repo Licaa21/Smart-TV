@@ -26,13 +26,15 @@ export const openingAudioStream = (audioStreams, canDecode = () => true) =>
  * @param {Object|null} plan.wanted - the audio stream the start is meant to open on
  * @param {Array} plan.audioStreams - the audio streams of the file, in file order
  * @param {Function} [plan.canDecode] - whether the set decodes a stream
+ * @param {boolean} [plan.allowSameCodec] - a pick in the opening codec is left to the player. Only a start has a
+ *   native switch queued for it, so a reload, which has none, leaves this off and builds the track
  * @param {boolean} [plan.forceDirectPlay] - Force Direct Play is on, so the server cannot be asked
  * @param {boolean} [plan.isLiveTV]
  * @returns {boolean}
  */
-export const audioStartNeedsServer = ({wanted, audioStreams, canDecode, forceDirectPlay, isLiveTV}) => {
+export const audioStartNeedsServer = ({wanted, audioStreams, canDecode, allowSameCodec = false, forceDirectPlay, isLiveTV}) => {
 	const opening = openingAudioStream(audioStreams, canDecode);
 	if (!wanted || !opening || isLiveTV || forceDirectPlay) return false;
 	if (indexOf(wanted) === indexOf(opening)) return false;
-	return codecOf(wanted) !== codecOf(opening);
+	return !allowSameCodec || codecOf(wanted) !== codecOf(opening);
 };

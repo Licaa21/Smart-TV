@@ -754,7 +754,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		const decodable = await decodableAudioIndexes(fileAudio);
 		const firstAudio = openingAudioStream(fileAudio, (s) => decodable.has(s.Index));
 		const wantedAudio = fileAudio.find((s) => s.Index === options.audioStreamIndex);
-		if (firstAudio && audioStartNeedsServer({wanted: wantedAudio, audioStreams: fileAudio, canDecode: (s) => decodable.has(s.Index)})) {
+		if (firstAudio && audioStartNeedsServer({wanted: wantedAudio, audioStreams: fileAudio, canDecode: (s) => decodable.has(s.Index), allowSameCodec: Boolean(options.switchInPlayer)})) {
 			const rebuilt = await api.getPlaybackInfo(itemId, {
 				DeviceProfile: deviceProfile,
 				StartTimeTicks: requestedStartTime,

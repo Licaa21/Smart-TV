@@ -34,22 +34,24 @@ describe('the track the set opens on', () => {
 	});
 
 	test('a pick in the codec it opens on is left to the player', () => {
-		expect(audioStartNeedsServer({wanted: truehdFirst[2], audioStreams: truehdFirst, canDecode})).toBe(false);
-		expect(audioStartNeedsServer({wanted: truehdFirst[1], audioStreams: truehdFirst, canDecode})).toBe(false);
+		expect(audioStartNeedsServer({wanted: truehdFirst[2], audioStreams: truehdFirst, canDecode, allowSameCodec: true})).toBe(false);
+		expect(audioStartNeedsServer({wanted: truehdFirst[1], audioStreams: truehdFirst, canDecode, allowSameCodec: true})).toBe(false);
+		// a reload has no native switch queued, so it builds the track
+		expect(audioStartNeedsServer({wanted: truehdFirst[2], audioStreams: truehdFirst, canDecode})).toBe(true);
 	});
 
 	test('a pick in another codec is built on the server', () => {
 		const flacFirst = [{index: 4, codec: 'flac'}, {index: 6, codec: 'ac3'}];
-		expect(audioStartNeedsServer({wanted: flacFirst[1], audioStreams: flacFirst, canDecode})).toBe(true);
+		expect(audioStartNeedsServer({wanted: flacFirst[1], audioStreams: flacFirst, canDecode, allowSameCodec: true})).toBe(true);
 	});
 
 	test('a pick the set cannot decode is built on the server', () => {
-		expect(audioStartNeedsServer({wanted: truehdFirst[0], audioStreams: truehdFirst, canDecode})).toBe(true);
+		expect(audioStartNeedsServer({wanted: truehdFirst[0], audioStreams: truehdFirst, canDecode, allowSameCodec: true})).toBe(true);
 	});
 
 	test('the server and player shapes of a stream read the same', () => {
 		const serverShape = [{Index: 4, Codec: 'FLAC'}, {Index: 6, Codec: 'AC3'}];
-		expect(audioStartNeedsServer({wanted: serverShape[1], audioStreams: serverShape})).toBe(true);
+		expect(audioStartNeedsServer({wanted: serverShape[1], audioStreams: serverShape, allowSameCodec: true})).toBe(true);
 		expect(audioStartNeedsServer({wanted: serverShape[0], audioStreams: serverShape})).toBe(false);
 	});
 });
