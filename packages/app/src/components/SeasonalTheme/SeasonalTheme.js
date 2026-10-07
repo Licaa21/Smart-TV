@@ -71,8 +71,9 @@ const SeasonalTheme = ({theme, density}) => {
 	const level = normalizeSeasonalDensity(density);
 	const tier = getPerfTier();
 	const particles = useMemo(
-		() => buildSeasonalParticles(effect, level, Math.floor(Math.random() * 0x7fffffff), tier),
-		[effect, level, tier]
+		// How many fall is the viewer's own Density setting, so the performance level does not thin them out
+		() => buildSeasonalParticles(effect, level, Math.floor(Math.random() * 0x7fffffff)),
+		[effect, level]
 	);
 	const overlayRef = useRef(null);
 	const active = Boolean(effect) && effect !== 'none';

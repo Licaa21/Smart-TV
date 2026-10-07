@@ -67,10 +67,10 @@ describe('SeasonalTheme', () => {
 		expect(count('.flyer > .beeLeft') + count('.flyer > .beeRight')).toBe(FLYER_COUNTS.petals.heavy);
 	});
 
-	test('draws fewer on the low tier', () => {
+	test('draws as many on the low tier as the density setting says', () => {
 		mockTier = 'low';
 		render(<SeasonalTheme theme="snow" density="heavy" />);
-		expect(count('.particle')).toBe(FALL_COUNTS.low.heavy);
+		expect(count('.particle')).toBe(FALL_COUNTS.high.heavy);
 	});
 
 	test('draws fireworks as bursts with every spark inside one ring', () => {
