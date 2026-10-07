@@ -720,7 +720,7 @@ const AppContent = (props) => {
 				// back to the player a person was opened from, where it left off
 				const back = playerReturnRef.current;
 				playerReturnRef.current = null;
-				if (!back?.item) {
+				if (!back?.item || back.depth !== panelHistory.length - 1) {
 					setPanelIndex(PANELS.BROWSE);
 					return;
 				}
@@ -1197,8 +1197,11 @@ const AppContent = (props) => {
 		if (!person?.Id) return;
 		playerReturnRef.current = {
 			item: playingItem,
-			options: {...(playbackOptions || {}), startPositionTicks: positionTicks > 0 ? positionTicks : playbackOptions?.startPositionTicks},
-			isResume
+			// 0 is a place too, so a seek back to the start is kept and not read as the saved resume point
+			options: {...(playbackOptions || {}), startPositionTicks: positionTicks ?? playbackOptions?.startPositionTicks},
+			isResume,
+			// where the player's entry sits in the history, so only that entry brings it back
+			depth: panelHistory.length
 		};
 		setIsPlayerPaused(false);
 		setPlayingItem(null);
@@ -1211,7 +1214,7 @@ const AppContent = (props) => {
 		}
 		setSelectedPerson(person);
 		navigateTo(PANELS.PERSON);
-	}, [navigateTo, settings.detailScreenStyle, playingItem, playbackOptions, isResume]);
+	}, [navigateTo, settings.detailScreenStyle, playingItem, playbackOptions, isResume, panelHistory.length]);
 
 	const handleOpenRecordings = useCallback(() => {
 		navigateTo(PANELS.RECORDINGS);
