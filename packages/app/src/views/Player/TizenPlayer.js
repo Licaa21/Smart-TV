@@ -3087,7 +3087,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			_serverType: item?._serverType,
 			_serverAccessToken: item?._serverAccessToken,
 			_serverUserId: item?._serverUserId
-		});
+		}, positionRef.current);
 	}, [closeModal, item, onSelectPerson]);
 
 	const handleButtonAction = useCallback((action) => {

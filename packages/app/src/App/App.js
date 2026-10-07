@@ -704,6 +704,8 @@ const AppContent = (props) => {
 		showPanel(panel);
 	}, [panelIndex, showPanel]);
 
+	const playerReturnRef = useRef(null);
+
 	const handleBack = useCallback(() => {
 		detailsItemStackRef.current = [];
 		if (panelIndex === PANELS.ADD_SERVER || panelIndex === PANELS.ADD_USER) {
@@ -714,6 +716,18 @@ const AppContent = (props) => {
 		if (panelHistory.length > 0) {
 			const prevPanel = panelHistory[panelHistory.length - 1];
 			setPanelHistory(prev => prev.slice(0, -1));
+			if (prevPanel === PANELS.PLAYER) {
+				// back to the player a person was opened from, where it left off
+				const back = playerReturnRef.current;
+				playerReturnRef.current = null;
+				if (!back?.item) {
+					setPanelIndex(PANELS.BROWSE);
+					return;
+				}
+				setPlayingItem(back.item);
+				setPlaybackOptions(back.options);
+				setIsResume(back.isResume);
+			}
 			setPanelIndex(prevPanel);
 		} else if (panelIndex > PANELS.BROWSE) {
 			setPanelIndex(PANELS.BROWSE);
@@ -1177,20 +1191,27 @@ const AppContent = (props) => {
 		navigateTo(PANELS.PERSON);
 	}, [navigateTo, settings.detailScreenStyle, handleSelectItem]);
 
-	const handleSelectPersonFromPlayer = useCallback((person) => {
+	// The player closes for a person, but Back from there comes to it again at the same place. The history holds the
+	// player's place so Back finds it, and where it was is kept in the ref.
+	const handleSelectPersonFromPlayer = useCallback((person, positionTicks) => {
 		if (!person?.Id) return;
+		playerReturnRef.current = {
+			item: playingItem,
+			options: {...(playbackOptions || {}), startPositionTicks: positionTicks > 0 ? positionTicks : playbackOptions?.startPositionTicks},
+			isResume
+		};
 		setIsPlayerPaused(false);
 		setPlayingItem(null);
 		setPlaybackOptions(null);
 		setIsResume(false);
 		if (settings.detailScreenStyle === 'v4') {
 			setSelectedItem(person);
-			navigateTo(PANELS.DETAILS, false);
+			navigateTo(PANELS.DETAILS);
 			return;
 		}
 		setSelectedPerson(person);
-		navigateTo(PANELS.PERSON, false);
-	}, [navigateTo, settings.detailScreenStyle]);
+		navigateTo(PANELS.PERSON);
+	}, [navigateTo, settings.detailScreenStyle, playingItem, playbackOptions, isResume]);
 
 	const handleOpenRecordings = useCallback(() => {
 		navigateTo(PANELS.RECORDINGS);
