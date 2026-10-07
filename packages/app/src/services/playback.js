@@ -224,7 +224,7 @@ const selectMediaSource = (mediaSources, capabilities, options, passthroughSetti
 	return scored[0].source;
 };
 
-const determinePlayMethod = (mediaSource, capabilities, options = {}, passthroughSettings = DEFAULT_PASSTHROUGH_SETTINGS) => {
+const computePlayMethod = (mediaSource, capabilities, options = {}, passthroughSettings = DEFAULT_PASSTHROUGH_SETTINGS) => {
 	if (options.forceDirectPlay) return PlayMethod.DirectPlay;
 
 	const mediaStreams = mediaSource?.MediaStreams || [];
@@ -253,6 +253,23 @@ const determinePlayMethod = (mediaSource, capabilities, options = {}, passthroug
 	return PlayMethod.Transcode;
 };
 
+// A direct stream the server gave no address for is the file as it is, the same address a direct play opens,
+// so it is treated as one and every later step sees a direct play. A request that turned direct play off on
+// purpose, for a track the file's first one is not, is left alone: the file as it is would ignore the track.
+const determinePlayMethod = (mediaSource, capabilities, options = {}, passthroughSettings = DEFAULT_PASSTHROUGH_SETTINGS) => {
+	const method = computePlayMethod(mediaSource, capabilities, options, passthroughSettings);
+	if (method === PlayMethod.DirectStream && options.enableDirectPlay !== false
+		&& !mediaSource?.DirectStreamUrl && !mediaSource?.TranscodingUrl) {
+		serverLogger.playbackError('Playback: the server offered a direct stream with no address, opening the file as a direct play', {
+			supportsDirectPlay: mediaSource.SupportsDirectPlay,
+			supportsDirectStream: mediaSource.SupportsDirectStream,
+			container: mediaSource.Container
+		});
+		return PlayMethod.DirectPlay;
+	}
+	return method;
+};
+
 const buildPlaybackUrl = (itemId, mediaSource, playSessionId, playMethod, credentials = null, isAudio = false, options = {}) => {
 	const serverUrl = credentials?.serverUrl || jellyfinApi.getServerUrl();
 	const apiKey = credentials?.accessToken || jellyfinApi.getApiKey();
@@ -274,19 +291,7 @@ const buildPlaybackUrl = (itemId, mediaSource, playSessionId, playMethod, creden
 		isAudio
 	});
 
-	// A direct stream the server gave no address for is the file as it is, which is the same address a direct
-	// play opens. The report names it, since it is the server answering with less than it promised.
-	const directStreamWithoutUrl = playMethod === PlayMethod.DirectStream
-		&& !mediaSource.DirectStreamUrl && !mediaSource.TranscodingUrl;
-	if (directStreamWithoutUrl) {
-		serverLogger.playbackError('Playback: the server offered a direct stream with no address, opening the file as it is', {
-			supportsDirectPlay: mediaSource.SupportsDirectPlay,
-			supportsDirectStream: mediaSource.SupportsDirectStream,
-			container
-		});
-	}
-
-	if (playMethod === PlayMethod.DirectPlay || directStreamWithoutUrl) {
+	if (playMethod === PlayMethod.DirectPlay) {
 		// Build query string manually for Chromium 47 compat (no URLSearchParams)
 		const queryParts = [
 			'Static=true',
