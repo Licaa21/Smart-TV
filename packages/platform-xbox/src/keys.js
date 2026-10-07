@@ -16,6 +16,7 @@ const RIGHT = {keyCode: 39, key: 'ArrowRight', code: 'ArrowRight'};
 const ENTER = {keyCode: 13, key: 'Enter', code: 'Enter'};
 const BACK = {keyCode: 27, key: 'Escape', code: 'Escape'};
 const MENU = {keyCode: 93, key: 'ContextMenu', code: 'ContextMenu'};
+const BACKSPACE = {keyCode: 8, key: 'Backspace', code: 'Backspace'};
 const REWIND = {keyCode: 227, key: 'MediaRewind', code: 'MediaRewind'};
 const FAST_FORWARD = {keyCode: 228, key: 'MediaFastForward', code: 'MediaFastForward'};
 
@@ -27,9 +28,10 @@ export const GAMEPAD_KEYS = {
 	141: RIGHT,
 	142: ENTER,
 	143: BACK,
-	// A and B
+	// A, B and X
 	195: ENTER,
 	196: BACK,
+	197: BACKSPACE,
 	// Left and right trigger
 	201: REWIND,
 	202: FAST_FORWARD,

@@ -43,7 +43,7 @@ describe('the Xbox gamepad keys', () => {
 		[203, 38, 'ArrowUp'], [204, 40, 'ArrowDown'], [205, 37, 'ArrowLeft'], [206, 39, 'ArrowRight'],
 		[211, 38, 'ArrowUp'], [212, 40, 'ArrowDown'], [213, 39, 'ArrowRight'], [214, 37, 'ArrowLeft'],
 		[138, 38, 'ArrowUp'], [139, 40, 'ArrowDown'], [140, 37, 'ArrowLeft'], [141, 39, 'ArrowRight'],
-		[195, 13, 'Enter'], [142, 13, 'Enter'], [196, 27, 'Escape'], [143, 27, 'Escape'], [207, 93, 'ContextMenu'],
+		[195, 13, 'Enter'], [142, 13, 'Enter'], [196, 27, 'Escape'], [143, 27, 'Escape'], [197, 8, 'Backspace'], [207, 93, 'ContextMenu'],
 		[201, 227, 'MediaRewind'], [202, 228, 'MediaFastForward']
 	])('gamepad code %i reaches the app once, as %i', (gamepad, keyCode, key) => {
 		const raw = press(button, gamepad);
@@ -78,7 +78,7 @@ describe('the Xbox gamepad keys', () => {
 
 	test('every code in the table stands for a key the app handles', () => {
 		for (const standard of Object.values(GAMEPAD_KEYS)) {
-			expect([13, 27, 37, 38, 39, 40, 93, 227, 228]).toContain(standard.keyCode);
+			expect([8, 13, 27, 37, 38, 39, 40, 93, 227, 228]).toContain(standard.keyCode);
 		}
 	});
 
