@@ -55,6 +55,7 @@ const DetailActionButtons = ({
 	tracksPending,
 	canAddToCollection,
 	canIdentify,
+	canChangeArtwork,
 	playLongPress,
 	resumeLongPress,
 	onFocusRow,
@@ -73,6 +74,7 @@ const DetailActionButtons = ({
 	onOpenCollectionModal,
 	onOpenDeleteDialog,
 	onOpenIdentifyModal,
+	onOpenArtworkModal,
 	maxVisibleButtons,
 	overflowAsMenu
 }) => {
@@ -242,6 +244,14 @@ const DetailActionButtons = ({
 					<BtnIcon path={DETAIL_ICON_PATHS.delete}/>
 				</div>
 				<span className={css.btnLabel}>{$L('Delete')}</span>
+			</SpottableDiv>
+		)},
+		{id: 'artwork', when: canChangeArtwork, render: () => (
+			<SpottableDiv className={css.btnWrapper} onClick={onOpenArtworkModal}>
+				<div className={css.btnAction}>
+					<BtnIcon path={DETAIL_ICON_PATHS.artwork}/>
+				</div>
+				<span className={css.btnLabel}>{$L('Change Artwork')}</span>
 			</SpottableDiv>
 		)},
 		{id: 'seerrWatchlist', when: seerr.showsWatchlist, render: () => (

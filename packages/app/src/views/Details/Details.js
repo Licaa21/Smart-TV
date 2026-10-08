@@ -1303,6 +1303,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 			tracksPending={isSeed}
 			canAddToCollection={canAddToCollection}
 			canIdentify={canIdentify}
+			canChangeArtwork={canChangeArtwork}
 			playLongPress={playLongPress}
 			resumeLongPress={resumeLongPress}
 			onFocusRow={handleButtonRowFocus}
@@ -1321,6 +1322,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 			onOpenCollectionModal={modals.handleOpenCollectionModal}
 			onOpenDeleteDialog={modals.handleOpenDeleteDialog}
 			onOpenIdentifyModal={modals.handleOpenIdentifyModal}
+			onOpenArtworkModal={modals.handleOpenArtworkModal}
 		/>
 	);
 
