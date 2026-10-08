@@ -346,7 +346,7 @@
     "Leave group": "Gruppe verlassen",
     "Left Sidebar": "Linke Seitenleiste",
     "LEGAL": "RECHTLICH",
-    "Letterboxd": "Briefkastend",
+    "Letterboxd": "Letterboxd",
     "Libraries": "Bibliotheken",
     "Library": "Bibliothek",
     "Library Art": "Bibliothekskunst",
@@ -1227,5 +1227,15 @@
     "Anamorphic video is not supported.": "Anamorphotische Videos werden nicht unterstützt.",
     "Artwork first, with cards that open what they name.": "Zuerst das Artwork – mit Karten, die das öffnen, was sie bezeichnen.",
     "Audio bit depth is not supported.": "Audio bit Tiefe wird nicht unterstützt.",
-    "Audio bitrate exceeds streaming limit.": "Audio bitrate überschreitet Streaminglimit."
+    "Audio bitrate exceeds streaming limit.": "Audio bitrate überschreitet Streaminglimit.",
+    "Enter a Letterboxd username.": "Gib einen Letterboxd-Benutzernamen ein.",
+    "Paste a TMDB, MDBList, or Letterboxd URL": "Füge eine TMDB-, MDBList- oder Letterboxd-URL ein",
+    "Unrecognized URL. Use a TMDB list/collection, MDBList list, or Letterboxd profile URL.": "Nicht erkannte URL. Verwende eine URL zu einer TMDB-Liste/-Sammlung, einer MDBList-Liste oder einem Letterboxd-Profil.",
+    "1 held": "1 gehalten",
+    "1 item": "1 Objekt",
+    "Audio codec ({codec}) is not supported directly.": "Audio codec ({codec}) wird nicht direkt unterstützt.",
+    "Audio codec is not supported.": "Audio codec wird nicht unterstützt.",
+    "Audio profile is not supported.": "Audioprofil wird nicht unterstützt.",
+    "Audio sample rate is not supported.": "Audio-Abtastrate wird nicht unterstützt",
+    "Additional Component": "Zusätzliche Komponente"
 }
