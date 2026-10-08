@@ -1217,5 +1217,15 @@
     "Since you watched {name}": "Weil du {name} gesehen hast",
     "Cancel Series Recording": "Aufnahme der Serie abbrechen",
     "Channel Number": "Kanal Nummer",
-    "Chapter Marks": "Kapitelmarkierungen"
+    "Chapter Marks": "Kapitelmarkierungen",
+    "Adjusts animation speed when expanding focused modern cards": "Passt die Animationsgeschwindigkeit beim Erweitern fokussierter moderner Karten an",
+    "Animation Position": "Animationsposition",
+    "Animation Size": "Animationsgröße",
+    "Animation Speed": "Animationsgeschwindigkeit",
+    "ASS/SSA subtitles require transcoding because direct play is turned off.": "ASS/SSA-Untertitel müssen transkodiert werden, da direct play deaktiviert ist.",
+    "Add to Favorites": "Zu Favoriten hinzufügen",
+    "Anamorphic video is not supported.": "Anamorphotische Videos werden nicht unterstützt.",
+    "Artwork first, with cards that open what they name.": "Zuerst das Artwork – mit Karten, die das öffnen, was sie bezeichnen.",
+    "Audio bit depth is not supported.": "Audio bit Tiefe wird nicht unterstützt.",
+    "Audio bitrate exceeds streaming limit.": "Audio bitrate überschreitet Streaminglimit."
 }
