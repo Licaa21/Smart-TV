@@ -149,3 +149,93 @@ describe('useThemeMusic when focus moves on', () => {
 		expect(FakeAudio.last).toBeNull();
 	});
 });
+
+describe('useThemeMusic around the screensaver', () => {
+	beforeEach(() => {
+		jest.useFakeTimers();
+		jellyfinApi.api.getThemeSongs.mockResolvedValue({Items: [{Id: 'song1'}]});
+		window.Audio = FakeAudio;
+	});
+
+	afterEach(() => {
+		jest.useRealTimers();
+	});
+
+	test('the theme fades out when the screensaver comes up and starts again when it goes', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		act(() => {
+			result.current.suspend();
+			jest.advanceTimersByTime(2000);
+		});
+		expect(result.current.isPlaying()).toBe(false);
+
+		FakeAudio.last = null;
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(FakeAudio.last).not.toBeNull();
+		act(() => FakeAudio.last.listeners.canplaythrough());
+		expect(result.current.isPlaying()).toBe(true);
+	});
+
+	test('it starts the card that was focused last when focus changed in between', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		act(() => {
+			result.current.suspend();
+			jest.advanceTimersByTime(2000);
+		});
+		await act(async () => {
+			await result.current.playThemeMusic('item9');
+		});
+		jellyfinApi.api.getThemeSongs.mockClear();
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(jellyfinApi.api.getThemeSongs).toHaveBeenCalledWith('item9', true);
+	});
+
+	test('nothing starts when nothing was playing', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		FakeAudio.last = null;
+		act(() => result.current.suspend());
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(FakeAudio.last).toBeNull();
+	});
+});
+
+describe('useThemeMusic behind the screensaver', () => {
+	beforeEach(() => {
+		jest.useFakeTimers();
+		jellyfinApi.api.getThemeSongs.mockResolvedValue({Items: [{Id: 'song1'}]});
+		window.Audio = FakeAudio;
+	});
+
+	afterEach(() => {
+		jest.useRealTimers();
+	});
+
+	test('focus moving about behind it neither starts a theme nor forgets the one that was playing', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		act(() => {
+			result.current.suspend();
+			jest.advanceTimersByTime(2000);
+		});
+		FakeAudio.last = null;
+		// the overlay takes focus off the card, and a card in the rows is focused again
+		act(() => result.current.stopForFocus());
+		await act(async () => {
+			await result.current.playThemeMusic('item1');
+		});
+		expect(FakeAudio.last).toBeNull();
+
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(FakeAudio.last).not.toBeNull();
+	});
+});
