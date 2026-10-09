@@ -273,16 +273,13 @@ const nextRevision = () => {
 	return next;
 };
 
-// A probe build needs another name, a build that counts its version up needs that
-// version and a Store build needs the Store's identity, so those are made from a copy
-// of the manifest, written fresh each build and never committed. Null when the app's
-// own manifest will do.
+// The package is built from a copy of the manifest written fresh each build and never
+// committed, which carries the version the build is given, a probe build's other name
+// and a Store build's identity. Writing it every time keeps MSBuild from reusing the
+// manifest of the build before.
 const writeBuildManifest = (version) => {
-	if (!flag('--probe') && !flag('--store') && !countsVersionUp()) return null;
 	let manifest = fs.readFileSync(MANIFEST_PATH, 'utf8');
-	if (countsVersionUp()) {
-		manifest = manifest.replace(/(<Identity[^>]*?Version=")[^"]*(")/, `$1${version}.${nextRevision()}$2`);
-	}
+	manifest = manifest.replace(/(<Identity[^>]*?Version=")[^"]*(")/, `$1${version}.${countsVersionUp() ? nextRevision() : 0}$2`);
 	if (flag('--store')) {
 		manifest = manifest
 			.replace(/(<Identity[^>]*?Name=")[^"]*(")/, `$1${STORE_IDENTITY.name}$2`)
@@ -409,8 +406,7 @@ const buildMsix = (version) => {
 		'-p:AppxPackageSigningEnabled=true',
 		`-p:PackageCertificateKeyFile=${certificate.pfx}`
 	];
-	const buildManifest = writeBuildManifest(version);
-	if (buildManifest) msbuildArgs.push(`-p:MoonfinManifest=${buildManifest}`);
+	msbuildArgs.push(`-p:MoonfinManifest=${writeBuildManifest(version)}`);
 	console.log(`> MSBuild ${msbuildArgs.slice(1).join(' ')}`);
 	// The password goes in through the environment, where MSBuild reads properties from
 	// too, so it stays out of the command line and the log.
