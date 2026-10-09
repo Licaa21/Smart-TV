@@ -10,7 +10,7 @@ import * as seerrApi from '../../services/seerrApi';
 import usePersonSeerrCredits from '../../hooks/usePersonSeerrCredits';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import {getImageUrl} from '../../utils/helpers';
-import {mosaicSize, personDateLines, splitFilmography} from '../../utils/personCredits';
+import {personDateLines, splitFilmography, wallOf} from '../../utils/personCredits';
 import {sectionVisibility} from '../../utils/detailSectionLayout';
 
 import css from './Person.module.less';
@@ -84,15 +84,15 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 		if (backdropPaths.length) {
 			// A wall of tiles is small pictures. The one backdrop on screen can afford TMDB's 'original' size,
 			// since 'w1280' is under 1080p and the CSS covers the full screen with it.
-			const tiles = mosaicSize(backdropPaths.length);
-			return backdropPaths.slice(0, tiles).map((path) => seerrApi.getImageUrl(path, tiles === 1 ? 'original' : 'w780'));
+			const tiles = wallOf(backdropPaths);
+			return tiles.map((path) => seerrApi.getImageUrl(path, tiles.length === 1 ? 'original' : 'w780'));
 		}
 		const rated = [...movies, ...series]
 			.filter((f) => f.BackdropImageTags?.length > 0)
 			.map((f, index) => ({f, index}))
 			.sort((a, b) => ((b.f.CommunityRating || 0) - (a.f.CommunityRating || 0)) || (a.index - b.index));
-		const size = mosaicSize(rated.length);
-		return rated.slice(0, size).map(({f}) => getImageUrl(serverUrl, f.Id, 'Backdrop', size === 1 ? {maxWidth: 1920, quality: 90} : {maxWidth: 800, quality: 80}));
+		const shown = wallOf(rated.slice(0, 12));
+		return shown.map(({f}) => getImageUrl(serverUrl, f.Id, 'Backdrop', shown.length === 1 ? {maxWidth: 1920, quality: 90} : {maxWidth: 800, quality: 80}));
 	}, [creditsSettled, backdropPaths, movies, series, serverUrl]);
 
 	const tabs = useMemo(() => {

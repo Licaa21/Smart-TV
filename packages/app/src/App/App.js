@@ -322,6 +322,12 @@ const AppContent = (props) => {
 		window.dispatchEvent(new CustomEvent('moonfin:screensaver', {detail: {active: showScreensaver}}));
 	}, [showScreensaver]);
 
+	// A theme song left playing behind the screensaver fades out when it comes up
+	const {stopForFocus: stopThemeForScreensaver} = themeMusic;
+	useEffect(() => {
+		if (showScreensaver) stopThemeForScreensaver();
+	}, [showScreensaver, stopThemeForScreensaver]);
+
 	useEffect(() => {
 		const handleTrailerPreview = (e) => setTrailerPreviewActive(!!e.detail?.active);
 		window.addEventListener('moonfin:trailerPreview', handleTrailerPreview);

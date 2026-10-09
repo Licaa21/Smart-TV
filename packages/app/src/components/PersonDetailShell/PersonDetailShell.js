@@ -72,8 +72,8 @@ const PersonDetailShell = ({
 			)}
 			{backdropUrls.length > 1 && (
 				<div className={`${css.wall} ${backdropUrls.length > 6 ? css.wallWide : ''}`}>
-					{backdropUrls.map((url) => (
-						<div key={url} className={css.wallTile} style={{backgroundImage: `url(${url})`}} />
+					{backdropUrls.map((url, index) => (
+						<div key={`${index}-${url}`} className={css.wallTile} style={{backgroundImage: `url(${url})`}} />
 					))}
 				</div>
 			)}

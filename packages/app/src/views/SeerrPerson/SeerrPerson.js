@@ -7,7 +7,7 @@ import {useAuth} from '../../context/AuthContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import MediaRow from '../../components/MediaRow';
 import PersonDetailShell from '../../components/PersonDetailShell';
-import {knownForBackdropPaths, mosaicSize, personDateLines, prepareCredits} from '../../utils/personCredits';
+import {knownForBackdropPaths, personDateLines, prepareCredits, wallOf} from '../../utils/personCredits';
 import {normalizeMediaItem} from '../../utils/seerrHomeRows';
 
 import css from './SeerrPerson.module.less';
@@ -58,10 +58,10 @@ const SeerrPerson = ({personId, personName, onClose, onSelectItem, onBack}) => {
 	// fetch one separately. A wall is small pictures, but the one backdrop on screen can afford 'original':
 	// 'w1280' is under 1080p and the CSS covers the full screen with it.
 	const backdropUrls = useMemo(() => {
-		const paths = [...knownForBackdropPaths(rawCast), ...knownForBackdropPaths(rawCrew)];
-		const unique = paths.filter((path, index) => paths.indexOf(path) === index);
-		const size = mosaicSize(unique.length);
-		return unique.slice(0, size).map((path) => seerrApi.getImageUrl(path, size === 1 ? 'original' : 'w780'));
+		// The cast first. A person who only directs or writes is known for that work instead.
+		const cast = knownForBackdropPaths(rawCast);
+		const tiles = wallOf(cast.length ? cast : knownForBackdropPaths(rawCrew));
+		return tiles.map((path) => seerrApi.getImageUrl(path, tiles.length === 1 ? 'original' : 'w780'));
 	}, [rawCast, rawCrew]);
 
 	const handleSelectMedia = useCallback((item) => {
