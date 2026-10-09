@@ -35,7 +35,8 @@ const usePersonSeerrCredits = (tmdbId) => {
 	return {
 		appearances: credits ? prepareCredits(credits.cast, {isCrew: false, group: true}).map(normalizeMediaItem) : EMPTY,
 		crewCredits: credits ? prepareCredits(credits.crew, {isCrew: true, group: true}).map(normalizeMediaItem) : EMPTY,
-		backdropPath: credits ? knownForBackdropPath(credits.cast) : null,
+		// the cast first, then the crew work of a person who only directs or writes, as the Seerr person screen does
+		backdropPath: credits ? (knownForBackdropPath(credits.cast) || knownForBackdropPath(credits.crew)) : null,
 		// False while credits are still on their way, so a backdrop chosen from them is not
 		// replaced a moment after another was drawn.
 		creditsSettled: !tmdbId || !isEnabled || credits !== null,
