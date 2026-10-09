@@ -17,7 +17,7 @@ import {useSettings} from '../context/SettingsContext';
 import * as connectionPool from '../services/connectionPool';
 import * as jellyfinApi from '../services/jellyfinApi';
 import {adoptLegacyBlockedRatings, loadParentalControls, parentalScopeKey, setParentalScope} from '../services/parentalControls';
-import {libraryIdOf, seerrDetailStub} from '../utils/seerrTarget';
+import {libraryIdOf, seerrCardTarget, seerrDetailStub} from '../utils/seerrTarget';
 import serverLogger from '../services/serverLogger';
 import * as remoteControl from '../services/remoteControl';
 import * as serverSocket from '../services/serverSocket';
@@ -889,7 +889,9 @@ const AppContent = (props) => {
 		navigateTo(PANELS.PLAYER);
 	}, [navigateTo]);
 
-	const handleSelectItem = useCallback((item) => {
+	const handleSelectItem = useCallback((picked) => {
+		// a Seerr card reaches here from rows that open library items too, such as the related row
+		const item = seerrCardTarget(picked);
 		setDetailsAutoPlay(false);
 		// A channel has no details worth landing on, so it tunes straight away.
 		if (isLiveTvChannel(item)) {
