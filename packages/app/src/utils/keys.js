@@ -79,6 +79,15 @@ export const isExitKey = (e) => {
 	return (e.keyCode || e.which) === TIZEN_KEYS.EXIT;
 };
 
+// The channel buttons that are not the up and down pair: Guide, Channel List and Previous Channel. Sets that
+// have none never send them, and they are taken from the TV in blockedKeys.js so they reach the app.
+const TIZEN_CHANNEL_MENU_KEYS = [458, 10073, 10190];
+
+export const isChannelMenuKey = (e) => {
+	if (getPlatform() !== 'tizen') return false;
+	return TIZEN_CHANNEL_MENU_KEYS.includes(e.keyCode || e.which);
+};
+
 export const ESSENTIAL_KEY_NAMES = [
 	'MediaPlay',
 	'MediaPause',

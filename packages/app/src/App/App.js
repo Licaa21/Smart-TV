@@ -21,7 +21,7 @@ import {libraryIdOf, seerrDetailStub} from '../utils/seerrTarget';
 import serverLogger from '../services/serverLogger';
 import * as remoteControl from '../services/remoteControl';
 import * as serverSocket from '../services/serverSocket';
-import {isBackKey, KEYS} from '../utils/keys';
+import {isBackKey, isChannelMenuKey, KEYS} from '../utils/keys';
 import {applyPerfTier} from '../utils/perfTier';
 import {isLiveTvChannel, isLiveTvLibrary} from '../utils/liveTvLibrary';
 import {OLED_TUNING} from '../utils/oledMode';
@@ -734,6 +734,21 @@ const AppContent = (props) => {
 		}
 	}, [panelHistory, panelIndex]);
 
+	// A channel button on a screen reached from the player goes straight back to it, the way a pile of Back presses
+	// would, with everything the player had kept. False when there is no player to go back to.
+	const handleReturnToPlayer = useCallback(() => {
+		const back = playerReturnRef.current;
+		if (panelIndex === PANELS.PLAYER || !back?.item || panelHistory[back.depth] !== PANELS.PLAYER) return false;
+		detailsItemStackRef.current = [];
+		playerReturnRef.current = null;
+		setPanelHistory(panelHistory.slice(0, back.depth));
+		setPlayingItem(back.item);
+		setPlaybackOptions(back.options);
+		setIsResume(back.isResume);
+		setPanelIndex(PANELS.PLAYER);
+		return true;
+	}, [panelHistory, panelIndex]);
+
 	useEffect(() => {
 		const handleKeyDown = (e) => {
 			// An arrow press means the user is done pointing. Spotlight flips
@@ -751,6 +766,15 @@ const AppContent = (props) => {
 				return;
 			}
 			if (e.keyCode === KEYS.BACKSPACE && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+				return;
+			}
+			// Not over a dialog, which would be left open on top of the player. An open item menu is closed by the press,
+			// the way Back would, and the player waits for the next one.
+			if (isChannelMenuKey(e) && playerReturnRef.current && !isPinGateActive && !setupWizardActive && !showExitDialog &&
+				!syncPlayDialogOpen && !updateInfo && !showAccountModal && !showServerMessages && !showSettingsPanel &&
+				!itemMenuBackRef.current?.() && handleReturnToPlayer()) {
+				e.preventDefault();
+				e.stopPropagation();
 				return;
 			}
 			if (isBackKey(e)) {
@@ -829,7 +853,7 @@ const AppContent = (props) => {
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [panelIndex, handleBack, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay]);
+	}, [panelIndex, handleBack, handleReturnToPlayer, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay]);
 
 	const handleLoggedIn = useCallback(() => {
 		setPanelHistory([]);
@@ -1574,6 +1598,9 @@ const AppContent = (props) => {
 
 	const hasLiveTv = libraries.some(isLiveTvLibrary);
 
+	// the history holds the place of a player that a person was opened from, and nothing else has it keep the navbar off
+	const cameFromPlayer = Boolean(playerReturnRef.current) && panelHistory[playerReturnRef.current.depth] === PANELS.PLAYER;
+
 	const showNavBar = panelIndex !== PANELS.LOGIN &&
 		panelIndex !== PANELS.PLAYER &&
 		panelIndex !== PANELS.GAME_PLAYER &&
@@ -1588,10 +1615,10 @@ const AppContent = (props) => {
 		panelIndex !== PANELS.GENRES &&
 		panelIndex !== PANELS.FAVORITES &&
 		!(panelIndex === PANELS.DETAILS && ['Playlist', 'MusicAlbum', 'MusicArtist'].includes(selectedItem?.Type)) &&
-		// A person opened from the player's cast list has Back to the player and nothing else, since a navbar
-		// would let the viewer leave the video behind. The person screen reached from anywhere else keeps it.
-		!(panelHistory[panelHistory.length - 1] === PANELS.PLAYER &&
-			(panelIndex === PANELS.PERSON || (panelIndex === PANELS.DETAILS && selectedItem?.Type === 'Person')));
+		// Screens reached from the player's cast list, a person and whatever is opened from there, have Back to the
+		// player and nothing else, since a navbar would let the viewer leave the video behind. The same screens
+		// reached from anywhere else keep the navbar.
+		!cameFromPlayer;
 
 	return (
 		<div className={css.app} {...props}>

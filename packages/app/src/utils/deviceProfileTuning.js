@@ -43,6 +43,13 @@ const resolutionConditions = ({width, height}) => ([
 	{Condition: 'LessThanEqual', Property: 'Height', Value: String(height), IsRequired: false}
 ]);
 
+// Jellyfin writes a level as the number times 30, so 5.2 is 156.
+const HEVC_LEVEL_52 = '156';
+
+const isLowHevcLevel = (codecProfile) => codecProfile.Type === 'Video' && codecProfile.Codec === 'hevc'
+	&& (codecProfile.Conditions || []).some((condition) =>
+		condition.Property === 'VideoLevel' && condition.Condition === 'LessThanEqual' && parseInt(condition.Value, 10) < parseInt(HEVC_LEVEL_52, 10));
+
 export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 	if (!profile) return profile;
 
@@ -65,7 +72,12 @@ export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 	const dropStreamLimit = settings.allowManyStreams === true
 		&& (profile.ContainerProfiles || []).some((container) => (container.Conditions || []).some((condition) => condition.Property === 'NumStreams'));
 
-	if (!resolution && !channelCap && !dropAss && !dropPgs && !dropAv1Transcode && !allowDoviEl && !dropStreamLimit) return profile;
+	// The Tizen profile stops 4K HEVC at level 5.1 to be safe, which sends a 5.2 file to the server for re-encoding
+	// although it is still 2160p. Only a profile that is below 5.2 on a 4K set is raised.
+	const raiseHevcLevel = settings.allowHevcLevel52 === true && capabilities?.uhd === true
+		&& (profile.CodecProfiles || []).some(isLowHevcLevel);
+
+	if (!resolution && !channelCap && !dropAss && !dropPgs && !dropAv1Transcode && !allowDoviEl && !dropStreamLimit && !raiseHevcLevel) return profile;
 
 	const tuned = {...profile};
 
@@ -127,6 +139,17 @@ export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 					const present = String(condition.Value).split('|');
 					return {...condition, Value: present.concat(added.filter((type) => present.indexOf(type) < 0)).join('|')};
 				})
+			};
+		});
+	}
+
+	if (raiseHevcLevel) {
+		tuned.CodecProfiles = (tuned.CodecProfiles || []).map((codecProfile) => {
+			if (!isLowHevcLevel(codecProfile)) return codecProfile;
+			return {
+				...codecProfile,
+				Conditions: codecProfile.Conditions.map((condition) =>
+					(condition.Property === 'VideoLevel' && condition.Condition === 'LessThanEqual' ? {...condition, Value: HEVC_LEVEL_52} : condition))
 			};
 		});
 	}
