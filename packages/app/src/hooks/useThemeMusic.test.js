@@ -4,7 +4,7 @@ import * as jellyfinApi from '../services/jellyfinApi';
 import {useThemeMusic} from './useThemeMusic';
 
 jest.mock('../context/SettingsContext', () => ({
-	useSettings: () => ({settings: {themeMusicEnabled: true, themeMusicVolume: 30, themeMusicLoop: true}})
+	useSettings: () => ({settings: {themeMusicEnabled: true, themeMusicOnHomeRows: true, themeMusicVolume: 30, themeMusicLoop: true}})
 }));
 
 jest.mock('../services/jellyfinApi', () => ({
@@ -145,6 +145,152 @@ describe('useThemeMusic when focus moves on', () => {
 		await act(async () => {
 			resolveSongs({Items: [{Id: 'song2'}]});
 			await started;
+		});
+		expect(FakeAudio.last).toBeNull();
+	});
+});
+
+describe('useThemeMusic around the screensaver', () => {
+	beforeEach(() => {
+		jest.useFakeTimers();
+		jellyfinApi.api.getThemeSongs.mockResolvedValue({Items: [{Id: 'song1'}]});
+		window.Audio = FakeAudio;
+	});
+
+	afterEach(() => {
+		jest.useRealTimers();
+	});
+
+	test('the theme fades out when the screensaver comes up and starts again when it goes', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		act(() => {
+			result.current.suspend();
+			jest.advanceTimersByTime(2000);
+		});
+		expect(result.current.isPlaying()).toBe(false);
+
+		FakeAudio.last = null;
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(FakeAudio.last).not.toBeNull();
+		act(() => FakeAudio.last.listeners.canplaythrough());
+		expect(result.current.isPlaying()).toBe(true);
+	});
+
+	test('it starts the card that was focused last when focus changed in between', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		act(() => {
+			result.current.suspend();
+			jest.advanceTimersByTime(2000);
+		});
+		await act(async () => {
+			await result.current.playThemeMusic('item9');
+		});
+		jellyfinApi.api.getThemeSongs.mockClear();
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(jellyfinApi.api.getThemeSongs).toHaveBeenCalledWith('item9', true);
+	});
+
+	test('nothing starts when nothing was playing', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		FakeAudio.last = null;
+		act(() => result.current.suspend());
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(FakeAudio.last).toBeNull();
+	});
+});
+
+describe('useThemeMusic behind the screensaver', () => {
+	beforeEach(() => {
+		jest.useFakeTimers();
+		jellyfinApi.api.getThemeSongs.mockResolvedValue({Items: [{Id: 'song1'}]});
+		window.Audio = FakeAudio;
+	});
+
+	afterEach(() => {
+		jest.useRealTimers();
+	});
+
+	test('the overlay taking focus off the card does not make the theme forgotten', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		act(() => {
+			result.current.suspend();
+			jest.advanceTimersByTime(2000);
+		});
+		act(() => result.current.stopForFocus());
+		FakeAudio.last = null;
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(FakeAudio.last).not.toBeNull();
+	});
+
+	test('a card focused behind it starts nothing and is the one that comes back', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		act(() => {
+			result.current.suspend();
+			jest.advanceTimersByTime(2000);
+		});
+		FakeAudio.last = null;
+		act(() => {
+			result.current.playThemeMusicDelayed('item9');
+			jest.advanceTimersByTime(3000);
+		});
+		expect(FakeAudio.last).toBeNull();
+		jellyfinApi.api.getThemeSongs.mockClear();
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(jellyfinApi.api.getThemeSongs).toHaveBeenCalledWith('item9', true);
+	});
+
+	test('a start still waiting out its delay comes back too', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		act(() => result.current.playThemeMusicDelayed('itemP'));
+		act(() => result.current.suspend());
+		act(() => jest.advanceTimersByTime(3000));
+		jellyfinApi.api.getThemeSongs.mockClear();
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(jellyfinApi.api.getThemeSongs).toHaveBeenCalledWith('itemP', true);
+	});
+
+	test('the card focus came back to is the one that comes back, not the one it had moved to', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		act(() => {
+			result.current.playThemeMusicDelayed('other');
+			result.current.playThemeMusicDelayed('item1');
+		});
+		act(() => result.current.suspend());
+		act(() => jest.advanceTimersByTime(3000));
+		jellyfinApi.api.getThemeSongs.mockClear();
+		await act(async () => {
+			result.current.resume();
+		});
+		expect(jellyfinApi.api.getThemeSongs).toHaveBeenCalledWith('item1', true);
+	});
+
+	test('resume can be told the screen has changed and then starts nothing', async () => {
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		act(() => {
+			result.current.suspend();
+			jest.advanceTimersByTime(2000);
+		});
+		FakeAudio.last = null;
+		await act(async () => {
+			result.current.resume(false);
 		});
 		expect(FakeAudio.last).toBeNull();
 	});
