@@ -50,7 +50,7 @@ const isLowHevcLevel = (codecProfile) => codecProfile.Type === 'Video' && codecP
 	&& (codecProfile.Conditions || []).some((condition) =>
 		condition.Property === 'VideoLevel' && condition.Condition === 'LessThanEqual' && parseInt(condition.Value, 10) < parseInt(HEVC_LEVEL_52, 10));
 
-export const applyProfileTuning =(profile, settings = {}, capabilities) => {
+export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 	if (!profile) return profile;
 
 	const resolution = narrower(RESOLUTIONS[settings.maxVideoResolution], panelResolution(capabilities));
