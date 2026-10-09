@@ -9,6 +9,7 @@ export const defaultSettings = {
 	forceCompatibleAv1Transcode: false,
 	dolbyVisionAsHdr10: false,
 	allowManyStreams: false,
+	allowHevcLevel52: false,
 	maxBitrate: 0,
 	audioLanguage: '',
 	subtitleLanguage: '',

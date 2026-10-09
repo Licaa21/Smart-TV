@@ -154,6 +154,32 @@ describe('applyProfileTuning', () => {
 		});
 	});
 
+	describe('the HEVC level', () => {
+		const level = (value) => ({
+			...profile(),
+			CodecProfiles: [
+				{Type: 'Video', Codec: 'h264', Conditions: [{Condition: 'LessThanEqual', Property: 'VideoLevel', Value: '51', IsRequired: false}]},
+				{Type: 'Video', Codec: 'hevc', Conditions: [{Condition: 'LessThanEqual', Property: 'VideoLevel', Value: value, IsRequired: false}]}
+			]
+		});
+		const hevcLevel = (tuned) => tuned.CodecProfiles[1].Conditions[0].Value;
+
+		it('stays at 5.1 while the setting is off', () => {
+			expect(hevcLevel(applyProfileTuning(level('153'), {}, uhdPanel))).toBe('153');
+		});
+
+		it('goes to 5.2 on a 4K set when the setting is on, and leaves h264 alone', () => {
+			const tuned = applyProfileTuning(level('153'), {allowHevcLevel52: true}, uhdPanel);
+			expect(hevcLevel(tuned)).toBe('156');
+			expect(tuned.CodecProfiles[0].Conditions[0].Value).toBe('51');
+		});
+
+		it('is left alone on a Full HD set or when already higher', () => {
+			expect(hevcLevel(applyProfileTuning(level('123'), {allowHevcLevel52: true}, fhdPanel))).toBe('123');
+			expect(hevcLevel(applyProfileTuning(level('183'), {allowHevcLevel52: true}, {uhd: true, uhd8K: true}))).toBe('183');
+		});
+	});
+
 	describe('the stream count limit', () => {
 		const limited = () => ({...profile(), ContainerProfiles: [{Type: 'Video', Conditions: [{Condition: 'LessThanEqual', Property: 'NumStreams', Value: '32', IsRequired: false}]}]});
 
