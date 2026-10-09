@@ -9,6 +9,7 @@ import {
 	groupCredits,
 	knownForBackdropPaths,
 	mosaicSize,
+	wallOf,
 	sortCredits,
 	prepareCredits
 } from './personCredits';
@@ -177,12 +178,27 @@ describe('the backdrops they are best known for', () => {
 			.toEqual(['/top.jpg', '/mid.jpg', '/low.jpg']);
 	});
 
-	test('puts leading roles ahead of cameos however many votes the cameo has', () => {
+	test('leaves out walk-ons, cameos and guest spots however many votes they have', () => {
 		expect(paths([
 			c({backdropPath: '/cameo.jpg', voteCount: 90000, order: 40}),
-			c({backdropPath: '/guest.jpg', voteCount: 80000, episode_count: 1}),
-			c({backdropPath: '/lead.jpg', voteCount: 100, order: 0})
-		])).toEqual(['/lead.jpg', '/cameo.jpg', '/guest.jpg']);
+			c({backdropPath: '/guest.jpg', voteCount: 80000, order: 2, episode_count: 1}),
+			c({backdropPath: '/uncredited.jpg', voteCount: 70000, order: 3, character: 'Soldier (uncredited)'}),
+			c({backdropPath: '/lead.jpg', voteCount: 100, order: 0}),
+			c({backdropPath: '/show.jpg', voteCount: 50, order: 1, episode_count: 98})
+		])).toEqual(['/lead.jpg', '/show.jpg']);
+	});
+
+	test('takes every credit when none of them carries billing', () => {
+		expect(paths([c({backdropPath: '/x.jpg'}), c({backdropPath: '/y.jpg', voteCount: 20})])).toEqual(['/y.jpg', '/x.jpg']);
+	});
+
+	test('judges a series with no billing by its episodes, next to movies that have it', () => {
+		expect(paths([
+			c({backdropPath: '/movie.jpg', voteCount: 100, order: 1}),
+			c({backdropPath: '/cameo-movie.jpg', voteCount: 9000, order: 30}),
+			c({backdropPath: '/main-show.jpg', voteCount: 50, episode_count: 98}),
+			c({backdropPath: '/guest-show.jpg', voteCount: 5000, episode_count: 6})
+		])).toEqual(['/movie.jpg', '/main-show.jpg']);
 	});
 
 	test('skips talk shows, news and appearances as themselves', () => {
@@ -204,8 +220,15 @@ describe('the backdrops they are best known for', () => {
 	});
 });
 
-describe('mosaicSize', () => {
-	test('is a full wall, a half one, or a single picture', () => {
-		expect([0, 1, 5, 6, 11, 12, 30].map(mosaicSize)).toEqual([0, 1, 1, 6, 6, 12, 12]);
+describe('mosaicSize and wallOf', () => {
+	test('is a full wall, a half one that loops, or a single picture', () => {
+		expect([0, 1, 2, 5, 6, 11, 12, 30].map(mosaicSize)).toEqual([0, 1, 6, 6, 6, 6, 12, 12]);
+	});
+
+	test('repeats the few titles round to fill the wall', () => {
+		expect(wallOf(['a', 'b'])).toEqual(['a', 'b', 'a', 'b', 'a', 'b']);
+		expect(wallOf(['a', 'b', 'c', 'd'])).toEqual(['a', 'b', 'c', 'd', 'a', 'b']);
+		expect(wallOf(['a'])).toEqual(['a']);
+		expect(wallOf([])).toEqual([]);
 	});
 });
