@@ -330,7 +330,7 @@ const AppContent = (props) => {
 	const themeSpotSuspendedRef = useRef(null);
 	useEffect(() => {
 		if (showScreensaver) {
-			themeSpotSuspendedRef.current = themeSpotRef.current;
+			if (themeSpotSuspendedRef.current === null) themeSpotSuspendedRef.current = themeSpotRef.current;
 			suspendTheme();
 		} else {
 			// a remote command that moved the app on meanwhile leaves the old screen's theme where it is
