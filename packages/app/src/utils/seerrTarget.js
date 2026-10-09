@@ -20,6 +20,20 @@ export const seerrDetailStub = ({mediaId, mediaType, imdbId, title}) => ({
 	_seerrTitle: title || null
 });
 
+// A Seerr card, as the recommendation and discovery rows build them, is a title and not a library item. Opened as
+// one the detail screen asks the server for an id it has never had and shows the card as if it were in the library.
+// A title the library already holds opens as itself, and the rest as the Seerr stub. A library item that a Seerr
+// card was resolved into is returned as it is.
+export const seerrCardTarget = (item) => {
+	if (!item?._seerr || !item._seerrRaw || item._resolvedFromExternal) return item;
+	if (item._seerrLibraryId) return {Id: item._seerrLibraryId, Type: item.Type};
+	return seerrDetailStub({
+		mediaId: item._seerrRaw.mediaId,
+		mediaType: item._seerrRaw.mediaType === 'tv' ? 'tv' : 'movie',
+		title: item.Name
+	});
+};
+
 export const isSeerrOnlyItem = (item) => item?._seerrMediaId != null || item?._seerrImdbId != null;
 
 // The search hit of the kind that was asked for. Seerr ranks a search by popularity across

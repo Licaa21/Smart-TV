@@ -1,4 +1,4 @@
-import {seerrTargetFor, seerrDetailStub, isSeerrOnlyItem, bestSearchMatch, personRouteFor} from './seerrTarget';
+import {seerrTargetFor, seerrDetailStub, isSeerrOnlyItem, bestSearchMatch, personRouteFor, seerrCardTarget} from './seerrTarget';
 
 const movie = (providerIds) => ({Type: 'Movie', ProviderIds: providerIds});
 
@@ -97,5 +97,32 @@ describe('personRouteFor', () => {
 	it('has nowhere to send a person without an id', () => {
 		expect(personRouteFor({Name: 'Toni Collette'}, true)).toBeNull();
 		expect(personRouteFor(null, false)).toBeNull();
+	});
+});
+
+describe('seerrCardTarget', () => {
+	const card = (extra = {}) => ({Id: 'seerr-movie-634649', Name: 'A Film', Type: 'Movie', _seerr: true, _seerrRaw: {mediaId: 634649, mediaType: 'movie'}, ...extra});
+
+	it('turns a Seerr card into the stub the detail screen treats as Seerr only', () => {
+		const target = seerrCardTarget(card());
+		expect(isSeerrOnlyItem(target)).toBe(true);
+		expect(target).toMatchObject({Id: 'seerr-movie-634649', Type: 'Movie', _seerrMediaId: 634649, _seerrMediaType: 'movie', _seerrTitle: 'A Film'});
+	});
+
+	it('keeps a series a series', () => {
+		const target = seerrCardTarget(card({Type: 'Series', _seerrRaw: {mediaId: 12, mediaType: 'tv'}}));
+		expect(target).toMatchObject({Type: 'Series', _seerrMediaType: 'tv', _seerrMediaId: 12});
+	});
+
+	it('opens a title the library holds as that library item', () => {
+		expect(seerrCardTarget(card({_seerrLibraryId: 'abc'}))).toEqual({Id: 'abc', Type: 'Movie'});
+	});
+
+	it('leaves library items and resolved cards alone', () => {
+		const library = {Id: 'abc', Type: 'Movie'};
+		expect(seerrCardTarget(library)).toBe(library);
+		const resolved = card({_resolvedFromExternal: true});
+		expect(seerrCardTarget(resolved)).toBe(resolved);
+		expect(seerrCardTarget(null)).toBe(null);
 	});
 });
