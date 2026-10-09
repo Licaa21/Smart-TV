@@ -768,7 +768,11 @@ const AppContent = (props) => {
 			if (e.keyCode === KEYS.BACKSPACE && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
 				return;
 			}
-			if (isChannelMenuKey(e) && !isPinGateActive && !setupWizardActive && handleReturnToPlayer()) {
+			// Not over a dialog, which would be left open on top of the player. An open item menu is closed by the press,
+			// the way Back would, and the player waits for the next one.
+			if (isChannelMenuKey(e) && playerReturnRef.current && !isPinGateActive && !setupWizardActive && !showExitDialog &&
+				!syncPlayDialogOpen && !updateInfo && !showAccountModal && !showServerMessages && !showSettingsPanel &&
+				!itemMenuBackRef.current?.() && handleReturnToPlayer()) {
 				e.preventDefault();
 				e.stopPropagation();
 				return;
