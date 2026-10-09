@@ -7,7 +7,7 @@ import {useAuth} from '../../context/AuthContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import MediaRow from '../../components/MediaRow';
 import PersonDetailShell from '../../components/PersonDetailShell';
-import {personDateLines, prepareCredits, popularBackdropPath} from '../../utils/personCredits';
+import {knownForBackdropPaths, mosaicSize, personDateLines, prepareCredits} from '../../utils/personCredits';
 import {normalizeMediaItem} from '../../utils/seerrHomeRows';
 
 import css from './SeerrPerson.module.less';
@@ -53,28 +53,16 @@ const SeerrPerson = ({personId, personName, onClose, onSelectItem, onBack}) => {
 	const rawCast = credits?.cast || details?.combinedCredits?.cast || details?.credits?.cast;
 	const rawCrew = credits?.crew || details?.combinedCredits?.crew || details?.credits?.crew;
 
-	// Same idea as the native Person screen: pull a backdrop from whatever this person has
-	// been in, rather than leaving the screen flat. TMDB credits carry their own backdrop
-	// per title, so there is no need to go fetch one separately.
-	//
-	// 'original' rather than the app's usual 'w1280': this is the one backdrop on screen,
-	// not a grid of many, so it can afford it - 'w1280' is under 1080p and the CSS covers
-	// the full screen with it, so anything smaller than the screen gets visibly upscaled.
-	const backdropCandidates = useMemo(() => {
-		const urls = [];
-		for (const item of [...(rawCast || []), ...(rawCrew || [])]) {
-			const backdropPath = item.backdropPath || item.backdrop_path;
-			if (backdropPath) urls.push(seerrApi.getImageUrl(backdropPath, 'original'));
-		}
-		return urls;
+	// Same idea as the native Person screen: a wall of the backdrops of what this person is best known for, rather
+	// than leaving the screen flat. TMDB credits carry their own backdrop per title, so there is no need to go
+	// fetch one separately. A wall is small pictures, but the one backdrop on screen can afford 'original':
+	// 'w1280' is under 1080p and the CSS covers the full screen with it.
+	const backdropUrls = useMemo(() => {
+		const paths = [...knownForBackdropPaths(rawCast), ...knownForBackdropPaths(rawCrew)];
+		const unique = paths.filter((path, index) => paths.indexOf(path) === index);
+		const size = mosaicSize(unique.length);
+		return unique.slice(0, size).map((path) => seerrApi.getImageUrl(path, size === 1 ? 'original' : 'w780'));
 	}, [rawCast, rawCrew]);
-
-	// The title they are best known for, or anything with a backdrop when nothing qualifies.
-	const randomBackdrop = useMemo(() => {
-		const popular = popularBackdropPath(rawCast);
-		if (popular) return seerrApi.getImageUrl(popular, 'original');
-		return backdropCandidates[0] || null;
-	}, [rawCast, backdropCandidates]);
 
 	const handleSelectMedia = useCallback((item) => {
 		if (item?._seerrRaw) onSelectItem?.(item._seerrRaw);
@@ -144,7 +132,7 @@ const SeerrPerson = ({personId, personName, onClose, onSelectItem, onBack}) => {
 
 	return (
 		<PersonDetailShell
-			backdropUrl={randomBackdrop}
+			backdropUrls={backdropUrls}
 			imageUrl={profileUrl}
 			placeholderInitial={details.name?.[0]}
 			name={personName || details.name}
