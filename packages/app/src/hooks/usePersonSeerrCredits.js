@@ -1,4 +1,4 @@
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useMemo} from 'react';
 
 import {useSeerr} from '../context/SeerrContext';
 import * as seerrApi from '../services/seerrApi';
@@ -32,10 +32,12 @@ const usePersonSeerrCredits = (tmdbId) => {
 		return () => { cancelled = true; };
 	}, [tmdbId, isEnabled]);
 
+	const backdropPaths = useMemo(() => (credits ? knownForBackdropPaths(credits.cast) : EMPTY), [credits]);
+
 	return {
 		appearances: credits ? prepareCredits(credits.cast, {isCrew: false, group: true}).map(normalizeMediaItem) : EMPTY,
 		crewCredits: credits ? prepareCredits(credits.crew, {isCrew: true, group: true}).map(normalizeMediaItem) : EMPTY,
-		backdropPaths: credits ? knownForBackdropPaths(credits.cast) : EMPTY,
+		backdropPaths,
 		// False while credits are still on their way, so a backdrop chosen from them is not
 		// replaced a moment after another was drawn.
 		creditsSettled: !tmdbId || !isEnabled || credits !== null,
