@@ -1,4 +1,4 @@
-import {Fragment, useCallback, useState, useEffect, useMemo} from 'react';
+import {Fragment, useCallback, useState, useEffect, useMemo, useRef} from 'react';
 import $L from '@enact/i18n/$L';
 
 import MediaRow from '../../components/MediaRow';
@@ -10,7 +10,7 @@ import {isMdblistEnabled} from '../../services/mdblistApi';
 import {formatTime} from '../Player/PlayerConstants';
 import {SeerrStatusBadge, SeerrDownloadBars, SeerrSeasonDot} from '../../components/seerr/SeerrStatusBadge';
 import {SeerrChips, SeerrFacts, SeerrCollectionBanner} from '../../components/seerr/SeerrSections';
-import {SpottableDiv, RowContainer} from './detailsSpottables';
+import {SpottableDiv, RowContainer, CurrentRowContainer} from './detailsSpottables';
 import ExpandableOverview from './ExpandableOverview';
 import {handleSectionKeyDown, handleScrollerFocus} from './detailsFocus';
 import {PosterBadges, WatchedCheckIcon, FavoriteHeartIcon} from './DetailBadges';
@@ -77,6 +77,15 @@ const ClassicDetailScreen = ({
 	collectionMenu
 }) => {
 	const [upcomingEpisode, setUpcomingEpisode] = useState(null);
+
+	// The row of this season's episodes opens on the one this screen is for, not on the first
+	const episodesScrollRef = useRef(null);
+	useEffect(() => {
+		const scroller = episodesScrollRef.current;
+		const current = scroller && scroller.querySelector('[data-current="true"]');
+		if (!current) return;
+		scroller.scrollLeft += current.getBoundingClientRect().left - scroller.getBoundingClientRect().left - 20;
+	}, [item.Id, episodes.length]);
 
 	const episodeAt = useCallback((target) => itemWithIdAt(episodes, 'data-episode-id', target), [episodes]);
 	const episodeMenuHold = useItemMenuHold(episodeAt);
@@ -301,13 +310,13 @@ const ClassicDetailScreen = ({
 			)}
 
 			{isEpisode && showsSection('moreEpisodes') && episodes.length > 0 && (
-				<RowContainer className={css.section}>
+				<CurrentRowContainer className={css.section}>
 					<div className={css.sectionHeader}>
 						<h3 className={css.sectionTitle}>
 							{item.ParentIndexNumber !== undefined ? $L('Season {number} Episodes').replace('{number}', item.ParentIndexNumber) : $L('Episodes')}
 						</h3>
 					</div>
-					<div className={css.sectionScroll} onFocus={handleScrollerFocus} {...episodeMenuHold}>
+					<div className={css.sectionScroll} ref={episodesScrollRef} onFocus={handleScrollerFocus} {...episodeMenuHold}>
 						{episodes.map(ep => {
 							// The episode carries the series artwork on most records, and the
 							// screen's own item stands in for the ones that don't.
@@ -325,6 +334,7 @@ const ClassicDetailScreen = ({
 									key={ep.Id}
 									className={`${css.episodeCard} ${isCurrentEp ? css.episodeCurrent : ''}`}
 									data-episode-id={ep.Id}
+									data-current={isCurrentEp ? 'true' : undefined}
 									onClick={onEpisodeSelect}
 								>
 									<div className={css.episodeThumb}>
@@ -367,7 +377,7 @@ const ClassicDetailScreen = ({
 							);
 						})}
 					</div>
-				</RowContainer>
+				</CurrentRowContainer>
 			)}
 
 			{isBoxSet && collectionItems.length > 0 && (

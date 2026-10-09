@@ -52,6 +52,7 @@ export const useThemeMusic = () => {
 	}, [clearFade]);
 
 	const stopImmediate = useCallback(() => {
+		pendingIdRef.current = null;
 		if (delayTimerRef.current) {
 			clearTimeout(delayTimerRef.current);
 			delayTimerRef.current = null;
@@ -163,6 +164,7 @@ export const useThemeMusic = () => {
 		}
 		suspendedIdRef.current = null;
 
+		pendingIdRef.current = null;
 		if (delayTimerRef.current) {
 			clearTimeout(delayTimerRef.current);
 		}
@@ -215,12 +217,12 @@ export const useThemeMusic = () => {
 	}, [endTheme]);
 
 	// The screensaver went. The theme starts again unless something has been focused or opened since, which
-	// would have cleared it.
-	const resume = useCallback(() => {
+	// would have cleared it, or the caller says the screen has changed under it.
+	const resume = useCallback((shouldPlay = true) => {
 		suspendedRef.current = false;
 		const id = suspendedIdRef.current;
 		suspendedIdRef.current = null;
-		if (id) playThemeMusic(id);
+		if (id && shouldPlay) playThemeMusic(id);
 	}, [playThemeMusic]);
 
 	useEffect(() => {

@@ -324,9 +324,19 @@ const AppContent = (props) => {
 
 	// A theme song left playing behind the screensaver fades out when it comes up, and starts again when it goes
 	const {suspend: suspendTheme, resume: resumeTheme} = themeMusic;
+	const themeSpotNow = `${panelIndex}:${panelIndex === PANELS.DETAILS ? selectedItem?.Id : ''}`;
+	const themeSpotRef = useRef(themeSpotNow);
+	themeSpotRef.current = themeSpotNow;
+	const themeSpotSuspendedRef = useRef(null);
 	useEffect(() => {
-		if (showScreensaver) suspendTheme();
-		else resumeTheme();
+		if (showScreensaver) {
+			themeSpotSuspendedRef.current = themeSpotRef.current;
+			suspendTheme();
+		} else {
+			// a remote command that moved the app on meanwhile leaves the old screen's theme where it is
+			resumeTheme(themeSpotSuspendedRef.current === null || themeSpotSuspendedRef.current === themeSpotRef.current);
+			themeSpotSuspendedRef.current = null;
+		}
 	}, [showScreensaver, suspendTheme, resumeTheme]);
 
 	useEffect(() => {
