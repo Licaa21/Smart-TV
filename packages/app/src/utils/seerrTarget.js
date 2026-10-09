@@ -29,6 +29,7 @@ export const seerrCardTarget = (item) => {
 	if (item._seerrLibraryId) return {Id: item._seerrLibraryId, Type: item.Type};
 	return seerrDetailStub({
 		mediaId: item._seerrRaw.mediaId,
+		imdbId: item._seerrRaw.imdbId,
 		mediaType: item._seerrRaw.mediaType === 'tv' ? 'tv' : 'movie',
 		title: item.Name
 	});
