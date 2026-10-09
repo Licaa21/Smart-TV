@@ -55,6 +55,7 @@ import useLiveRecovery, {reopenLiveChannel} from './useLiveRecovery';
 import LiveFailedCard from './LiveFailedCard';
 import LoadingAnimationLayer from '../../components/LoadingAnimation';
 import useSleepTimer from './useSleepTimer';
+import {useSubtitleLift} from './useSubtitleLift';
 import useSyncPlayCommands from './useSyncPlayCommands';
 import useSegmentPopups from './useSegmentPopups';
 import {isPreroll, nextInQueue, shouldAutoAdvance} from '../../utils/cinemaMode';
@@ -220,6 +221,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		() => resolveSubtitleStyleSettings(settings, isHdrContent),
 		[settings, isHdrContent]
 	);
+
+	// The subtitles slide up out of the way of the controls, and of the description shown while paused
+	const pauseDescriptionShown = Boolean(isPaused && settings.showDescriptionOnPause && item?.Overview && !isAudioMode && !activeModal && !controlsVisible);
+	// the bar is faded out while a modal is open, and the subtitles come back down with it
+	const subtitleLift = useSubtitleLift({
+		controlsVisible: controlsVisible && !activeModal,
+		descriptionShown: pauseDescriptionShown && !isLoading && !error,
+		settings: subtitleStyleSettings,
+		measureKey: `${item?.Id}|${item?.Overview}`
+	});
 
 	const zoomModeLabel = useMemo(() => {
 		if (zoomMode === 'fill') return $L('Crop');
@@ -3349,7 +3360,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			{!isLoading && !error && currentSubtitleText && !isAudioMode && (
 				<div
 					className={css.subtitleOverlay}
-					style={getSubtitleOverlayStyle(subtitleStyleSettings)}
+					style={getSubtitleOverlayStyle(subtitleStyleSettings, subtitleLift)}
 				>
 					<div
 						className={css.subtitleText}
@@ -3364,8 +3375,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			{!isLoading && (reconnecting || showBuffering) && <LoadingAnimationLayer label={reconnecting || $L('Loading Stream...')} />}
 
-			{!isLoading && !error && isPaused && settings.showDescriptionOnPause && item?.Overview && !isAudioMode && !activeModal && !controlsVisible && (
-				<div className={css.pauseDescriptionOverlay}>
+			{!isLoading && !error && pauseDescriptionShown && (
+				<div className={css.pauseDescriptionOverlay} data-pause-description="true">
 					<div className={css.pauseDescriptionText}>{item.Overview}</div>
 				</div>
 			)}

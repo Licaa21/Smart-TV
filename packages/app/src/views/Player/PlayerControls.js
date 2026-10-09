@@ -354,7 +354,7 @@ const PlayerControls = ({
 				</div>
 				)}
 
-				<div className={css.controlsBottom}>
+				<div className={css.controlsBottom} data-player-controls-bottom="true">
 					{isLiveTV && (() => {
 						// The live timeline is the current program's span, not a seek bar.
 						// Without guide data it falls back to a clock and a LIVE tag.
