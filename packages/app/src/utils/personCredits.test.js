@@ -7,7 +7,8 @@ import {
 	splitFilmography,
 	usableCredits,
 	groupCredits,
-	popularBackdropPath,
+	knownForBackdropPaths,
+	mosaicSize,
 	sortCredits,
 	prepareCredits
 } from './personCredits';
@@ -167,23 +168,44 @@ describe('credits', () => {
 	});
 });
 
-describe('the backdrop they are best known for', () => {
+describe('the backdrops they are best known for', () => {
 	const c = (extra) => ({backdropPath: '/a.jpg', voteCount: 10, ...extra});
+	const paths = (list, limit) => knownForBackdropPaths(list, limit);
 
-	test('goes to the most voted-on acting credit', () => {
-		expect(popularBackdropPath([c({backdropPath: '/low.jpg'}), c({backdropPath: '/top.jpg', voteCount: 9000}), c({backdrop_path: '/mid.jpg', vote_count: 500, backdropPath: undefined})])).toBe('/top.jpg');
+	test('goes to the most voted-on acting credit first', () => {
+		expect(paths([c({backdropPath: '/low.jpg'}), c({backdropPath: '/top.jpg', voteCount: 9000}), c({backdrop_path: '/mid.jpg', vote_count: 500, voteCount: undefined, backdropPath: undefined})]))
+			.toEqual(['/top.jpg', '/mid.jpg', '/low.jpg']);
+	});
+
+	test('puts leading roles ahead of cameos however many votes the cameo has', () => {
+		expect(paths([
+			c({backdropPath: '/cameo.jpg', voteCount: 90000, order: 40}),
+			c({backdropPath: '/guest.jpg', voteCount: 80000, episode_count: 1}),
+			c({backdropPath: '/lead.jpg', voteCount: 100, order: 0})
+		])).toEqual(['/lead.jpg', '/cameo.jpg', '/guest.jpg']);
 	});
 
 	test('skips talk shows, news and appearances as themselves', () => {
-		expect(popularBackdropPath([
+		expect(paths([
 			c({backdropPath: '/talk.jpg', voteCount: 99999, genre_ids: [10767]}),
 			c({backdropPath: '/self.jpg', voteCount: 88888, character: 'Himself'}),
 			c({backdropPath: '/film.jpg', voteCount: 5})
-		])).toBe('/film.jpg');
+		])).toEqual(['/film.jpg']);
+	});
+
+	test('lists a title once and stops at the limit', () => {
+		expect(paths([c({backdropPath: '/x.jpg'}), c({backdropPath: '/x.jpg'}), c({backdropPath: '/y.jpg'})])).toEqual(['/x.jpg', '/y.jpg']);
+		expect(paths([c({backdropPath: '/x.jpg'}), c({backdropPath: '/y.jpg'})], 1)).toEqual(['/x.jpg']);
 	});
 
 	test('is nothing when no credit has one', () => {
-		expect(popularBackdropPath([{voteCount: 5}])).toBeNull();
-		expect(popularBackdropPath(null)).toBeNull();
+		expect(paths([{voteCount: 5}])).toEqual([]);
+		expect(paths(null)).toEqual([]);
+	});
+});
+
+describe('mosaicSize', () => {
+	test('is a full wall, a half one, or a single picture', () => {
+		expect([0, 1, 5, 6, 11, 12, 30].map(mosaicSize)).toEqual([0, 1, 1, 6, 6, 12, 12]);
 	});
 });

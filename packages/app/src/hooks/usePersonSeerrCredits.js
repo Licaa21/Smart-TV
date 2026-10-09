@@ -2,7 +2,7 @@ import {useState, useEffect} from 'react';
 
 import {useSeerr} from '../context/SeerrContext';
 import * as seerrApi from '../services/seerrApi';
-import {prepareCredits, popularBackdropPath} from '../utils/personCredits';
+import {prepareCredits, knownForBackdropPaths} from '../utils/personCredits';
 import {normalizeMediaItem} from '../utils/seerrHomeRows';
 
 const EMPTY = [];
@@ -35,7 +35,7 @@ const usePersonSeerrCredits = (tmdbId) => {
 	return {
 		appearances: credits ? prepareCredits(credits.cast, {isCrew: false, group: true}).map(normalizeMediaItem) : EMPTY,
 		crewCredits: credits ? prepareCredits(credits.crew, {isCrew: true, group: true}).map(normalizeMediaItem) : EMPTY,
-		backdropPath: credits ? popularBackdropPath(credits.cast) : null,
+		backdropPaths: credits ? knownForBackdropPaths(credits.cast) : EMPTY,
 		// False while credits are still on their way, so a backdrop chosen from them is not
 		// replaced a moment after another was drawn.
 		creditsSettled: !tmdbId || !isEnabled || credits !== null,

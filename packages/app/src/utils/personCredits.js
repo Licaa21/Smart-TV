@@ -137,24 +137,41 @@ export const groupCredits = (credits, isCrew = false) => {
 // say little about what they are known for.
 const SELF_GENRES = [10767, 10763];
 
-// The backdrop of the title this person is best known for: the most voted-on of their acting
-// credits, leaving out appearances as themselves. Null when no credit has a backdrop.
-export const popularBackdropPath = (cast) => {
-	let best = null;
-	let bestVotes = -1;
+// Billing below this is a walk-on, and a guest spot of a couple of episodes is a cameo too. Such a credit can
+// carry the most votes of anyone's work and still say nothing about the person.
+const LEAD_BILLING = 10;
+const MIN_EPISODES = 3;
+
+// The backdrops of the titles this person is best known for, best first: leading roles by how much the title
+// was voted on, then the small parts to fill what is left. Appearances as themselves are left out, and so is any
+// title twice. At most `limit` are returned.
+export const knownForBackdropPaths = (cast, limit = 12) => {
+	const seen = new Set();
+	const usable = [];
 	(Array.isArray(cast) ? cast : []).forEach((credit) => {
 		const path = credit.backdropPath || credit.backdrop_path;
-		if (!path) return;
+		if (!path || seen.has(path)) return;
 		const genres = credit.genreIds || credit.genre_ids || [];
 		if (genres.some((id) => SELF_GENRES.includes(id))) return;
 		if (/^(self|himself|herself|themselves)\b/i.test(credit.character || '')) return;
-		const votes = credit.voteCount || credit.vote_count || 0;
-		if (votes > bestVotes) {
-			best = path;
-			bestVotes = votes;
-		}
+		seen.add(path);
+		const order = credit.order;
+		const episodes = credit.episodeCount ?? credit.episode_count;
+		usable.push({
+			path,
+			votes: credit.voteCount || credit.vote_count || 0,
+			lead: (!Number.isFinite(order) || order < LEAD_BILLING) && !(Number.isFinite(episodes) && episodes < MIN_EPISODES)
+		});
 	});
-	return best;
+	usable.sort((a, b) => (Number(b.lead) - Number(a.lead)) || (b.votes - a.votes));
+	return usable.slice(0, limit).map((entry) => entry.path);
+};
+
+// A wall of backdrops is 12 tiles, or 6 when the person has fewer, and a lone picture when they have hardly any.
+export const mosaicSize = (count) => {
+	if (count >= 12) return 12;
+	if (count >= 6) return 6;
+	return Math.min(count, 1);
 };
 
 export const sortCredits = (credits, sortOption = 'alphabetical') => {

@@ -10,7 +10,7 @@ import * as seerrApi from '../../services/seerrApi';
 import usePersonSeerrCredits from '../../hooks/usePersonSeerrCredits';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import {getImageUrl} from '../../utils/helpers';
-import {personDateLines, splitFilmography} from '../../utils/personCredits';
+import {mosaicSize, personDateLines, splitFilmography} from '../../utils/personCredits';
 import {sectionVisibility} from '../../utils/detailSectionLayout';
 
 import css from './Person.module.less';
@@ -51,7 +51,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	}, [api, personId]);
 
 	const tmdbId = person?.ProviderIds?.Tmdb;
-	const {appearances, crewCredits, backdropPath, creditsSettled, seerrEnabled} = usePersonSeerrCredits(tmdbId);
+	const {appearances, crewCredits, backdropPaths, creditsSettled, seerrEnabled} = usePersonSeerrCredits(tmdbId);
 
 	const handleSelectCredit = useCallback((item) => {
 		if (item?._seerrRaw) onSelectSeerrItem?.(item._seerrRaw);
@@ -76,21 +76,24 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	const syncedItems = useUserDataList(items);
 	const {movies, series, guestAppearances, musicVideos} = useMemo(() => splitFilmography(syncedItems, showsSection), [syncedItems, showsSection]);
 
-	// The backdrop of what they are best known for, which the credits know and the library does
-	// not. Without Seerr it is the best rated movie or series held here. Nothing is drawn until
-	// the credits have answered, so the picture never changes once it is up.
-	const randomBackdrop = useMemo(() => {
-		if (!creditsSettled) return null;
-		// This is the one backdrop on screen, not a grid of many, so it can afford TMDB's
-		// 'original' size - 'w1280' is under 1080p and the CSS covers the full screen with
-		// it, so anything smaller than the screen gets visibly upscaled and goes soft.
-		if (backdropPath) return seerrApi.getImageUrl(backdropPath, 'original');
+	// The backdrops of what they are best known for, which the credits know and the library does not. Without
+	// Seerr it is the best rated movies and series held here. Nothing is drawn until the credits have answered,
+	// so the pictures never change once they are up.
+	const backdropUrls = useMemo(() => {
+		if (!creditsSettled) return [];
+		if (backdropPaths.length) {
+			// A wall of tiles is small pictures. The one backdrop on screen can afford TMDB's 'original' size,
+			// since 'w1280' is under 1080p and the CSS covers the full screen with it.
+			const tiles = mosaicSize(backdropPaths.length);
+			return backdropPaths.slice(0, tiles).map((path) => seerrApi.getImageUrl(path, tiles === 1 ? 'original' : 'w780'));
+		}
 		const rated = [...movies, ...series]
 			.filter((f) => f.BackdropImageTags?.length > 0)
 			.map((f, index) => ({f, index}))
 			.sort((a, b) => ((b.f.CommunityRating || 0) - (a.f.CommunityRating || 0)) || (a.index - b.index));
-		return rated.length ? getImageUrl(serverUrl, rated[0].f.Id, 'Backdrop', {maxWidth: 1920, quality: 90}) : null;
-	}, [creditsSettled, backdropPath, movies, series, serverUrl]);
+		const size = mosaicSize(rated.length);
+		return rated.slice(0, size).map(({f}) => getImageUrl(serverUrl, f.Id, 'Backdrop', size === 1 ? {maxWidth: 1920, quality: 90} : {maxWidth: 800, quality: 80}));
+	}, [creditsSettled, backdropPaths, movies, series, serverUrl]);
 
 	const tabs = useMemo(() => {
 		const list = [];
@@ -165,7 +168,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 
 	return (
 		<PersonDetailShell
-			backdropUrl={randomBackdrop}
+			backdropUrls={backdropUrls}
 			imageUrl={imageUrl}
 			placeholderInitial={person.Name?.[0]}
 			name={person.Name}
