@@ -141,16 +141,18 @@ const SELF_GENRES = [10767, 10763];
 // most votes of anyone's work and still say nothing about the person.
 const LEAD_BILLING = 10;
 const MIN_EPISODES = 5;
+// TMDB bills the movies of a cast list and leaves the series without a place in it, so a series credit with no
+// billing has only its episode count to show it was a main part
+const MIN_EPISODES_UNBILLED = 10;
 const CAMEO_CHARACTER = /uncredited|cameo/i;
 const SELF_CHARACTER = /^(self|himself|herself|themselves)\b/i;
 
 // The backdrops of the titles this person is known for, best first: the main and supporting casts, by how much the
 // title was voted on. Walk-ons, cameos, guest spots and appearances as themselves are left out, and so is any title
-// twice, so a person may come back with a few or none. Credits that carry no billing at all are all taken to be
-// leading, since nothing tells them apart. At most `limit` are returned.
+// twice, so a person may come back with a few or none. A credit with no billing is judged by its episodes, and a
+// movie with neither is taken to be leading, since nothing tells it apart. At most `limit` are returned.
 export const knownForBackdropPaths = (cast, limit = 12) => {
 	const list = Array.isArray(cast) ? cast : [];
-	const hasBilling = list.some((credit) => Number.isFinite(credit.order));
 	const seen = new Set();
 	const usable = [];
 	list.forEach((credit) => {
@@ -162,11 +164,12 @@ export const knownForBackdropPaths = (cast, limit = 12) => {
 		if (SELF_CHARACTER.test(character)) return;
 		seen.add(path);
 		const episodes = credit.episodeCount ?? credit.episode_count;
-		const billed = hasBilling ? credit.order < LEAD_BILLING : true;
+		const hasOrder = Number.isFinite(credit.order);
+		const longEnough = !Number.isFinite(episodes) || episodes >= (hasOrder ? MIN_EPISODES : MIN_EPISODES_UNBILLED);
 		usable.push({
 			path,
 			votes: credit.voteCount || credit.vote_count || 0,
-			lead: billed && !CAMEO_CHARACTER.test(character) && !(Number.isFinite(episodes) && episodes < MIN_EPISODES)
+			lead: (!hasOrder || credit.order < LEAD_BILLING) && longEnough && !CAMEO_CHARACTER.test(character)
 		});
 	});
 	return usable

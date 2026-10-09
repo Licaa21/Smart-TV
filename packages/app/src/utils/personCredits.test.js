@@ -192,6 +192,15 @@ describe('the backdrops they are best known for', () => {
 		expect(paths([c({backdropPath: '/x.jpg'}), c({backdropPath: '/y.jpg', voteCount: 20})])).toEqual(['/y.jpg', '/x.jpg']);
 	});
 
+	test('judges a series with no billing by its episodes, next to movies that have it', () => {
+		expect(paths([
+			c({backdropPath: '/movie.jpg', voteCount: 100, order: 1}),
+			c({backdropPath: '/cameo-movie.jpg', voteCount: 9000, order: 30}),
+			c({backdropPath: '/main-show.jpg', voteCount: 50, episode_count: 98}),
+			c({backdropPath: '/guest-show.jpg', voteCount: 5000, episode_count: 6})
+		])).toEqual(['/movie.jpg', '/main-show.jpg']);
+	});
+
 	test('skips talk shows, news and appearances as themselves', () => {
 		expect(paths([
 			c({backdropPath: '/talk.jpg', voteCount: 99999, genre_ids: [10767]}),
