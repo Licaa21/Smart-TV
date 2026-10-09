@@ -20,7 +20,7 @@ export const subtitleLiftFor = (restingBottom, obstacleTops) => {
 	return Math.max(0, Math.round(restingBottom - Math.min(...tops)));
 };
 
-export const useSubtitleLift = ({controlsVisible, descriptionShown, settings}) => {
+export const useSubtitleLift = ({controlsVisible, descriptionShown, settings, measureKey}) => {
 	const [lift, setLift] = useState(0);
 	const bottomPercent = subtitleBottomPercent(settings);
 
@@ -29,7 +29,8 @@ export const useSubtitleLift = ({controlsVisible, descriptionShown, settings}) =
 		if (controlsVisible) tops.push(topOf(CONTROLS_SELECTOR));
 		if (descriptionShown) tops.push(topOf(DESCRIPTION_SELECTOR));
 		setLift(subtitleLiftFor(window.innerHeight * (1 - bottomPercent / 100), tops));
-	}, [controlsVisible, descriptionShown, bottomPercent]);
+	// measureKey is whatever changes how tall the controls or the description are, such as the title playing
+	}, [controlsVisible, descriptionShown, bottomPercent, measureKey]);
 
 	return lift;
 };

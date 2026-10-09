@@ -224,7 +224,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	// The subtitles slide up out of the way of the controls, and of the description shown while paused
 	const pauseDescriptionShown = Boolean(isPaused && settings.showDescriptionOnPause && item?.Overview && !isAudioMode && !activeModal && !controlsVisible);
-	const subtitleLift = useSubtitleLift({controlsVisible, descriptionShown: pauseDescriptionShown, settings: subtitleStyleSettings});
+	// the bar is faded out while a modal is open, and the subtitles come back down with it
+	const subtitleLift = useSubtitleLift({
+		controlsVisible: controlsVisible && !activeModal,
+		descriptionShown: pauseDescriptionShown && !isLoading && !error,
+		settings: subtitleStyleSettings,
+		measureKey: `${item?.Id}|${item?.Overview}`
+	});
 
 	const zoomModeLabel = useMemo(() => {
 		if (zoomMode === 'fill') return $L('Crop');
