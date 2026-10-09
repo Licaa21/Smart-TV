@@ -236,12 +236,11 @@ try {
 
 	run(`npx ares-package ${DIST_DIR}${packageServiceArg} -o ${ROOT_DIR} --no-minify`);
 
-	// Rename to Moonfin_webOS_<version>.ipk
 	const generatedIpk = path.join(ROOT_DIR, `org.moonfin.webos_${appPkg.version}_all.ipk`);
-	const finalIpk = path.join(ROOT_DIR, `Moonfin_webOS_${appPkg.version}.ipk`);
+	const finalIpk = path.join(ROOT_DIR, `Moonfin_webOS_v${appPkg.version}.ipk`);
 	if (fs.existsSync(generatedIpk)) {
 		fs.renameSync(generatedIpk, finalIpk);
-		console.log(`  Renamed to Moonfin_webOS_${appPkg.version}.ipk`);
+		console.log(`  Renamed to ${path.basename(finalIpk)}`);
 	}
 
 	// Update manifest with version and hash

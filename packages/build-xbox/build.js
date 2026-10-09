@@ -422,10 +422,10 @@ const buildMsix = (version) => {
 	if (!built) throw new Error(`No package found under ${PACKAGES_DIR}`);
 
 	const prefix = `Moonfin_Xbox_${flag('--probe') ? 'Probe_' : ''}${flag('--store') ? 'Store_' : ''}${configuration === 'Debug' ? 'Debug_' : ''}`;
-	for (const file of fs.readdirSync(ROOT_DIR).filter((entry) => entry.startsWith(prefix) && /^\d+\.\d+\.\d+\.msix(upload)?$/.test(entry.slice(prefix.length)))) {
+	for (const file of fs.readdirSync(ROOT_DIR).filter((entry) => entry.startsWith(prefix) && /^v?\d+\.\d+\.\d+\.msix(upload)?$/.test(entry.slice(prefix.length)))) {
 		fs.unlinkSync(path.join(ROOT_DIR, file));
 	}
-	const finalName = `${prefix}${version}.${extension}`;
+	const finalName = `${prefix}v${version}.${extension}`;
 	fs.copyFileSync(built, path.join(ROOT_DIR, finalName));
 	console.log(`  ${finalName}`);
 

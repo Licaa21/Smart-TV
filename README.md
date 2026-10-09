@@ -57,11 +57,11 @@ Samsung and LG don't carry Moonfin in their TV app stores, so it's installed by 
 
 | Platform | File | Supported Devices |
 |---|---|---|
-| **Tizen Regular** | `Moonfin_Tizen_Regular_*.wgt` | Samsung Smart TVs (2017+, square icon) |
-| **Tizen Oblong** | `Moonfin_Tizen_Oblong_*.wgt` | Samsung Smart TVs (2017+, oblong icon) |
-| **Tizen Legacy** | `Moonfin_Tizen_Legacy_*.wgt` | Samsung Smart TVs (2016, Tizen 2.4) |
-| **webOS** | `Moonfin_webOS_*.ipk` | LG Smart TVs (2016+, webOS 3.0+) |
-| **Vega** | `Moonfin_Vega_*.vpkg` | Fire TV sticks on Vega OS (Fire TV Stick 4K Select and newer) |
+| **Tizen Regular** | `Moonfin_Tizen_Regular_v*.wgt` | Samsung Smart TVs (2017+, square icon) |
+| **Tizen Oblong** | `Moonfin_Tizen_Oblong_v*.wgt` | Samsung Smart TVs (2017+, oblong icon) |
+| **Tizen Legacy** | `Moonfin_Tizen_Legacy_v*.wgt` | Samsung Smart TVs (2016, Tizen 2.4) |
+| **webOS** | `Moonfin_webOS_v*.ipk` | LG Smart TVs (2016+, webOS 3.0+) |
+| **Vega** | `Moonfin_Vega_v*.vpkg` | Fire TV sticks on Vega OS (Fire TV Stick 4K Select and newer) |
 
 The easiest route on each brand:
 
