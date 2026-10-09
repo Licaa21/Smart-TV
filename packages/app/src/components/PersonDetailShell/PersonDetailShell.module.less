@@ -24,33 +24,6 @@
 	z-index: 0;
 }
 
-// The titles they are known for, a few tiles across: three by two, or four by three when there are twelve. Dimmer
-// than the lone backdrop, since this is many pictures behind the text rather than one.
-.wall {
-	position: fixed;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	display: flex;
-	flex-wrap: wrap;
-	opacity: 0.5;
-	pointer-events: none;
-	z-index: 0;
-}
-
-.wallTile {
-	width: 33.3334%;
-	height: 50%;
-	background-size: cover;
-	background-position: center;
-}
-
-.wallWide .wallTile {
-	width: 25%;
-	height: 33.3334%;
-}
-
 // Darkens the left, where the portrait and text sit, and the bottom, where the cards sit, so
 // both read against any backdrop while the middle of the picture stays bright.
 .scrim {

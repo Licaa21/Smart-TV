@@ -7,7 +7,7 @@ import {useAuth} from '../../context/AuthContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import MediaRow from '../../components/MediaRow';
 import PersonDetailShell from '../../components/PersonDetailShell';
-import {knownForBackdropPaths, personDateLines, prepareCredits, wallOf} from '../../utils/personCredits';
+import {knownForBackdropPath, personDateLines, prepareCredits} from '../../utils/personCredits';
 import {normalizeMediaItem} from '../../utils/seerrHomeRows';
 
 import css from './SeerrPerson.module.less';
@@ -53,15 +53,16 @@ const SeerrPerson = ({personId, personName, onClose, onSelectItem, onBack}) => {
 	const rawCast = credits?.cast || details?.combinedCredits?.cast || details?.credits?.cast;
 	const rawCrew = credits?.crew || details?.combinedCredits?.crew || details?.credits?.crew;
 
-	// Same idea as the native Person screen: a wall of the backdrops of what this person is best known for, rather
-	// than leaving the screen flat. TMDB credits carry their own backdrop per title, so there is no need to go
-	// fetch one separately. A wall is small pictures, but the one backdrop on screen can afford 'original':
-	// 'w1280' is under 1080p and the CSS covers the full screen with it.
-	const backdropUrls = useMemo(() => {
-		// The cast first. A person who only directs or writes is known for that work instead.
-		const cast = knownForBackdropPaths(rawCast);
-		const tiles = wallOf(cast.length ? cast : knownForBackdropPaths(rawCrew));
-		return tiles.map((path) => seerrApi.getImageUrl(path, tiles.length === 1 ? 'original' : 'w780'));
+	// Same idea as the native Person screen: the backdrop of the one title this person is best known for, rather than
+	// leaving the screen flat. TMDB credits carry their own backdrop per title, so there is no need to go fetch one
+	// separately. A person who only directs or writes is known for that work instead.
+	//
+	// 'original' rather than the app's usual 'w1280': this is the one backdrop on screen, not a grid of many, so it
+	// can afford it - 'w1280' is under 1080p and the CSS covers the full screen with it, so anything smaller than
+	// the screen gets visibly upscaled.
+	const randomBackdrop = useMemo(() => {
+		const path = knownForBackdropPath(rawCast) || knownForBackdropPath(rawCrew);
+		return path ? seerrApi.getImageUrl(path, 'original') : null;
 	}, [rawCast, rawCrew]);
 
 	const handleSelectMedia = useCallback((item) => {
@@ -132,7 +133,7 @@ const SeerrPerson = ({personId, personName, onClose, onSelectItem, onBack}) => {
 
 	return (
 		<PersonDetailShell
-			backdropUrls={backdropUrls}
+			backdropUrl={randomBackdrop}
 			imageUrl={profileUrl}
 			placeholderInitial={details.name?.[0]}
 			name={personName || details.name}

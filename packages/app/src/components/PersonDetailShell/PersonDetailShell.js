@@ -21,7 +21,7 @@ const TabsContainer = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'di
 // Each tab is {key, label, content}, where content is whatever the caller wants drawn for it.
 // Each action is {key, label, icon, onClick} for the optional row under the overview.
 const PersonDetailShell = ({
-	backdropUrls = [],
+	backdropUrl,
 	imageUrl,
 	placeholderInitial,
 	name,
@@ -67,17 +67,10 @@ const PersonDetailShell = ({
 
 	return (
 		<div className={css.page}>
-			{backdropUrls.length === 1 && (
-				<div className={css.randomBackdrop} style={{backgroundImage: `url(${backdropUrls[0]})`}} />
+			{backdropUrl && (
+				<div className={css.randomBackdrop} style={{backgroundImage: `url(${backdropUrl})`}} />
 			)}
-			{backdropUrls.length > 1 && (
-				<div className={`${css.wall} ${backdropUrls.length > 6 ? css.wallWide : ''}`}>
-					{backdropUrls.map((url, index) => (
-						<div key={`${index}-${url}`} className={css.wallTile} style={{backgroundImage: `url(${url})`}} />
-					))}
-				</div>
-			)}
-			{backdropUrls.length > 0 && <div className={css.scrim} />}
+			{backdropUrl && <div className={css.scrim} />}
 			<div className={`${css.content} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>
 				<div className={css.personInfo}>
 					{imageUrl ? (
