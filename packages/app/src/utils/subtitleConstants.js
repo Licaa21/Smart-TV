@@ -86,11 +86,18 @@ const toCssColor = (value, opacityPercent) => {
 const SIZE_MAP = { small: 36, medium: 44, large: 52, xlarge: 60 };
 const POSITION_MAP = { bottom: 10, lower: 20, middle: 30, higher: 40 };
 
-export const getSubtitleOverlayStyle = (settings) => ({
-	bottom: settings.subtitlePosition === 'absolute'
-		? `${100 - settings.subtitlePositionAbsolute}%`
-		: `${POSITION_MAP[settings.subtitlePosition] || 10}%`,
-	opacity: (settings.subtitleOpacity || 100) / 100
+// How far up from the bottom of the screen the subtitles rest, in percent
+export const subtitleBottomPercent = (settings) => (settings.subtitlePosition === 'absolute'
+	? 100 - settings.subtitlePositionAbsolute
+	: POSITION_MAP[settings.subtitlePosition] || 10);
+
+// `lift` is how far the controls or the pause description push the subtitles up, and the transition on the
+// overlay's class makes that a slide
+export const getSubtitleOverlayStyle = (settings, lift = 0) => ({
+	bottom: `${subtitleBottomPercent(settings)}%`,
+	opacity: (settings.subtitleOpacity || 100) / 100,
+	transform: `translateY(${-lift}px)`,
+	WebkitTransform: `translateY(${-lift}px)`
 });
 
 export const getSubtitleTextStyle = (settings) => {

@@ -41,6 +41,7 @@ import {hasTrickplayPreview} from '../../components/TrickplayPreview';
 import useChannelCarousel from './useChannelCarousel';
 import ChannelCarousel from './ChannelCarousel';
 import useSleepTimer from './useSleepTimer';
+import {useSubtitleLift} from './useSubtitleLift';
 import useSyncPlayCommands from './useSyncPlayCommands';
 import AudioMode from './audio/AudioMode';
 import useAudioTransport from './audio/useAudioTransport';
@@ -427,6 +428,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		() => resolveSubtitleStyleSettings(settings, isHdrContent),
 		[settings, isHdrContent]
 	);
+
+	// The subtitles slide up out of the way of the controls, and of the description shown while paused
+	const pauseDescriptionShown = Boolean(isPaused && settings.showDescriptionOnPause && item?.Overview && !isAudioMode && !activeModal && !controlsVisible);
+	const subtitleLift = useSubtitleLift({controlsVisible, descriptionShown: pauseDescriptionShown, settings: subtitleStyleSettings});
 
 	const hasCastMembers = useMemo(() => {
 		if (castMembers.length > 0) return true;
@@ -3757,7 +3762,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			{currentSubtitleText && !isAudioMode && (
 				<div
 					className={css.subtitleOverlay}
-					style={getSubtitleOverlayStyle(subtitleStyleSettings)}
+					style={getSubtitleOverlayStyle(subtitleStyleSettings, subtitleLift)}
 				>
 				{/* eslint-disable react/no-danger */}
 					<div
@@ -3789,8 +3794,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			{(reconnecting || showBuffering) && <LoadingAnimationLayer label={reconnecting || $L('Loading Stream...')} />}
 
-			{isPaused && settings.showDescriptionOnPause && item?.Overview && !isAudioMode && !activeModal && !controlsVisible && (
-				<div className={css.pauseDescriptionOverlay}>
+			{pauseDescriptionShown && (
+				<div className={css.pauseDescriptionOverlay} data-pause-description="true">
 					<div className={css.pauseDescriptionText}>{item.Overview}</div>
 				</div>
 			)}

@@ -84,6 +84,9 @@
 
 /* Custom Subtitle Overlay - webOS doesn't support native <track> elements */
 .subtitleOverlay {
+	// slides when the controls or the pause description come and go
+	-webkit-transition: -webkit-transform 0.35s ease;
+	transition: transform 0.35s ease;
 	position: fixed;
 	left: 0;
 	right: 0;
