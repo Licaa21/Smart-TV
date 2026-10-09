@@ -252,6 +252,11 @@ const AppContent = (props) => {
 	const [isPlayerPaused, setIsPlayerPaused] = useState(false);
 	const [trailerPreviewActive, setTrailerPreviewActive] = useState(false);
 	const [panelHistory, setPanelHistory] = useState([]);
+	// The history holds only which panel was left. The item and person that panel was showing are kept beside it,
+	// entry for entry, so Back lands on the one it left and not on the last one picked since.
+	const navStateRef = useRef([]);
+	const shownRef = useRef({});
+	shownRef.current = {item: selectedItem, person: selectedPerson};
 	const [seerrBrowse, setSeerrBrowse] = useState(null);
 	const [seerrPerson, setSeerrPerson] = useState(null);
 	const [authChecked, setAuthChecked] = useState(false);
@@ -693,11 +698,15 @@ const AppContent = (props) => {
 
 	const navigateTo = useCallback((panel, addToHistory = true) => {
 		if (addToHistory && panelIndex !== PANELS.LOGIN) {
+			const left = shownRef.current;
 			setPanelHistory(prev => {
 				const newHistory = [...prev, panelIndex];
+				const states = [...navStateRef.current.slice(0, prev.length), left];
 				if (newHistory.length > MAX_HISTORY_LENGTH) {
+					navStateRef.current = states.slice(-MAX_HISTORY_LENGTH);
 					return newHistory.slice(-MAX_HISTORY_LENGTH);
 				}
+				navStateRef.current = states;
 				return newHistory;
 			});
 		}
@@ -705,6 +714,12 @@ const AppContent = (props) => {
 	}, [panelIndex, showPanel]);
 
 	const playerReturnRef = useRef(null);
+
+	const restoreShown = useCallback((index) => {
+		const shown = navStateRef.current[index];
+		if (shown?.item) setSelectedItem(shown.item);
+		if (shown?.person) setSelectedPerson(shown.person);
+	}, []);
 
 	const handleBack = useCallback(() => {
 		detailsItemStackRef.current = [];
@@ -716,6 +731,8 @@ const AppContent = (props) => {
 		if (panelHistory.length > 0) {
 			const prevPanel = panelHistory[panelHistory.length - 1];
 			setPanelHistory(prev => prev.slice(0, -1));
+			// Leaving the player keeps the item as it stands, since an episode played on from inside it moves that
+			if (panelIndex !== PANELS.PLAYER) restoreShown(panelHistory.length - 1);
 			if (prevPanel === PANELS.PLAYER) {
 				// back to the player a person was opened from, where it left off
 				const back = playerReturnRef.current;
@@ -732,7 +749,7 @@ const AppContent = (props) => {
 		} else if (panelIndex > PANELS.BROWSE) {
 			setPanelIndex(PANELS.BROWSE);
 		}
-	}, [panelHistory, panelIndex]);
+	}, [panelHistory, panelIndex, restoreShown]);
 
 	// A channel button on a screen reached from the player goes straight back to it, the way a pile of Back presses
 	// would, with everything the player had kept. False when there is no player to go back to.
@@ -742,12 +759,13 @@ const AppContent = (props) => {
 		detailsItemStackRef.current = [];
 		playerReturnRef.current = null;
 		setPanelHistory(panelHistory.slice(0, back.depth));
+		restoreShown(back.depth);
 		setPlayingItem(back.item);
 		setPlaybackOptions(back.options);
 		setIsResume(back.isResume);
 		setPanelIndex(PANELS.PLAYER);
 		return true;
-	}, [panelHistory, panelIndex]);
+	}, [panelHistory, panelIndex, restoreShown]);
 
 	useEffect(() => {
 		const handleKeyDown = (e) => {
