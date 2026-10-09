@@ -7,9 +7,7 @@ import {
 	splitFilmography,
 	usableCredits,
 	groupCredits,
-	knownForBackdropPaths,
-	mosaicSize,
-	wallOf,
+	knownForBackdropPath,
 	sortCredits,
 	prepareCredits
 } from './personCredits';
@@ -169,66 +167,58 @@ describe('credits', () => {
 	});
 });
 
-describe('the backdrops they are best known for', () => {
+describe('the backdrop they are best known for', () => {
 	const c = (extra) => ({backdropPath: '/a.jpg', voteCount: 10, ...extra});
-	const paths = (list, limit) => knownForBackdropPaths(list, limit);
+	const pick = (list) => knownForBackdropPath(list);
 
-	test('goes to the most voted-on acting credit first', () => {
-		expect(paths([c({backdropPath: '/low.jpg'}), c({backdropPath: '/top.jpg', voteCount: 9000}), c({backdrop_path: '/mid.jpg', vote_count: 500, voteCount: undefined, backdropPath: undefined})]))
-			.toEqual(['/top.jpg', '/mid.jpg', '/low.jpg']);
+	test('is the series they were in for the most episodes, when one ran long', () => {
+		expect(pick([
+			c({backdropPath: '/film.jpg', voteCount: 90000, order: 0}),
+			c({backdropPath: '/short.jpg', voteCount: 900, order: 1, episode_count: 12}),
+			c({backdropPath: '/walking-dead.jpg', voteCount: 50, episode_count: 98}),
+			c({backdropPath: '/other-show.jpg', voteCount: 50, order: 2, episode_count: 40})
+		])).toBe('/walking-dead.jpg');
+	});
+
+	test('is the highest billed title otherwise, the most voted on a tie', () => {
+		expect(pick([
+			c({backdropPath: '/second.jpg', voteCount: 90000, order: 1}),
+			c({backdropPath: '/lead-small.jpg', voteCount: 100, order: 0}),
+			c({backdropPath: '/lead-big.jpg', voteCount: 5000, order: 0})
+		])).toBe('/lead-big.jpg');
 	});
 
 	test('leaves out walk-ons, cameos and guest spots however many votes they have', () => {
-		expect(paths([
+		expect(pick([
 			c({backdropPath: '/cameo.jpg', voteCount: 90000, order: 40}),
 			c({backdropPath: '/guest.jpg', voteCount: 80000, order: 2, episode_count: 1}),
-			c({backdropPath: '/uncredited.jpg', voteCount: 70000, order: 3, character: 'Soldier (uncredited)'}),
-			c({backdropPath: '/lead.jpg', voteCount: 100, order: 0}),
-			c({backdropPath: '/show.jpg', voteCount: 50, order: 1, episode_count: 98})
-		])).toEqual(['/lead.jpg', '/show.jpg']);
-	});
-
-	test('takes every credit when none of them carries billing', () => {
-		expect(paths([c({backdropPath: '/x.jpg'}), c({backdropPath: '/y.jpg', voteCount: 20})])).toEqual(['/y.jpg', '/x.jpg']);
+			c({backdropPath: '/uncredited.jpg', voteCount: 70000, order: 0, character: 'Soldier (uncredited)'}),
+			c({backdropPath: '/support.jpg', voteCount: 10, order: 7})
+		])).toBe('/support.jpg');
 	});
 
 	test('judges a series with no billing by its episodes, next to movies that have it', () => {
-		expect(paths([
+		expect(pick([
 			c({backdropPath: '/movie.jpg', voteCount: 100, order: 1}),
-			c({backdropPath: '/cameo-movie.jpg', voteCount: 9000, order: 30}),
-			c({backdropPath: '/main-show.jpg', voteCount: 50, episode_count: 98}),
 			c({backdropPath: '/guest-show.jpg', voteCount: 5000, episode_count: 6})
-		])).toEqual(['/movie.jpg', '/main-show.jpg']);
+		])).toBe('/movie.jpg');
+	});
+
+	test('takes the most voted when nothing carries billing', () => {
+		expect(pick([c({backdropPath: '/x.jpg'}), c({backdropPath: '/y.jpg', voteCount: 20})])).toBe('/y.jpg');
 	});
 
 	test('skips talk shows, news and appearances as themselves', () => {
-		expect(paths([
+		expect(pick([
 			c({backdropPath: '/talk.jpg', voteCount: 99999, genre_ids: [10767]}),
 			c({backdropPath: '/self.jpg', voteCount: 88888, character: 'Himself'}),
 			c({backdropPath: '/film.jpg', voteCount: 5})
-		])).toEqual(['/film.jpg']);
-	});
-
-	test('lists a title once and stops at the limit', () => {
-		expect(paths([c({backdropPath: '/x.jpg'}), c({backdropPath: '/x.jpg'}), c({backdropPath: '/y.jpg'})])).toEqual(['/x.jpg', '/y.jpg']);
-		expect(paths([c({backdropPath: '/x.jpg'}), c({backdropPath: '/y.jpg'})], 1)).toEqual(['/x.jpg']);
+		])).toBe('/film.jpg');
 	});
 
 	test('is nothing when no credit has one', () => {
-		expect(paths([{voteCount: 5}])).toEqual([]);
-		expect(paths(null)).toEqual([]);
-	});
-});
-
-describe('mosaicSize and wallOf', () => {
-	test('is a full wall, a half one that loops, or a single picture', () => {
-		expect([0, 1, 2, 5, 6, 11, 12, 30].map(mosaicSize)).toEqual([0, 1, 6, 6, 6, 6, 12, 12]);
-	});
-
-	test('repeats the few titles round to fill the wall', () => {
-		expect(wallOf(['a', 'b'])).toEqual(['a', 'b', 'a', 'b', 'a', 'b']);
-		expect(wallOf(['a', 'b', 'c', 'd'])).toEqual(['a', 'b', 'c', 'd', 'a', 'b']);
-		expect(wallOf(['a'])).toEqual(['a']);
-		expect(wallOf([])).toEqual([]);
+		expect(pick([{voteCount: 5}])).toBeNull();
+		expect(pick([c({order: 50})])).toBeNull();
+		expect(pick(null)).toBeNull();
 	});
 });

@@ -144,18 +144,18 @@ const MIN_EPISODES = 5;
 // TMDB bills the movies of a cast list and leaves the series without a place in it, so a series credit with no
 // billing has only its episode count to show it was a main part
 const MIN_EPISODES_UNBILLED = 10;
+// A series this long is what its cast is known for, ahead of any film
+const LONG_RUN = 20;
 const CAMEO_CHARACTER = /uncredited|cameo/i;
 const SELF_CHARACTER = /^(self|himself|herself|themselves)\b/i;
 
-// The backdrops of the titles this person is known for, best first: the main and supporting casts, by how much the
-// title was voted on. Walk-ons, cameos, guest spots and appearances as themselves are left out, and so is any title
-// twice, so a person may come back with a few or none. A credit with no billing is judged by its episodes, and a
-// movie with neither is taken to be leading, since nothing tells it apart. At most `limit` are returned.
-export const knownForBackdropPaths = (cast, limit = 12) => {
-	const list = Array.isArray(cast) ? cast : [];
+// The credits that are a main or supporting part, with a backdrop to show for them. Walk-ons, cameos, guest spots and
+// appearances as themselves are left out, and so is any title twice. A credit with no billing is judged by its
+// episodes, and a movie with neither is taken to be leading, since nothing tells it apart.
+const leadingCredits = (cast) => {
 	const seen = new Set();
-	const usable = [];
-	list.forEach((credit) => {
+	const leading = [];
+	(Array.isArray(cast) ? cast : []).forEach((credit) => {
 		const path = credit.backdropPath || credit.backdrop_path;
 		if (!path || seen.has(path)) return;
 		const genres = credit.genreIds || credit.genre_ids || [];
@@ -163,34 +163,32 @@ export const knownForBackdropPaths = (cast, limit = 12) => {
 		const character = credit.character || '';
 		if (SELF_CHARACTER.test(character)) return;
 		seen.add(path);
+		const order = Number.isFinite(credit.order) ? credit.order : null;
 		const episodes = credit.episodeCount ?? credit.episode_count;
-		const hasOrder = Number.isFinite(credit.order);
-		const longEnough = !Number.isFinite(episodes) || episodes >= (hasOrder ? MIN_EPISODES : MIN_EPISODES_UNBILLED);
-		usable.push({
+		const longEnough = !Number.isFinite(episodes) || episodes >= (order === null ? MIN_EPISODES_UNBILLED : MIN_EPISODES);
+		if ((order !== null && order >= LEAD_BILLING) || !longEnough || CAMEO_CHARACTER.test(character)) return;
+		leading.push({
 			path,
-			votes: credit.voteCount || credit.vote_count || 0,
-			lead: (!hasOrder || credit.order < LEAD_BILLING) && longEnough && !CAMEO_CHARACTER.test(character)
+			order,
+			episodes: Number.isFinite(episodes) ? episodes : null,
+			votes: credit.voteCount || credit.vote_count || 0
 		});
 	});
-	return usable
-		.filter((entry) => entry.lead)
-		.sort((a, b) => b.votes - a.votes)
-		.slice(0, limit)
-		.map((entry) => entry.path);
+	return leading;
 };
 
-// A wall is 12 tiles when there are that many titles, and otherwise 6 with the few there are repeated to fill them. A
-// lone title is one picture.
-export const mosaicSize = (count) => {
-	if (count >= 12) return 12;
-	if (count >= 2) return 6;
-	return Math.min(count, 1);
-};
-
-// The titles laid out to fill the wall, looping round when there are fewer than tiles.
-export const wallOf = (items) => {
-	const size = mosaicSize(items.length);
-	return Array.from({length: size}, (_, index) => items[index % items.length]);
+// The backdrop of the one title this person is known for: the series they were in for the most episodes, when one
+// ran long, and otherwise the film or series where they were billed highest, the most voted of those on a tie.
+// Null when they have no leading part with a backdrop.
+export const knownForBackdropPath = (cast) => {
+	const leading = leadingCredits(cast);
+	const longest = leading
+		.filter((entry) => entry.episodes !== null && entry.episodes >= LONG_RUN)
+		.sort((a, b) => b.episodes - a.episodes)[0];
+	if (longest) return longest.path;
+	const billed = (entry) => (entry.order === null ? Infinity : entry.order);
+	const best = leading.sort((a, b) => (billed(a) - billed(b)) || (b.votes - a.votes))[0];
+	return best ? best.path : null;
 };
 
 export const sortCredits = (credits, sortOption = 'alphabetical') => {
