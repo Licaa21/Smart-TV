@@ -20,8 +20,9 @@
 import {fetchWithTimeout} from '../utils/fetchTimeout';
 import {classifyError, INSECURE_CERT, DNS_OR_NETWORK} from '../utils/connectionErrors';
 import {traceRequest} from '../utils/networkLogSink';
-import {isVega, isWebOS} from '../platform';
+import {isWebOS} from '../platform';
 import {getFromStorage} from './storage';
+import {loadShellBridge} from './shellBridge';
 
 const SERVICE_URI = 'luna://org.moonfin.webos.service/fetch';
 
@@ -63,19 +64,20 @@ const readSettings = async () => {
 	return lastSettings;
 };
 
-// The Vega WebView refuses a certificate it cant verify and the page only sees a
-// network error. With the setting on, the shell is told to accept the host and
-// the request is tried once more.
-const vegaAllowedHosts = new Set();
+// The WebView on Fire TV and on Xbox refuses a certificate it cant verify and the
+// page only sees a network error. With the setting on, the shell is told to
+// accept the host and the request is tried once more.
+const shellAllowedHosts = new Set();
 
-const allowVegaHost = async (url) => {
+const allowHostInShell = async (url) => {
 	const host = (/^https:\/\/([^/?#]+)/i.exec(url || '') || [])[1];
-	if (!host || vegaAllowedHosts.has(host)) return false;
+	if (!host || shellAllowedHosts.has(host)) return false;
+	const bridge = await loadShellBridge();
+	if (!bridge) return false;
 	const settings = await readSettings();
 	if (!settings.allowInsecureCerts) return false;
-	const {allowInsecureHost} = await import('@moonfin/platform-vega/bridge');
-	allowInsecureHost(host);
-	vegaAllowedHosts.add(host);
+	bridge.allowInsecureHost(host);
+	shellAllowedHosts.add(host);
 	return true;
 };
 
@@ -175,7 +177,7 @@ export const platformFetch = async (url, options = {}, timeoutMs) => {
 		if (classifyError(err) !== DNS_OR_NETWORK) {
 			throw err;
 		}
-		if (isVega() && isHttps(url) && await allowVegaHost(url)) {
+		if (isHttps(url) && await allowHostInShell(url)) {
 			return fetchWithTimeout(url, options, timeoutMs);
 		}
 		if (!canProxy) {

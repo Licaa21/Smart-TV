@@ -392,6 +392,7 @@ async function main() {
 		'@moonfin/platform-webos': path.resolve(ROOT, '..', 'platform-webos', 'src'),
 		'@moonfin/platform-tizen': path.resolve(ROOT, '..', 'platform-tizen', 'src'),
 		'@moonfin/platform-vega': path.resolve(ROOT, '..', 'platform-vega', 'src'),
+		'@moonfin/platform-xbox': path.resolve(ROOT, '..', 'platform-xbox', 'src'),
 		'@moonfin/app': path.resolve(ROOT, '..', 'app')
 	});
 	const appPkg = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'package.json'), 'utf8'));
@@ -617,7 +618,7 @@ async function main() {
 	const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 	const version = pkg.version || '0.0.0';
 	const typeName = isLegacy ? 'Legacy' : isOblong ? 'Oblong' : 'Regular';
-	const wgtName = `Moonfin_Tizen_${typeName}_${version}.wgt`;
+	const wgtName = `Moonfin_Tizen_${typeName}_v${version}.wgt`;
 	const finalWgt = path.join(REPO_ROOT, wgtName);
 
 	log('Cleaning up old output...');

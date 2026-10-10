@@ -74,7 +74,7 @@ const loadDeviceInfo = async () => {
 	return deviceInfoCache;
 };
 
-const platformName = {tizen: 'Tizen', vega: 'Fire TV'}[getPlatform()] || 'webOS';
+const platformName = {tizen: 'Tizen', vega: 'Fire TV', xbox: 'Xbox'}[getPlatform()] || 'webOS';
 const logEndpointName = `moonfin-${getPlatform()}-log`;
 
 const formatLogAsText = (entry) => {
@@ -206,6 +206,16 @@ const uploadReport = async () => {
 	}
 };
 
+// Where a document of the given name would go on the signed in server, for a page
+// outside the app that has a report of its own to send. Null when nobody is signed
+// in, or the server has nowhere to take one.
+const documentRequest = (name) => {
+	const auth = authGetter ? authGetter() : null;
+	if (!auth?.serverUrl || !auth?.accessToken || !acceptsReports(auth.serverType, clientLogSupported)) return null;
+	const {url, init} = clientLogRequest(auth, name);
+	return {url, method: init.method, headers: init.headers};
+};
+
 const flushLogs = async () => {
 	if (!isEnabled || logBuffer.length === 0) return;
 
@@ -261,6 +271,7 @@ export const serverLogger = {
 	},
 
 	uploadReport,
+	documentRequest,
 
 	debug: (category, message, context) => log(LOG_LEVELS.DEBUG, category, message, context),
 	info: (category, message, context) => log(LOG_LEVELS.INFO, category, message, context),

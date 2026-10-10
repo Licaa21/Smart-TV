@@ -46,7 +46,11 @@ export const defaultSettings = {
 	playerZoomMode: 'fit',
 	mediaSegmentAutoHide: 'off',
 	cinemaModeEpisodesEnabled: false,
-	trickPlayEnabled: true,
+	xboxNativePlayer: true,
+	trickPlayMode: 'single',
+	trickPlayPreviewScale: 30,
+	trickPlayVerticalPosition: 0,
+	trickPlayFollowScrub: true,
 	trickPlayPauseWhileScrubbing: true,
 	showChapterMarkers: false,
 	assDirectPlay: true,
@@ -141,6 +145,9 @@ export const defaultSettings = {
 	mediaBarCollectionIds: [],
 	unifiedLibraryMode: false,
 	useMoonfinPlugin: false,
+	// The plugin profile this device syncs with. Empty follows the TV profile. It's a choice
+	// about this device rather than the account, so it never syncs.
+	syncProfile: '',
 	mdblistEnabled: true,
 	mdblistRatingSources: ['stars', 'imdb', 'tmdb', 'tomatoes', 'metacritic'],
 	tmdbEpisodeRatingsEnabled: true,

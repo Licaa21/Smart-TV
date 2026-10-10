@@ -8,7 +8,9 @@
 /* eslint-disable no-var */
 
 import {applyPerfTier} from './utils/perfTier';
-import {isVega} from './platform';
+import {isVega, isXbox} from './platform';
+import {installGamepadKeys} from '@moonfin/platform-xbox/keys';
+import {installMissingFileAnswer} from '@moonfin/platform-xbox/packageFiles';
 
 // @enact/core/platform references globalThis directly without a typeof guard.
 // Missing on Tizen 2.4 (WebKit r152340), webOS 3–5 (Chromium <71).
@@ -134,6 +136,7 @@ if (typeof document !== 'undefined') {
 		document.documentElement.className = (document.documentElement.className ? document.documentElement.className + ' ' : '') + 'legacy';
 	}
 	if (isVega()) document.documentElement.classList.add('vega');
+	if (isXbox()) document.documentElement.classList.add('xbox');
 	applyPerfTier(null);
 }
 
@@ -148,4 +151,12 @@ if (typeof window !== 'undefined' && isVega()) {
 			e.preventDefault();
 		}
 	}, true);
+}
+
+// The Xbox controller can reach the page as gamepad key codes, and they are made
+// into the standard keys here, before Spotlight or the app listens for any. A
+// missing file of the package has to be a 404 before the locale loader asks for one.
+if (typeof window !== 'undefined' && isXbox()) {
+	installGamepadKeys();
+	installMissingFileAnswer();
 }

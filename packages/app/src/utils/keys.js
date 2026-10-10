@@ -59,7 +59,21 @@ const VEGA_KEYS = {
 	FAST_FORWARD: 228,
 };
 
-const PLATFORM_KEYS = {tizen: TIZEN_KEYS, webos: WEBOS_KEYS, vega: VEGA_KEYS};
+// The controller's own key codes are turned into arrows, Enter, Escape and the
+// context menu key before the app sees them, see @moonfin/platform-xbox/keys.
+// The transport keys are the ones the host raises for the media remote, and the
+// triggers come as its rewind and fast forward.
+const XBOX_KEYS = {
+	BACK: 27,
+	MENU: 93,
+	PLAY: 250,
+	PAUSE: 19,
+	STOP: 178,
+	REWIND: 227,
+	FAST_FORWARD: 228,
+};
+
+const PLATFORM_KEYS = {tizen: TIZEN_KEYS, webos: WEBOS_KEYS, vega: VEGA_KEYS, xbox: XBOX_KEYS};
 
 export const KEYS = {
 	...STANDARD_KEYS,

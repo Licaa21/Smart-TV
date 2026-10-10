@@ -1,41 +1,45 @@
-.trickplayPreview {
+.strip {
 	position: absolute;
-	bottom: 160px;
-	left: 50%;
-	transform: translateX(-50%);
-	background: rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.95);
-	border: 2px solid rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.2);
-	border-radius: 8px;
-	padding: 8px;
+	display: flex;
+	align-items: center;
 	z-index: 1002;
-	animation: fadeIn 0.15s ease-out;
+	pointer-events: none;
 }
 
-@keyframes fadeIn {
-	from {
-		opacity: 0;
-		transform: translateX(-50%) translateY(10px);
-	}
-	to {
-		opacity: 1;
-		transform: translateX(-50%) translateY(0);
-	}
-}
-
-.thumbnailContainer {
+.tile {
+	flex: none;
+	box-sizing: border-box;
 	overflow: hidden;
-	border-radius: 4px;
+	background: #000;
+	border-radius: 8px;
+	border: 1px solid rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.2);
 }
 
-.thumbnailSprite {
+.tileActive {
+	border: 2px solid var(--accent-color, #00a4dc);
+	box-shadow: 0 0 16px rgba(var(--theme-accent-rgb, 0, 164, 220), 0.5);
+}
+
+.tileEmpty {
+	opacity: 0;
+}
+
+.sprite {
 	background-repeat: no-repeat;
 }
 
-.timeDisplay {
-	text-align: center;
-	color: var(--theme-text-primary, #fff);
-	font-size: 20px;
-	font-weight: 600;
-	margin-top: 8px;
-	font-variant-numeric: tabular-nums;
+/* Stands in for the picture while scrubbing, under the controls and over the video. */
+.cover {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	background: #000;
+	z-index: -1;
+	pointer-events: none;
 }

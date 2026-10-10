@@ -1,6 +1,7 @@
-import {act, fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {act, cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import Spotlight from '@enact/spotlight';
 import * as gamesApi from '../../services/gamesApi';
+import {controllerIsOnlyRemote, giveControllerToGame} from '../../services/video';
 import * as ejs from '../../utils/emulatorjs';
 import {loadGameStateWithMigration} from '../../utils/gameSaves';
 import GamePlayer from './GamePlayer';
@@ -38,6 +39,8 @@ jest.mock('../../components/LoadingSpinner', () => () => null);
 jest.mock('../../services/serverLogger', () => ({error: jest.fn(), LOG_CATEGORIES: {APP: 'app'}}));
 jest.mock('../../services/video', () => ({
 	initVideo: () => Promise.resolve(),
+	controllerIsOnlyRemote: jest.fn(() => false),
+	giveControllerToGame: jest.fn(),
 	keepScreenOn: jest.fn(),
 	setupVisibilityHandler: () => () => {}
 }));
@@ -377,6 +380,22 @@ test('holding Start and Select for five seconds opens the pause menu, with the p
 	expect(screen.queryByText('Hold to open menu')).toBeNull();
 });
 
+test('where the controller is the only remote, holding Start alone for a second opens the pause menu', async () => {
+	jest.useFakeTimers();
+	controllerIsOnlyRemote.mockReturnValue(true);
+	await startGame();
+
+	pressPad(9);
+	await act(async () => { jest.advanceTimersByTime(300); });
+	pressPad(9, false);
+	await act(async () => { jest.advanceTimersByTime(2000); });
+	expect(screen.queryByText('Resume')).toBeNull();
+
+	pressPad(9);
+	await act(async () => { jest.advanceTimersByTime(1000); });
+	expect(screen.getByText('Resume')).toBeTruthy();
+});
+
 test('letting go early cancels the hold', async () => {
 	jest.useFakeTimers();
 	await startGame();
@@ -442,6 +461,14 @@ test('the pad is left to EmulatorJS in the game and on the controller screen', a
 	expect(screen.queryByText('Resume')).toBeNull();
 });
 
+test('a running game has the controller to itself until it is left', async () => {
+	await startGame();
+	expect(giveControllerToGame).toHaveBeenLastCalledWith(true);
+
+	cleanup();
+	expect(giveControllerToGame).toHaveBeenLastCalledWith(false);
+});
+
 test('loads EmulatorJS from the path the server resolved', async () => {
 	gamesApi.getEmulatorDataPath.mockResolvedValue('https://server/Moonfin/EmulatorJS/data/');
 
@@ -457,4 +484,5 @@ test('a game that fails to start takes EmulatorJS down and says so', async () =>
 
 	expect(await screen.findByText('Could not start this game on this device.')).toBeTruthy();
 	expect(ejs.destroyEmulator).toHaveBeenCalled();
+	expect(giveControllerToGame).not.toHaveBeenCalledWith(true);
 });

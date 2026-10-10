@@ -1,6 +1,6 @@
 import * as jellyfinApi from './jellyfinApi';
 import {getDeviceProfile, getDeviceCapabilities} from './deviceProfile';
-import {getPlayMethod, getMimeType, isAudioStreamPlayable, canRenderEmbeddedPgsInBand} from './video';
+import {getPlayMethod, getMimeType, isAudioStreamPlayable, canRenderEmbeddedPgsInBand, rendersSubtitleInHost} from './video';
 import {getFromStorage} from './storage';
 import {selectCompatibleAlternateAudio} from '../utils/alternateAudio';
 import {serverLogger} from './serverLogger';
@@ -9,7 +9,8 @@ import {applyProfileTuning} from '../utils/deviceProfileTuning';
 import {findNextInSeason, findNextSeason, firstPlayableEpisode} from '../utils/nextEpisode';
 import {videoRangeTypeOf} from '../utils/videoRange';
 import {getVolumeState, lastVolumeState} from './systemVolume';
-import {isVega} from '../platform';
+import {loadShellBridge} from './shellBridge';
+import {linkBitrate} from './linkBitrate';
 
 export const PlayMethod = {
 	DirectPlay: 'DirectPlay',
@@ -383,7 +384,11 @@ const extractSubtitleStreams = (mediaSource, itemId = null, creds = null, assBur
 			}
 			// Encode is the server saying the only way it can deliver this track is
 			// baked into the video, which is what a format left off the profile gets.
-			const isBurnIn = isBurnInSubtitleCodec(codec) || s.DeliveryMethod === 'Encode' ||
+			// A platform player that draws these bitmaps itself needs the file as it is,
+			// since a transcode carries no subtitle tracks.
+			const bitmapOnly = isBurnInSubtitleCodec(codec);
+			const hostRendered = bitmapOnly && !s.IsExternal && playMethod === PlayMethod.DirectPlay && rendersSubtitleInHost(codec);
+			const isBurnIn = (bitmapOnly && !hostRendered) || s.DeliveryMethod === 'Encode' ||
 				(assBurnsIn && isAssSubtitleCodec(codec));
 			return {
 				index: s.Index,
@@ -400,6 +405,7 @@ const extractSubtitleStreams = (mediaSource, itemId = null, creds = null, assBur
 				isAss: !assBurnsIn && isAssSubtitleCodec(codec),
 				isImageBased,
 				isBurnIn,
+				hostRendered,
 				// Bitmap tracks left in the container are AVPlay's to select. Text normally
 				// comes over the API because the profile asks the server to extract it, but a
 				// server that cant transcode cant extract either, and then the copy in the
@@ -432,6 +438,23 @@ const getAutoMaxBitrate = (capabilities) => {
 	return 40_000_000;
 };
 
+// Where the platform asks for it, the automatic bitrate also stays under what the
+// link to the server was measured to carry.
+const autoMaxBitrate = async (capabilities, creds, canMeasure) => {
+	const ceiling = getAutoMaxBitrate(capabilities);
+	if (!capabilities.fitsBitrateToLink) return ceiling;
+	const measured = await linkBitrate(creds ? {
+		serverUrl: creds.serverUrl,
+		serverType: creds.serverType,
+		authHeader: jellyfinApi.getAuthHeaderFor(creds.serverType, creds.accessToken)
+	} : {
+		serverUrl: jellyfinApi.getServerUrl(),
+		serverType: jellyfinApi.getServerType(),
+		authHeader: jellyfinApi.getAuthHeader()
+	}, canMeasure).catch(() => null);
+	return measured ? Math.min(ceiling, measured) : ceiling;
+};
+
 export const getPlaybackInfo = async (itemId, options = {}) => {
 	const serverType = options.serverType || options.item?._serverType || jellyfinApi.getServerType();
 	const storedSettings = (await getFromStorage('settings')) || {};
@@ -462,7 +485,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	const enableDirectStream = allowDirectStream && options.enableDirectStream !== false;
 
 	// maxBitrate: user-set value (>0), or auto-detect from device capabilities
-	const maxBitrate = options.maxBitrate > 0 ? options.maxBitrate : getAutoMaxBitrate(capabilities);
+	const maxBitrate = options.maxBitrate > 0 ? options.maxBitrate : await autoMaxBitrate(capabilities, creds, !currentSession);
 
 	const requestedStartTime = isLiveTV ? 0 : (options.startPositionTicks || 0);
 	const hasExplicitSubtitle = options.subtitleStreamIndex != null;
@@ -1184,19 +1207,17 @@ const stopRequest = (positionTicks) => {
 	};
 };
 
-// Page scripts freeze once the app is in the background on Fire TV, so the shell
-// that hosts the page gets what it needs to end the session itself.
-let vegaBridge = null;
-if (isVega()) {
-	import('@moonfin/platform-vega/bridge').then((mod) => {
-		vegaBridge = mod;
-	});
-}
+// Page scripts freeze once the app is in the background on Fire TV and on Xbox,
+// so the shell that hosts the page gets what it needs to end the session itself.
+let shellBridge = null;
+loadShellBridge().then((mod) => {
+	shellBridge = mod;
+});
 
 const shareStopWithShell = (positionTicks) => {
-	if (!vegaBridge) return;
+	if (!shellBridge) return;
 	const request = stopRequest(positionTicks);
-	vegaBridge.postToShell('PLAYBACK_SESSION', request && {
+	shellBridge.postToShell('PLAYBACK_SESSION', request && {
 		stopUrl: request.endpoint,
 		headers: {'Content-Type': 'application/json'},
 		body: request.json
@@ -1381,9 +1402,16 @@ export const startProgressReporting = (getPositionTicks, intervalMs = 10000, get
 	}, intervalMs);
 };
 
+// A second of playback is a bad one when more than this share of its frames were
+// dropped, and a file is given up on when nearly every second of the last while was.
+const DROPPED_SHARE = 0.12;
+const FRAME_WATCH_MS = 15000;
+const BAD_SECONDS_SHARE = 0.8;
+
 class PlaybackHealthMonitor {
 	constructor() {
 		this.stallCount = 0;
+		this.frameSamples = [];
 		this.bufferEvents = [];
 		this.lastProgressTime = Date.now();
 		this.isHealthy = true;
@@ -1418,6 +1446,24 @@ class PlaybackHealthMonitor {
 		this.lastProgressTime = Date.now();
 	}
 
+	// Some files play at full speed with a good part of their frames never reaching the
+	// screen, which nothing else here notices. Only watched where the platform asks.
+	recordFrames(video) {
+		if (!currentSession?.capabilities?.watchesDroppedFrames || !video?.getVideoPlaybackQuality) return;
+		const now = Date.now();
+		const samples = this.frameSamples;
+		const last = samples[samples.length - 1];
+		if (last && now - last.at < 1000) return;
+		const {totalVideoFrames: total, droppedVideoFrames: dropped} = video.getVideoPlaybackQuality();
+		const decoded = last ? total - last.total : 0;
+		samples.push({at: now, total, dropped, bad: decoded > 0 && (dropped - last.dropped) / decoded > DROPPED_SHARE});
+		while (samples.length > 1 && now - samples[1].at >= FRAME_WATCH_MS) samples.shift();
+		const seconds = samples.slice(1);
+		if (now - samples[0].at >= FRAME_WATCH_MS && seconds.filter((sample) => sample.bad).length >= seconds.length * BAD_SECONDS_SHARE) {
+			this.isHealthy = false;
+		}
+	}
+
 	checkHealth() {
 		if (this.isPaused) {
 			return true;
@@ -1430,6 +1476,7 @@ class PlaybackHealthMonitor {
 
 	reset() {
 		this.stallCount = 0;
+		this.frameSamples = [];
 		this.bufferEvents = [];
 		this.lastProgressTime = Date.now();
 		this.isHealthy = true;

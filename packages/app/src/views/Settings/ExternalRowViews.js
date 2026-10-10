@@ -6,7 +6,7 @@ import {TMDB_PRESETS} from '../../utils/externalHomeRows';
 import {withSeasonalRow} from '../../utils/homeLayout';
 import {SEASONAL_COUNTRY_OPTIONS, SEASONAL_HOLIDAYS} from '../../utils/seasonalRow';
 import {seasonalCountryLabel, seasonalTitle} from '../../utils/seasonalTitles';
-import {renderRadio, renderSettingsIcon, renderToggle} from './settingsIcons';
+import {renderCheck, renderSettingsIcon, renderToggle} from './settingsIcons';
 import {SpottableDiv} from './settingsSpottables';
 import {SectionTitle, ToggleRow} from './settingsRows';
 import SettingsView from './SettingsView';
@@ -17,8 +17,7 @@ import css from './Settings.module.less';
 // Radarr and Sonarr calendars, and lists the viewer pastes a URL for.
 
 export const ExternalTmdbListsView = ({enabledMap, onToggleRow}) => (
-	<SettingsView spotlightId='external-tmdb-lists-view'>
-		<SectionTitle>{$L('TMDB Lists')}</SectionTitle>
+	<SettingsView spotlightId='external-tmdb-lists-view' title={$L('TMDB Lists')} clean>
 		<div className={css.viewDescription}>
 			{$L('Choose which TMDB chart rows appear on the home screen.')}
 		</div>
@@ -53,8 +52,7 @@ export const ExternalCalendarsView = ({enabledMap, settings, onToggleRow, onTogg
 	);
 
 	return (
-		<SettingsView spotlightId='external-calendars-view'>
-			<SectionTitle>{$L('Upcoming Calendars')}</SectionTitle>
+		<SettingsView spotlightId='external-calendars-view' title={$L('Upcoming Calendars')} clean>
 			<div className={css.viewDescription}>
 				{$L('Show upcoming releases from Radarr and Sonarr. Requires the servers to be configured in Seerr.')}
 			</div>
@@ -101,8 +99,7 @@ export const SeasonalRowView = ({settings, onUpdateSettings}) => {
 	});
 
 	return (
-		<SettingsView spotlightId='seasonal-row-view'>
-			<SectionTitle>{$L('Seasonal Row')}</SectionTitle>
+		<SettingsView spotlightId='seasonal-row-view' title={$L('Seasonal Row')} clean>
 			<div className={css.viewDescription}>
 				{$L('Show a row of holiday movies from your library, with Seerr suggestions when available.')}
 			</div>
@@ -118,7 +115,7 @@ export const SeasonalRowView = ({settings, onUpdateSettings}) => {
 					<div className={css.listItemBody}>
 						<div className={css.listItemHeading}>{seasonalCountryLabel(code)}</div>
 					</div>
-					<div className={css.listItemTrailing}>{renderRadio(code === country)}</div>
+					<div className={css.listItemTrailing}>{renderCheck(code === country)}</div>
 				</SpottableDiv>
 			))}
 			<SectionTitle>{$L('Holidays')}</SectionTitle>
@@ -220,8 +217,7 @@ export const ExternalCustomRowsView = ({
 	};
 	const sortOrderApplies = sortBy !== 'none' && sortBy !== 'shuffle';
 	return (
-		<SettingsView spotlightId='external-custom-rows-view'>
-			<SectionTitle>{$L('Custom Home Rows')}</SectionTitle>
+		<SettingsView spotlightId='external-custom-rows-view' title={$L('Custom Home Rows')} clean>
 			<div className={css.viewDescription}>
 				{$L('Add a home row from a TMDB list or collection, an MDBList list, or a Letterboxd profile.')}
 			</div>

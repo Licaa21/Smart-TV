@@ -1,4 +1,4 @@
-import {isTizen, isWebOS} from '../platform';
+import {isTizen, isWebOS, isXbox} from '../platform';
 import serverLogger from './serverLogger';
 
 const INNERTUBE_URL = 'https://www.youtube.com/youtubei/v1/player';
@@ -393,10 +393,11 @@ export function fetchVideoStream (videoId, preferHighQuality = false, captionLan
 }
 
 // Tizen's video element turns an HLS manifest away whatever canPlayType says, but its runtime
-// lets script read googlevideo across origins, so hls.js plays it there. webOS holds script to
+// lets script read googlevideo across origins, so hls.js plays it there. The WebView on Xbox
+// never starts one either, and its host fetches googlevideo for script. webOS holds script to
 // CORS, which googlevideo only answers for YouTube's own pages, so its native player takes it.
 export function needsHlsJs (url) {
-	return isTizen() && isManifestUrl(url);
+	return (isTizen() || isXbox()) && isManifestUrl(url);
 }
 
 export function playsManifestNatively (url) {

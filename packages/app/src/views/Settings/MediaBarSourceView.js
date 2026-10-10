@@ -1,13 +1,12 @@
 /* eslint-disable react/jsx-no-bind */
 import $L from '@enact/i18n/$L';
-import Button from '@enact/sandstone/Button';
 
 import {renderToggle} from './settingsIcons';
 import {SpottableDiv} from './settingsSpottables';
-import {SectionTitle} from './settingsRows';
 import SettingsView from './SettingsView';
 
 import css from './Settings.module.less';
+import SettingsButton from './SettingsButton';
 
 // Picking libraries and picking collections are the same screen with different words and a
 // different list, so both go through here.
@@ -28,8 +27,7 @@ const MediaBarSourceView = ({
 	onCancel,
 	onSave
 }) => (
-	<SettingsView spotlightId={viewSpotlightId}>
-		<SectionTitle>{title}</SectionTitle>
+	<SettingsView spotlightId={viewSpotlightId} title={title}>
 		<div className={css.viewDescription}>{description}</div>
 		{loading ? (
 			<div className={css.loadingMessage}>{loadingLabel}</div>
@@ -55,12 +53,12 @@ const MediaBarSourceView = ({
 		)}
 		{!loading && (
 			<div className={css.actionBar}>
-				<Button onClick={onCancel} size='small' spotlightId={cancelSpotlightId}>
+				<SettingsButton onClick={onCancel} spotlightId={cancelSpotlightId}>
 					{$L('Cancel')}
-				</Button>
-				<Button onClick={onSave} size='small' spotlightId={saveSpotlightId}>
+				</SettingsButton>
+				<SettingsButton primary onClick={onSave} spotlightId={saveSpotlightId}>
 					{$L('Save')}
-				</Button>
+				</SettingsButton>
 			</div>
 		)}
 	</SettingsView>

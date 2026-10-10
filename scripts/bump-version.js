@@ -3,12 +3,13 @@
  * Version bump script — updates version references for a specific platform.
  *
  * Usage:
- *   node scripts/bump-version.js <webos|tizen|vega|all> <version>
+ *   node scripts/bump-version.js <webos|tizen|vega|xbox|all> <version>
  *
  * Examples:
  *   node scripts/bump-version.js webos 2.3.0
  *   node scripts/bump-version.js tizen 2.1.1
  *   node scripts/bump-version.js vega 2.10.0
+ *   node scripts/bump-version.js xbox 2.10.0
  *   node scripts/bump-version.js all 3.0.0
  */
 
@@ -20,14 +21,15 @@ const ROOT = path.resolve(__dirname, '..');
 const platform = process.argv[2];
 const newVersion = process.argv[3];
 
-if (!platform || !newVersion || !/^\d+\.\d+\.\d+$/.test(newVersion) || !['webos', 'tizen', 'vega', 'all'].includes(platform)) {
-	console.error('Usage: node scripts/bump-version.js <webos|tizen|vega|all> <major.minor.patch>');
+if (!platform || !newVersion || !/^\d+\.\d+\.\d+$/.test(newVersion) || !['webos', 'tizen', 'vega', 'xbox', 'all'].includes(platform)) {
+	console.error('Usage: node scripts/bump-version.js <webos|tizen|vega|xbox|all> <major.minor.patch>');
 	process.exit(1);
 }
 
 const doWebos = platform === 'webos' || platform === 'all';
 const doTizen = platform === 'tizen' || platform === 'all';
 const doVega = platform === 'vega' || platform === 'all';
+const doXbox = platform === 'xbox' || platform === 'all';
 
 /**
  * Update "version" in a JSON file, preserving its indentation style.
@@ -65,6 +67,11 @@ const tizenJsonFiles = [
 const vegaJsonFiles = [
 	'packages/platform-vega/package.json',
 	'packages/build-vega/package.json',
+];
+
+const xboxJsonFiles = [
+	'packages/platform-xbox/package.json',
+	'packages/build-xbox/package.json',
 ];
 
 console.log(`Bumping ${platform} to ${newVersion}\n`);
@@ -144,6 +151,25 @@ if (doTizen) {
 if (doVega) {
 	for (const rel of vegaJsonFiles) {
 		updateJsonVersion(rel);
+	}
+}
+
+// ── Xbox ──
+if (doXbox) {
+	for (const rel of xboxJsonFiles) {
+		updateJsonVersion(rel);
+	}
+
+	// The package manifest takes four parts, and the Store keeps the last one for itself.
+	const manifestPath = path.join(ROOT, 'packages/build-xbox/shell/Moonfin.Xbox/Package.appxmanifest');
+	if (fs.existsSync(manifestPath)) {
+		const manifest = fs.readFileSync(manifestPath, 'utf8');
+		const identityVersion = /(<Identity[^>]*?Version=")([^"]*)(")/;
+		const old = (manifest.match(identityVersion) || [])[2];
+		if (old) {
+			fs.writeFileSync(manifestPath, manifest.replace(identityVersion, `$1${newVersion}.0$3`));
+			console.log(`  build-xbox/shell/Moonfin.Xbox/Package.appxmanifest: ${old} → ${newVersion}.0`);
+		}
 	}
 }
 

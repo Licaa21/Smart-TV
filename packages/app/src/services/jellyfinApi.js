@@ -13,7 +13,8 @@ const APP_VERSION = packageJson.version;
 const PLATFORM_IDENTITY = {
 	tizen: {appName: 'Moonfin for Tizen', deviceName: 'Samsung Smart TV', tag: 'tizen'},
 	vega: {appName: 'Moonfin for Fire TV', deviceName: 'Fire TV', tag: 'vega'},
-	webos: {appName: 'Moonfin for webOS', deviceName: 'LG Smart TV', tag: 'webos'}
+	webos: {appName: 'Moonfin for webOS', deviceName: 'LG Smart TV', tag: 'webos'},
+	xbox: {appName: 'Moonfin for Xbox', deviceName: 'Xbox', tag: 'xbox'}
 };
 const {appName: APP_NAME, deviceName: DEVICE_NAME, tag: platformTag} = PLATFORM_IDENTITY[getPlatform()] || PLATFORM_IDENTITY.webos;
 
@@ -86,6 +87,7 @@ const buildAuthHeader = (type, token) => {
 };
 
 export const getAuthHeader = () => buildAuthHeader(serverType, accessToken);
+export const getAuthHeaderFor = buildAuthHeader;
 
 export const initDeviceId = async () => {
 	try {

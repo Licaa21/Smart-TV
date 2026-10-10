@@ -33,11 +33,22 @@ export const setupVisibilityHandler = (...args) => impl.setupVisibilityHandler(.
 export const waitForDecoderRelease = (...args) => impl.waitForDecoderRelease(...args);
 export const getSharedVideoElement = (...args) => impl.getSharedVideoElement(...args);
 export const leavesPlayerInBackground = () => !!impl.leavesPlayerInBackground;
+export const resumesAfterFirstFrame = (mediaSource) => !!impl.resumesAfterFirstFrame?.(mediaSource);
+export const notePlaybackError = (...args) => impl?.notePlaybackError?.(...args);
+// A platform whose own player draws a bitmap subtitle format the page cant, and the call
+// that picks the track by stream index, with -1 for none.
+export const rendersSubtitleInHost = (codec) => !!impl?.rendersSubtitleInHost?.(codec);
+export const showHostSubtitle = (video, index) => !!impl?.showHostSubtitle?.(video, index);
+export const controllerIsOnlyRemote = () => !!impl?.controllerIsOnlyRemote;
+
+// Only Xbox hands the page its controller as keys as well, which a game reading the
+// controller itself would get twice.
+export const giveControllerToGame = (given) => impl?.giveControllerToGame?.(given);
 
 // Only webOS has a service bridge to bring up before the player can use it.
 export const initPlayerPlatform = () => (impl.initLunaAPI ? impl.initLunaAPI() : Promise.resolve(false));
 
-const LIFECYCLE_SETUP = {tizen: 'setupTizenLifecycle', webos: 'setupWebOSLifecycle', vega: 'setupVegaLifecycle'};
+const LIFECYCLE_SETUP = {tizen: 'setupTizenLifecycle', webos: 'setupWebOSLifecycle', vega: 'setupVegaLifecycle', xbox: 'setupXboxLifecycle'};
 
 // Asked for before the platform module has loaded, so a caller that tears down first is
 // caught by the flag rather than by a remover for a handler that never went on.

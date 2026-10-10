@@ -1,351 +1,958 @@
 @import '../../styles/mixins.less';
 
+@title-ink: 0.87;
+// A 1 unit border is 1.67px, but a border snaps down to a whole pixel, so the rest of it goes
+// into the padding to keep each row at its full height
+@border-rest: (1 * @dp - 1px);
+@soft-ink: 0.54;
+
 // Low and mid tier sets redraw every frame of a focus fade, which is most of what
 // makes moving through these lists stutter there.
 .noFocusFade() {
-:global(.perf-low) &,
-:global(.perf-mid) & {
-transition: none;
-}
+	:global(.perf-low) &,
+	:global(.perf-mid) & {
+		transition: none;
+	}
 }
 
 .page {
-position: fixed;
-top: 0;
-left: 0;
-right: 0;
-bottom: 0;
-overflow: hidden;
-background: var(--theme-background, #000);
-
-// The glass theme's background is translucent, so the screen behind shows
-// through and gets frosted here. Engines without backdrop-filter keep the
-// plain translucent surface.
-:global(html[data-theme-id='glass']) & {
-backdrop-filter: blur(24px) saturate(1.4);
--webkit-backdrop-filter: blur(24px) saturate(1.4);
-}
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	overflow: hidden;
+	background: var(--theme-background, #101010);
 }
 
+// Opened over a screen it fills the panel, and on its own it draws the same panel on the right
 .pagePanel {
-position: absolute;
-background: transparent;
+	position: absolute;
+	background: transparent;
+}
+
+.pageAlone {
+	left: auto;
+	width: (420 * @dp);
+	border-radius: (16 * @dp) 0 0 (16 * @dp);
 }
 
 .viewContainer {
-position: absolute;
-top: 0;
-left: 0;
-right: 0;
-bottom: 0;
-display: flex;
-flex-direction: column;
-overflow: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	background: var(--theme-background, #101010);
+}
+
+// A screen pushed on top slides in over the one it opened from, and one going back slides out
+.pageEnter {
+	animation: settingsPageIn 160ms cubic-bezier(0.33, 1, 0.68, 1);
+
+	:global(.perf-low) & {
+		animation: none;
+	}
+}
+
+.pageLeave {
+	pointer-events: none;
+	animation: settingsPageOut 130ms cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+@keyframes settingsPageIn {
+	from { transform: translateX(100%); }
+	to { transform: translateX(0); }
+}
+
+@keyframes settingsPageOut {
+	from { transform: translateX(0); }
+	to { transform: translateX(100%); }
+}
+
+// The title stays put while the list under it scrolls
+.appBar {
+	flex-shrink: 0;
+	height: (56 * @dp);
+	display: flex;
+	align-items: center;
+	background: var(--theme-background, #101010);
+}
+
+.appBarScrolled {
+	background-image: linear-gradient(rgba(0, 164, 220, 0.08), rgba(0, 164, 220, 0.08));
+}
+
+.appBarTitle {
+	padding: 0 (16 * @dp) 0 (72 * @dp);
+	font-size: (22 * @dp);
+	font-weight: 400;
+	line-height: (28 * @dp);
+	color: var(--theme-on-surface, #fff);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.appBarAction {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: (48 * @dp);
+	height: (48 * @dp);
+	margin-left: auto;
+	border-radius: 50%;
+	color: #fff;
+
+	svg {
+		width: (24 * @dp);
+		height: (24 * @dp);
+	}
+
+	&:focus {
+		outline: none;
+		background: rgba(255, 255, 255, 0.1);
+	}
+}
+
+.appBarTitleRoot {
+	padding-left: (16 * @dp);
+}
+
+// Clean screens set their headings and chips in NotoSans, and the editors' rows with them
+.cleanType {
+	.appBarTitle,
+	.sectionTitle,
+	.valueBubble,
+	.listItemClean .listItemHeading,
+	.listItemPlain .listItemHeading,
+	.listItemPlain .listItemCaption {
+		font-family: 'NotoSans', 'Roboto', 'Sandstone', sans-serif;
+	}
 }
 
 .sectionTitle {
-font-size: 32px;
-font-weight: 600;
-color: var(--theme-text-primary, #fff);
-padding: 20px 0 20px;
-margin: 0;
-text-align: center;
+	padding: (20 * @dp) (16 * @dp) (6 * @dp);
+	font-size: (12 * @dp);
+	font-weight: 700;
+	line-height: (17.16 * @dp);
+	letter-spacing: (1.2 * @dp);
+	color: var(--theme-accent, #00a4dc);
+}
+
+// A group with nothing to call it keeps the gap a header would have left
+.sectionTitleEmpty {
+	padding: (20 * @dp) 0 0;
+}
+
+// A column, so the cards' margins add up between them instead of collapsing
+.listInner {
+	display: flex;
+	flex-direction: column;
 }
 
 .listContent {
-flex: 1;
-overflow-y: auto;
-padding: 100px 0 60px;
-scrollbar-width: none;
+	position: relative;
+	flex: 1;
+	overflow-y: auto;
+	padding: 0 0 (8 * @dp);
+	scrollbar-width: none;
 
-&::-webkit-scrollbar {
-display: none;
-}
+	&::-webkit-scrollbar {
+		display: none;
+	}
 }
 
-.listInner {
-max-width: 960px;
-margin: 0 auto;
-padding: 0 60px;
-}
+// ---- Rows. One card each, the text column between an icon tile and whatever sits on the end.
 
 .listItem {
-display: flex;
-align-items: center;
-padding: 18px 24px;
-background: var(--theme-surface, #141414);
-border-radius: 12px;
-margin-bottom: 4px;
-cursor: pointer;
-transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-border: 2px solid transparent;
-.noFocusFade();
+	display: flex;
+	align-items: center;
+	box-sizing: border-box;
+	margin: (4 * @dp) (12 * @dp);
+	padding: (8 * @dp + @border-rest) (16 * @dp + @border-rest);
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	border-radius: (16 * @dp);
+	background: rgba(26, 26, 26, 0.82);
+	color: var(--theme-on-surface, #fff);
+	cursor: pointer;
+	transition: background 90ms ease-out, border-color 90ms ease-out, box-shadow 90ms ease-out;
+	.noFocusFade();
 
-&:focus {
-outline: none;
-background: var(--theme-surface-variant, #1e1e1e);
-border-color: var(--theme-focus-border-color, #00a4dc);
-transform: scale(1.02);
-will-change: transform;
+	&:focus {
+		outline: none;
+		background: #fff;
+		border-color: rgba(0, 164, 220, 0.72);
+		box-shadow: 0 0 (17.2 * @dp) (0.5 * @dp) rgba(0, 164, 220, 0.22);
+	}
+
+	:global(.perf-low) &:focus {
+		box-shadow: none;
+	}
 }
+
+// Switches and pickers sit closer to the card's edges than a row that opens a screen
+.listItemTight {
+	padding-top: (4 * @dp + @border-rest);
+	padding-bottom: (4 * @dp + @border-rest);
 }
 
 .listItemSelected {
-border-color: var(--theme-focus-border-color, #00a4dc);
+	border-color: var(--theme-accent, #00a4dc);
 }
+
 
 .listItemIcon {
-width: 48px;
-height: 48px;
-display: flex;
-align-items: center;
-justify-content: center;
-background: var(--theme-surface-variant, #1e1e1e);
-border-radius: 14px;
-margin-right: 20px;
-flex-shrink: 0;
-color: var(--theme-accent, #00a4dc);
+	box-sizing: border-box;
+	width: (44 * @dp);
+	height: (44 * @dp);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-right: (14 * @dp);
+	flex-shrink: 0;
+	border-radius: (14 * @dp);
+	border: 1px solid rgba(0, 164, 220, 0.42);
+	background: rgba(0, 164, 220, 0.14);
+	color: rgba(255, 255, 255, 0.78);
 
-svg {
-width: 24px;
-height: 24px;
+	svg {
+		width: (22 * @dp);
+		height: (22 * @dp);
+	}
+
+	.listItem:focus & {
+		border-color: rgba(0, 164, 220, 0.64);
+		background: rgba(0, 164, 220, 0.22);
+		color: rgba(0, 0, 0, @soft-ink);
+	}
 }
 
-.listItem:focus & {
-background: var(--theme-chip-background, rgba(0, 164, 220, 0.15));
-}
+// A switch row's glyph is full strength
+.listItemIconStrong {
+	color: #fff;
 }
 
+// The text column is 56 tall for a title on its own, 72 with a line under it and 88 when that
+// line is a picker's description. When the line under it wraps, it's just the text with 8 above
+// and below.
 .listItemBody {
-flex: 1;
-min-width: 0;
+	flex: 1;
+	min-width: 0;
+	box-sizing: border-box;
+	min-height: (56 * @dp);
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+.bodyTwoLine {
+	height: (72 * @dp);
+	justify-content: flex-start;
+	padding-top: (19 * @dp);
+
+	.listItemCaption {
+		margin-top: (5.45 * @dp);
+	}
+}
+
+.bodyThreeLine {
+	min-height: (88 * @dp);
+	justify-content: flex-start;
+	padding-top: (15 * @dp);
+
+	.listItemCaption {
+		margin-top: (6.4 * @dp);
+	}
+}
+
+.bodyCompact {
+	height: auto;
+	min-height: 0;
+	justify-content: flex-start;
+	padding: (8 * @dp) 0;
+
+	.listItemCaption {
+		margin-top: 0;
+	}
 }
 
 .listItemHeading {
-font-size: 20px;
-font-weight: 500;
-color: var(--theme-text-primary, #fff);
-line-height: 1.3;
+	font-size: (14 * @dp);
+	font-weight: 600;
+	line-height: 1.1719;
+	color: var(--theme-on-surface, #fff);
+
+	.listItem:focus & {
+		color: rgba(0, 0, 0, @title-ink);
+	}
 }
 
 .listItemCaption {
-font-size: 15px;
-color: var(--theme-text-secondary, #888);
-margin-top: 3px;
-line-height: 1.3;
+	font-size: (12 * @dp);
+	line-height: 1.1719;
+	color: rgba(255, 255, 255, 0.7);
+
+	.listItem:focus & {
+		color: rgba(0, 0, 0, @soft-ink);
+	}
+}
+
+// What a switch or a picker says under its title, full strength, and as dark as the title on focus
+.listItemDescription {
+	color: #fff;
+
+	.listItem:focus & {
+		color: rgba(0, 0, 0, @title-ink);
+	}
+}
+
+.listItemDescriptionSmall {
+	font-size: (11 * @dp);
 }
 
 .listItemTrailing {
-margin-left: 20px;
-flex-shrink: 0;
-display: flex;
-align-items: center;
+	margin-left: (14 * @dp);
+	min-width: (18 * @dp);
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
 }
 
-.listItemValue {
-font-size: 17px;
-color: var(--accent-color, #00a4dc);
-font-weight: 500;
-margin-left: 20px;
-flex-shrink: 0;
-text-align: right;
-max-width: 400px;
-overflow: hidden;
-text-overflow: ellipsis;
-white-space: nowrap;
+// The arrows a reorder row ends in only show which ways it can move, the remote does the moving
+.reorderHint {
+	display: flex;
+	color: rgba(255, 255, 255, 0.7);
+
+	.listItem:focus & {
+		color: rgba(0, 0, 0, @soft-ink);
+	}
 }
 
-.toggleTrack {
-width: 52px;
-height: 30px;
-border-radius: 15px;
-background: var(--theme-surface-variant, #444);
-position: relative;
-transition: background 0.2s;
-flex-shrink: 0;
+// One it can't move any further dims to nothing against the focused card
+.reorderHintOff,
+.listItem:focus .reorderHintOff {
+	color: rgba(255, 255, 255, 0.38);
 }
 
-.toggleOn {
-background: var(--accent-color, #00a4dc);
+.reorderButton {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: (48 * @dp);
+	height: (48 * @dp);
+
+	svg {
+		width: (24 * @dp);
+		height: (24 * @dp);
+	}
 }
 
-.toggleThumb {
-width: 24px;
-height: 24px;
-border-radius: 50%;
-background: var(--theme-on-surface, #fff);
-position: absolute;
-top: 3px;
-left: 3px;
-transition: transform 0.2s;
-
-.toggleOn & {
-transform: translateX(22px);
-}
+.reorderCaret svg {
+	width: (18 * @dp);
+	height: (18 * @dp);
 }
 
-.radioOuter {
-width: 24px;
-height: 24px;
-border-radius: 50%;
-border: 2px solid var(--theme-border-color, #555);
-display: flex;
-align-items: center;
-justify-content: center;
-transition: border-color 0.2s;
+.reorderSwitch {
+	display: flex;
 }
 
-.radioSelected {
-border-color: var(--accent-color, #00a4dc);
+.reorderLock {
+	display: flex;
+	padding: 0 (12 * @dp);
+	color: rgba(255, 255, 255, 0.6);
+
+	svg {
+		width: (18 * @dp);
+		height: (18 * @dp);
+	}
+
+	.listItem:focus & {
+		color: rgba(0, 0, 0, 0.32);
+	}
 }
 
-.radioInner {
-width: 14px;
-height: 14px;
-border-radius: 50%;
-background: var(--accent-color, #00a4dc);
-transform: scale(0);
-transition: transform 0.15s ease;
+// A plain list tile, edge to edge with no card, which only tints when it has the focus
+.listItemPlain {
+	min-height: (72 * @dp);
+	margin: 0;
+	padding: 0 (16 * @dp);
+	border-color: transparent;
+	border-radius: 0;
+	background: transparent;
 
-.radioSelected & {
-transform: scale(1);
+	.listItemHeading {
+		color: #e6e0e9;
+	}
+
+	.listItemCaption {
+		color: #cac4d0;
+	}
+
+	.listItemIconPlain {
+		width: (40 * @dp);
+		margin-right: (16 * @dp);
+		color: #fff;
+	}
+
+	.reorderHint {
+		color: #fff;
+	}
+
+	&:focus {
+		background: rgba(0, 164, 220, 0.18);
+		border-color: transparent;
+		box-shadow: none;
+
+		.listItemHeading {
+			color: #e6e0e9;
+		}
+
+		.listItemIconPlain,
+		.reorderHint {
+			color: #fff;
+		}
+	}
 }
+
+// A plain tile that only heads the list under it, so the focus passes it by
+.listItemStatic {
+	padding: (16 * @dp + @border-rest) (16 * @dp);
+	cursor: default;
+
+	.listItemBody {
+		min-height: 0;
+	}
+
+	.listItemCaption {
+		margin-top: (2 * @dp);
+		line-height: (16 * @dp);
+	}
+}
+
+.plainCheckbox {
+	display: flex;
+	width: (40 * @dp);
+	margin-right: (16 * @dp);
+	flex-shrink: 0;
+	color: #fff;
+
+	svg {
+		width: (24 * @dp);
+		height: (24 * @dp);
+	}
+}
+
+.plainCheckboxOn {
+	color: #00a4dc;
 }
 
 .chevronIcon {
-color: var(--theme-text-muted, #555);
-display: flex;
-align-items: center;
+	display: flex;
+	color: rgba(255, 255, 255, 0.7);
 
-svg {
-width: 24px;
-height: 24px;
+	svg {
+		width: (20 * @dp);
+		height: (20 * @dp);
+	}
+
+	.listItem:focus & {
+		color: rgba(0, 0, 0, @soft-ink);
+	}
 }
 
-.listItem:focus & {
-color: var(--theme-accent, #00a4dc);
-}
+// A picker shows what it's set to on the end, in a small outlined bubble
+.valueBubble {
+	box-sizing: border-box;
+	max-width: (280 * @dp);
+	padding: (8 * @dp + @border-rest) (10 * @dp + @border-rest);
+	border: 1px solid rgba(0, 164, 220, 0.35);
+	border-radius: (12 * @dp);
+	background: rgba(0, 164, 220, 0.1);
+	color: var(--theme-accent, #00a4dc);
+	font-size: (11 * @dp);
+	font-weight: 600;
+	line-height: (14.67 * @dp);
+	letter-spacing: (0.5 * @dp);
+	text-align: center;
+	// Three lines at most
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
+
+	.listItem:focus & {
+		border-color: rgba(0, 0, 0, 0.35);
+		background: rgba(0, 0, 0, 0.12);
+		color: rgba(0, 0, 0, @title-ink);
+	}
 }
 
-.sliderContainer {
-padding: 18px 24px;
-background: var(--theme-surface, #141414);
-border-radius: 12px;
-margin-bottom: 4px;
-border: 2px solid transparent;
-transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-.noFocusFade();
+// A row's glyph with no tile behind it, in the same space the tile takes
+.listItemIconPlain {
+	width: (44 * @dp);
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	margin-right: (14 * @dp);
+	color: rgba(255, 255, 255, 0.7);
 
-&:focus-within {
-background: var(--theme-surface-variant, #1e1e1e);
-border-color: var(--theme-focus-border-color, #00a4dc);
-transform: scale(1.02);
-will-change: transform;
-}
-}
+	svg {
+		width: (24 * @dp);
+		height: (24 * @dp);
+	}
 
-.sliderLabel {
-display: flex;
-justify-content: space-between;
-align-items: center;
-margin-bottom: 12px;
+	.listItem:focus & {
+		color: rgba(0, 0, 0, @soft-ink);
+	}
 }
 
-.sliderTitle {
-font-size: 20px;
-font-weight: 500;
-color: var(--theme-text-primary, #fff);
+.colorCircle {
+	box-sizing: border-box;
+	width: (24 * @dp);
+	height: (24 * @dp);
+	border-radius: 50%;
+	border: 1px solid rgba(142, 200, 240, 0.33);
 }
 
-.sliderValue {
-font-size: 17px;
-color: var(--accent-color, #00a4dc);
-font-weight: 500;
+// A sample line set the way subtitles are set right now
+.subtitlePreview {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: (140 * @dp);
+	margin: (12 * @dp) (16 * @dp) (8 * @dp);
+	padding: 0 (12 * @dp);
+	border-radius: (12 * @dp);
+	background: linear-gradient(to bottom right, #252525, rgba(0, 0, 0, 0.8));
+	text-align: center;
+	overflow: hidden;
 }
 
-.settingsSlider {
-width: 100%;
---slider-active-bg-color: var(--accent-color, #00a4dc);
---slider-knob-bg-color: var(--theme-on-surface, #fff);
+.subtitlePreviewText {
+	line-height: 1.4;
 }
 
-// Sandstone grows the knob each time the slider takes focus
-.sliderContainer .sliderKnob::before {
-.noFocusFade();
+.colorSwatch {
+	width: (18 * @dp);
+	height: (18 * @dp);
+	border-radius: 50%;
+	border: 1px solid rgba(85, 142, 200, 0.94);
 }
 
-.divider {
-height: 1px;
-background: var(--theme-border-color, #1a1a1a);
-margin: 8px 24px;
+// ---- The Material switch: an outlined track with a small thumb when off, filled when on.
+
+.toggleTrack {
+	position: relative;
+	box-sizing: border-box;
+	width: (52 * @dp);
+	height: (32 * @dp);
+	margin: 0 (4 * @dp);
+	border-radius: (16 * @dp);
+	border: (2 * @dp) solid #fff;
+	background: #252525;
+	transition: background 300ms ease, border-color 300ms ease;
+	flex-shrink: 0;
+	.noFocusFade();
 }
 
-.inputGroup {
-padding: 8px 24px;
-margin-bottom: 8px;
-
-label {
-display: block;
-font-size: 15px;
-color: var(--theme-text-secondary, #888);
-margin-bottom: 8px;
-}
+.toggleOn {
+	border-color: var(--theme-accent, #00a4dc);
+	background: var(--theme-accent, #00a4dc);
 }
 
-.input {
-width: 100%;
-padding: 16px 20px;
-font-size: 18px;
-background: var(--theme-surface, #141414);
-border: 2px solid var(--theme-border-color, #333);
-border-radius: 16px;
-color: var(--theme-text-primary, #fff);
-transition: background 0.2s ease, border-color 0.2s ease;
+.toggleThumb {
+	position: absolute;
+	top: 50%;
+	left: (8 * @dp - 2 * @dp);
+	width: (16 * @dp);
+	height: (16 * @dp);
+	margin-top: (-8 * @dp);
+	border-radius: 50%;
+	background: #fff;
+	transition: transform 300ms ease, width 300ms ease, height 300ms ease, margin 300ms ease;
+	.noFocusFade();
 
-&:focus, &[data-focused] {
-outline: none;
-border-color: var(--theme-focus-border-color, #00a4dc);
-background: var(--theme-surface-variant, #1e1e1e);
+	.toggleOn & {
+		width: (24 * @dp);
+		height: (24 * @dp);
+		margin-top: (-12 * @dp);
+		transform: translateX((16 * @dp));
+	}
 }
 
-input::placeholder {
-color: var(--theme-text-muted, #555);
+// ---- Sliders. The value reads under the title and the track runs the width of the text column.
+
+.sliderBody {
+	flex: 1;
+	min-width: 0;
+	padding: (8 * @dp) 0;
 }
+
+.sliderTrackArea {
+	position: relative;
+	height: (48 * @dp);
+	margin: 0 (24 * @dp);
+}
+
+.sliderInactive,
+.sliderActive {
+	position: absolute;
+	top: 50%;
+	left: 0;
+	right: 0;
+}
+
+.sliderInactive {
+	height: (4 * @dp);
+	margin-top: (-2 * @dp);
+	border-radius: (2 * @dp);
+	background: #404040;
+}
+
+.sliderActive {
+	right: auto;
+	height: (6 * @dp);
+	margin-top: (-3 * @dp);
+	border-radius: (3 * @dp);
+	background: var(--theme-accent, #00a4dc);
+}
+
+.sliderTick {
+	position: absolute;
+	top: 50%;
+	width: (2 * @dp);
+	height: (2 * @dp);
+	margin: (-1 * @dp) 0 0 (-1 * @dp);
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.38);
+}
+
+.sliderThumb {
+	position: absolute;
+	top: 50%;
+	width: (20 * @dp);
+	height: (20 * @dp);
+	margin: (-10 * @dp) 0 0 (-10 * @dp);
+	border-radius: 50%;
+	background: var(--theme-accent, #00a4dc);
+	box-shadow: 0 (1 * @dp) (1.5 * @dp) rgba(0, 0, 0, 0.3);
+}
+
+// ---- Search, pinned under the title on the first screen.
+
+.searchBar {
+	flex-shrink: 0;
+	padding: (8 * @dp) (16 * @dp);
+}
+
+.searchWrap {
+	position: relative;
 }
 
 .searchInput {
-display: block;
-width: 100%;
-padding: 16px 20px;
-margin-bottom: 12px;
-font-size: 18px;
-background: var(--theme-surface, #141414);
-border: 2px solid var(--theme-border-color, #333);
-border-radius: 999px;
-color: var(--theme-text-primary, #fff);
-transition: background 0.2s ease, border-color 0.2s ease;
+	display: flex;
+	align-items: center;
+	box-sizing: border-box;
+	width: 100%;
+	height: (48 * @dp);
+	padding: 0 (14 * @dp) 0 (46 * @dp);
+	border: 0;
+	border-radius: (28 * @dp);
+	background: #252525;
+	color: #fff;
+	font-size: (14 * @dp);
+	transition: background 200ms linear, color 200ms linear;
 
-&:focus, &[data-focused] {
-outline: none;
-border-color: var(--theme-focus-border-color, #00a4dc);
-background: var(--theme-surface-variant, #1e1e1e);
+	input {
+		font-size: (14 * @dp);
+		letter-spacing: (0.25 * @dp);
+	}
+
+	input::placeholder {
+		color: rgba(255, 255, 255, 0.55);
+	}
+
+	&:focus, &[data-focused] {
+		outline: none;
+		background: #fff;
+		color: #00a4dc;
+	}
+
+	&:focus input, &[data-focused] input {
+		color: #00a4dc;
+	}
+
+	&:focus input::placeholder, &[data-focused] input::placeholder {
+		color: rgba(0, 164, 220, 0.55);
+	}
 }
 
-input::placeholder {
-color: var(--theme-text-secondary, #888);
+// Drawn over the field's left end, so it follows the field's focus through the sibling rule
+.searchIcon {
+	position: absolute;
+	top: 50%;
+	left: (14 * @dp);
+	display: flex;
+	margin-top: (-12 * @dp);
+	color: rgba(255, 255, 255, 0.7);
+	pointer-events: none;
+
+	svg {
+		width: (24 * @dp);
+		height: (24 * @dp);
+	}
+
+	.searchInput:focus ~ &,
+	.searchInput[data-focused] ~ & {
+		color: #00a4dc;
+	}
 }
+
+// ---- The picker opens as a dialog over the screen it was chosen on.
+
+.dialogBarrier {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 0, 0, 0.54);
+	animation: settingsDialogIn 150ms ease-out;
+
+	:global(.perf-low) & {
+		animation: none;
+	}
+}
+
+@keyframes settingsDialogIn {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+.dialog {
+	box-sizing: border-box;
+	width: (280 * @dp);
+	max-width: (340 * @dp);
+	max-height: calc(100% - (48 * @dp));
+	display: flex;
+	flex-direction: column;
+	border-radius: (16 * @dp);
+	background: #1a1a1a;
+	overflow: hidden;
+}
+
+.dialogTitle {
+	flex-shrink: 0;
+	padding: (24 * @dp) (24 * @dp) 0;
+	font-size: (14 * @dp);
+	font-weight: 600;
+	line-height: (17.8 * @dp);
+	color: #fff;
+}
+
+// A column, so the options' margins add up between them instead of collapsing
+.dialogList {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	overflow-y: auto;
+	padding: (12 * @dp) 0 (16 * @dp);
+	scrollbar-width: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
+
+	.listItem {
+		margin: (2 * @dp) 0;
+	}
+}
+
+.checkIcon {
+	display: flex;
+	color: rgba(255, 255, 255, 0.7);
+
+	svg {
+		width: (24 * @dp);
+		height: (24 * @dp);
+	}
+
+	.listItem:focus & {
+		color: rgba(0, 0, 0, @soft-ink);
+	}
+}
+
+// The logo and the version over the About list, with a rule under them
+.aboutHeader {
+	padding-top: (24 * @dp);
+	text-align: center;
+}
+
+// Bundled through the stylesheet, so every platform's build carries it
+.aboutLogo {
+	width: (72 * @dp * 1179 / 266);
+	height: (72 * @dp);
+	margin: 0 auto;
+	background: url('../../../resources/logo-and-text.png') no-repeat center;
+	background-size: contain;
+}
+
+.aboutVersion {
+	margin-top: (8 * @dp);
+	font-size: (14 * @dp);
+	line-height: (20 * @dp);
+	letter-spacing: (0.25 * @dp);
+	color: #fff;
+}
+
+.aboutDivider {
+	height: (1 * @dp);
+	margin: (24 * @dp) 0 (8 * @dp);
+	background: #fff;
+}
+
+.divider {
+	height: 1px;
+	margin: (8 * @dp) (12 * @dp);
+	background: rgba(255, 255, 255, 0.12);
+}
+
+.inputGroup {
+	padding: (8 * @dp) (16 * @dp);
+	margin-bottom: (8 * @dp);
+
+	label {
+		display: block;
+		font-size: (12 * @dp);
+		color: rgba(255, 255, 255, 0.7);
+		margin-bottom: (8 * @dp);
+	}
+}
+
+.input {
+	box-sizing: border-box;
+	width: 100%;
+	padding: (12 * @dp) (14 * @dp);
+	font-size: (14 * @dp);
+	background: #252525;
+	border: 0;
+	border-radius: (12 * @dp);
+	color: #fff;
+	transition: background 200ms linear, color 200ms linear;
+
+	&:focus, &[data-focused] {
+		outline: none;
+		background: #fff;
+		color: #00a4dc;
+	}
+
+	input::placeholder {
+		color: rgba(255, 255, 255, 0.55);
+	}
+}
+
+// The lines that open an editor, saying what it changes and how the remote moves things
+.editorHint {
+	padding: (16 * @dp) (16 * @dp) (4 * @dp);
+	font-size: (12 * @dp);
+	line-height: (16 * @dp);
+	letter-spacing: (0.4 * @dp);
+	color: #fff;
+}
+
+.editorHintLast {
+	padding-top: 0;
+	padding-bottom: (12 * @dp);
+}
+
+.editorHintSolo {
+	padding-bottom: (12 * @dp);
+}
+
+// A screen that opens on a plain sentence, then a smaller line under it, both in the clean face
+.editorLead {
+	padding: (16 * @dp) (16 * @dp) (8 * @dp);
+	font-family: 'NotoSans', 'Roboto', 'Sandstone', sans-serif;
+	font-size: (14 * @dp);
+	line-height: (20 * @dp);
+	letter-spacing: (0.25 * @dp);
+	color: #fff;
+}
+
+.editorHintClean {
+	padding-top: 0;
+	padding-bottom: (8 * @dp);
+	font-family: 'NotoSans', 'Roboto', 'Sandstone', sans-serif;
+}
+
+// Library Order leaves less room before its list
+.editorHintShort {
+	padding-bottom: (8 * @dp);
 }
 
 .actionBar {
-display: flex;
-justify-content: flex-end;
-padding: 24px 0 0;
-margin-top: 16px;
-border-top: 1px solid var(--theme-border-color, #1a1a1a);
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	padding: (8 * @dp) (16 * @dp) (16 * @dp);
 
-> * + * {
-margin-left: 12px;
+	> * + * {
+		margin-left: (8 * @dp);
+	}
 }
+
+// The buttons the editors end on, Save filled and the rest as text. They take the rows' focus
+// look, so the cursor reads the same everywhere.
+.settingsButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	flex-shrink: 0;
+	height: (40 * @dp);
+	border: 1px solid transparent;
+	background: transparent;
+	color: #00a4dc;
+	font-family: inherit;
+	font-size: (14 * @dp);
+	font-weight: 500;
+	letter-spacing: (0.1 * @dp);
+	line-height: 1;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: background-color 90ms ease-out, border-color 90ms ease-out, color 90ms ease-out, box-shadow 90ms ease-out;
+	.noFocusFade();
+
+	padding: 0 (12 * @dp);
+	border-radius: (20 * @dp);
+
+	&:focus {
+		outline: none;
+		background: #fff;
+		color: rgba(0, 0, 0, @title-ink);
+	}
+}
+
+.settingsButtonPrimary {
+	padding: 0 (24 * @dp);
+	border-radius: (8 * @dp);
+	background: #2a2a2a;
+	color: #fff;
+}
+
+.settingsButtonDisabled {
+	opacity: 0.38;
+	cursor: default;
 }
 
 .themeCardList {
@@ -504,26 +1111,7 @@ color: var(--theme-text-muted, #555);
 font-size: 18px;
 }
 
-.homeRowItem {
-display: flex;
-align-items: center;
-margin-bottom: 4px;
 
-.listItem {
-flex: 1;
-margin-bottom: 0;
-}
-}
-
-.homeRowControls {
-display: flex;
-margin-left: 8px;
-flex-shrink: 0;
-
-> * + * {
-margin-left: 4px;
-}
-}
 
 .integrationServerBlock {
 margin-bottom: 8px;
@@ -614,13 +1202,288 @@ background: var(--theme-focus-border-color, #00a4dc);
 	border-radius: 8px;
 }
 
-.profileSyncBlock {
-	.flex-col-gap(10px);
+// The Settings Sync screen. Every card takes the focus the way a settings row does, and the text
+// is set in NotoSans.
+.syncPage {
+	padding: (8 * @dp) (12 * @dp) (16 * @dp);
+	font-family: 'NotoSans', 'Roboto', 'Sandstone', sans-serif;
+
+	.sectionTitle {
+		padding-left: (16 * @dp);
+		padding-right: (16 * @dp);
+	}
 }
 
-.actionButtonActive {
-	background: var(--theme-focus-border-color, #00a4dc);
+.syncCard {
+	display: flex;
+	align-items: center;
+	box-sizing: border-box;
+	padding: (14 * @dp + @border-rest);
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	border-radius: (16 * @dp);
+	background: #1a1a1a;
 	color: #fff;
+	cursor: pointer;
+	transition: background 90ms ease-out, border-color 90ms ease-out, box-shadow 90ms ease-out;
+	.noFocusFade();
+
+	&:focus {
+		outline: none;
+		background: #fff;
+		border-color: rgba(0, 164, 220, 0.72);
+		box-shadow: 0 0 (17.2 * @dp) (0.5 * @dp) rgba(0, 164, 220, 0.22);
+	}
+}
+
+.syncCardSelected {
+	border: (2 * @dp) solid var(--theme-accent, #00a4dc);
+	background: rgba(0, 164, 220, 0.14);
+}
+
+.syncText {
+	flex: 1;
+	min-width: 0;
+}
+
+.syncSubtle {
+	font-size: (12 * @dp);
+	line-height: (16 * @dp);
+	letter-spacing: (0.4 * @dp);
+	color: rgba(255, 255, 255, 0.7);
+
+	.syncCard:focus & {
+		color: rgba(0, 0, 0, 0.7);
+	}
+}
+
+.syncStatusCard {
+	display: block;
+	margin-bottom: 0;
+}
+
+.syncStatusRow {
+	display: flex;
+	align-items: center;
+
+	.listItemIcon {
+		margin-right: (12 * @dp);
+	}
+
+	.syncCard:focus & .listItemIcon {
+		border-color: rgba(0, 164, 220, 0.64);
+		background: rgba(0, 164, 220, 0.22);
+		color: rgba(0, 0, 0, @soft-ink);
+	}
+}
+
+.syncStatusTitle {
+	font-size: (16 * @dp);
+	font-weight: 700;
+	line-height: (24 * @dp);
+	letter-spacing: (0.15 * @dp);
+	margin-bottom: (2 * @dp);
+
+	.syncCard:focus & {
+		color: rgba(0, 0, 0, @title-ink);
+	}
+}
+
+.syncStatusLine {
+	display: flex;
+	align-items: center;
+}
+
+.syncDot {
+	width: (8 * @dp);
+	height: (8 * @dp);
+	margin-right: (6 * @dp);
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.syncDotOn {
+	background: #22c55e;
+}
+
+.syncDotBusy {
+	background: #f59e0b;
+}
+
+.syncDotOff {
+	background: #cf6679;
+}
+
+// The switch only shows the state. The card takes the focus and the press.
+.syncSwitch {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	flex-shrink: 0;
+	margin-left: (12 * @dp);
+
+	.toggleTrack {
+		margin: (8 * @dp) (4 * @dp);
+	}
+}
+
+.syncSwitchLabel {
+	font-size: (11 * @dp);
+	font-weight: 600;
+	line-height: (16 * @dp);
+	letter-spacing: (0.5 * @dp);
+	color: rgba(255, 255, 255, 0.7);
+
+	.syncCard:focus & {
+		color: rgba(0, 0, 0, 0.7);
+	}
+}
+
+.syncChips {
+	display: flex;
+	flex-wrap: wrap;
+	margin-top: (12 * @dp);
+}
+
+.syncChip {
+	padding: (3 * @dp) (10 * @dp);
+	border: 1px solid rgba(142, 200, 240, 0.33);
+	border-radius: 999px;
+	background: rgba(142, 200, 240, 0.12);
+	color: #fff;
+	font-size: (11 * @dp);
+	font-weight: 500;
+	line-height: (16 * @dp);
+	letter-spacing: (0.5 * @dp);
+
+	.syncCard:focus & {
+		border-color: rgba(0, 0, 0, 0.2);
+		background: rgba(0, 0, 0, 0.06);
+		color: rgba(0, 0, 0, @title-ink);
+	}
+}
+
+.syncCaption {
+	padding: 0 (16 * @dp) (12 * @dp);
+	font-size: (12 * @dp);
+	line-height: (16 * @dp);
+	letter-spacing: (0.4 * @dp);
+	color: rgba(255, 255, 255, 0.7);
+}
+
+.syncProfileRow {
+	display: flex;
+}
+
+.syncProfileCard {
+	flex: 1 1 0;
+	min-width: 0;
+	padding: (12 * @dp + @border-rest);
+}
+
+.syncProfileIcon {
+	display: flex;
+	flex-shrink: 0;
+	margin-right: (10 * @dp);
+	color: rgba(255, 255, 255, 0.7);
+
+	svg {
+		width: (24 * @dp);
+		height: (24 * @dp);
+	}
+
+	.syncCard:focus & {
+		color: rgba(0, 0, 0, @soft-ink);
+	}
+}
+
+.syncProfileIconActive {
+	color: var(--theme-accent, #00a4dc);
+}
+
+.syncProfileTitle,
+.syncTransferTitle {
+	font-size: (14 * @dp);
+	font-weight: 600;
+	line-height: (20 * @dp);
+	letter-spacing: (0.1 * @dp);
+
+	.syncCard:focus & {
+		color: rgba(0, 0, 0, @title-ink);
+	}
+}
+
+.syncTransferTitle {
+	font-weight: 700;
+}
+
+.syncTransferCard {
+	margin-top: (12 * @dp);
+	padding: (12 * @dp);
+	border-radius: (16 * @dp);
+	background: #1a1a1a;
+}
+
+.syncTransferRow {
+	display: flex;
+}
+
+.syncTransferButton {
+	flex: 1 1 0;
+	min-width: 0;
+	padding: (12 * @dp + @border-rest);
+	border-color: transparent;
+	background: #2a2a2a;
+}
+
+.syncTransferIcon {
+	display: flex;
+	flex-shrink: 0;
+	margin-right: (10 * @dp);
+	color: var(--theme-accent, #00a4dc);
+
+	svg {
+		width: (24 * @dp);
+		height: (24 * @dp);
+	}
+
+	.syncCard:focus & {
+		color: rgba(0, 0, 0, @soft-ink);
+	}
+}
+
+// A line of red text that only takes a card's fill with the focus
+.syncResetButton {
+	display: inline-flex;
+	margin-top: (8 * @dp);
+	padding: (8 * @dp + @border-rest) (10 * @dp + @border-rest);
+	border-color: transparent;
+	background: transparent;
+	color: #cf6679;
+	font-size: (14 * @dp);
+	font-weight: 600;
+	line-height: (20 * @dp);
+	letter-spacing: (0.1 * @dp);
+
+	&:focus {
+		color: rgb(135, 66, 79);
+	}
+}
+
+.syncResetIcon {
+	display: flex;
+	margin-right: (8 * @dp);
+
+	svg {
+		width: (20 * @dp);
+		height: (20 * @dp);
+	}
+}
+
+.syncMessage {
+	margin-top: (8 * @dp);
+	font-size: (12 * @dp);
+	line-height: (16 * @dp);
+	color: rgba(255, 255, 255, 0.7);
 }
 
 .logFilterBar {
@@ -708,19 +1571,6 @@ color: var(--theme-text-secondary, #888);
 font-size: 16px;
 }
 
-.libraryOrderHint {
-margin-top: 4px;
-}
-
-.libraryOrderArrows {
-color: var(--theme-text-secondary, #888);
-}
-
-.libraryOrderArrow {
-width: 18px;
-height: 18px;
-}
-
 .libraryOrderMessage {
 padding: 24px 16px 8px;
 text-align: center;
@@ -766,3 +1616,8 @@ opacity: 0;
 transform: translateX(-50%) translateY(16px);
 }
 }
+
+.syncProfileGrid { .flex-col-gap((10 * @dp)); }
+.syncProfileRow { .flex-row-gap((10 * @dp)); }
+.syncTransferRow { .flex-row-gap((10 * @dp)); }
+.syncChips { .flex-wrap-gap((6 * @dp)); }

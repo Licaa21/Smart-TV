@@ -1,3 +1,7 @@
+@import '../../styles/mixins.less';
+
+@ease-out-cubic: cubic-bezier(0.33, 1, 0.68, 1);
+
 .overlay {
 	position: fixed;
 	top: 0;
@@ -7,32 +11,71 @@
 	// Over the navbar and its clock, under the dialogs and keyboard settings can open
 	z-index: 1500;
 	display: flex;
-	animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-	from { opacity: 0; }
-	to { opacity: 1; }
 }
 
 .scrim {
 	flex: 1;
-	background: rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.6);
+	background: rgba(0, 0, 0, 0.54);
 	cursor: pointer;
+	animation: settingsScrimIn 220ms ease;
 }
 
 .panel {
-	width: 720px;
-	height: 100%;
-	background: var(--theme-background, #0a0a0a);
-	border-left: 1px solid rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.08);
 	position: relative;
-	overflow: hidden;
 	flex-shrink: 0;
-	animation: slideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+	width: (420 * @dp);
+	height: 100%;
+	overflow: hidden;
+	border-radius: (16 * @dp) 0 0 (16 * @dp);
+	background: #101010;
+	animation: settingsPanelIn 220ms @ease-out-cubic;
 }
 
-@keyframes slideIn {
-	from { transform: translateX(100%); }
-	to { transform: translateX(0); }
+.closing {
+	.scrim {
+		animation: settingsScrimOut 220ms ease forwards;
+	}
+
+	.panel {
+		animation: settingsPanelOut 220ms @ease-out-cubic forwards;
+	}
+}
+
+:global(.perf-low) {
+	.scrim,
+	.panel {
+		animation: none;
+	}
+}
+
+@keyframes settingsScrimIn {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@keyframes settingsScrimOut {
+	from { opacity: 1; }
+	to { opacity: 0; }
+}
+
+@keyframes settingsPanelIn {
+	from {
+		opacity: 0;
+		transform: translateX(100%);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes settingsPanelOut {
+	from {
+		opacity: 1;
+		transform: translateX(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateX(100%);
+	}
 }

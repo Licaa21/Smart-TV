@@ -1,7 +1,7 @@
-jest.mock('../platform', () => ({isTizen: jest.fn(), isWebOS: jest.fn()}));
+jest.mock('../platform', () => ({isTizen: jest.fn(), isWebOS: jest.fn(), isXbox: jest.fn()}));
 jest.mock('./serverLogger', () => ({__esModule: true, default: {warn: jest.fn(), LOG_CATEGORIES: {PLAYBACK: 'Playback'}}}));
 
-import {isTizen, isWebOS} from '../platform';
+import {isTizen, isWebOS, isXbox} from '../platform';
 import serverLogger from './serverLogger';
 import {
 	attachTrailerStream,
@@ -43,6 +43,7 @@ FakeHls.Events = {ERROR: 'hlsError'};
 beforeEach(() => {
 	isTizen.mockReturnValue(false);
 	isWebOS.mockReturnValue(false);
+	isXbox.mockReturnValue(false);
 });
 
 // The shape of a Vision Pro answer for a trailer YouTube has machine dubbed
@@ -257,11 +258,14 @@ describe('fetchVideoStream', () => {
 });
 
 describe('needsHlsJs', () => {
-	test('only sends a manifest on Tizen through hls.js', () => {
+	test('only sends a manifest on Tizen and Xbox through hls.js', () => {
 		expect(needsHlsJs(HLS_URL)).toBe(false);
 		isTizen.mockReturnValue(true);
 		expect(needsHlsJs(HLS_URL)).toBe(true);
 		expect(needsHlsJs('https://rr3---sn.googlevideo.com/videoplayback?itag=18')).toBe(false);
+		isTizen.mockReturnValue(false);
+		isXbox.mockReturnValue(true);
+		expect(needsHlsJs(HLS_URL)).toBe(true);
 	});
 });
 

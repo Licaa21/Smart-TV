@@ -194,11 +194,6 @@ export const getScreensaverDimmingOptions = () => [
 	{ value: 100, label: $L('100%') }
 ];
 
-export const getClockDisplayOptions = () => [
-	{ value: '12-hour', label: $L('12-Hour') },
-	{ value: '24-hour', label: $L('24-Hour') }
-];
-
 export const getNavPositionOptions = () => [
 	{ value: 'top', label: $L('Top Bar') },
 	{ value: 'left', label: $L('Left Sidebar') }
@@ -445,6 +440,13 @@ export const getMaxResolutionOptions = () => [
 	{ value: 'res2160p', label: $L('2160p (4K)') }
 ];
 
+export const getTrickplayModeOptions = () => [
+	{ value: 'disabled', label: $L('Disabled') },
+	{ value: 'single', label: $L('Single Thumbnail') },
+	{ value: 'strip', label: $L('Filmstrip') },
+	{ value: 'full', label: $L('Full Screen') }
+];
+
 export const getZoomModeOptions = () => [
 	{ value: 'fit', label: $L('Fit') },
 	{ value: 'autoCrop', label: $L('Auto Crop') },
@@ -457,14 +459,15 @@ export const getMediaSegmentAutoHideOptions = () => [
 	{ value: 'off', label: $L('Off') }
 ];
 
+// The row's chip has room for the value, and the picker for the explanation
 export const getPassthroughModeOptions = () => [
-	{ value: 'auto', label: $L('Auto (match detected device support)') },
-	{ value: 'manual', label: $L('Manual (choose formats below)') },
-	{ value: 'disabled', label: $L('Disabled (always decode on this device)') }
+	{ value: 'auto', label: $L('Auto (match detected device support)'), chip: $L('Auto') },
+	{ value: 'manual', label: $L('Manual (choose formats below)'), chip: $L('Manual') },
+	{ value: 'disabled', label: $L('Disabled (always decode on this device)'), chip: $L('Disabled') }
 ];
 
 export const getMaxAudioChannelsOptions = () => [
-	{ value: 0, label: $L('Auto Detect (Hardware Default)') },
+	{ value: 0, label: $L('Auto Detect (Hardware Default)'), chip: $L('Auto Detect') },
 	{ value: 1, label: $L('Mono') },
 	{ value: 2, label: $L('Stereo') },
 	{ value: 3, label: $L('3.0') },
@@ -678,6 +681,12 @@ export const getAgeRatingOptions = () => [
 export const getLabel = (options, value, fallback) => {
 	const option = options.find((o) => o.value === value);
 	return option?.label || fallback;
+};
+
+// What a picker row shows on its chip, the short form when an option has one
+export const getChipLabel = (options, value, fallback) => {
+	const option = options.find((o) => o.value === value);
+	return option?.chip || option?.label || fallback;
 };
 
 export const getEnabledRatingSourcesSummary = (sources) => {
