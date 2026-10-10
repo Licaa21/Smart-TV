@@ -126,6 +126,14 @@ export const getUiScaleOptions = () => [
 	{ value: 1.3, label: $L('Maximum') }
 ];
 
+// How much the rows and text inside Settings are shrunk, with the Settings window left at its size
+export const getSettingsSizeOptions = () => [
+	{ value: 1.0, label: $L('Default') },
+	{ value: 0.9, label: $L('Slightly Smaller') },
+	{ value: 0.8, label: $L('Smaller') },
+	{ value: 0.7, label: $L('Compact') }
+];
+
 export const getScreensaverBackdropOptions = () => [
 	{ value: 'library', label: $L('Library Art') },
 	{ value: 'black', label: $L('Black') },

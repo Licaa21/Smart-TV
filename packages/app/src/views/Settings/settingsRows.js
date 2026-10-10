@@ -26,7 +26,9 @@ const useWraps = (text) => {
 			return;
 		}
 		const line = parseFloat(window.getComputedStyle(node).lineHeight);
-		setWraps(line > 0 && node.offsetHeight > line * 1.5);
+		// the line is measured unzoomed and the row on screen, so Settings Size is allowed for
+		const zoom = parseFloat(node.closest('[data-settings-zoom]')?.dataset.settingsZoom) || 1;
+		setWraps(line > 0 && node.getBoundingClientRect().height > line * zoom * 1.5);
 	}, [text]);
 	return [ref, wraps];
 };

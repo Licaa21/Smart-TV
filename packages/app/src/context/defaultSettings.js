@@ -285,6 +285,7 @@ export const defaultSettings = {
 	screensaverAgeFilter: false,
 	screensaverMaxRating: 13,
 	uiScale: 1.0,
+	settingsScale: 1.0,
 	enablePgsRendering: true,
 	syncplayEnabled: true,
 	syncplayAutoOpen: false,
