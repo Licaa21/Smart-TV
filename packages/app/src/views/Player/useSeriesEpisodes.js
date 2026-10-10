@@ -83,11 +83,12 @@ const useSeriesEpisodes = ({item, enabled}) => {
 		const run = runRef.current;
 		return api.getEpisodes(seriesId, seasonId)
 			.then((data) => {
+				// A late answer from a closed browser or another series is dropped before it reaches
+				// memory, so it can't replace a newer list.
+				if (run !== runRef.current) return;
 				const list = tagWithServerOf(playing, data?.Items || []);
 				const entry = {items: browsableEpisodes(list)};
 				remember({bySeason: {[seasonId]: entry}});
-				// An answer that lands after the browser closed, or moved to another series, is dropped.
-				if (run !== runRef.current) return;
 				setBySeason((prev) => ({...prev, [seasonId]: entry}));
 			})
 			.catch(() => {
