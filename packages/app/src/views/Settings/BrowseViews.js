@@ -1,12 +1,12 @@
 /* eslint-disable react/jsx-no-bind */
-import {Fragment} from 'react';
+import {Fragment, useLayoutEffect, useRef} from 'react';
 import $L from '@enact/i18n/$L';
 
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
-import {renderSettingsIcon, renderChevron, renderRadio} from './settingsIcons';
-import {SpottableDiv} from './settingsSpottables';
-import {SectionTitle, Swatch} from './settingsRows';
-import SettingsView from './SettingsView';
+import {IconSearch, renderSettingsIcon, renderChevron, renderCheck} from './settingsIcons';
+import {SpottableDiv, ViewContainer} from './settingsSpottables';
+import {NavRow, SectionTitle} from './settingsRows';
+import SettingsView, {TitleAction, followFocus} from './SettingsView';
 import {resultSpotlightId} from './settingsSearch';
 
 import css from './Settings.module.less';
@@ -23,12 +23,30 @@ const ResultItem = ({entry, index, onOpen, onKeyDown}) => (
 		spotlightId={resultSpotlightId(entry)}
 	>
 		{renderSettingsIcon(entry.icon)}
-		<div className={css.listItemBody}>
+		<div className={`${css.listItemBody} ${css.bodyTwoLine}`}>
 			<div className={css.listItemHeading}>{entry.title}</div>
 			<div className={css.listItemCaption}>{entry.breadcrumb}</div>
 		</div>
 		<div className={css.listItemTrailing}>{renderChevron()}</div>
 	</SpottableDiv>
+);
+
+const SearchBar = ({value, onChange, onKeyDown}) => (
+	<div className={css.searchBar}>
+		<div className={css.searchWrap}>
+			<SpottableInput
+				className={css.searchInput}
+				type='text'
+				value={value}
+				onChange={onChange}
+				onKeyDown={onKeyDown}
+				placeholder={$L('Search settings')}
+				spotlightId='settings-search-input'
+				autoComplete='off'
+			/>
+			<div className={css.searchIcon}><IconSearch /></div>
+		</div>
+	</div>
 );
 
 export const CategoriesView = ({
@@ -43,20 +61,12 @@ export const CategoriesView = ({
 	onOpenCategory,
 	hideSearch
 }) => (
-	<SettingsView spotlightId='categories-view'>
-		<SectionTitle>{$L('Settings')}</SectionTitle>
-		{!hideSearch && (
-			<SpottableInput
-				className={css.searchInput}
-				type='text'
-				value={searchQuery}
-				onChange={onSearchChange}
-				onKeyDown={onSearchKeyDown}
-				placeholder={$L('Search settings')}
-				spotlightId='settings-search-input'
-				autoComplete='off'
-			/>
-		)}
+	<SettingsView
+		spotlightId='categories-view'
+		title={$L('Settings')}
+		root
+		header={!hideSearch && <SearchBar value={searchQuery} onChange={onSearchChange} onKeyDown={onSearchKeyDown} />}
+	>
 		{showSearchResults
 			? (searchResults.length > 0
 				? searchResults.map((entry, index) => (
@@ -70,73 +80,92 @@ export const CategoriesView = ({
 				))
 				: <div className={css.viewDescription}>{$L('No settings found')}</div>)
 			: categories.map((cat) => (
-				<SpottableDiv
+				<NavRow
 					key={cat.id}
-					className={css.listItem}
-					onClick={() => onOpenCategory(cat.id)}
+					id={cat.id}
 					spotlightId={`cat-${cat.id}`}
-				>
-					{renderSettingsIcon(cat.icon)}
-					<div className={css.listItemBody}>
-						<div className={css.listItemHeading}>{cat.label}</div>
-						<div className={css.listItemCaption}>{cat.description}</div>
-					</div>
-					<div className={css.listItemTrailing}>{renderChevron()}</div>
-				</SpottableDiv>
+					title={cat.label}
+					desc={cat.description}
+					icon={cat.icon}
+					onClick={() => onOpenCategory(cat.id)}
+				/>
 			))}
 	</SettingsView>
 );
 
-export const CategoryView = ({title, subcategories, onOpenSubcategory}) => (
-	<SettingsView spotlightId='category-view'>
-		<SectionTitle>{title}</SectionTitle>
+export const CategoryView = ({title, subcategories, onOpenSubcategory, clean}) => (
+	<SettingsView spotlightId='category-view' title={title} clean={clean}>
 		{subcategories.map((sub, index) => (
 			<Fragment key={sub.id}>
 				{sub.section && sub.section !== subcategories[index - 1]?.section && (
 					<SectionTitle>{sub.section}</SectionTitle>
 				)}
-				<SpottableDiv
-					className={css.listItem}
-					onClick={() => onOpenSubcategory(sub)}
+				<NavRow
+					id={sub.id}
 					spotlightId={`subcat-${sub.id}`}
-				>
-					{renderSettingsIcon(sub.icon)}
-					<div className={css.listItemBody}>
-						<div className={css.listItemHeading}>{sub.label}</div>
-						{sub.description && <div className={css.listItemCaption}>{sub.description}</div>}
-					</div>
-					<div className={css.listItemTrailing}>{renderChevron()}</div>
-				</SpottableDiv>
+					title={sub.label}
+					desc={sub.description}
+					icon={sub.icon}
+					onClick={() => onOpenSubcategory(sub)}
+				/>
 			</Fragment>
 		))}
 	</SettingsView>
 );
 
-export const SubcategoryView = ({title, children}) => (
-	<SettingsView spotlightId='subcategory-view'>
-		<SectionTitle>{title}</SectionTitle>
+export const SubcategoryView = ({title, clean, action, ctx, children}) => (
+	<SettingsView
+		spotlightId='subcategory-view'
+		title={title}
+		clean={clean}
+		action={action && <TitleAction icon={action.icon} label={action.label()} onClick={() => action.action(ctx)} />}
+	>
 		{children}
 	</SettingsView>
 );
 
-export const OptionsView = ({title, options, currentValue, onSelect}) => (
-	<SettingsView spotlightId='options-view'>
-		<SectionTitle>{title}</SectionTitle>
-		{options.map((opt, idx) => (
-			<SpottableDiv
-				key={String(opt.value)}
-				className={`${css.listItem} ${opt.value === currentValue ? css.listItemSelected : ''}`}
-				onClick={() => onSelect(opt.value)}
-				spotlightId={`opt-${idx}`}
-			>
-				<div className={css.listItemBody}>
-					<div className={css.listItemHeading}>{opt.label}</div>
-				</div>
-				<div className={css.listItemTrailing}>
-					<Swatch color={opt.swatch} />
-					{renderRadio(opt.value === currentValue)}
-				</div>
-			</SpottableDiv>
-		))}
-	</SettingsView>
-);
+// The dialog grows in steps of 56 units, between 280 and the width the panel leaves it
+const DP = 1920 / 1150;
+const DIALOG_STEP = 56 * DP;
+const DIALOG_MIN = 280 * DP;
+const DIALOG_MAX = 340 * DP;
+
+// A picker opens as a dialog over the screen it was chosen from, which stays where it was
+export const OptionsDialog = ({title, options, currentValue, onSelect}) => {
+	const dialogRef = useRef(null);
+	useLayoutEffect(() => {
+		const node = dialogRef.current;
+		if (!node) return;
+		const scale = parseFloat(window.getComputedStyle(document.documentElement).fontSize) / 24 || 1;
+		node.style.width = 'auto';
+		const natural = node.scrollWidth / scale;
+		const stepped = Math.ceil(natural / DIALOG_STEP) * DIALOG_STEP;
+		node.style.width = `${Math.min(DIALOG_MAX, Math.max(DIALOG_MIN, stepped)) * scale}px`;
+	}, [title, options]);
+
+	return (
+		<div className={css.dialogBarrier}>
+			<div ref={dialogRef} className={css.dialog}>
+				<div className={css.dialogTitle}>{title}</div>
+				<ViewContainer className={css.dialogList} spotlightId='options-view' onFocus={followFocus}>
+					{options.map((opt, idx) => (
+						<SpottableDiv
+							key={String(opt.value)}
+							className={css.listItem}
+							onClick={() => onSelect(opt.value)}
+							spotlightId={`opt-${idx}`}
+						>
+							<div className={css.listItemBody}>
+								<div className={css.listItemHeading}>{opt.label}</div>
+							</div>
+							<div className={css.listItemTrailing}>
+								{opt.swatch && <div className={css.colorSwatch} style={{background: opt.swatch, marginRight: '12px'}} />}
+								{renderCheck(opt.value === currentValue)}
+							</div>
+						</SpottableDiv>
+					))}
+				</ViewContainer>
+			</div>
+		</div>
+	);
+};

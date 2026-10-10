@@ -115,8 +115,7 @@ export const FriendsView = ({onOpen}) => {
 
 	if (!friends) {
 		return (
-			<SettingsView spotlightId="friends-view">
-				<SectionTitle>{$L('Friends')}</SectionTitle>
+			<SettingsView spotlightId="friends-view" title={$L('Friends')}>
 				{failed ? <LoadFailed message={LOAD_FAILED()} spotlightId="friends-retry" onRetry={load} /> : <Message>{$L('Loading...')}</Message>}
 			</SettingsView>
 		);
@@ -137,8 +136,7 @@ export const FriendsView = ({onOpen}) => {
 	));
 
 	return (
-		<SettingsView spotlightId="friends-view">
-			<SectionTitle>{$L('Friends')}</SectionTitle>
+		<SettingsView spotlightId="friends-view" title={$L('Friends')}>
 			<NavRow id="friends-messages" title={$L('Messages')} desc={unreadLabel(unread)} icon="forum" onClick={() => onOpen('friendsMessages', 'setting-friends-messages')} />
 			{!friends.simpleMode && (
 				<NavRow id="friends-requests" title={$L('Friend requests')} desc={requestLabel(friends.incoming.length)} icon="group_work" onClick={() => onOpen('friendsRequests', 'setting-friends-requests')} />
@@ -274,8 +272,7 @@ export const RequestsView = () => {
 	const outgoing = friends?.outgoing || [];
 
 	return (
-		<SettingsView spotlightId="friends-requests-view">
-			<SectionTitle>{$L('Friend requests')}</SectionTitle>
+		<SettingsView spotlightId="friends-requests-view" title={$L('Friend requests')}>
 			{problem && <Message>{problem}</Message>}
 			{incoming.length === 0 && outgoing.length === 0 && <Message>{$L('No friend requests.')}</Message>}
 			{incoming.length > 0 && <SectionTitle>{$L('Waiting for you')}</SectionTitle>}
@@ -353,8 +350,7 @@ export const FindPeopleView = () => {
 	};
 
 	return (
-		<SettingsView spotlightId="friends-add-view">
-			<SectionTitle>{$L('Add friends')}</SectionTitle>
+		<SettingsView spotlightId="friends-add-view" title={$L('Add friends')}>
 			<div className={settingsCss.inputGroup}>
 				<SpottableInput
 					className={settingsCss.input}
@@ -429,8 +425,7 @@ export const PrivacyView = () => {
 	];
 
 	return (
-		<SettingsView spotlightId="friends-privacy-view">
-			<SectionTitle>{$L('Privacy')}</SectionTitle>
+		<SettingsView spotlightId="friends-privacy-view" title={$L('Privacy')}>
 			{privacy === undefined && <Message>{$L('Loading...')}</Message>}
 			{privacy === null && <LoadFailed message={LOAD_FAILED()} spotlightId="friends-privacy-retry" onRetry={load} />}
 			{privacy && rows.map(([key, title, desc, icon]) => (
@@ -480,8 +475,7 @@ export const MessagesView = ({onOpen}) => {
 	}, [refreshSocial]);
 
 	return (
-		<SettingsView spotlightId="friends-messages-view">
-			<SectionTitle>{$L('Messages')}</SectionTitle>
+		<SettingsView spotlightId="friends-messages-view" title={$L('Messages')}>
 			<NavRow id="chat-new" title={$L('New message')} desc={$L('Start a chat with a friend')} icon="forum" onClick={() => onOpen('chatPick', 'setting-chat-new')} />
 			<NavRow id="chat-new-group" title={$L('New group')} desc={$L('Chat with several friends at once')} icon="groups" onClick={() => onOpen('chatNewGroup', 'setting-chat-new-group')} />
 			{threads.length === 0 && <Message>{$L('No messages yet.')}</Message>}
@@ -508,8 +502,7 @@ export const PickFriendView = ({onOpen}) => {
 		if (conversationId) onOpen('chat', `pick-${friend.userId}`, {conversationId, name: friend.userName, isGroup: false});
 	};
 	return (
-		<SettingsView spotlightId="chat-pick-view">
-			<SectionTitle>{$L('New message')}</SectionTitle>
+		<SettingsView spotlightId="chat-pick-view" title={$L('New message')}>
 			{list.length === 0 && <Message>{$L('No friends yet. Add people from this server to see them here.')}</Message>}
 			{list.map((friend) => (
 				<PersonRow key={friend.userId} spotlightId={`pick-${friend.userId}`} name={friend.userName} caption={friendCaption(friend)} online={friend.online} onClick={() => start(friend)} />
@@ -536,8 +529,7 @@ export const NewGroupView = ({onOpen, onBack}) => {
 	};
 
 	return (
-		<SettingsView spotlightId="chat-new-group-view">
-			<SectionTitle>{$L('New group')}</SectionTitle>
+		<SettingsView spotlightId="chat-new-group-view" title={$L('New group')}>
 			<div className={settingsCss.inputGroup}>
 				<label>{$L('Group name')}</label>
 				<SpottableInput className={settingsCss.input} type="text" value={title} onChange={(e) => setTitle(e.target.value)} spotlightId="chat-group-name" />
@@ -646,8 +638,7 @@ export const ChatView = ({conversationId, name, isGroup, onOpen}) => {
 	const lastMine = messages ? [...messages].reverse().find(mine) : null;
 
 	return (
-		<SettingsView spotlightId="chat-view">
-			<SectionTitle>{name}</SectionTitle>
+		<SettingsView spotlightId="chat-view" title={name}>
 			{isGroup && <NavRow id="chat-group-info" title={$L('Group info')} icon="groups" onClick={() => onOpen('chatGroupInfo', 'setting-chat-group-info', {conversationId, name})} />}
 			<div className={css.messages} ref={listRef}>
 				{messages === null && <Message>{$L('Loading...')}</Message>}
@@ -764,8 +755,7 @@ export const GroupInfoView = ({conversationId, onOpen, onBack}) => {
 	const tagOf = (memberId) => (group.isOwner(memberId) ? $L('Owner') : (group.isAdmin(memberId) ? $L('Admin') : null));
 
 	return (
-		<SettingsView spotlightId="chat-group-view">
-			<SectionTitle>{$L('Group info')}</SectionTitle>
+		<SettingsView spotlightId="chat-group-view" title={$L('Group info')}>
 			<div className={settingsCss.inputGroup}>
 				<label>{$L('Group name')}</label>
 				<SpottableInput className={settingsCss.input} type="text" value={title} onChange={(e) => setTitle(e.target.value)} spotlightId="chat-group-rename" disabled={!admin} />
@@ -846,8 +836,7 @@ export const AddMembersView = ({conversationId, onBack}) => {
 	};
 
 	return (
-		<SettingsView spotlightId="chat-add-members-view">
-			<SectionTitle>{$L('Add people')}</SectionTitle>
+		<SettingsView spotlightId="chat-add-members-view" title={$L('Add people')}>
 			{problem && <Message>{problem}</Message>}
 			{group && candidates.length === 0 && <Message>{$L('No one left to add.')}</Message>}
 			{candidates.map((friend) => (

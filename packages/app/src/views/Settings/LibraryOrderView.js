@@ -1,64 +1,31 @@
+/* eslint-disable react/jsx-no-bind */
 import {useCallback, useEffect, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
-import Button from '@enact/sandstone/Button';
 import Spotlight from '@enact/spotlight';
 
 import LoadingSpinner from '../../components/LoadingSpinner';
 import {isFirstOfServer, isLastOfServer, libraryOrderIcon} from './libraryOrder';
-import {materialIconPath} from './materialIconMap';
-import {renderSettingsIcon} from './settingsIcons';
-import {SectionTitle} from './settingsRows';
-import {SpottableDiv} from './settingsSpottables';
+import {ReorderRow} from './settingsRows';
 import SettingsView from './SettingsView';
 import useLibraryOrder from './useLibraryOrder';
 
 import css from './Settings.module.less';
+import SettingsButton from './SettingsButton';
 
 const rowId = (library) => `library-order-${library.Id}`;
 
-const Arrow = ({name}) => (
-	<svg className={css.libraryOrderArrow} viewBox='0 -960 960 960' fill='currentColor' aria-hidden='true' focusable='false'>
-		<path d={materialIconPath(name)} />
-	</svg>
+const LibraryOrderRow = ({library, index, isFirst, isLast, hidden, showServerName, onMove}) => (
+	<ReorderRow
+		spotlightId={rowId(library)}
+		title={`${library.Name}${showServerName && library._serverName ? ` (${library._serverName})` : ''}`}
+		subtitle={hidden ? $L('Hidden') : null}
+		icon={libraryOrderIcon(library)}
+		plain
+		isFirst={isFirst}
+		isLast={isLast}
+		onMove={(delta) => onMove(index, index + delta)}
+	/>
 );
-
-const LibraryOrderRow = ({library, index, isFirst, isLast, hidden, showServerName, onMove}) => {
-	const handleLeft = useCallback((ev) => {
-		if (isFirst) return;
-		ev.preventDefault();
-		ev.stopPropagation();
-		onMove(index, index - 1, library);
-	}, [isFirst, index, library, onMove]);
-
-	const handleRight = useCallback((ev) => {
-		if (isLast) return;
-		ev.preventDefault();
-		ev.stopPropagation();
-		onMove(index, index + 1, library);
-	}, [isLast, index, library, onMove]);
-
-	return (
-		<SpottableDiv
-			className={css.listItem}
-			spotlightId={rowId(library)}
-			onSpotlightLeft={handleLeft}
-			onSpotlightRight={handleRight}
-		>
-			{renderSettingsIcon(libraryOrderIcon(library))}
-			<div className={css.listItemBody}>
-				<div className={css.listItemHeading}>
-					{library.Name}
-					{showServerName && library._serverName ? ` (${library._serverName})` : ''}
-				</div>
-				{hidden && <div className={css.listItemCaption}>{$L('Hidden')}</div>}
-			</div>
-			<div className={`${css.listItemTrailing} ${css.libraryOrderArrows}`}>
-				{!isFirst && <Arrow name='arrow_left' />}
-				{!isLast && <Arrow name='arrow_right' />}
-			</div>
-		</SpottableDiv>
-	);
-};
 
 // Left and right move the focused library, since up and down already move the focus.
 const LibraryOrderView = ({api, unified, onLibrariesChanged}) => {
@@ -77,11 +44,6 @@ const LibraryOrderView = ({api, unified, onLibrariesChanged}) => {
 		if (loadFailed) Spotlight.focus('library-order-retry');
 	}, [loadFailed]);
 
-	// The row is put back in the list at its new place, which drops the focus it had.
-	const handleMove = useCallback((index, newIndex, library) => {
-		if (move(index, newIndex)) window.requestAnimationFrame(() => Spotlight.focus(rowId(library)));
-	}, [move]);
-
 	const handleToastEnd = useCallback(() => setDismissedFailures(saveFailures), [saveFailures]);
 
 	let body;
@@ -91,7 +53,7 @@ const LibraryOrderView = ({api, unified, onLibrariesChanged}) => {
 		body = (
 			<div className={css.libraryOrderMessage}>
 				<div>{$L('Failed to load libraries')}</div>
-				<Button size='small' spotlightId='library-order-retry' onClick={retry}>{$L('Retry')}</Button>
+				<SettingsButton spotlightId='library-order-retry' onClick={retry}>{$L('Retry')}</SettingsButton>
 			</div>
 		);
 	} else if (!libraries?.length) {
@@ -106,17 +68,18 @@ const LibraryOrderView = ({api, unified, onLibrariesChanged}) => {
 				isLast={isLastOfServer(libraries, index)}
 				hidden={hidden.has(library.Id)}
 				showServerName={unified}
-				onMove={handleMove}
+				onMove={move}
 			/>
 		));
 	}
 
 	return (
-		<SettingsView spotlightId='library-order-view'>
-			<SectionTitle>{$L('Library Order')}</SectionTitle>
-			<div className={css.viewDescription}>
+		<SettingsView spotlightId='library-order-view' title={$L('Library Order')} clean>
+			<div className={css.editorHint}>
 				{$L('Your libraries appear in this order on My Media, the recently added rows and the navigation bar. The order is saved to your server account, so other apps you sign in to use it too.')}
-				<div className={css.libraryOrderHint}>{$L('Press left or right to move the highlighted library.')}</div>
+			</div>
+			<div className={`${css.editorHint} ${css.editorHintLast} ${css.editorHintShort}`}>
+				{$L('Press left or right to move the highlighted library.')}
 			</div>
 			{body}
 			{saveFailures > dismissedFailures && (

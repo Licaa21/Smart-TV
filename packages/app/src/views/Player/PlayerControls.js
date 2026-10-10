@@ -6,6 +6,7 @@ import {getImageUrl} from '../../utils/helpers';
 import {autocropLogoUrl} from '../../utils/logoAutocrop';
 import {getServerUrl} from '../../services/jellyfinApi';
 import TrickplayPreview from '../../components/TrickplayPreview';
+import {isTrickplayOn} from '../../utils/trickplayLayout';
 import SubtitleOffsetOverlay from './SubtitleOffsetOverlay';
 import SubtitleSettingsOverlay from './SubtitleSettingsOverlay';
 import {formatBitrate, getAudioChannels, getAudioCodec, getHdrType, getVideoCodec} from '../../utils/mediaStreamFacts';
@@ -403,13 +404,18 @@ const PlayerControls = ({
 							{chapterMarks.map((ms) => (
 								<div key={ms} className={css.chapterMark} style={{left: `${(ms / durationMs) * 100}%`}} />
 							))}
-							{!isAudioMode && settings.trickPlayEnabled !== false && (
+							{!isAudioMode && isTrickplayOn(settings) && (
 								<TrickplayPreview
 									itemId={item.Id}
 									mediaSourceId={mediaSourceId}
 									positionTicks={displayTime * 10000000}
 									durationTicks={durationMs * 10000}
 									stepSeconds={settings.seekStep}
+									mode={settings.trickPlayMode}
+									scalePercent={settings.trickPlayPreviewScale}
+									verticalPercent={settings.trickPlayVerticalPosition}
+									followScrub={settings.trickPlayFollowScrub}
+									zoomMode={settings.playerZoomMode}
 									visible={isSeeking}
 									warm={controlsVisible}
 								/>

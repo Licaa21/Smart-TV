@@ -28,7 +28,7 @@ jest.mock('./video', () => ({
 jest.mock('./storage', () => ({getFromStorage: async () => ({})}));
 jest.mock('./serverLogger', () => ({serverLogger: {playback: jest.fn(), playbackError: jest.fn()}}));
 jest.mock('./systemVolume', () => ({getVolumeState: jest.fn(), lastVolumeState: () => null}));
-jest.mock('../platform', () => ({isVega: () => false}));
+jest.mock('../platform', () => ({isVega: () => false, isXbox: () => false}));
 
 const {api} = jellyfinApi;
 const episode = {Id: 'ep-1', Type: 'Episode'};

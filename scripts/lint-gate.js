@@ -1,5 +1,5 @@
 /**
- * Shared lint gate for the Tizen and webOS builds.
+ * Shared lint gate for the platform builds.
  */
 const {spawnSync} = require('child_process');
 const path = require('path');
@@ -12,7 +12,8 @@ const LINT_DIRS = [
 	path.join(PACKAGES_DIR, 'app'),
 	path.join(PACKAGES_DIR, 'platform-tizen'),
 	path.join(PACKAGES_DIR, 'platform-webos'),
-	path.join(PACKAGES_DIR, 'platform-vega')
+	path.join(PACKAGES_DIR, 'platform-vega'),
+	path.join(PACKAGES_DIR, 'platform-xbox')
 ];
 
 // enact lint reports style problems as warnings and still exits zero, so the

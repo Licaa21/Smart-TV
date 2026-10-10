@@ -3,12 +3,21 @@ import {Fragment} from 'react';
 import $L from '@enact/i18n/$L';
 
 import {DETAIL_SECTION_GROUPS, offeredSections, sectionVisibility} from '../../utils/detailSectionLayout';
-import {renderToggle} from './settingsIcons';
-import {SpottableDiv} from './settingsSpottables';
-import {SectionTitle} from './settingsRows';
+import {ReorderRow, SectionTitle} from './settingsRows';
 import SettingsView from './SettingsView';
 
 import css from './Settings.module.less';
+
+const ICONS = {
+	logo: 'branding_watermark_outlined', tagline: 'format_quote', poster: 'image_outlined', upNext: 'skip_next_outlined',
+	cast: 'people_outline', crew: 'movie_creation_outlined', studios: 'business_outlined', chapters: 'bookmarks_outlined',
+	extras: 'video_library_outlined', collections: 'collections_bookmark_outlined', moreLikeThis: 'recommend_outlined',
+	moreEpisodes: 'view_list_outlined', mediaInfo: 'info_outline', seerrGenresTags: 'sell_outlined', seerrStats: 'bar_chart',
+	seerrRecommendations: 'auto_awesome_outlined', seerrSimilar: 'grid_view_outlined', seerrCollection: 'collections_outlined',
+	seerrPersonAppearances: 'theaters_outlined', seerrPersonCrew: 'engineering_outlined', biography: 'article_outlined',
+	birthplace: 'place_outlined', guestAppearances: 'person_add_alt_outlined', musicVideos: 'music_video_outlined',
+	playlistOrder: 'format_list_numbered'
+};
 
 // Switches for the parts of the Details screen, limited to what the chosen style draws. The
 // hidden list is shared, so a section switched off under one style stays off after switching
@@ -18,9 +27,8 @@ const DetailSectionsView = ({style, seerrAvailable, seerrLabel, hidden, onToggle
 	const offered = offeredSections(style, seerrAvailable);
 
 	return (
-		<SettingsView spotlightId='detail-sections-view'>
-			<SectionTitle>{$L('Sections')}</SectionTitle>
-			<div className={css.viewDescription}>
+		<SettingsView spotlightId='detail-sections-view' title={$L('Sections')} clean>
+			<div className={`${css.editorHint} ${css.editorHintSolo}`}>
 				{$L('Only the sections the current Details screen style can show are listed. Hiding one hides it in every style that has it.')}
 			</div>
 			{DETAIL_SECTION_GROUPS.map((group) => {
@@ -30,18 +38,17 @@ const DetailSectionsView = ({style, seerrAvailable, seerrLabel, hidden, onToggle
 					<Fragment key={group.id}>
 						<SectionTitle>{group.id === 'seerr' ? seerrLabel : $L(group.label)}</SectionTitle>
 						{sections.map((section) => (
-							<SpottableDiv
+							<ReorderRow
 								key={section.id}
-								className={css.listItem}
-								onClick={() => onToggle(section.id)}
 								spotlightId={`detail-section-${section.id}`}
-							>
-								<div className={css.listItemBody}>
-									<div className={css.listItemHeading}>{$L(section.label)}</div>
-									{section.subtitle && <div className={css.listItemCaption}>{$L(section.subtitle)}</div>}
-								</div>
-								<div className={css.listItemTrailing}>{renderToggle(shows(section.id))}</div>
-							</SpottableDiv>
+								title={$L(section.label)}
+								subtitle={section.subtitle && $L(section.subtitle)}
+								icon={ICONS[section.id] || 'dashboard_customize_outlined'}
+								buttons
+								fixed
+								enabled={shows(section.id)}
+								onToggle={() => onToggle(section.id)}
+							/>
 						))}
 					</Fragment>
 				);

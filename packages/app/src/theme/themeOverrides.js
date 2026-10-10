@@ -12,7 +12,6 @@
 import {
 	blendOver,
 	contrastRatio,
-	deepenForLightInk,
 	ensureVisible,
 	DEFAULT_ERROR_COLOR,
 	inkOn,
@@ -32,6 +31,7 @@ import appCss from '../App/App.module.less';
 import sidebarCss from '../components/Sidebar/Sidebar.module.less';
 import navBarCss from '../components/NavBar/NavBar.module.less';
 import settingsCss from '../views/Settings/Settings.module.less';
+import panelCss from '../components/SettingsPanel/SettingsPanel.module.less';
 import achievementsCss from '../views/Settings/achievements/Achievements.module.less';
 import searchCss from '../views/Search/Search.module.less';
 import detailsCss from '../views/Details/Details.module.less';
@@ -197,7 +197,6 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	const inputBackground = toCssColor(c.inputBackground);
 	const inputFocused = toCssColor(c.inputFocused);
 	const inputBorder = toCssColor(c.inputBorder);
-	const inputBorderFocused = toCssColor(c.inputBorderFocused);
 	const rangeTrack = toCssColor(c.rangeTrack);
 	const rangeProgress = toCssColor(c.rangeProgress);
 	const badgeUnplayed = toCssColor(c.badgeUnplayed);
@@ -231,18 +230,14 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		? os(0.16)
 		: toCssColorWithAlpha(b.cardBorder.color, 0.55);
 
-	// The glow a tile falls back to when the theme carries none of its own.
-	const tileGlow = glowOr(`0 0 14px 0.5px ${settingsAccent.a(0.22)}`);
+	// The glow a tile falls back to when the theme carries none of its own, a 14 blur at 0.5
+	// spread in the settings units
+	const tileGlow = glowOr(`0 0 28.7px 0.83px ${settingsAccent.a(0.22)}`);
 	const focusInk = inkOn(c.buttonFocused);
-	// A focused row keeps the theme's colour but takes it down far enough to carry the same
-	// light text the rows around it use. Flipping to dark text on a bright fill measures well
-	// and still reads muddy across a room, and it makes the list flash every time focus moves.
-	const tileFocusFill = deepenForLightInk(c.buttonFocused);
-	const tileInk = inkOn(tileFocusFill);
-	const invertedStrong = `rgba(${tileInk}, 0.96)`;
-	// The quieter line stays close behind the heading, since a caption at half strength is what
-	// turns unreadable from across a room.
-	const invertedSoft = `rgba(${tileInk}, 0.78)`;
+	// A focused settings row fills with the theme's focused button colour, and its text turns to
+	// that colour's ink, strong for the title and softer for the lines under it
+	const invertedStrong = `rgba(${focusInk}, 0.87)`;
+	const invertedSoft = `rgba(${focusInk}, 0.54)`;
 	// The sidebar and nav fill with onSurface, which is a colour of its own.
 	const onSurfaceInk = `rgba(${inkOn(c.onSurface)}, 0.92)`;
 	// A theme names the colour it wants on a focused button, but some name one that
@@ -260,7 +255,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		const hex = picked[id];
 		if (!hex) {
 			return {
-				fill: toCssColor(tileFocusFill), fillHex: tileFocusFill, strong: invertedStrong, soft: invertedSoft, button: buttonFocused, buttonInk,
+				fill: buttonFocused, fillHex: c.buttonFocused, strong: invertedStrong, soft: invertedSoft, button: buttonFocused, buttonInk,
 				active: buttonActive, activeInk: toCssColor(c.onButtonNormal), bar: rangeProgress
 			};
 		}
@@ -352,29 +347,110 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${navBarCss.active}`, `color: ${onSurface}; background: ${navAccent.a(0.28)};`);
 	rule(`.${navBarCss.navPill}`, `border: ${b.navBorder ? `${b.navBorder.width}px solid ${toCssColor(b.navBorder.color)}` : 'none'};`);
 
+	// Under a theme with a face of its own the settings rows stay in Roboto, and only the title,
+	// section headers, value chips and search take the theme's face. A clean screen swaps that face
+	// for its own, and Neon Pulse's title keeps its colour and glow either way.
+	if (theme.fontFamily) {
+		const isNeon = theme.id === 'neon_pulse';
+		const bodyFace = isNeon ? 'NeonPulseBody' : theme.fontFamily;
+		const notClean = `.${settingsCss.viewContainer}:not(.${settingsCss.cleanType})`;
+		rule(
+			`.${settingsCss.viewContainer}, .${settingsCss.viewContainer} button, .${settingsCss.viewContainer} input, .${settingsCss.dialogBarrier}`,
+			`font-family: 'Roboto', sans-serif; letter-spacing: normal;`
+		);
+		rule(`${notClean} .${settingsCss.appBarTitle}`, `font-family: '${theme.fontFamily}', sans-serif;`);
+		rule(
+			`${notClean} .${settingsCss.sectionTitle}, ${notClean} .${settingsCss.valueBubble}, .${settingsCss.searchInput}, .${settingsCss.searchInput} input`,
+			`font-family: '${bodyFace}', sans-serif;${isNeon ? ' letter-spacing: 0.6px;' : ''}`
+		);
+		if (isNeon) {
+			rule(`.${settingsCss.appBarTitle}`, `font-weight: 700; letter-spacing: 0.4px; color: ${settingsAccent.css}; text-shadow: ${textGlow};`);
+		}
+	}
+
+	// The pixel face runs far larger than a normal one, so settings text shrinks to 60 percent
+	// under a pixel theme. Sizes here are in rem so a 720p set scales them too.
+	if (theme.isPixel) {
+		const rem = (dp) => `${(dp * 1.66957 / 24).toFixed(4)}rem`;
+		const dpRem = (dp) => rem(dp * 0.6);
+		const sizes = {
+			appBarTitle: 22, sectionTitle: 12, listItemHeading: 14, listItemCaption: 12, listItemDescriptionSmall: 11,
+			valueBubble: 11, searchInput: 14, dialogTitle: 14, aboutVersion: 14, input: 14, editorHint: 12,
+			editorLead: 14, settingsButton: 14, syncSubtle: 12, syncStatusTitle: 16,
+			syncSwitchLabel: 11, syncChip: 11, syncCaption: 12, syncTransferTitle: 14, syncResetButton: 14, syncMessage: 12
+		};
+		Object.keys(sizes).forEach((name) => {
+			rule(`.${settingsCss[name]}`, `font-size: ${dpRem(sizes[name])};`);
+		});
+		rule(`.${settingsCss.searchInput} input`, `font-size: ${dpRem(14)};`);
+		// Smaller text keeps the line positions full size text has, so a two-line row moves its
+		// lines down
+		rule(`.${settingsCss.bodyTwoLine}`, `padding-top: ${rem(25)};`);
+		rule(`.${settingsCss.bodyTwoLine} .${settingsCss.listItemCaption}`, `margin-top: ${rem(10.85)};`);
+	}
+
 	// Settings
-	rule(`.${settingsCss.page}`, `background: ${background};`);
-	rule(`.${settingsCss.sectionTitle}`, `color: ${onBackground};`);
-	rule(`.${settingsCss.listItem}, .${settingsCss.sliderContainer}, .${settingsCss.themeCard}`, `background: ${surfaceA(0.82)}; border: 1px solid ${tileBorderColor};`);
+	const settingsFocusInk = inkOn(settingsFocus.fillHex);
 	const tileFocus = `background: ${settingsFocus.fill}; border-color: ${settingsMarkA(0.72)}; box-shadow: ${tileGlow};`;
+	rule(`.${panelCss.panel}`, `background: ${background}; border-left: ${b.navBorder ? `${b.navBorder.width}px solid ${toCssColor(b.navBorder.color)}` : '0'};`);
+	rule(`.${panelCss.scrim}`, `background: ${scrim(0.54)};`);
+	rule(`.${settingsCss.page}, .${settingsCss.viewContainer}, .${settingsCss.appBar}`, `background-color: ${background};`);
+	rule(`.${settingsCss.appBarScrolled}`, `background-image: linear-gradient(${settingsAccent.a(0.08)}, ${settingsAccent.a(0.08)});`);
+	rule(`.${settingsCss.appBarTitle}, .${settingsCss.dialogTitle}`, `color: ${onSurface};`);
+	rule(`.${settingsCss.sectionTitle}`, `color: ${settingsAccent.css};`);
+	rule(`.${settingsCss.listItem}, .${settingsCss.themeCard}`, `background: ${surfaceA(0.82)}; border-color: ${tileBorderColor};`);
 	rule(`.${settingsCss.listItem}:focus, .${settingsCss.themeCard}:focus`, tileFocus);
-	// The older engines treat focus-within as a parse error that voids the whole
-	// rule, so it always stands alone instead of joining the selectors above.
-	rule(`.${settingsCss.sliderContainer}:focus-within`, tileFocus);
 	rule(`.${settingsCss.listItemSelected}, .${settingsCss.themeCardSelected}`, `border-color: ${settingsMark};`);
-	rule(`.${settingsCss.listItemHeading}`, `color: ${onSurface};`);
-	rule(`.${settingsCss.listItemCaption}, .${settingsCss.listItemValue}, .${settingsCss.chevronIcon}, .${settingsCss.sliderValue}`, `color: ${os(0.7)};`);
-	rule(`.${settingsCss.sliderTitle}, .${settingsCss.themeCardName}, .${settingsCss.playbackTimeRow}`, `color: ${onSurface};`);
+	rule(`.${settingsCss.listItemCaption}, .${settingsCss.chevronIcon}, .${settingsCss.checkIcon}, .${settingsCss.listItemIconPlain}, .${settingsCss.reorderHint}`, `color: ${os(0.7)};`);
+	// A switch or a picker writes its description at full strength, so this follows the caption rule
+	rule(`.${settingsCss.listItemHeading}, .${settingsCss.listItemDescription}`, `color: ${onSurface};`);
+	rule(`.${settingsCss.themeCardName}, .${settingsCss.playbackTimeRow}`, `color: ${onSurface};`);
 	// The focused tile fills with the light button color, so its content flips dark.
 	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemHeading}`, `color: ${settingsFocus.strong};`);
-	rule(`.${settingsCss.sliderContainer}:focus-within .${settingsCss.sliderTitle}`, `color: ${settingsFocus.strong};`);
-	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemCaption}, .${settingsCss.listItem}:focus .${settingsCss.listItemValue}, .${settingsCss.listItem}:focus .${settingsCss.chevronIcon}`, `color: ${settingsFocus.soft};`);
+	rule([settingsCss.listItemCaption, settingsCss.chevronIcon, settingsCss.checkIcon, settingsCss.listItemIconPlain, settingsCss.reorderHint]
+		.map((name) => `.${settingsCss.listItem}:focus .${name}`).join(', '), `color: ${settingsFocus.soft};`);
+	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemDescription}`, `color: ${settingsFocus.strong};`);
 	// The theme cards fill the same way the rows do, so their text flips with them
 	rule(`.${settingsCss.themeCard}:focus .${settingsCss.themeCardName}`, `color: ${settingsFocus.strong};`);
 	rule(`.${settingsCss.themeCard}:focus .${settingsCss.themeCardDescription}`, `color: ${settingsFocus.soft};`);
-	rule(`.${settingsCss.sliderContainer}:focus-within .${settingsCss.sliderValue}`, `color: ${settingsFocus.soft};`);
-	rule(`.${settingsCss.listItemIcon}`, `background: ${settingsAccent.a(0.14)}; border: 1px solid ${settingsAccent.a(0.42)}; box-sizing: border-box; color: ${os(0.78)};`);
+	rule(`.${settingsCss.listItemIcon}`, `background: ${settingsAccent.a(0.14)}; border-color: ${settingsAccent.a(0.42)}; color: ${os(0.78)};`);
+	rule(`.${settingsCss.listItemIconStrong}`, `color: ${onSurface};`);
+	rule(`.${settingsCss.reorderHintOff}, .${settingsCss.listItem}:focus .${settingsCss.reorderHintOff}`, `color: ${os(0.38)};`);
+	rule(`.${settingsCss.reorderLock}`, `color: ${os(0.6)};`);
+	rule(`.${settingsCss.listItem}:focus .${settingsCss.reorderLock}`, `color: rgba(${settingsFocusInk}, 0.32);`);
+	// A plain tile has no card, and only tints with the accent when it has the focus
+	rule(`.${settingsCss.listItemPlain}`, `background: transparent; border-color: transparent;`);
+	rule(`.${settingsCss.listItemPlain}:focus`, `background: ${settingsAccent.a(0.18)}; border-color: transparent; box-shadow: none;`);
+	rule(`.${settingsCss.listItemPlain} .${settingsCss.listItemIconPlain}, .${settingsCss.listItemPlain}:focus .${settingsCss.listItemIconPlain}, .${settingsCss.listItemPlain} .${settingsCss.reorderHint}, .${settingsCss.listItemPlain}:focus .${settingsCss.reorderHint}, .${settingsCss.plainCheckbox}`, `color: ${onSurface};`);
+	rule(`.${settingsCss.plainCheckboxOn}`, `color: ${settingsMark};`);
+	// Plain tiles keep the stock dark type's text colours whatever the theme
+	rule(`.${settingsCss.listItemPlain} .${settingsCss.listItemHeading}, .${settingsCss.listItemPlain}:focus .${settingsCss.listItemHeading}`, `color: #e6e0e9;`);
+	rule(`.${settingsCss.listItemPlain} .${settingsCss.listItemCaption}, .${settingsCss.listItemPlain}:focus .${settingsCss.listItemCaption}`, `color: #cac4d0;`);
+	rule(`.${settingsCss.colorCircle}`, `border: ${chipBorder};`);
+	rule(`.${settingsCss.subtitlePreview}`, `background: linear-gradient(to bottom right, ${surfaceVariant}, ${scrim(0.8)});`);
 	rule(`.${settingsCss.listItem}:focus .${settingsCss.listItemIcon}`, `background: ${settingsMarkA(0.22)}; border-color: ${settingsMarkA(0.64)}; color: ${focusedIconInk};`);
+	rule(`.${settingsCss.valueBubble}`, `background: ${settingsAccent.a(0.1)}; border-color: ${settingsAccent.a(0.35)}; color: ${settingsAccent.css};`);
+	rule(`.${settingsCss.listItem}:focus .${settingsCss.valueBubble}`, `background: rgba(${settingsFocusInk}, 0.12); border-color: rgba(${settingsFocusInk}, 0.35); color: ${settingsFocus.strong};`);
+	// The switch keeps its colours on a focused row
+	rule(`.${settingsCss.toggleTrack}`, `background: ${surfaceVariant}; border-color: ${onSurface};`);
+	rule(`.${settingsCss.toggleOn}`, `background: ${settingsMark}; border-color: ${settingsMark};`);
+	rule(`.${settingsCss.toggleThumb}`, `background: ${onSurface};`);
+	rule(`.${settingsCss.toggleOn} .${settingsCss.toggleThumb}`, `background: ${settingsMarkInk};`);
+	rule(`.${settingsCss.sliderInactive}`, `background: ${rangeTrack};`);
+	rule(`.${settingsCss.sliderActive}`, `background: ${rangeProgress};`);
+	rule(`.${settingsCss.sliderThumb}`, `background: ${toCssColor(c.rangeThumb)};`);
+	rule(`.${settingsCss.sliderTick}`, `background: ${os(0.38)};`);
+	rule(`.${settingsCss.divider}`, `background: ${os(0.12)};`);
+	rule(`.${settingsCss.dialog}`, `background: ${surface};`);
+	rule(`.${settingsCss.aboutVersion}`, `color: ${onSurface};`);
+	rule(`.${settingsCss.aboutDivider}`, `background: ${onSurface};`);
+	rule(`.${settingsCss.input}, .${settingsCss.searchInput}`, `background: ${surfaceVariant}; color: ${onSurface};`);
+	rule(`.${settingsCss.input}:focus, .${settingsCss.input}[data-focused], .${settingsCss.searchInput}:focus, .${settingsCss.searchInput}[data-focused]`, `background: ${buttonFocused}; color: ${onButtonFocused};`);
+	rule(`.${settingsCss.input}:focus input, .${settingsCss.input}[data-focused] input, .${settingsCss.searchInput}:focus input, .${settingsCss.searchInput}[data-focused] input`, `color: ${onButtonFocused};`);
+	rule(`.${settingsCss.searchIcon}`, `color: ${os(0.7)};`);
+	rule(`.${settingsCss.searchInput}:focus ~ .${settingsCss.searchIcon}, .${settingsCss.searchInput}[data-focused] ~ .${settingsCss.searchIcon}`, `color: ${onButtonFocused};`);
+	rule(`.${settingsCss.input} input::-webkit-input-placeholder, .${settingsCss.searchInput} input::-webkit-input-placeholder`, `color: ${os(0.55)};`);
+	rule(`.${settingsCss.input} input::placeholder, .${settingsCss.searchInput} input::placeholder`, `color: ${os(0.55)};`);
 	// An achievement row carries its own figures on the end, so they follow the tile rather than
 	// keeping a resting colour nobody can read once it lights up.
 	rule(`.${achievementsCss.points}, .${achievementsCss.progressText}`, `color: ${os(0.7)};`);
@@ -382,27 +458,33 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${achievementsCss.reward}`, `color: ${achievementsAccent.css};`);
 	rule(`.${settingsCss.listItem}:focus .${achievementsCss.points}, .${settingsCss.listItem}:focus .${achievementsCss.progressText}`, `color: ${settingsFocus.soft};`);
 	rule(`.${settingsCss.listItem}:focus .${achievementsCss.boardValue}, .${settingsCss.listItem}:focus .${achievementsCss.rankGutter}, .${settingsCss.listItem}:focus .${achievementsCss.reward}`, `color: ${settingsFocus.strong};`);
-	rule(`.${settingsCss.toggleTrack}`, `background: ${surfaceVariant};`);
-	rule(`.${settingsCss.toggleOn}`, `background: ${settingsMark};`);
-	rule(`.${settingsCss.toggleThumb}`, `background: ${onSurface};`);
-	rule(`.${settingsCss.toggleOn} .${settingsCss.toggleThumb}`, `background: ${settingsMarkInk};`);
-	rule(`.${settingsCss.radioOuter}`, `border-color: ${os(0.35)};`);
-	// Was a flat rgba(0,0,0,0.35) - only reads against a *light* focused fill, and goes
-	// invisible the same way if the picked Settings Focus accent is dark instead.
-	rule(`.${settingsCss.listItem}:focus .${settingsCss.radioOuter}`, `border-color: rgba(${inkOn(settingsFocus.fillHex)}, 0.35);`);
-	rule(`.${settingsCss.radioSelected}`, `border-color: ${settingsMark};`);
-	rule(`.${settingsCss.radioInner}`, `background: ${settingsMark};`);
-	rule(`.${settingsCss.settingsSlider}`, `--slider-active-bg-color: ${settingsAccent.css}; --slider-knob-bg-color: ${onSurface};`);
-	rule(`.${settingsCss.divider}`, `background: ${os(0.12)};`);
-	rule(`.${settingsCss.actionBar}`, `border-top-color: ${os(0.12)};`);
-	rule(`.${settingsCss.input}, .${settingsCss.searchInput}`, `background: ${inputBackground}; border-color: ${inputBorder}; color: ${onSurface};`);
-	rule(`.${settingsCss.input}:focus, .${settingsCss.input}[data-focused], .${settingsCss.searchInput}:focus, .${settingsCss.searchInput}[data-focused]`, `background: ${inputFocused}; border-color: ${inputBorderFocused};`);
-	rule(`.${settingsCss.input} input::-webkit-input-placeholder, .${settingsCss.searchInput} input::-webkit-input-placeholder`, `color: ${os(0.45)};`);
-	rule(`.${settingsCss.input} input::placeholder, .${settingsCss.searchInput} input::placeholder`, `color: ${os(0.45)};`);
 	rule(`.${settingsCss.actionButton}`, `background: ${buttonNormal}; color: ${onButtonNormal}; border-color: ${tileBorderColor};`);
 	rule(`.${settingsCss.actionButton}:focus`, `background: ${settingsFocus.button}; border-color: ${focusColor}; color: ${settingsFocus.buttonInk};`);
 	rule(`.${settingsCss.dangerButton}:focus`, `background: ${recordingActive} !important; border-color: ${recordingActive} !important; color: #fff;`);
-	rule(`.${settingsCss.actionButtonActive}`, `background: ${settingsFocus.active}; color: ${settingsFocus.activeInk};`);
+	// The editors' buttons, Save filled and the rest as text, focus the way the rows do
+	rule(`.${settingsCss.settingsButton}`, `color: ${settingsAccent.css};`);
+	rule(`.${settingsCss.settingsButtonPrimary}`, `background: ${buttonNormal}; color: ${onButtonNormal};`);
+	rule(`.${settingsCss.settingsButton}:focus`, `${tileFocus} color: ${settingsFocus.strong};`);
+	// Low tier sets skip the glow, which this sheet would otherwise put back over the stylesheet
+	rules.push(`${[settingsCss.listItem, settingsCss.syncCard, settingsCss.settingsButton]
+		.map((name) => `${prefix}.perf-low .${name}:focus`).join(', ')} { box-shadow: none; }`);
+	// The Settings Sync cards fill and focus the way the settings rows do
+	rule(`.${settingsCss.syncCard}, .${settingsCss.syncTransferCard}`, `background: ${surface}; border-color: ${tileBorderColor};`);
+	rule(`.${settingsCss.syncTransferCard}`, `border-color: transparent;`);
+	rule(`.${settingsCss.syncTransferButton}`, `background: ${buttonNormal}; border-color: transparent;`);
+	rule(`.${settingsCss.syncResetButton}`, `background: transparent; border-color: transparent; color: ${error};`);
+	rule(`.${settingsCss.syncCardSelected}`, `background: ${settingsMarkA(0.14)}; border-color: ${settingsMark};`);
+	rule(`.${settingsCss.syncCard}:focus`, tileFocus);
+	rule(`.${settingsCss.syncStatusTitle}, .${settingsCss.syncProfileTitle}, .${settingsCss.syncTransferTitle}`, `color: ${onSurface};`);
+	rule(`.${settingsCss.syncSubtle}, .${settingsCss.syncSwitchLabel}, .${settingsCss.syncCaption}, .${settingsCss.syncMessage}, .${settingsCss.syncProfileIcon}`, `color: ${os(0.7)};`);
+	rule(`.${settingsCss.syncProfileIconActive}, .${settingsCss.syncTransferIcon}`, `color: ${settingsMark};`);
+	rule(`.${settingsCss.syncChip}`, `background: ${chipBackground}; border: ${chipBorder}; color: ${onSurface};`);
+	rule(`.${settingsCss.syncCard}:focus .${settingsCss.syncStatusTitle}, .${settingsCss.syncCard}:focus .${settingsCss.syncProfileTitle}, .${settingsCss.syncCard}:focus .${settingsCss.syncTransferTitle}`, `color: ${settingsFocus.strong};`);
+	rule(`.${settingsCss.syncCard}:focus .${settingsCss.syncSubtle}, .${settingsCss.syncCard}:focus .${settingsCss.syncSwitchLabel}`, `color: rgba(${settingsFocusInk}, 0.7);`);
+	rule(`.${settingsCss.syncCard}:focus .${settingsCss.syncProfileIcon}, .${settingsCss.syncCard}:focus .${settingsCss.syncTransferIcon}`, `color: ${settingsFocus.soft};`);
+	rule(`.${settingsCss.syncCard}:focus .${settingsCss.syncChip}`, `background: rgba(${settingsFocusInk}, 0.06); border-color: rgba(${settingsFocusInk}, 0.2); color: ${settingsFocus.strong};`);
+	rule(`.${settingsCss.syncCard}:focus .${settingsCss.listItemIcon}`, `background: ${settingsMarkA(0.22)}; border-color: ${settingsMarkA(0.64)}; color: ${focusedIconInk};`);
+	rule(`.${settingsCss.editorHint}, .${settingsCss.editorLead}`, `color: ${onSurface};`);
 	rule(`.${settingsCss.statusMessage}, .${settingsCss.authHint}, .${settingsCss.viewDescription}, .${settingsCss.viewCaption}, .${settingsCss.themeCardDescription}, .${settingsCss.themeStoreMessage}`, `color: ${os(0.7)};`);
 	rule(`.${settingsCss.statusError}`, `color: ${error};`);
 	rule(`.${settingsCss.loadingMessage}, .${settingsCss.integrationSpec}`, `color: ${os(0.45)};`);
@@ -606,9 +688,10 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		rule([
 			`.${sidebarCss.sidebarItem}`, `.${sidebarCss.libraryItem}`, `.${sidebarCss.userBtn}`,
 			`.${navBarCss.navPill}`, `.${navBarCss.navBtn}`,
-			`.${settingsCss.listItem}`, `.${settingsCss.listItemIcon}`, `.${settingsCss.sliderContainer}`,
+			`.${settingsCss.listItem}`, `.${settingsCss.listItemIcon}`, `.${settingsCss.valueBubble}`, `.${settingsCss.dialog}`, `.${panelCss.panel}`, `.${settingsCss.pageAlone}`,
 			`.${settingsCss.themeCard}`, `.${settingsCss.themeCardStripe}`, `.${settingsCss.input}`,
-			`.${settingsCss.searchInput}`, `.${settingsCss.actionButton}`, `.${settingsCss.playbackTimePreview}`, `.${searchCss.searchInputWrapper}`,
+			`.${settingsCss.actionButton}`, `.${settingsCss.settingsButtonPrimary}`, `.${settingsCss.playbackTimePreview}`, `.${searchCss.searchInputWrapper}`,
+			`.${settingsCss.syncCard}`, `.${settingsCss.syncTransferCard}`, `.${settingsCss.syncChip}`,
 			`.${detailsCss.poster}`, `.${detailsCss.btnAction}`, `.${detailsCss.nextUpCard}`,
 			`.${detailsCss.episodeCard}`, `.${detailsCss.chapterCard}`, `.${detailsCss.extraCard}`,
 			`.${detailsCss.seasonPosterWrapper}`, `.${detailsCss.episodeNumber}`, `.${detailsCss.badge}`,

@@ -2,7 +2,6 @@
 import $L from '@enact/i18n/$L';
 
 import {SpottableDiv} from './settingsSpottables';
-import {SectionTitle} from './settingsRows';
 import SettingsView from './SettingsView';
 
 import css from './Settings.module.less';
@@ -19,8 +18,7 @@ const hexToRgba = (hex) => {
 };
 
 export const ThemesView = ({availableThemes, activeThemeId, onSelectTheme}) => (
-	<SettingsView spotlightId='themes-view'>
-		<SectionTitle>{$L('Theme')}</SectionTitle>
+	<SettingsView spotlightId='themes-view' title={$L('Theme')} clean>
 		<div className={css.themeCardList}>
 			{availableThemes.map((theme) => {
 				const isSelected = theme.id === activeThemeId;
@@ -54,8 +52,7 @@ export const ThemesView = ({availableThemes, activeThemeId, onSelectTheme}) => (
 );
 
 export const ThemeStoreView = ({catalog, loading, error, busyId, availableThemes, onStoreThemeClick}) => (
-	<SettingsView spotlightId='theme-store-view'>
-		<SectionTitle>{$L('Theme Store')}</SectionTitle>
+	<SettingsView spotlightId='theme-store-view' title={$L('Theme Store')} clean>
 		{loading ? (
 			<div className={css.themeStoreMessage}>{$L('Loading themes…')}</div>
 		) : error ? (

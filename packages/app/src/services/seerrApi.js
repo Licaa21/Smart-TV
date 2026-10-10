@@ -430,7 +430,7 @@ export const getMoonfinThemes = async (serverUrl, token) => {
 };
 
 // One flattened profile: the device override merged over global and the
-// admin defaults, which is what Load Profile applies locally.
+// admin defaults, which is what Load and Reset apply locally.
 export const getMoonfinResolvedProfile = async (profileName, serverUrl, token) => {
 	const sUrl = serverUrl || jellyfinServerUrl;
 	const sToken = token || jellyfinAccessToken;

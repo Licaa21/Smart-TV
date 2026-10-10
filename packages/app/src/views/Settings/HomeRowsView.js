@@ -1,140 +1,76 @@
 /* eslint-disable react/jsx-no-bind */
 import $L from '@enact/i18n/$L';
-import Button from '@enact/sandstone/Button';
 
 import {getPluginSectionSourceLabel, isHomeRowVisibleByGates} from './homeSectionsModel';
-import {IconArrowUp, IconArrowDown, renderToggle} from './settingsIcons';
-import {SpottableDiv} from './settingsSpottables';
-import {SectionTitle, OptionRow} from './settingsRows';
-import SettingsView from './SettingsView';
+import {ReorderRow, useCommitOnLeave} from './settingsRows';
+import SettingsView, {TitleAction} from './SettingsView';
 
 import css from './Settings.module.less';
+import SettingsButton from './SettingsButton';
 
-// Rows the viewer has switched off elsewhere are filtered out, so the up and down buttons
-// step between the rows actually on show rather than over gaps.
+// Rows the viewer has switched off elsewhere are filtered out, so a move steps between the rows
+// actually on show rather than over gaps. Left and right move a row and OK switches it, and
+// the arrangement is written back when the screen closes.
 const HomeRowsView = ({
 	settings,
-	rowsTypeCaption,
-	onOpenRowsType,
 	tempHomeRows,
 	tempPluginSections,
 	pluginSectionRenderLimit,
 	onShowMoreSections,
 	onToggleHomeRow,
-	onMoveHomeRowUp,
-	onMoveHomeRowDown,
+	onMoveHomeRow,
 	onTogglePluginSection,
-	onMovePluginSectionUp,
-	onMovePluginSectionDown,
+	onMovePluginSection,
 	onReset,
-	onSave
-}) => (
-	<SettingsView spotlightId='homerows-view'>
-		<SectionTitle>{$L('Configure Home Rows')}</SectionTitle>
-		<div className={css.viewDescription}>
-			{$L('Enable/disable and reorder the rows that appear on your home screen.')}
-		</div>
-		<OptionRow
-			settingKey='homeRowsStyle'
-			title={$L('Row Type')}
-			caption={rowsTypeCaption}
-			icon='appscontents'
-			onOpen={onOpenRowsType}
-		/>
-		{tempHomeRows.filter((row) => isHomeRowVisibleByGates(row.id, settings)).map((row, index, visibleRows) => (
-			<div key={row.id} className={css.homeRowItem}>
-				<SpottableDiv
-					className={css.listItem}
-					onClick={() => onToggleHomeRow(row.id)}
+	onLeave
+}) => {
+	useCommitOnLeave(onLeave);
+	const visibleRows = tempHomeRows.filter((row) => isHomeRowVisibleByGates(row.id, settings));
+	const sections = tempPluginSections.slice(0, pluginSectionRenderLimit);
+
+	return (
+		<SettingsView
+			spotlightId='homerows-view'
+			title={$L('Rows')}
+			clean
+			action={<TitleAction icon='restore' label={$L('Reset to defaults')} onClick={onReset} />}
+		>
+			{visibleRows.map((row, index) => (
+				<ReorderRow
+					key={row.id}
 					spotlightId={`homerow-${row.id}`}
-				>
-					<div className={css.listItemBody}>
-						<div className={css.listItemHeading}>{$L(row.name)}</div>
-					</div>
-					<div className={css.listItemTrailing}>{renderToggle(row.enabled)}</div>
-				</SpottableDiv>
-				<div className={css.homeRowControls}>
-					<Button
-						onClick={() => onMoveHomeRowUp(row.id)}
-						disabled={index === 0}
-						size='small'
-						aria-label={$L('Up')}
-						spotlightId={`homerow-up-${row.id}`}
-					>
-						<IconArrowUp />
-					</Button>
-					<Button
-						onClick={() => onMoveHomeRowDown(row.id)}
-						disabled={index === visibleRows.length - 1}
-						size='small'
-						aria-label={$L('Down')}
-						spotlightId={`homerow-down-${row.id}`}
-					>
-						<IconArrowDown />
-					</Button>
+					title={$L(row.name)}
+					checkbox
+					enabled={row.enabled}
+					isFirst={index === 0}
+					isLast={index === visibleRows.length - 1}
+					onToggle={() => onToggleHomeRow(row.id)}
+					onMove={(direction) => onMoveHomeRow(row.id, direction)}
+				/>
+			))}
+			{sections.map((section, index) => (
+				<ReorderRow
+					key={section.id}
+					spotlightId={`pluginrow-${section.id}`}
+					title={section.name}
+					subtitle={getPluginSectionSourceLabel(section.source)}
+					checkbox
+					enabled={section.enabled}
+					isFirst={index === 0}
+					isLast={index === tempPluginSections.length - 1}
+					onToggle={() => onTogglePluginSection(section.id)}
+					onMove={(direction) => onMovePluginSection(section.id, direction)}
+				/>
+			))}
+			{tempPluginSections.length > pluginSectionRenderLimit && (
+				<div className={css.actionBar}>
+					<SettingsButton onClick={onShowMoreSections} spotlightId='pluginrow-show-more'>
+						{$L('Show More')} ({tempPluginSections.length - pluginSectionRenderLimit})
+					</SettingsButton>
 				</div>
-			</div>
-		))}
-		{tempPluginSections.length > 0 && (
-			<>
-				<SectionTitle>{$L('Plugin Sections')}</SectionTitle>
-				{tempPluginSections.slice(0, pluginSectionRenderLimit).map((section, index) => (
-					<div key={section.id} className={css.homeRowItem}>
-						<SpottableDiv
-							className={css.listItem}
-							onClick={() => onTogglePluginSection(section.id)}
-							spotlightId={`pluginrow-${section.id}`}
-						>
-							<div className={css.listItemBody}>
-								<div className={css.listItemHeading}>{section.name}</div>
-								<div className={css.listItemCaption}>{getPluginSectionSourceLabel(section.source)}</div>
-							</div>
-							<div className={css.listItemTrailing}>{renderToggle(section.enabled)}</div>
-						</SpottableDiv>
-						<div className={css.homeRowControls}>
-							<Button
-								onClick={() => onMovePluginSectionUp(section.id)}
-								disabled={index === 0}
-								size='small'
-								aria-label={$L('Up')}
-								spotlightId={`pluginrow-up-${section.id}`}
-							>
-								<IconArrowUp />
-							</Button>
-							<Button
-								onClick={() => onMovePluginSectionDown(section.id)}
-								disabled={index === tempPluginSections.length - 1}
-								size='small'
-								aria-label={$L('Down')}
-								spotlightId={`pluginrow-down-${section.id}`}
-							>
-								<IconArrowDown />
-							</Button>
-						</div>
-					</div>
-				))}
-				{tempPluginSections.length > pluginSectionRenderLimit && (
-					<div className={css.actionBar}>
-						<Button
-							onClick={onShowMoreSections}
-							size='small'
-							spotlightId='pluginrow-show-more'
-						>
-							{$L('Show More')} ({tempPluginSections.length - pluginSectionRenderLimit})
-						</Button>
-					</div>
-				)}
-			</>
-		)}
-		<div className={css.actionBar}>
-			<Button onClick={onReset} size='small' spotlightId='homerow-reset'>
-				{$L('Reset to defaults')}
-			</Button>
-			<Button onClick={onSave} size='small' spotlightId='homerow-save'>
-				{$L('Save')}
-			</Button>
-		</div>
-	</SettingsView>
-);
+			)}
+		</SettingsView>
+	);
+};
 
 export default HomeRowsView;

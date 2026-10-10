@@ -8,8 +8,14 @@ jest.mock('react/jsx-dev-runtime', () => ({}));
 jest.mock('react', () => ({createContext: () => ({})}));
 // Storage picks its platform module through a dynamic import that jest can't transform.
 jest.mock('../services/storage', () => ({}));
+// Only the profile save is ever reached, and the queue tests need to see where it went.
+jest.mock('../services/seerrApi', () => ({saveMoonfinProfile: jest.fn(() => Promise.resolve(true))}));
 
-import {SYNCABLE_KEYS, defaultSettings, profileToLocal, localToProfile} from './SettingsContext';
+import {saveMoonfinProfile} from '../services/seerrApi';
+import {
+	SYNCABLE_KEYS, SYNC_PROFILES, __pushQueue, activeSyncProfile, defaultSettings, flushSettingsPush,
+	localToProfile, profileToLocal, resolveFromEnvelope
+} from './SettingsContext';
 import {__resetHomeLayoutPassthrough, homeRowsFromProfile} from '../utils/homeLayout';
 
 describe('profileToLocal', () => {
@@ -319,5 +325,186 @@ describe('the seasonal row settings', () => {
 	test('carry the toggle through as it was sent', () => {
 		expect(profileToLocal({seasonalRowEnabled: true}).seasonalRowEnabled).toBe(true);
 		expect(profileToLocal({seasonalRowEnabled: false}).seasonalRowEnabled).toBe(false);
+	});
+});
+
+describe('activeSyncProfile', () => {
+	test('names each profile the plugin stores', () => {
+		for (const profile of SYNC_PROFILES) {
+			expect(activeSyncProfile(profile)).toBe(profile);
+		}
+	});
+
+	test('follows the TV profile when nothing or something unknown is stored', () => {
+		for (const stored of ['', undefined, null, 'TV', 'phone', 3]) {
+			expect(activeSyncProfile(stored)).toBe('tv');
+		}
+	});
+});
+
+describe('the sync profile setting', () => {
+	test('belongs to this device', () => {
+		expect(defaultSettings.syncProfile).toBe('');
+		expect(SYNCABLE_KEYS).not.toContain('syncProfile');
+	});
+
+	test('never goes out in a profile', () => {
+		const local = {...defaultSettings, syncProfile: 'desktop'};
+
+		expect(localToProfile(local)).not.toHaveProperty('syncProfile');
+		expect(localToProfile(local, ['syncProfile'])).toEqual({});
+	});
+
+	test("can't be changed by a value the server holds", () => {
+		expect(profileToLocal({syncProfile: 'global'})).toEqual({});
+	});
+});
+
+describe('resolveFromEnvelope', () => {
+	const admin = {themeMusicEnabled: false, themeMusicVolume: 10, navbarPosition: 'top', confirmExit: true, tmdbApiKey: 'admin-key'};
+	const envelope = {
+		global: {themeMusicVolume: 20, navbarPosition: 'left', tmdbApiKey: 'global-key'},
+		desktop: {themeMusicVolume: 50},
+		mobile: {themeMusicVolume: 60},
+		tv: {themeMusicVolume: 40, themeMusicEnabled: true, tmdbApiKey: 'tv-key'}
+	};
+
+	test('lays the TV profile over global over the admin defaults when nothing is picked', () => {
+		const resolved = resolveFromEnvelope(envelope, admin);
+
+		expect(resolved.themeMusicVolume).toBe(40);
+		expect(resolved.themeMusicEnabled).toBe(true);
+		expect(resolved.navbarPosition).toBe('left');
+		expect(resolved.exitConfirmation).toBe(true);
+		expect(resolved.tmdbApiKey).toBe('tv-key');
+		expect(resolveFromEnvelope(envelope, admin, '')).toEqual(resolved);
+		expect(resolveFromEnvelope(envelope, admin, 'bogus')).toEqual(resolved);
+	});
+
+	test('reads the desktop and mobile profiles when one of them is active', () => {
+		const desktop = resolveFromEnvelope(envelope, admin, 'desktop');
+		const mobile = resolveFromEnvelope(envelope, admin, 'mobile');
+
+		expect(desktop.themeMusicVolume).toBe(50);
+		expect(mobile.themeMusicVolume).toBe(60);
+		// What only the TV profile holds stays out, so the admin default shows through.
+		expect(desktop.themeMusicEnabled).toBe(false);
+		expect(mobile.themeMusicEnabled).toBe(false);
+		expect(desktop.navbarPosition).toBe('left');
+		expect(desktop.exitConfirmation).toBe(true);
+		expect(desktop.tmdbApiKey).toBe('global-key');
+	});
+
+	test('has nothing above global when global is active', () => {
+		const resolved = resolveFromEnvelope(envelope, admin, 'global');
+
+		expect(resolved.themeMusicVolume).toBe(20);
+		expect(resolved.themeMusicEnabled).toBe(false);
+		expect(resolved.navbarPosition).toBe('left');
+		expect(resolved.exitConfirmation).toBe(true);
+		expect(resolved.tmdbApiKey).toBe('global-key');
+	});
+
+	test('falls back to the admin defaults alone when there is no envelope', () => {
+		const resolved = resolveFromEnvelope(null, admin, 'global');
+
+		expect(resolved.themeMusicVolume).toBe(10);
+		expect(resolved.navbarPosition).toBe('top');
+		expect(resolved.tmdbApiKey).toBe('admin-key');
+	});
+
+	test('takes the whole home layout from the active profile first', () => {
+		__resetHomeLayoutPassthrough();
+		const layouts = {
+			global: {homeRowOrder: ['latestmedia']},
+			desktop: {homeRowOrder: ['resume']},
+			tv: {homeRowOrder: ['nextup']}
+		};
+		const enabledRows = (profile) => resolveFromEnvelope(layouts, null, profile).homeRows
+			.filter((row) => row.enabled)
+			.map((row) => row.id);
+
+		expect(enabledRows('tv')).toEqual(['nextup']);
+		expect(enabledRows('desktop')).toEqual(['resume']);
+		expect(enabledRows('mobile')).toEqual(['latest-media']);
+		expect(enabledRows('global')).toEqual(['latest-media']);
+	});
+});
+
+describe('the profile push queue', () => {
+	const creds = {current: {serverUrl: 'http://server', token: 'token'}};
+	const settingsFor = (syncProfile, changes) => ({...defaultSettings, syncProfile, ...changes});
+
+	beforeEach(() => {
+		jest.useFakeTimers();
+		__pushQueue.drop();
+		saveMoonfinProfile.mockClear();
+		saveMoonfinProfile.mockImplementation(() => Promise.resolve(true));
+	});
+
+	afterEach(() => {
+		jest.useRealTimers();
+	});
+
+	test('sends a change to the profile that is active', () => {
+		__pushQueue.queue(settingsFor('desktop', {themeMusicEnabled: true}), creds, ['themeMusicEnabled']);
+		jest.runAllTimers();
+
+		expect(saveMoonfinProfile).toHaveBeenCalledTimes(1);
+		expect(saveMoonfinProfile).toHaveBeenCalledWith('desktop', {themeMusicEnabled: true}, 'http://server', 'token');
+	});
+
+	test('sends to the TV profile when nothing is picked', () => {
+		__pushQueue.queue(settingsFor('', {themeMusicEnabled: true}), creds, ['themeMusicEnabled']);
+		jest.runAllTimers();
+
+		expect(saveMoonfinProfile.mock.calls[0][0]).toBe('tv');
+	});
+
+	test('a change queued before the profile changed goes to the profile it was made under', () => {
+		__pushQueue.queue(settingsFor('', {themeMusicEnabled: true}), creds, ['themeMusicEnabled']);
+		__pushQueue.handOver();
+		__pushQueue.queue(settingsFor('global', {navbarPosition: 'left'}), creds, ['navbarPosition']);
+		jest.runAllTimers();
+
+		expect(saveMoonfinProfile.mock.calls).toEqual([
+			['tv', {themeMusicEnabled: true}, 'http://server', 'token'],
+			['global', {navbarPosition: 'left'}, 'http://server', 'token']
+		]);
+	});
+
+	test('a queued change never rides along to another profile, even without a hand over', () => {
+		__pushQueue.queue(settingsFor('mobile', {themeMusicEnabled: true}), creds, ['themeMusicEnabled']);
+		__pushQueue.queue(settingsFor('desktop', {navbarPosition: 'left'}), creds, ['navbarPosition']);
+		jest.runAllTimers();
+
+		expect(saveMoonfinProfile.mock.calls).toEqual([
+			['mobile', {themeMusicEnabled: true}, 'http://server', 'token'],
+			['desktop', {navbarPosition: 'left'}, 'http://server', 'token']
+		]);
+	});
+
+	test('a change that failed to send stays with the profile it was made under', async () => {
+		saveMoonfinProfile.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+		const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+		__pushQueue.queue(settingsFor('', {themeMusicEnabled: true}), creds, ['themeMusicEnabled']);
+		await flushSettingsPush();
+		__pushQueue.handOver();
+		__pushQueue.queue(settingsFor('desktop', {navbarPosition: 'left'}), creds, ['navbarPosition']);
+		jest.runAllTimers();
+		warn.mockRestore();
+
+		expect(saveMoonfinProfile.mock.calls[1]).toEqual(['desktop', {navbarPosition: 'left'}, 'http://server', 'token']);
+	});
+
+	test('a change made before there were credentials stays with the profile it was made under', () => {
+		__pushQueue.queue(settingsFor('', {themeMusicEnabled: true}), {current: null}, ['themeMusicEnabled']);
+		__pushQueue.handOver();
+		__pushQueue.queue(settingsFor('global', {navbarPosition: 'left'}), creds, ['navbarPosition']);
+		jest.runAllTimers();
+
+		expect(saveMoonfinProfile.mock.calls).toEqual([
+			['global', {navbarPosition: 'left'}, 'http://server', 'token']
+		]);
 	});
 });

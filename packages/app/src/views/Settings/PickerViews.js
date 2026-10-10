@@ -1,74 +1,62 @@
 /* eslint-disable react/jsx-no-bind */
 import $L from '@enact/i18n/$L';
-import Button from '@enact/sandstone/Button';
 
 import LoadingSpinner from '../../components/LoadingSpinner';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
-import {KEYS} from '../../utils/keys';
 import {getRatingSourceOptions, getImageTypeOptions} from './settingsOptions';
-import {renderToggle} from './settingsIcons';
+import {renderSettingsIcon} from './settingsIcons';
 import {ratingIsRanked} from '../../utils/parentalFilter';
 import {SpottableDiv} from './settingsSpottables';
-import {SectionTitle} from './settingsRows';
-import SettingsView from './SettingsView';
+import {ReorderRow, SectionTitle, useCommitOnLeave} from './settingsRows';
+import SettingsView, {TitleAction} from './SettingsView';
 
 import css from './Settings.module.less';
+import SettingsButton from './SettingsButton';
 
-// Three screens that edit one value against a scratch copy and offer Cancel or Save, rather
-// than writing through on every press the way a plain settings row does.
+// Screens that edit one value against a scratch copy rather than writing through on every press
+// the way a plain settings row does.
 
-export const RatingSourcesView = ({selected, onToggleSource, onMoveSource, onReset, onCancel, onSave}) => {
-	// Enabled sources first in their stored order, since that order is the one
-	// the ratings row draws them in. Everything else follows.
+// Enabled sources lead in their stored order, since that order is the one the ratings row draws
+// them in, and only those move. The list is written back when the screen closes.
+export const RatingSourcesView = ({selected, onToggleSource, onMoveSource, onReset, onLeave}) => {
+	useCommitOnLeave(onLeave);
 	const options = getRatingSourceOptions();
 	const byValue = new Map(options.map((option) => [option.value, option]));
 	const ordered = [
 		...selected.map((value) => byValue.get(value)).filter(Boolean),
 		...options.filter((option) => !selected.includes(option.value))
 	];
-	const makeKeyDown = (value) => (e) => {
-		if (!selected.includes(value)) return;
-		if (e.keyCode === KEYS.LEFT) {
-			e.preventDefault();
-			e.stopPropagation();
-			onMoveSource(value, -1);
-		} else if (e.keyCode === KEYS.RIGHT) {
-			e.preventDefault();
-			e.stopPropagation();
-			onMoveSource(value, 1);
-		}
-	};
 	return (
-		<SettingsView spotlightId='rating-sources-view'>
-			<SectionTitle>{$L('Enabled Rating Sources')}</SectionTitle>
-			<div className={css.viewDescription}>
-				{$L('Choose which rating sources are shown in ratings rows. Press left or right on an enabled source to reorder it.')}
+		<SettingsView
+			spotlightId='rating-sources-view'
+			title={$L('Ratings')}
+			clean
+			action={<TitleAction icon='restore' label={$L('Reset to defaults')} onClick={onReset} />}
+		>
+			<div className={`${css.listItem} ${css.listItemPlain} ${css.listItemStatic}`}>
+				{renderSettingsIcon('reorder', false, true)}
+				<div className={css.listItemBody}>
+					<div className={css.listItemHeading}>{$L('Rating Sources')}</div>
+					<div className={css.listItemCaption}>{$L('Enable and reorder the rating sources shown throughout the app')}</div>
+				</div>
 			</div>
-			{ordered.map((option) => (
-				<SpottableDiv
-					key={option.value}
-					className={css.listItem}
-					onClick={() => onToggleSource(option.value)}
-					onKeyDown={makeKeyDown(option.value)}
-					spotlightId={`rating-source-${option.value}`}
-				>
-					<div className={css.listItemBody}>
-						<div className={css.listItemHeading}>{option.label}</div>
-					</div>
-					<div className={css.listItemTrailing}>{renderToggle(selected.includes(option.value))}</div>
-				</SpottableDiv>
-			))}
-			<div className={css.actionBar}>
-				<Button onClick={onReset} size='small' spotlightId='rating-sources-reset'>
-					{$L('Reset to defaults')}
-				</Button>
-				<Button onClick={onCancel} size='small' spotlightId='rating-sources-cancel'>
-					{$L('Cancel')}
-				</Button>
-				<Button onClick={onSave} size='small' spotlightId='rating-sources-save'>
-					{$L('Save')}
-				</Button>
-			</div>
+			{ordered.map((option) => {
+				const index = selected.indexOf(option.value);
+				return (
+					<ReorderRow
+						key={option.value}
+						spotlightId={`rating-source-${option.value}`}
+						title={option.label}
+						plain
+						checkbox
+						enabled={index >= 0}
+						isFirst={index <= 0}
+						isLast={index < 0 || index === selected.length - 1}
+						onToggle={() => onToggleSource(option.value)}
+						onMove={(delta) => onMoveSource(option.value, delta)}
+					/>
+				);
+			})}
 		</SettingsView>
 	);
 };
@@ -79,10 +67,10 @@ const BlockedRatingRow = ({rating, isBlocked, onToggleRating}) => (
 		onClick={() => onToggleRating(rating)}
 		spotlightId={`blocked-rating-${rating}`}
 	>
+		{renderSettingsIcon(isBlocked ? 'check_box' : 'check_box_outline_blank', false, true)}
 		<div className={css.listItemBody}>
 			<div className={css.listItemHeading}>{rating}</div>
 		</div>
-		<div className={css.listItemTrailing}>{renderToggle(isBlocked)}</div>
 	</SpottableDiv>
 );
 
@@ -91,10 +79,9 @@ export const BlockedRatingsView = ({ratings, blocked, loading, loadFailed, onTog
 	const ranked = ratings.filter(ratingIsRanked);
 	const unranked = ratings.filter((rating) => !ratingIsRanked(rating));
 	return (
-		<SettingsView spotlightId='blocked-ratings-view'>
-			<SectionTitle>{$L('Parental Controls')}</SectionTitle>
-			<div className={css.viewDescription}>{$L('Block content with the following ratings:')}</div>
-			<div className={css.viewCaption}>{$L('Blocking a rating also blocks everything stronger than it.')}</div>
+		<SettingsView spotlightId='blocked-ratings-view' title={$L('Parental Controls')} clean>
+			<div className={css.editorLead}>{$L('Block content with the following ratings:')}</div>
+			<div className={`${css.editorHint} ${css.editorHintClean}`}>{$L('Blocking a rating also blocks everything stronger than it.')}</div>
 			{loading && <div className={css.viewSpinner}><LoadingSpinner /></div>}
 			{!loading && ratings.length === 0 && (
 				<div className={css.viewDescription}>
@@ -121,8 +108,7 @@ export const BlockedRatingsView = ({ratings, blocked, loading, loadFailed, onTog
 // One row per enabled home section. Clicking cycles Default and the four
 // image types, writing through immediately like the plain settings rows do.
 export const RowImageTypesView = ({rows, overrides, globalLabel, onCycleRow}) => (
-	<SettingsView spotlightId='row-image-types-view'>
-		<SectionTitle>{$L('Row Image Types')}</SectionTitle>
+	<SettingsView spotlightId='row-image-types-view' title={$L('Row Image Types')} clean>
 		<div className={css.viewDescription}>
 			{$L('Choose the artwork each classic home row uses. Default follows the global Home Rows Image Type.')}
 		</div>
@@ -152,8 +138,7 @@ export const RowImageTypesView = ({rows, overrides, globalLabel, onCycleRow}) =>
 );
 
 export const ExcludedGenresView = ({text, onTextChange, onCancel, onSave}) => (
-	<SettingsView spotlightId='excluded-genres-view'>
-		<SectionTitle>{$L('Excluded Genres')}</SectionTitle>
+	<SettingsView spotlightId='excluded-genres-view' title={$L('Excluded Genres')} clean>
 		<div className={css.viewDescription}>
 			{$L('Enter a comma-separated list of genre names to hide from the featured media bar.')}
 		</div>
@@ -169,19 +154,18 @@ export const ExcludedGenresView = ({text, onTextChange, onCancel, onSave}) => (
 			/>
 		</div>
 		<div className={css.actionBar}>
-			<Button onClick={onCancel} size='small' spotlightId='excluded-genres-cancel'>
+			<SettingsButton onClick={onCancel} spotlightId='excluded-genres-cancel'>
 				{$L('Cancel')}
-			</Button>
-			<Button onClick={onSave} size='small' spotlightId='excluded-genres-save'>
+			</SettingsButton>
+			<SettingsButton primary onClick={onSave} spotlightId='excluded-genres-save'>
 				{$L('Save')}
-			</Button>
+			</SettingsButton>
 		</div>
 	</SettingsView>
 );
 
 export const PinCodeView = ({pin, error, onPinChange, onCancel, onSave}) => (
-	<SettingsView spotlightId='pin-code-view'>
-		<SectionTitle>{$L('Set PIN Code')}</SectionTitle>
+	<SettingsView spotlightId='pin-code-view' title={$L('Set PIN Code')} clean>
 		<div className={css.viewDescription}>
 			{$L('Enter a 4-digit PIN used to unlock the app when PIN protection is enabled.')}
 		</div>
@@ -200,12 +184,12 @@ export const PinCodeView = ({pin, error, onPinChange, onCancel, onSave}) => (
 		</div>
 		{error && <div className={`${css.statusMessage} ${css.statusError}`}>{error}</div>}
 		<div className={css.actionBar}>
-			<Button onClick={onCancel} size='small' spotlightId='pin-code-cancel'>
+			<SettingsButton onClick={onCancel} spotlightId='pin-code-cancel'>
 				{$L('Cancel')}
-			</Button>
-			<Button onClick={onSave} size='small' spotlightId='pin-code-save'>
+			</SettingsButton>
+			<SettingsButton primary onClick={onSave} spotlightId='pin-code-save'>
 				{$L('Save')}
-			</Button>
+			</SettingsButton>
 		</div>
 	</SettingsView>
 );

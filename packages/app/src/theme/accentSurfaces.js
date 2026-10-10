@@ -1,4 +1,4 @@
-import {deepenForLightInk, isValidHexColor, toCssColor} from './themeSpec';
+import {isValidHexColor, toCssColor} from './themeSpec';
 
 // The parts of the app that can each take an accent color of their own. `key` is the
 // setting that holds the pick, and an empty value means the surface keeps whatever the
@@ -59,10 +59,10 @@ export const accentSignature = (settings) =>
 // surface the theme reaches follows the theme's accent, and any other keeps the shipped cyan.
 export const defaultAccentSwatch = (surface, theme) => {
 	if (!surface.themed) return SHIPPED_ACCENT;
-	// A focused row is filled with the theme's button color, deepened until light text reads on it.
+	// A focused row is filled with the theme's button color.
 	if (surface.swatchFrom === 'buttonFocused') {
 		const fill = theme?.colors?.buttonFocused;
-		return fill ? toCssColor(deepenForLightInk(fill)) : undefined;
+		return fill ? toCssColor(fill) : undefined;
 	}
 	const accent = theme?.colors?.accent;
 	return accent ? toCssColor(accent) : undefined;

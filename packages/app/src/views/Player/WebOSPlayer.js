@@ -26,7 +26,10 @@ import {
 	getSharedVideoElement,
 	setupVisibilityHandler,
 	setupPlatformLifecycle,
-	leavesPlayerInBackground
+	leavesPlayerInBackground,
+	resumesAfterFirstFrame,
+	showHostSubtitle,
+	notePlaybackError
 } from '../../services/video';
 import {KEYS, isBackKey} from '../../utils/keys';
 import {useSettings} from '../../context/SettingsContext';
@@ -45,6 +48,7 @@ import {canBrowseEpisodes} from '../../utils/episodeBrowser';
 import useLiveProgram from './useLiveProgram';
 import useMediaSession from './useMediaSession';
 import {hasTrickplayPreview} from '../../components/TrickplayPreview';
+import {isTrickplayOn} from '../../utils/trickplayLayout';
 import useChannelCarousel from './useChannelCarousel';
 import ChannelCarousel from './ChannelCarousel';
 import NextUpOverlay from './NextUpOverlay';
@@ -205,7 +209,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const {showBuffering, noteSeek} = useBufferingAnimation({
 		isBuffering,
 		isSeeking,
-		hasPreview: settings.trickPlayEnabled !== false && hasTrickplayPreview(item.Id, mediaSourceId)
+		hasPreview: isTrickplayOn(settings) && hasTrickplayPreview(item.Id, mediaSourceId)
 	});
 	const [hasTriedTranscode, setHasTriedTranscode] = useState(false);
 	const [focusRow, setFocusRow] = useState('bottom');
@@ -1095,6 +1099,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					disposeAssRenderer(assRendererRef.current);
 					assRendererRef.current = null;
 					clearAssCanvas(assCanvasRef.current);
+					showHostSubtitle(videoRef.current, -1);
 
 					const supportsAss = sub && sub.isAss && supportsAssRenderer();
 					if (supportsAss) {
@@ -1108,6 +1113,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						} else {
 							initAssRendererForStream(sub);
 						}
+					} else if (sub && sub.hostRendered) {
+						showHostSubtitle(videoRef.current, sub.index);
+						setSubtitleTrackEvents(null);
 					} else if (sub && sub.isTextBased) {
 						loadTextTrack(sub);
 					} else if (sub && sub.isImageBased && settings.enablePgsRendering) {
@@ -1122,6 +1130,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const turnSubtitlesOff = () => {
 					setSelectedSubtitleIndex(-1);
 					setSubtitleTrackEvents(null);
+					showHostSubtitle(videoRef.current, -1);
 				};
 				if (initialSubtitleChoice === null) {
 					turnSubtitlesOff();
@@ -1513,14 +1522,20 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			destroyHlsPlayer();
 
 			let srcUrl = mediaUrl;
+			const isHls = mimeType === 'application/x-mpegURL' || mediaUrl.includes('.m3u8');
 			const resumeTicks = pendingResumeTicksRef.current;
-			if (resumeTicks > 0) {
+			if (resumeTicks > 0 && !isHls && resumesAfterFirstFrame(playback.getCurrentSession()?.mediaSource)) {
+				// Where a seek made before the first frame shows never lands, the file is
+				// opened at its start and the resume waits for that frame.
+				video.addEventListener('loadeddata', () => {
+					if (video.src === mediaUrl && pendingResumeTicksRef.current > 0) video.currentTime = pendingResumeTicksRef.current / 10000000;
+				}, {once: true});
+			} else if (resumeTicks > 0) {
 				const resumeSec = resumeTicks / 10000000;
 				srcUrl = mediaUrl + '#t=' + resumeSec;
 				console.log('[Player] Appending media fragment #t=' + resumeSec + ' for resume (' + resumeTicks + ' ticks)');
 			}
 
-			const isHls = mimeType === 'application/x-mpegURL' || mediaUrl.includes('.m3u8');
 			// forceHlsJsRef overrides native when HEVC decoding already failed
 			const nativeHlsOk = !forceHlsJsRef.current
 				&& !!(video.canPlayType('application/x-mpegURL').replace(/no/, ''));
@@ -1925,6 +1940,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			if (healthMonitorRef.current) {
 				healthMonitorRef.current.recordProgress();
+				healthMonitorRef.current.recordFrames(videoRef.current);
 			}
 
 			if (subtitleTrackEvents && subtitleTrackEvents.length > 0) {
@@ -2092,6 +2108,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 
 		const session = playback.getCurrentSession();
+		notePlaybackError(video?.error, session?.mediaSource, playMethod);
 		const hasVideoStream = !!session?.mediaSource?.MediaStreams?.some((s) => s.Type === 'Video');
 		const isAudioOnlySession = !!session?.mediaSource && !hasVideoStream;
 		if (isAudioOnlySession) {
@@ -2298,7 +2315,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// commits it. The viewer can turn that off, and without a preview playback carries on.
 	const beginScrub = useCallback(() => {
 		if (scrubHoldRef.current.active || settings.trickPlayPauseWhileScrubbing === false ||
-			settings.trickPlayEnabled === false || isInGroup || !hasTrickplayPreview(item.Id, mediaSourceId)) return;
+			settings.trickPlayMode === 'disabled' || isInGroup || !hasTrickplayPreview(item.Id, mediaSourceId)) return;
 		const video = videoRef.current;
 		const wasPlaying = Boolean(video && !video.paused);
 		scrubHoldRef.current = {active: true, wasPlaying, ticks: null};
@@ -2306,7 +2323,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			video.pause();
 			healthMonitorRef.current?.setPaused(true);
 		}
-	}, [settings.trickPlayPauseWhileScrubbing, settings.trickPlayEnabled, isInGroup, item.Id, mediaSourceId]);
+	}, [settings.trickPlayPauseWhileScrubbing, settings.trickPlayMode, isInGroup, item.Id, mediaSourceId]);
 
 	// One scrub step on. A held scrub only moves its target, anything else seeks as it goes.
 	const scrubBy = useCallback((deltaSeconds) => {
@@ -2483,6 +2500,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		disposeAssRenderer(assRendererRef.current);
 		assRendererRef.current = null;
 		clearAssCanvas(assCanvasRef.current);
+		showHostSubtitle(videoRef.current, -1);
 
 		if (index === -1) {
 			setSelectedSubtitleIndex(-1);
@@ -2520,6 +2538,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						console.error('[Player] Burn in subtitle reload failed:', err);
 					}
 				}
+			} else if (stream && stream.hostRendered) {
+				showHostSubtitle(videoRef.current, index);
+				setSubtitleTrackEvents(null);
 			} else if (stream && stream.isAss && supportsAssRenderer()) {
 				await initAssRendererForStream(stream);
 			} else if (stream && stream.isTextBased) {

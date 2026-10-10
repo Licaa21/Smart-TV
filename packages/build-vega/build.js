@@ -162,6 +162,7 @@ const buildApp = (appPkg) => {
 		'@moonfin/platform-webos': path.resolve(__dirname, '..', 'platform-webos', 'src'),
 		'@moonfin/platform-tizen': path.resolve(__dirname, '..', 'platform-tizen', 'src'),
 		'@moonfin/platform-vega': path.resolve(__dirname, '..', 'platform-vega', 'src'),
+		'@moonfin/platform-xbox': path.resolve(__dirname, '..', 'platform-xbox', 'src'),
 		'@moonfin/app': APP_DIR
 	});
 
@@ -256,10 +257,10 @@ const buildVpkg = (version) => {
 	if (!built) throw new Error(`No .vpkg found under ${outDir}`);
 
 	const prefix = `Moonfin_Vega_${buildType === 'Debug' ? 'Debug_' : ''}`;
-	for (const file of fs.readdirSync(ROOT_DIR).filter((entry) => entry.startsWith(prefix) && /^\d+\.\d+\.\d+\.vpkg$/.test(entry.slice(prefix.length)))) {
+	for (const file of fs.readdirSync(ROOT_DIR).filter((entry) => entry.startsWith(prefix) && /^v?\d+\.\d+\.\d+\.vpkg$/.test(entry.slice(prefix.length)))) {
 		fs.unlinkSync(path.join(ROOT_DIR, file));
 	}
-	const finalName = `${prefix}${version}.vpkg`;
+	const finalName = `${prefix}v${version}.vpkg`;
 	fs.copyFileSync(path.join(outDir, built), path.join(ROOT_DIR, finalName));
 	console.log(`  ${finalName}`);
 

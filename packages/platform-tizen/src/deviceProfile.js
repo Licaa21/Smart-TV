@@ -339,6 +339,9 @@ const probeTizenAudioCodecSupport = () => {
 	}
 
 	if (support.dtshd) support.dts = true;
+	// A set saying it takes TrueHD isn't enough on its own. It only reaches a receiver over eARC
+	// and can fall back to something else on the way, so it waits for the viewer to opt in.
+	if (!isExperimentalTruehdEnabled()) support.truehd = false;
 
 	console.log('[deviceProfile] Tizen audio codec probe:', support);
 	return support;
@@ -394,6 +397,9 @@ export const getDeviceCapabilities = async () => {
 		ac3: audioProbe.ac3,
 		eac3: audioProbe.eac3,
 		truehd: audioProbe.truehd,
+		// What the set answered when asked, true, false or null when it couldn't say, for the
+		// player's info panel. Whether TrueHD is offered also waits on the opt-in.
+		truehdCodecSupported: probeTruehdCodecSupport(),
 		dtshd: audioProbe.dtshd,
 		opus: true,
 

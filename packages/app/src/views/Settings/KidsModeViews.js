@@ -1,13 +1,12 @@
 import {useCallback} from 'react';
 import $L from '@enact/i18n/$L';
 
-import Button from '@enact/sandstone/Button';
 
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
 import SettingsView from './SettingsView';
-import {SectionTitle} from './settingsRows';
 
 import css from './Settings.module.less';
+import SettingsButton from './SettingsButton';
 
 // The field hands back an event, and both screens only want the digits out of it.
 const usePinInput = (onPinChange) => useCallback(
@@ -41,19 +40,18 @@ export const KidsModeSetView = ({pin, error, onPinChange, onCancel, onSave}) => 
 	const handleChange = usePinInput(onPinChange);
 
 	return (
-		<SettingsView spotlightId="kids-mode-set-view">
-			<SectionTitle>{$L('Set Kids Mode PIN')}</SectionTitle>
+		<SettingsView spotlightId="kids-mode-set-view" title={$L('Set Kids Mode PIN')}>
 			<div className={css.viewDescription}>
 				{$L('Choose a 4-digit PIN. You will need it to turn Kids Mode off.')}
 			</div>
 			<PinField pin={pin} error={error} onChange={handleChange} />
 			<div className={css.actionBar}>
-				<Button onClick={onCancel} size="small" spotlightId="kids-pin-cancel">
+				<SettingsButton onClick={onCancel} spotlightId="kids-pin-cancel">
 					{$L('Cancel')}
-				</Button>
-				<Button onClick={onSave} size="small" spotlightId="kids-pin-save">
+				</SettingsButton>
+				<SettingsButton primary onClick={onSave} spotlightId="kids-pin-save">
 					{$L('Save')}
-				</Button>
+				</SettingsButton>
 			</div>
 		</SettingsView>
 	);
@@ -65,19 +63,18 @@ export const KidsModeExitView = ({pin, error, onPinChange, onCancel, onSubmit}) 
 	const handleChange = usePinInput(onPinChange);
 
 	return (
-		<SettingsView spotlightId="kids-mode-exit-view">
-			<SectionTitle>{$L('Exit Kids Mode')}</SectionTitle>
+		<SettingsView spotlightId="kids-mode-exit-view" title={$L('Exit Kids Mode')}>
 			<div className={css.viewDescription}>
 				{$L('Enter your PIN to restore the full app')}
 			</div>
 			<PinField pin={pin} error={error} onChange={handleChange} />
 			<div className={css.actionBar}>
-				<Button onClick={onCancel} size="small" spotlightId="kids-pin-cancel">
+				<SettingsButton onClick={onCancel} spotlightId="kids-pin-cancel">
 					{$L('Cancel')}
-				</Button>
-				<Button onClick={onSubmit} size="small" spotlightId="kids-pin-save">
+				</SettingsButton>
+				<SettingsButton primary onClick={onSubmit} spotlightId="kids-pin-save">
 					{$L('Unlock')}
-				</Button>
+				</SettingsButton>
 			</div>
 		</SettingsView>
 	);

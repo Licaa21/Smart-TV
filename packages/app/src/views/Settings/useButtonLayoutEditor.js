@@ -1,4 +1,4 @@
-import {useCallback, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 
 import {
 	ordered, hiddenSet, withUnknownIds, DETAIL_BUTTONS, OSD_BUTTONS,
@@ -8,6 +8,7 @@ import {
 	DETAIL_METADATA, DETAIL_METADATA_ORDER_KEY, DETAIL_METADATA_HIDDEN_KEY
 } from '../../utils/detailMetadataLayout';
 import {AUDIO_CODECS, AUDIO_CODEC_ORDER_KEY} from '../../utils/audioCodecs';
+import {editedListKey} from './settingsRows';
 
 // The details row, the player controls, and the details metadata row are arranged the same way,
 // so one view drives all three and only the storage keys and catalogue differ. The audio codec
@@ -32,16 +33,20 @@ const returnFocusMap = {
 	audioCodec: 'setting-audioCodecOrder'
 };
 
-// Edits go to a scratch copy, so backing out of the screen leaves the stored arrangement alone.
-const useButtonLayoutEditor = ({settings, updateSettings, pushView, popView}) => {
+// Edits go to a scratch copy that's written back once the screen closes, and only if it ended up
+// different, so stepping through the list doesn't redraw the screens that read it at every press.
+const useButtonLayoutEditor = ({settings, updateSettings, pushView}) => {
 	const [tempButtons, setTempButtons] = useState([]);
 	const [buttonLayoutKind, setButtonLayoutKind] = useState('detail');
+	const openedRef = useRef('');
 
 	const openButtonLayout = useCallback((kind) => {
 		const {catalogue, orderKey, hiddenKey} = buttonLayoutKeys(kind);
 		const off = hiddenSet(hiddenKey ? settings[hiddenKey] : []);
+		const buttons = ordered(catalogue, settings[orderKey]).map((btn) => ({...btn, enabled: !off.has(btn.id)}));
+		openedRef.current = editedListKey(buttons);
 		setButtonLayoutKind(kind);
-		setTempButtons(ordered(catalogue, settings[orderKey]).map((btn) => ({...btn, enabled: !off.has(btn.id)})));
+		setTempButtons(buttons);
 		pushView({view: 'buttonLayout', returnFocusTo: returnFocusMap[kind] || 'setting-detailButtons'});
 	}, [settings, pushView]);
 
@@ -50,11 +55,12 @@ const useButtonLayoutEditor = ({settings, updateSettings, pushView, popView}) =>
 	const openDetailMetadata = useCallback(() => openButtonLayout('metadata'), [openButtonLayout]);
 	const openAudioCodecs = useCallback(() => openButtonLayout('audioCodec'), [openButtonLayout]);
 
-	const saveButtonLayout = useCallback(() => {
+	const commitButtonLayout = useCallback(() => {
+		if (editedListKey(tempButtons) === openedRef.current) return;
+		openedRef.current = editedListKey(tempButtons);
 		const {catalogue, orderKey, hiddenKey} = buttonLayoutKeys(buttonLayoutKind);
 		if (!hiddenKey) {
 			updateSettings({[orderKey]: tempButtons.map((btn) => btn.id)});
-			popView();
 			return;
 		}
 		const merged = withUnknownIds(
@@ -66,8 +72,7 @@ const useButtonLayoutEditor = ({settings, updateSettings, pushView, popView}) =>
 			{order: settings[orderKey], hidden: settings[hiddenKey]}
 		);
 		updateSettings({[orderKey]: merged.order, [hiddenKey]: merged.hidden});
-		popView();
-	}, [buttonLayoutKind, tempButtons, settings, updateSettings, popView]);
+	}, [buttonLayoutKind, tempButtons, settings, updateSettings]);
 
 	const resetButtonLayout = useCallback(() => {
 		setTempButtons(buttonLayoutKeys(buttonLayoutKind).catalogue.map((btn) => ({...btn, enabled: true})));
@@ -96,7 +101,7 @@ const useButtonLayoutEditor = ({settings, updateSettings, pushView, popView}) =>
 		openOsdButtons,
 		openDetailMetadata,
 		openAudioCodecs,
-		saveButtonLayout,
+		commitButtonLayout,
 		resetButtonLayout,
 		toggleLayoutButton,
 		moveLayoutButton

@@ -1,4 +1,4 @@
-import {useCallback, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 
 import {DEFAULT_HOME_ROWS} from '../../context/SettingsContext';
 import {SEERR_CONFIG_TO_SECTION} from '../../utils/seerrHomeRows';
@@ -13,13 +13,25 @@ import {
 	mergeDiscoveredPluginSections
 } from './homeSectionsModel';
 import {apiSortBy, getGenresIncludeTypes, resolveSortOrder} from '../../utils/homeRowSorting';
+import {editedListKey} from './settingsRows';
 
-// The home screen row order, edited against a scratch copy and written back on save. The
-// IMDb rows are stored twice, as a row and as their own setting, so both are updated.
-const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushView, popView}) => {
+// Swaps the order two entries hold, as new objects so the stored rows aren't changed under the
+// screen before it writes them back
+const swapOrder = (list, index, target) => {
+	const next = [...list];
+	next[index] = {...list[index], order: list[target].order};
+	next[target] = {...list[target], order: list[index].order};
+	return next.sort((a, b) => a.order - b.order);
+};
+
+// The home screen row order, edited against a scratch copy and written back once the screen
+// closes, and only if it ended up different. The IMDb rows are stored twice, as a row and as
+// their own setting, so both are updated.
+const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushView}) => {
 	const [tempHomeRows, setTempHomeRows] = useState([]);
 	const [tempPluginSections, setTempPluginSections] = useState([]);
 	const [pluginSectionRenderLimit, setPluginSectionRenderLimit] = useState(INITIAL_PLUGIN_SECTION_RENDER_COUNT);
+	const openedRef = useRef({rows: '', sections: ''});
 
 	const refreshBuiltInCollectionGenreSections = useCallback(async () => {
 		const collectionsSortBy = apiSortBy(settings.collectionsRowSortBy || 'SortName');
@@ -63,7 +75,9 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 	}, [toggleHomeRowEnabled]);
 
 	const openHomeRows = useCallback(() => {
-		setTempHomeRows([...(settings.homeRows || DEFAULT_HOME_ROWS)].sort((a, b) => a.order - b.order));
+		const rows = [...(settings.homeRows || DEFAULT_HOME_ROWS)].sort((a, b) => a.order - b.order);
+		openedRef.current = {rows: editedListKey(rows), sections: null};
+		setTempHomeRows(rows);
 		setPluginSectionRenderLimit(INITIAL_PLUGIN_SECTION_RENDER_COUNT);
 		pushView({ view: 'homeRows', returnFocusTo: 'setting-homeRows' });
 
@@ -87,13 +101,19 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 							builtInSectionToPluginSection
 						);
 					}
+					// The discovered rows join the list as it opened, so they alone are no change
+					if (openedRef.current.sections === null) openedRef.current.sections = editedListKey(merged);
 					return merged;
 				});
 			})
 			.catch(() => {});
 	}, [settings.homeRows, pushView, refreshBuiltInCollectionGenreSections]);
 
-	const saveHomeRows = useCallback(() => {
+	const commitHomeRows = useCallback(() => {
+		const rowsChanged = editedListKey(tempHomeRows) !== openedRef.current.rows;
+		const sectionsChanged = openedRef.current.sections !== null && editedListKey(tempPluginSections) !== openedRef.current.sections;
+		if (!rowsChanged && !sectionsChanged) return;
+		openedRef.current = {rows: editedListKey(tempHomeRows), sections: editedListKey(tempPluginSections)};
 		const updates = {homeRows: tempHomeRows, pluginSections: tempPluginSections};
 		const imdbMap = {
 			'imdb-top250-movies': 'imdbTop250MoviesEnabled',
@@ -110,8 +130,7 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 			}
 		});
 		updateSettings(updates);
-		popView();
-	}, [tempHomeRows, tempPluginSections, updateSettings, popView]);
+	}, [tempHomeRows, tempPluginSections, updateSettings]);
 
 	const resetHomeRows = useCallback(() => {
 		setTempHomeRows([...DEFAULT_HOME_ROWS]);
@@ -123,7 +142,7 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 
 	// Reordering steps over the rows the gates are hiding, so a press moves the row past
 	// the next one the viewer can actually see.
-	const swapVisibleNeighbour = useCallback((rowId, direction) => {
+	const moveHomeRow = useCallback((rowId, direction) => {
 		setTempHomeRows((prev) => {
 			const visibleRows = prev.filter((row) => isHomeRowVisibleByGates(row.id, settings));
 			const visibleIndex = visibleRows.findIndex((row) => row.id === rowId);
@@ -133,36 +152,31 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 			const index = prev.findIndex((r) => r.id === rowId);
 			const targetIndex = prev.findIndex((r) => r.id === targetId);
 			if (index < 0 || targetIndex < 0) return prev;
-			const newRows = [...prev];
-			const temp = newRows[index].order;
-			newRows[index].order = newRows[targetIndex].order;
-			newRows[targetIndex].order = temp;
-			return newRows.sort((a, b) => a.order - b.order);
+			return swapOrder(prev, index, targetIndex);
 		});
 	}, [settings]);
 
-	const moveHomeRowUp = useCallback((rowId) => swapVisibleNeighbour(rowId, -1), [swapVisibleNeighbour]);
-	const moveHomeRowDown = useCallback((rowId) => swapVisibleNeighbour(rowId, 1), [swapVisibleNeighbour]);
+	// A section touched before the discovered ones came back still counts against the list it had
+	const noteSectionsOpened = (prev) => {
+		if (openedRef.current.sections === null) openedRef.current.sections = editedListKey(prev);
+	};
 
 	const togglePluginSection = useCallback((sectionId) => {
-		setTempPluginSections((prev) => prev.map((section) => (section.id === sectionId ? {...section, enabled: !section.enabled} : section)));
+		setTempPluginSections((prev) => {
+			noteSectionsOpened(prev);
+			return prev.map((section) => (section.id === sectionId ? {...section, enabled: !section.enabled} : section));
+		});
 	}, []);
 
 	const movePluginSection = useCallback((sectionId, direction) => {
 		setTempPluginSections((prev) => {
+			noteSectionsOpened(prev);
 			const index = prev.findIndex((section) => section.id === sectionId);
 			const target = index + direction;
 			if (index < 0 || target < 0 || target >= prev.length) return prev;
-			const next = [...prev];
-			const temp = next[index].order;
-			next[index].order = next[target].order;
-			next[target].order = temp;
-			return next.sort((a, b) => a.order - b.order);
+			return swapOrder(prev, index, target);
 		});
 	}, []);
-
-	const movePluginSectionUp = useCallback((sectionId) => movePluginSection(sectionId, -1), [movePluginSection]);
-	const movePluginSectionDown = useCallback((sectionId) => movePluginSection(sectionId, 1), [movePluginSection]);
 
 	return {
 		tempHomeRows,
@@ -172,14 +186,12 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 		toggleHomeRowEnabled,
 		toggleSeerrHomeRow,
 		openHomeRows,
-		saveHomeRows,
+		commitHomeRows,
 		resetHomeRows,
 		toggleHomeRow,
-		moveHomeRowUp,
-		moveHomeRowDown,
+		moveHomeRow,
 		togglePluginSection,
-		movePluginSectionUp,
-		movePluginSectionDown
+		movePluginSection
 	};
 };
 

@@ -5,13 +5,13 @@ jest.mock('@enact/i18n/$L', () => ({__esModule: true, default: (str) => str}));
 import {defaultSettings} from '../../context/defaultSettings';
 
 import {KIND, SETTINGS_SCHEMA, resolve, spotlightIdOf} from './settingsSchema';
-import {buildSettingsIndex, resultSpotlightId} from './settingsSearch';
+import {buildSettingsIndex, matchSettings, resultSpotlightId} from './settingsSearch';
 
 // Guards the hand-written schema against the mistakes that would otherwise be invisible:
 // a key that does not exist writes junk into settings, and a repeated spotlight id makes
 // a deep linked search result focus the wrong row.
 
-const CUSTOM_RENDERERS = ['moonfinStatus', 'seerrPanel', 'aboutDataActions', 'imageCacheActions', 'checkForUpdates', 'profileSync', 'playbackTimePreview', 'screensaverPreview', 'loadingAnimationPreview', 'skipSegmentPreview'];
+const CUSTOM_RENDERERS = ['moonbasePlugin', 'seerrPanel', 'aboutHeader', 'aboutDataActions', 'subtitlePreview', 'imageCacheActions', 'checkForUpdates', 'playbackTimePreview', 'screensaverPreview', 'loadingAnimationPreview', 'trickplayPreview', 'skipSegmentPreview'];
 const KEYED = [KIND.TOGGLE, KIND.OPTION, KIND.SLIDER];
 
 // Enough of a context that every label, value and condition can be called.
@@ -24,6 +24,8 @@ const ctx = {
 	isSeerr: true,
 	hasMultipleServers: false,
 	isWebOS: true,
+	isTizen: false,
+	isVega: false,
 	serverUrl: 'http://localhost',
 	serverVersion: '10.9',
 	availableThemes: [{id: 'default', displayName: 'Default'}],
@@ -105,31 +107,72 @@ describe('settings schema', () => {
 		expect(problems).toEqual([]);
 	});
 
-	// An unanswered ping says nothing about what the admin chose, so these rows have to
-	// report that rather than the no they used to show.
-	describe('plugin panel status rows', () => {
-		const statusOf = (id, pluginInfo) => {
-			const {row} = allRows().find((entry) => entry.row.id === id);
-			return resolve(row.value, {...ctx, seerr: {...ctx.seerr, pluginInfo}});
-		};
+	describe('Moonbase plugin screen', () => {
+		const pluginScreen = () => allScreens().find(({category, sub}) => category.id === 'account' && sub.id === 'settingsSync').sub;
 
-		test.each([
-			['seerrStatus', 'seerrEnabled', 'Enabled by Admin', 'Disabled by Admin'],
-			['settingsSync', 'settingsSyncEnabled', 'Available', 'Not Available']
-		])('%s reads its flag and falls back to unknown', (id, flag, yes, no) => {
-			expect(statusOf(id, {[flag]: true})).toBe(yes);
-			expect(statusOf(id, {[flag]: false})).toBe(no);
-			expect(statusOf(id, null)).toBe('Unknown');
-			expect(statusOf(id, {})).toBe('Unknown');
+		test('Settings Sync is the Moonbase block and nothing else', () => {
+			const rows = pluginScreen().rows;
+
+			expect(rows).toHaveLength(1);
+			expect(rows[0]).toMatchObject({kind: KIND.CUSTOM, render: 'moonbasePlugin'});
+		});
+
+		test('has no other row for the plugin switch, its status or the profile picker', () => {
+			const rows = pluginScreen().rows;
+
+			expect(rows.filter((row) => row.key === 'useMoonfinPlugin')).toHaveLength(1);
+			for (const gone of ['moonfinStatus', 'pluginVersion', 'settingsSync', 'customizationProfile', 'profileSync']) {
+				expect(rows.some((row) => row.id === gone || row.render === gone)).toBe(false);
+			}
+		});
+
+		test('a search for the plugin lands on the status card', () => {
+			const index = buildSettingsIndex(SETTINGS_SCHEMA, ctx, {resolve, spotlightIdOf});
+			const [first] = matchSettings(index, 'Moonbase');
+
+			expect(first).toMatchObject({type: 'setting', categoryId: 'account', subcategoryId: 'settingsSync'});
+			expect(first.spotlightId).toBe('setting-useMoonfinPlugin');
+		});
+
+		test('a search for a profile finds the screen', () => {
+			const index = buildSettingsIndex(SETTINGS_SCHEMA, ctx, {resolve, spotlightIdOf});
+
+			expect(matchSettings(index, 'profile').map((entry) => entry.spotlightId)).toContain('setting-useMoonfinPlugin');
 		});
 	});
 
-	test('every option row falls back to one of its own option labels', () => {
+	describe('Experimental TrueHD', () => {
+		const truehdRow = () => allRows().find(({row}) => row.key === 'experimentalTruehd').row;
+		const shownWith = (overrides, settings = {}) => truehdRow().when({...ctx, ...overrides, settings: {...ctx.settings, ...settings}});
+
+		test('only Samsung sets offer it', () => {
+			expect(shownWith({isTizen: true, isWebOS: false})).toBe(true);
+			expect(shownWith({isTizen: false, isWebOS: true})).toBe(false);
+			expect(shownWith({isTizen: false, isWebOS: false, isVega: true})).toBe(false);
+		});
+
+		test('it shows in auto and manual mode, and goes away when nothing may bitstream', () => {
+			const tizen = {isTizen: true, isWebOS: false};
+			expect(shownWith(tizen, {audioPassthroughMode: 'auto'})).toBe(true);
+			expect(shownWith(tizen, {audioPassthroughMode: 'manual'})).toBe(true);
+			expect(shownWith(tizen, {audioPassthroughMode: 'disabled'})).toBe(false);
+			expect(shownWith(tizen, {audioPassthroughMode: 'auto', downmixToStereo: true})).toBe(false);
+		});
+
+		test('turning it on goes through the action that drops the cached capabilities', () => {
+			const toggleExperimentalTruehd = jest.fn();
+			truehdRow().onToggle({...ctx, actions: {toggleExperimentalTruehd}});
+			expect(toggleExperimentalTruehd).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	// The fallback stands in for the value on the row's chip, so it's one of the chip texts
+	test('every option row falls back to what one of its own options shows on the chip', () => {
 		const mismatched = [];
 		allRows()
 			.filter(({row}) => row.kind === KIND.OPTION)
 			.forEach(({sub, row}) => {
-				const labels = row.options(ctx).map((option) => option.label);
+				const labels = row.options(ctx).map((option) => option.chip || option.label);
 				const fallback = resolve(row.fallback, ctx);
 				if (labels.length > 0 && !labels.includes(fallback)) {
 					mismatched.push(`${sub.id}.${row.key} -> ${fallback}`);

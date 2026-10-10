@@ -34,6 +34,47 @@
 	font-display: swap;
 }
 
+// The interface is set in Roboto. A weight between the three faces takes the nearest one.
+@font-face {
+	font-family: 'Roboto';
+	src: url('../../resources/fonts/Roboto-Regular.woff') format('woff');
+	font-weight: 400;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Roboto';
+	src: url('../../resources/fonts/Roboto-Medium.woff') format('woff');
+	font-weight: 500;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Roboto';
+	src: url('../../resources/fonts/Roboto-Bold.woff') format('woff');
+	font-weight: 700;
+	font-display: swap;
+}
+
+// The face the clean settings screens set their headings in
+@font-face {
+	font-family: 'NotoSans';
+	src: url('../../resources/fonts/NotoSans-Regular.woff') format('woff');
+	font-weight: 400;
+	font-display: swap;
+}
+
+// Sandstone names its own face on its root, and its non-Latin rule outranks that, so both are
+// matched here. A script Roboto has no glyphs for falls back to Sandstone's faces for it.
+:global(html) :global(.sandstone-theme),
+:global(html) :global(.sandstone-theme.enact-locale-non-latin),
+:global(button),
+:global(input),
+:global(select),
+:global(textarea) {
+	font-family: 'Roboto', 'Sandstone', sans-serif;
+}
+
 :global(html),
 :global(body),
 :global(#root) {
@@ -45,7 +86,7 @@
 	text-size-adjust: 100%;
 	background: var(--theme-background, #000b25);
 	color: var(--theme-on-background, #fff);
-	font-family: var(--theme-font-family, inherit);
+	font-family: 'Roboto', 'Sandstone', sans-serif;
 }
 
 .app {

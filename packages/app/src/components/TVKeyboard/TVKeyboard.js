@@ -585,6 +585,11 @@ class TVKeyboardHost extends Component {
 			this.act('BACKSPACE');
 			return;
 		}
+		// The Xbox controller's Menu button, as a quicker way to the done key
+		if (code === 93) {
+			this.act('DONE');
+			return;
+		}
 		if (code === 37) return this.move(0, -1);
 		if (code === 39) return this.move(0, 1);
 		if (code === 38) {

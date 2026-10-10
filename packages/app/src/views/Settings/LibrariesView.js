@@ -1,13 +1,12 @@
 /* eslint-disable react/jsx-no-bind */
 import $L from '@enact/i18n/$L';
-import Button from '@enact/sandstone/Button';
 
 import {renderToggle} from './settingsIcons';
 import {SpottableDiv} from './settingsSpottables';
-import {SectionTitle} from './settingsRows';
 import SettingsView from './SettingsView';
 
 import css from './Settings.module.less';
+import SettingsButton from './SettingsButton';
 
 // In unified mode the same library name can appear once per server, so each row says which
 // server it came from.
@@ -21,8 +20,7 @@ const LibrariesView = ({
 	onCancel,
 	onSave
 }) => (
-	<SettingsView spotlightId='libraries-view'>
-		<SectionTitle>{$L('Hide Libraries')}</SectionTitle>
+	<SettingsView spotlightId='libraries-view' title={$L('Hide Libraries')} clean>
 		<div className={css.viewDescription}>
 			{$L('Hidden libraries are removed from all Jellyfin clients. This is a server-level setting.')}
 		</div>
@@ -52,12 +50,12 @@ const LibrariesView = ({
 		)}
 		{!loading && (
 			<div className={css.actionBar}>
-				<Button onClick={onCancel} size='small' spotlightId='lib-cancel'>
+				<SettingsButton onClick={onCancel} spotlightId='lib-cancel'>
 					{$L('Cancel')}
-				</Button>
-				<Button onClick={onSave} size='small' disabled={saving} spotlightId='lib-save'>
+				</SettingsButton>
+				<SettingsButton primary onClick={onSave} disabled={saving} spotlightId='lib-save'>
 					{saving ? $L('Saving...') : $L('Save')}
-				</Button>
+				</SettingsButton>
 			</div>
 		)}
 	</SettingsView>

@@ -38,10 +38,24 @@ export const buildSettingsIndex = (schema, ctx, deps) => {
 	schema.forEach((category) => {
 		if (category.when && !category.when(ctx)) return;
 		const categoryLabel = resolve(category.label, ctx);
+		const subsById = {};
+		(category.subcategories || []).forEach((sub) => {
+			subsById[sub.id] = sub;
+		});
 
 		(category.subcategories || []).forEach((sub) => {
 			if (sub.when && !sub.when(ctx)) return;
 			const subLabel = resolve(sub.label, ctx);
+			// The breadcrumb names the screens on the way to a row. A screen reached from another one
+			// names that one too, and a category's own page is the category, so it isn't said twice.
+			const path = [categoryLabel];
+			const parents = [];
+			for (let parent = subsById[sub.parent]; parent; parent = subsById[parent.parent]) {
+				parents.unshift(resolve(parent.label, ctx));
+			}
+			path.push(...parents);
+			const screenPath = path.join(' › ');
+			if (subLabel !== categoryLabel) path.push(subLabel);
 			let section = null;
 			let indexed = 0;
 
@@ -70,7 +84,7 @@ export const buildSettingsIndex = (schema, ctx, deps) => {
 					spotlightId: spotlightIdOf(row),
 					icon: resolve(row.icon, ctx),
 					title,
-					breadcrumb: [categoryLabel, subLabel, section].filter(Boolean).join(' › '),
+					breadcrumb: path.join(' › '),
 					haystackTitle: normalize(title),
 					haystackBody: normalize([desc, section, subLabel, categoryLabel, optionLabels, keywords].join(' '))
 				});
@@ -89,7 +103,7 @@ export const buildSettingsIndex = (schema, ctx, deps) => {
 				spotlightId: null,
 				icon: resolve(category.icon, ctx),
 				title: subLabel,
-				breadcrumb: categoryLabel,
+				breadcrumb: screenPath,
 				haystackTitle: normalize(subLabel),
 				haystackBody: normalize([subDesc, categoryLabel, subKeywords].join(' '))
 			});

@@ -4,7 +4,6 @@ import $L from '@enact/i18n/$L';
 import {getSeerrHomeRowConfigs, SEERR_CONFIG_TO_SECTION} from '../../utils/seerrHomeRows';
 import {renderToggle} from './settingsIcons';
 import {SpottableDiv} from './settingsSpottables';
-import {SectionTitle} from './settingsRows';
 import SettingsView from './SettingsView';
 
 import css from './Settings.module.less';
@@ -12,8 +11,7 @@ import css from './Settings.module.less';
 // Two lists of rows that are switched on and off one at a time, with no ordering to do.
 
 export const SeerrHomeRowsView = ({seerrLabel, enabledMap, onToggleRow}) => (
-	<SettingsView spotlightId='seerr-home-rows-view'>
-		<SectionTitle>{`${seerrLabel} ${$L('Home Rows')}`}</SectionTitle>
+	<SettingsView spotlightId='seerr-home-rows-view' title={`${seerrLabel} ${$L('Home Rows')}`} clean>
 		<div className={css.viewDescription}>
 			{$L('Choose which Seerr discover rows appear on the home screen.')}
 		</div>
@@ -57,8 +55,7 @@ export const ImdbListsView = ({settings, onUpdateSettings}) => {
 	};
 
 	return (
-		<SettingsView spotlightId='imdb-lists-view'>
-			<SectionTitle>{$L('IMDb Lists')}</SectionTitle>
+		<SettingsView spotlightId='imdb-lists-view' title={$L('IMDb Lists')} clean>
 			<div className={css.viewDescription}>
 				{$L('Choose which IMDb lists are active. Activating a list adds it to your Home Sections.')}
 			</div>

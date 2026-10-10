@@ -9,14 +9,14 @@ const ids = (libraries) => libraries.map((library) => library.Id);
 
 describe('libraryOrderIcon', () => {
 	test('follows the collection type, with a game library and anything unknown on their own icons', () => {
-		expect(libraryOrderIcon({CollectionType: 'movies'})).toBe('movie');
-		expect(libraryOrderIcon({CollectionType: 'TvShows'})).toBe('tv');
-		expect(libraryOrderIcon({CollectionType: 'audiobooks'})).toBe('menu_book');
-		expect(libraryOrderIcon({CollectionType: 'photos'})).toBe('photo_library');
-		expect(libraryOrderIcon({CollectionType: 'boxsets'})).toBe('collections_bookmark');
-		expect(libraryOrderIcon({CollectionType: 'playlists'})).toBe('playlist_play');
+		expect(libraryOrderIcon({CollectionType: 'movies'})).toBe('movie_rounded');
+		expect(libraryOrderIcon({CollectionType: 'TvShows'})).toBe('tv_rounded');
+		expect(libraryOrderIcon({CollectionType: 'audiobooks'})).toBe('menu_book_rounded');
+		expect(libraryOrderIcon({CollectionType: 'photos'})).toBe('photo_library_rounded');
+		expect(libraryOrderIcon({CollectionType: 'boxsets'})).toBe('collections_bookmark_rounded');
+		expect(libraryOrderIcon({CollectionType: 'playlists'})).toBe('playlist_play_rounded');
 		expect(libraryOrderIcon({Name: 'Games', CollectionType: ''})).toBe('sports_esports');
-		expect(libraryOrderIcon({Name: 'Mixed'})).toBe('video_library');
+		expect(libraryOrderIcon({Name: 'Mixed'})).toBe('video_library_rounded');
 	});
 });
 
