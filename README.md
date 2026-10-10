@@ -68,7 +68,7 @@ The easiest route on each brand:
 - **LG:** the Homebrew Channel if your TV has it. Otherwise LG's Developer Mode app plus [Dev Manager Desktop](https://github.com/webosbrew/dev-manager-desktop), a free desktop program that installs the `.ipk` in a few clicks. The webOS CLI (`ares-install`) works too.
 - **Samsung:** the [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung) tool, which signs and installs the `.wgt` for you.
 - **Fire TV (Vega OS):** Developer Mode on the stick and the Vega SDK's `vega device install-app` on a computer, until the app is in the Amazon Appstore.
-- **Xbox:** coming to the Microsoft Store, where the listing is in review. Until then it is built from source and installed on a console in Developer Mode through the Xbox Device Portal.
+- **Xbox:** coming to the Microsoft Store, where the listing is in review. Until then the `.zip` on the Releases page installs on a console in Developer Mode through the Xbox Device Portal.
   - The console draws every app's interface at 1080p and scales it up to the TV, so on a 4K set the text and posters look a little softer than the TV's own apps. That is how Xbox runs apps, Plex and Jellyfin look the same, and video is not affected: it goes through the console's own player at 4K and in HDR.
 
 Step-by-step instructions for all of them, including turning on Developer Mode, are on the [Installation and Sideloading](https://github.com/Moonfin-Client/Smart-TV/wiki/Installation-and-Sideloading) page. Once installed, [Getting Started](https://github.com/Moonfin-Client/Smart-TV/wiki/Getting-Started) walks through connecting to your server.
