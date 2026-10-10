@@ -33,12 +33,6 @@ const fetchText = async (url) => {
 	}
 };
 
-// The address of the first media playlist a master playlist lists, or null when it lists none.
-export const firstMediaPlaylistUrl = async (masterUrl) => {
-	const variant = firstVariantUri(await fetchText(masterUrl));
-	return variant ? resolveAgainst(variant, masterUrl) : null;
-};
-
 export const describeHlsManifest = async (url) => {
 	const master = await fetchText(url);
 	const info = {master: redactToken(master.slice(0, MAX_CHARS))};

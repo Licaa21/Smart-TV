@@ -25,7 +25,7 @@ import {createSkipGovernor, chooseCorrection} from '../../utils/syncCorrection';
 import {getImageUrl, getLogoUrl} from '../../utils/helpers';
 import {initPgsCanvasRenderer, disposePgsRenderer, clearPgsCanvas} from '../../utils/pgsRenderer';
 import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTime} from '../../utils/assRenderer';
-import {describeHlsManifest, firstMediaPlaylistUrl} from '../../utils/hlsManifestProbe';
+import {describeHlsManifest} from '../../utils/hlsManifestProbe';
 import {getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
@@ -783,18 +783,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			if (shouldAbort?.()) return;
 		}
 
-		// An AV1 stream is listed with a Dolby Vision codec tag and a second, H.264 variant next to it, and this
-		// set refuses the playlist. It is opened on the AV1 media playlist itself, which leaves both out.
-		let openUrl = url;
-		if (isTranscode && isHls && /[?&]VideoCodec=av1(,|&|$)/i.test(url)) {
-			const mediaUrl = await firstMediaPlaylistUrl(url).catch(() => null);
-			if (mediaUrl) {
-				openUrl = mediaUrl;
-				serverLogger.playback('Playback: AV1 stream opened on its media playlist', {});
-			}
-		}
-
-		avplayOpen(openUrl);
+		avplayOpen(url);
 		currentUrlRef.current = url;
 		applyDisplayWindow();
 		avplaySetBufferingParams({bitrate: mediaSource?.Bitrate});
