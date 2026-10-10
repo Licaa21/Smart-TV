@@ -5,7 +5,6 @@ import Spotlight from '@enact/spotlight';
 import {useSettings} from '../../context/SettingsContext';
 import {getServerUrl} from '../../services/jellyfinApi';
 import {getImageUrl} from '../../utils/helpers';
-import {channelKeyStep} from '../../utils/channelKeys';
 import {keepFocusInView} from '../../utils/focusScroll';
 import {watchedPercent} from '../../utils/episodeBrowser';
 import {ActiveTabContainer, ModalContainer} from '../../utils/spotlightContainers';
@@ -99,9 +98,6 @@ const EpisodeBrowser = memo(({item, logoUrl, onLogoError, onSelect, onClose}) =>
 	const {seasons, selectedSeasonId, selectSeason, episodes, failed} = useSeriesEpisodes({item, enabled: true});
 	const listRef = useRef(null);
 	const focusedOnceRef = useRef(false);
-	// Set when a channel key changes the season, so the remote follows into that season's list
-	// once its episodes are drawn, rather than being left on a row that has just gone.
-	const followSeasonRef = useRef(false);
 	const serverUrl = item?._serverUrl || getServerUrl();
 
 	// How many rows are drawn. The first batch is worked out while rendering and not in an effect,
@@ -150,22 +146,6 @@ const EpisodeBrowser = memo(({item, logoUrl, onLogoError, onSelect, onClose}) =>
 		});
 	}, [episodes, item.Id]);
 
-	useEffect(() => {
-		if (!followSeasonRef.current || !episodes || episodes.length === 0) return;
-		followSeasonRef.current = false;
-		const list = listRef.current;
-		if (list) list.scrollTop = 0;
-		window.requestAnimationFrame(() => {
-			if (Spotlight.focus(CURRENT_EPISODE_ID)) {
-				const row = list && list.querySelector(`[data-episode-id="${item.Id}"]`);
-				if (row) list.scrollTop = Math.max(0, row.offsetTop - 24);
-				return;
-			}
-			const first = list && list.querySelector('[data-episode-id]');
-			if (first) Spotlight.focus(first);
-		});
-	}, [episodes, item.Id]);
-
 	// The strip opens scrolled to the season that is playing, so it is on screen without having to
 	// go looking for it along the row.
 	const activeSeasonId = String(selectedSeasonId);
@@ -182,30 +162,15 @@ const EpisodeBrowser = memo(({item, logoUrl, onLogoError, onSelect, onClose}) =>
 		selectSeason(e.currentTarget.dataset.seasonId);
 	}, [selectSeason]);
 
-	// Channel up and down step through the seasons from anywhere in the panel, so a long season
-	// does not have to be climbed back out of to reach the strip.
-	const handleKeyDown = useCallback((e) => {
-		const step = channelKeyStep(e);
-		if (!step || !seasons || seasons.length < 2) return;
-		e.preventDefault();
-		e.stopPropagation();
-		const position = seasons.findIndex((season) => String(season.Id) === activeSeasonId);
-		const next = seasons[Math.min(seasons.length - 1, Math.max(0, position + step))];
-		if (!next || String(next.Id) === activeSeasonId) return;
-		followSeasonRef.current = true;
-		selectSeason(next.Id);
-	}, [seasons, activeSeasonId, selectSeason]);
-
 	const handleEpisode = useCallback((e) => {
 		const id = e.currentTarget.dataset.episodeId;
 		const episode = (episodes || []).find((candidate) => String(candidate.Id) === id);
 		if (episode) onSelect(episode);
 	}, [episodes, onSelect]);
 
-
 	return (
 		<div className={css.overlay} onClick={onClose}>
-			<ModalContainer className={css.panel} onClick={stopPropagation} onKeyDown={handleKeyDown} data-modal="episodes" spotlightId="episodes-modal">
+			<ModalContainer className={css.panel} onClick={stopPropagation} data-modal="episodes" spotlightId="episodes-modal">
 				{logoUrl ? (
 					<img className={css.logo} src={logoUrl} alt={item.SeriesName || ''} onError={onLogoError} />
 				) : (
@@ -244,10 +209,7 @@ const EpisodeBrowser = memo(({item, logoUrl, onLogoError, onSelect, onClose}) =>
 						/>
 					))}
 				</div>
-				<p className={css.footer}>
-					{seasonCount > 1 && `${$L('Press CH +/- to change season')}  •  `}
-					{$L('Press BACK to close')}
-				</p>
+				<p className={css.footer}>{$L('Press BACK to close')}</p>
 			</ModalContainer>
 		</div>
 	);
