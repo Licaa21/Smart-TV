@@ -219,13 +219,35 @@ describe('useSeriesEpisodes', () => {
 			expect(result.current.seasons).toBeNull();
 		});
 
-		it('drops an episode list that lands after the browser was closed', async () => {
+		it('drops an episode list that lands after the browser was closed, and keeps it out of memory', async () => {
 			let land;
 			mockApi.getEpisodes.mockImplementation(() => new Promise((resolve) => { land = resolve; }));
-			const {result, rerender} = renderHook(({enabled}) => useSeriesEpisodes({item, enabled}), {initialProps: {enabled: true}});
+			const {result, rerender, unmount} = renderHook(({enabled}) => useSeriesEpisodes({item, enabled}), {initialProps: {enabled: true}});
 			rerender({enabled: false});
 			await act(async () => { land(episodesOf('s2')); });
 			expect(result.current.episodes).toBeNull();
+			unmount();
+
+			mockApi.getEpisodes.mockImplementation(() => new Promise(() => {}));
+			const {result: reopened} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			expect(reopened.current.episodes).toBeNull();
+		});
+
+		it('does not let a closed request replace the list a newer open fetched', async () => {
+			const pending = [];
+			mockApi.getEpisodes.mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
+			const {unmount: closeFirst} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			closeFirst();
+			const {result: second, unmount: closeSecond} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			// The newer open's answer lands first, then the closed one's older answer.
+			await act(async () => { pending[1]({Items: [{Id: 's2-new', Name: 'New'}]}); });
+			await act(async () => { pending[0]({Items: [{Id: 's2-old', Name: 'Old'}]}); });
+			expect(second.current.episodes.map((entry) => entry.Id)).toEqual(['s2-new']);
+			closeSecond();
+
+			mockApi.getEpisodes.mockImplementation(() => new Promise(() => {}));
+			const {result: third} = renderHook(() => useSeriesEpisodes({item, enabled: true}));
+			expect(third.current.episodes.map((entry) => entry.Id)).toEqual(['s2-new']);
 		});
 
 		it('redraws the lists when the blocked ratings change while the browser is open', async () => {

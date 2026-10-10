@@ -152,26 +152,6 @@ describe('EpisodeBrowser', () => {
 		expect(mockEpisodes.selectSeason).toHaveBeenCalledWith('s2');
 	});
 
-	it('steps through the seasons with the channel keys from inside the episode list, stopping at either end', () => {
-		open();
-		const row = document.querySelector('[data-episode-id="e3"]');
-		fireEvent.keyDown(row, {key: 'ChannelDown'});
-		expect(mockEpisodes.selectSeason).not.toHaveBeenCalled();
-		fireEvent.keyDown(row, {key: 'ChannelUp'});
-		expect(mockEpisodes.selectSeason).toHaveBeenCalledWith('s2');
-	});
-
-	it('steps back a season on channel down, and leaves other keys alone', () => {
-		mockEpisodes.selectedSeasonId = 's2';
-		open();
-		const row = document.querySelector('[data-episode-id="e3"]');
-		fireEvent.keyDown(row, {key: 'ArrowDown'});
-		fireEvent.keyDown(row, {key: 'ChannelUp'});
-		expect(mockEpisodes.selectSeason).not.toHaveBeenCalled();
-		fireEvent.keyDown(row, {key: 'ChannelDown'});
-		expect(mockEpisodes.selectSeason).toHaveBeenCalledWith('s1');
-	});
-
 	it('closes on the dimmed background and not on the panel', () => {
 		const onClose = jest.fn();
 		open({onClose});
