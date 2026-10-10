@@ -327,6 +327,12 @@ export const SeerrProvider = ({children}) => {
 		}
 	}, [moonfinAuthType]);
 
+	// Asks the plugin again what it offers, without setting anything else up a second time
+	const refreshPluginInfo = useCallback(async (jellyfinServer, token) => {
+		const pingResult = await seerrApi.moonfinPing(jellyfinServer, token).catch(() => null);
+		setPluginInfo(pingResult || null);
+	}, []);
+
 	const disable = useCallback(async () => {
 		stopSettingsStream();
 		await removeFromStorage('seerr');
@@ -358,6 +364,7 @@ export const SeerrProvider = ({children}) => {
 			moonfinAuthType,
 			api: seerrApi,
 			configureWithMoonfin,
+			refreshPluginInfo,
 			loginWithMoonfin,
 			setMoonfinAuthType,
 			logout,

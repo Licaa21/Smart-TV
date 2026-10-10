@@ -45,7 +45,7 @@ const useDiagnosticsLog = ({currentViewName, pushView, serverType, pluginInfo}) 
 		setLogFilter('all');
 		setLogRenderLimit(LOG_RENDER_STEP);
 		setLogMessage('');
-		pushView({view: 'diagnostics', returnFocusTo: 'setting-diagnostics'});
+		pushView({view: 'diagnostics', returnFocusTo: 'setting-viewLogs'});
 	}, [pushView]);
 
 	// Entries arrive while the screen is open, so follow the logger rather than polling it.

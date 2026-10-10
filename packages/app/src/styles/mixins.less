@@ -205,3 +205,14 @@
 		fill: var(--theme-on-badge, #ffffff);
 	}
 }
+
+// A clipped single line of large text sits on the line height Sandstone's root hands down, which
+// Roboto's descenders hang below. This gives the clip room for them without moving the layout.
+.descender-room() {
+	padding-bottom: 0.25em;
+	margin-bottom: -0.25em;
+}
+
+// The settings lay out on a canvas 1150 units wide scaled to the screen. At 1080p one unit is this
+// many pixels, so settings sizes are written in those units.
+@dp: 1.66957px;

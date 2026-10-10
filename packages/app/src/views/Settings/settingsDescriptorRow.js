@@ -1,7 +1,7 @@
 /* eslint-disable react/jsx-no-bind */
 import {Fragment} from 'react';
 
-import {getLabel} from './settingsOptions';
+import {getChipLabel} from './settingsOptions';
 import {KIND, resolve} from './settingsSchema';
 import {SectionTitle, ToggleRow, OptionRow, SliderRow, NavRow, InfoRow} from './settingsRows';
 
@@ -29,7 +29,7 @@ const renderDescriptorRow = (row, ctx, index, deps) => {
 					title={text(row.label)}
 					desc={text(row.desc)}
 					icon={text(row.icon)}
-					checked={settings[row.key]}
+					checked={row.isOn ? row.isOn(ctx) : settings[row.key]}
 					onToggle={row.onToggle ? () => row.onToggle(ctx) : () => toggleSetting(row.key)}
 				/>
 			);
@@ -41,7 +41,13 @@ const renderDescriptorRow = (row, ctx, index, deps) => {
 					key={row.key}
 					settingKey={row.key}
 					title={title}
-					caption={getLabel(options, settings[row.key], text(row.fallback))}
+					desc={text(row.desc)}
+					caption={getChipLabel(options, settings[row.key], text(row.fallback))}
+					swatch={row.swatch ? row.swatch(ctx) : null}
+					padded={row.padded}
+					valueAsSubtitle={row.valueAsSubtitle}
+					colorTile={row.colorTile ? row.colorTile(ctx) : null}
+					plainIcon={row.plainIcon}
 					icon={text(row.icon)}
 					onOpen={() => pushView({view: 'options', title, options, settingKey: row.key, returnFocusTo: `setting-${row.key}`})}
 				/>
@@ -53,12 +59,14 @@ const renderDescriptorRow = (row, ctx, index, deps) => {
 					key={row.key}
 					settingKey={row.key}
 					title={text(row.label)}
+					desc={text(row.desc)}
 					min={row.min}
 					max={row.max}
 					step={row.step}
 					value={settings[row.key]}
 					format={row.format}
 					icon={text(row.icon)}
+					plainIcon={row.plainIcon}
 					onChange={(e) => updateSetting(row.key, e.value)}
 				/>
 			);

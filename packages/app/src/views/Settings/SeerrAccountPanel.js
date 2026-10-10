@@ -2,7 +2,7 @@
 import $L from '@enact/i18n/$L';
 
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
-import {renderRadio} from './settingsIcons';
+import {renderCheck} from './settingsIcons';
 import {SpottableDiv, SpottableButton} from './settingsSpottables';
 import {InfoRow} from './settingsRows';
 
@@ -74,7 +74,7 @@ const SeerrAccountPanel = ({
 							<div className={css.listItemHeading}>{$L('Jellyfin Account')}</div>
 							<div className={css.listItemCaption}>{$L('Use your Jellyfin username and password')}</div>
 						</div>
-						<div className={css.listItemTrailing}>{renderRadio(authType === 'jellyfin')}</div>
+						<div className={css.listItemTrailing}>{renderCheck(authType === 'jellyfin')}</div>
 					</SpottableDiv>
 					<SpottableDiv
 						className={`${css.listItem} ${authType === 'local' ? css.listItemSelected : ''}`}
@@ -85,7 +85,7 @@ const SeerrAccountPanel = ({
 							<div className={css.listItemHeading}>{$L('Local Account')}</div>
 							<div className={css.listItemCaption}>{$L('Use your local {seerrLabel} account credentials').replace('{seerrLabel}', seerrLabel)}</div>
 						</div>
-						<div className={css.listItemTrailing}>{renderRadio(authType === 'local')}</div>
+						<div className={css.listItemTrailing}>{renderCheck(authType === 'local')}</div>
 					</SpottableDiv>
 
 					<div className={css.inputGroup}>

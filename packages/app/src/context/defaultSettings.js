@@ -145,6 +145,9 @@ export const defaultSettings = {
 	mediaBarCollectionIds: [],
 	unifiedLibraryMode: false,
 	useMoonfinPlugin: false,
+	// The plugin profile this device syncs with. Empty follows the TV profile. It's a choice
+	// about this device rather than the account, so it never syncs.
+	syncProfile: '',
 	mdblistEnabled: true,
 	mdblistRatingSources: ['stars', 'imdb', 'tmdb', 'tomatoes', 'metacritic'],
 	tmdbEpisodeRatingsEnabled: true,

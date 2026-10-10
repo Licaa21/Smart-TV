@@ -1,21 +1,21 @@
 import {isGameLibrary} from '../../utils/gameLibrary';
 
 const ICON_BY_COLLECTION_TYPE = {
-	movies: 'movie',
-	tvshows: 'tv',
-	music: 'music_note',
-	books: 'menu_book',
-	audiobooks: 'menu_book',
-	livetv: 'live_tv',
-	homevideos: 'photo_library',
-	photos: 'photo_library',
-	boxsets: 'collections_bookmark',
-	playlists: 'playlist_play'
+	movies: 'movie_rounded',
+	tvshows: 'tv_rounded',
+	music: 'music_note_rounded',
+	books: 'menu_book_rounded',
+	audiobooks: 'menu_book_rounded',
+	livetv: 'live_tv_rounded',
+	homevideos: 'photo_library_rounded',
+	photos: 'photo_library_rounded',
+	boxsets: 'collections_bookmark_rounded',
+	playlists: 'playlist_play_rounded'
 };
 
 export const libraryOrderIcon = (library) => {
 	if (isGameLibrary(library.Id, library.CollectionType, library.Name)) return 'sports_esports';
-	return ICON_BY_COLLECTION_TYPE[(library.CollectionType || '').toLowerCase()] || 'video_library';
+	return ICON_BY_COLLECTION_TYPE[(library.CollectionType || '').toLowerCase()] || 'video_library_rounded';
 };
 
 // Each server keeps the order of its own libraries, so with several servers a library only

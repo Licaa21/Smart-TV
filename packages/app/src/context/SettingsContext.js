@@ -361,32 +361,45 @@ export const localToProfile = (localSettings, keys) => {
 	return profile;
 };
 
-const resolveFromEnvelope = (envelope, adminDefaults) => {
-	const globalProfile = profileToLocal(envelope?.global);
-	const tvProfile = profileToLocal(envelope?.tv);
-	const adminProfile = profileToLocal(adminDefaults);
+// The profiles the plugin stores, in the order the server lists them. This app is a TV, so
+// that's the one it syncs with until the viewer picks another.
+export const SYNC_PROFILES = ['global', 'desktop', 'mobile', 'tv'];
+export const DEVICE_SYNC_PROFILE = 'tv';
+
+// The profile automatic sync reads and writes. The stored value is empty while it follows
+// this device's own, and anything it doesn't recognize falls back to that too.
+export const activeSyncProfile = (syncProfile) => (
+	SYNC_PROFILES.includes(syncProfile) ? syncProfile : DEVICE_SYNC_PROFILE
+);
+
+// Merges the stored profiles the way the server resolves them. The active profile wins,
+// then global, then the admin defaults. Global has only the defaults under it.
+export const resolveFromEnvelope = (envelope, adminDefaults, profile) => {
+	const active = activeSyncProfile(profile);
+	const sources = active === 'global'
+		? [envelope?.global, adminDefaults]
+		: [envelope?.[active], envelope?.global, adminDefaults];
+	const layers = sources.map((source) => profileToLocal(source));
+	const firstWith = (key) => layers.find((layer) => layer[key] !== undefined);
 
 	const resolved = {};
 	for (const key of SYNCABLE_KEYS) {
-		if (tvProfile[key] !== undefined) {
-			resolved[key] = tvProfile[key];
-		} else if (globalProfile[key] !== undefined) {
-			resolved[key] = globalProfile[key];
-		} else if (adminProfile[key] !== undefined) {
-			resolved[key] = adminProfile[key];
-		}
+		const layer = firstWith(key);
+		if (layer) resolved[key] = layer[key];
 	}
-	const tmdbKey = tvProfile.tmdbApiKey ?? globalProfile.tmdbApiKey ?? adminProfile.tmdbApiKey;
-	if (tmdbKey !== undefined) resolved.tmdbApiKey = tmdbKey;
+	const tmdbLayer = firstWith('tmdbApiKey');
+	if (tmdbLayer) resolved.tmdbApiKey = tmdbLayer.tmdbApiKey;
 
 	// Same precedence as everything else, except the layout moves as one unit. The first
 	// profile that has any layout supplies all of it, so admin defaults only reach a user
 	// with no layout of their own. A layout from a client that predates the seasonal row
 	// lacks it, so its own toggle decides how it comes back.
 	const enabledById = {seasonal: resolved.seasonalRowEnabled === true};
-	const homeRows = homeRowsFromProfile(envelope?.tv, enabledById)
-		?? homeRowsFromProfile(envelope?.global, enabledById)
-		?? homeRowsFromProfile(adminDefaults, enabledById);
+	let homeRows;
+	for (const source of sources) {
+		homeRows = homeRowsFromProfile(source, enabledById);
+		if (homeRows !== undefined) break;
+	}
 	if (homeRows !== undefined) {
 		resolved.homeRows = homeRows;
 		resolved.serverPluginSections = serverPluginSections();
@@ -406,28 +419,58 @@ const unpushedKeys = new Set();
 
 let inFlightPush = null;
 
+// Bumped whenever the marks are thrown away. A send that lands after that leaves the marks
+// alone, since any mark there now belongs to a change it didn't carry.
+let markGeneration = 0;
+
 // Set while the login sync is resolving. A push sent in that window would carry
 // a fresh install's defaults for every key the viewer never touched and lay
 // them over the profile the pull is about to hand back, so the push waits and
 // goes out with the merged result instead.
 let holdPushesForLoginSync = false;
 
-const flushTvProfile = () => {
+// A push goes to the profile that was active when it was queued, which is the one the
+// viewer was editing at the time.
+const flushProfilePush = () => {
 	if (pushTimer) {
 		clearTimeout(pushTimer);
 		pushTimer = null;
 	}
 	if (!pendingPush) return inFlightPush || Promise.resolve();
-	const {updated, serverUrl, token} = pendingPush;
+	const {updated, serverUrl, token, profile} = pendingPush;
 	pendingPush = null;
 	const sent = [...unpushedKeys];
 	if (sent.length === 0) return inFlightPush || Promise.resolve();
-	inFlightPush = saveMoonfinProfile('tv', localToProfile(updated, sent), serverUrl, token).then(() => {
+	const generation = markGeneration;
+	inFlightPush = saveMoonfinProfile(profile, localToProfile(updated, sent), serverUrl, token).then(() => {
+		if (generation !== markGeneration) return;
 		for (const key of sent) unpushedKeys.delete(key);
 	}).catch(e =>
-		console.warn('[Settings] Failed to push TV profile:', e.message)
+		console.warn(`[Settings] Failed to push the ${profile} profile:`, e.message)
 	);
 	return inFlightPush;
+};
+
+const forgetUnpushedMarks = () => {
+	unpushedKeys.clear();
+	markGeneration += 1;
+};
+
+const dropQueuedPush = () => {
+	if (pushTimer) {
+		clearTimeout(pushTimer);
+		pushTimer = null;
+	}
+	pendingPush = null;
+	forgetUnpushedMarks();
+};
+
+// A change still waiting on the debounce was made under the old profile, so it goes there
+// now. The marks are cleared after that, or a push that failed or never had credentials
+// would ride along with the first one to the new profile.
+const handPushesToNewProfile = () => {
+	flushProfilePush();
+	forgetUnpushedMarks();
 };
 
 // A screen about to reload can wait for the queued change to reach the server,
@@ -435,20 +478,29 @@ const flushTvProfile = () => {
 // value it replaced. This always settles, so whatever comes next still happens
 // when the server is unreachable or the send throws.
 export const flushSettingsPush = (timeoutMs = 2000) => Promise.race([
-	Promise.resolve().then(flushTvProfile),
+	Promise.resolve().then(flushProfilePush),
 	new Promise((resolve) => { setTimeout(resolve, timeoutMs); })
 ]).catch(() => {});
 
-const pushTvProfile = (updated, credsRef, keys) => {
+const queueProfilePush = (updated, credsRef, keys) => {
+	const profile = activeSyncProfile(updated.syncProfile);
+	if (pendingPush && pendingPush.profile !== profile) handPushesToNewProfile();
 	for (const key of keys) unpushedKeys.add(key);
 	// Before the first sync there is nowhere to send this, but the keys are still
 	// marked so the pull that follows leaves them alone.
 	if (!credsRef.current) return;
 	const {serverUrl, token} = credsRef.current;
-	pendingPush = {updated, serverUrl, token};
+	pendingPush = {updated, serverUrl, token, profile};
 	if (holdPushesForLoginSync) return;
 	if (pushTimer) clearTimeout(pushTimer);
-	pushTimer = setTimeout(flushTvProfile, PUSH_DEBOUNCE_MS);
+	pushTimer = setTimeout(flushProfilePush, PUSH_DEBOUNCE_MS);
+};
+
+// Exported so tests can drive the queue without a provider.
+export const __pushQueue = {
+	queue: queueProfilePush,
+	handOver: handPushesToNewProfile,
+	drop: dropQueuedPush
 };
 
 const extractThemeObjects = (payload) => {
@@ -779,7 +831,7 @@ export function SettingsProvider({children}) {
 		setSettings(prev => {
 			const updated = {...prev, [key]: value};
 			saveToStorage('settings', updated);
-			if (SYNCABLE_KEYS.includes(key)) pushTvProfile(updated, serverCredsRef, [key]);
+			if (SYNCABLE_KEYS.includes(key)) queueProfilePush(updated, serverCredsRef, [key]);
 			return updated;
 		});
 	}, []);
@@ -792,7 +844,7 @@ export function SettingsProvider({children}) {
 			saveToStorage('settings', updated);
 			const syncable = Object.keys(newSettings).filter(k => SYNCABLE_KEYS.includes(k));
 			if (syncable.length > 0) {
-				pushTvProfile(updated, serverCredsRef, syncable);
+				queueProfilePush(updated, serverCredsRef, syncable);
 			}
 			return updated;
 		});
@@ -805,7 +857,7 @@ export function SettingsProvider({children}) {
 				? {...prev, visualTheme: themeId, customThemeId: ''}
 				: {...prev, visualTheme: prev.visualTheme || 'moonfin', customThemeId: themeId};
 			saveToStorage('settings', updated);
-			pushTvProfile(updated, serverCredsRef, ['visualTheme', 'customThemeId']);
+			queueProfilePush(updated, serverCredsRef, ['visualTheme', 'customThemeId']);
 			return updated;
 		});
 	}, []);
@@ -820,12 +872,7 @@ export function SettingsProvider({children}) {
 	// recreate the profile that was just deleted, and a push queued by an earlier edit
 	// would put the old settings back moments after, so that one is dropped too.
 	const restoreSyncedDefaults = useCallback((resolved = {}) => {
-		if (pushTimer) {
-			clearTimeout(pushTimer);
-			pushTimer = null;
-		}
-		pendingPush = null;
-		unpushedKeys.clear();
+		dropQueuedPush();
 		setSettings(prev => {
 			const updated = {...prev};
 			for (const key of SYNCABLE_KEYS) {
@@ -836,6 +883,35 @@ export function SettingsProvider({children}) {
 			}
 			Object.assign(updated, resolved);
 			persistBootLocale(updated.uiLanguage);
+			saveToStorage('settings', updated);
+			return updated;
+		});
+	}, []);
+
+	// Lays a profile read from the server over this device without sending anything back.
+	// A push queued by an earlier edit would put the replaced values over the profile that
+	// was just read, so that one is dropped too.
+	const applyServerProfile = useCallback((values = {}) => {
+		dropQueuedPush();
+		noteAnsweredSettings(Object.keys(values));
+		setSettings(prev => {
+			const updated = {...prev, ...values};
+			persistBootLocale(updated.uiLanguage);
+			saveToStorage('settings', updated);
+			return updated;
+		});
+	}, []);
+
+	// Only moves where automatic sync points. A change still waiting on the debounce goes to the
+	// old profile first, and nothing is fetched, so the device keeps what it shows until the next
+	// sync or a Load.
+	const selectSyncProfile = useCallback((profile) => {
+		if (!SYNC_PROFILES.includes(profile)) return;
+		if (activeSyncProfile(settingsRef.current.syncProfile) !== profile) handPushesToNewProfile();
+		const stored = profile === DEVICE_SYNC_PROFILE ? '' : profile;
+		setSettings(prev => {
+			if (prev.syncProfile === stored) return prev;
+			const updated = {...prev, syncProfile: stored};
 			saveToStorage('settings', updated);
 			return updated;
 		});
@@ -926,7 +1002,7 @@ export function SettingsProvider({children}) {
 				if (!adminDefaults) return pluginAnswered ? 'empty' : 'unavailable';
 			}
 
-			const resolved = resolveFromEnvelope(serverData, adminDefaults);
+			const resolved = resolveFromEnvelope(serverData, adminDefaults, settingsRef.current.syncProfile);
 
 			const hasServerValues = resolved.tmdbApiKey !== undefined || SYNCABLE_KEYS.some(key => resolved[key] !== undefined);
 			if (!hasServerValues) return pluginAnswered ? 'empty' : 'unavailable';
@@ -1013,7 +1089,7 @@ export function SettingsProvider({children}) {
 		// Known before any of the network work below, so a change made while that
 		// runs still has somewhere to go. Marks left over from another server were
 		// for that server's profile and would only hold this one's values back.
-		if (serverCredsRef.current?.serverUrl !== serverUrl) unpushedKeys.clear();
+		if (serverCredsRef.current?.serverUrl !== serverUrl) forgetUnpushedMarks();
 		serverCredsRef.current = {serverUrl, token};
 		const key = normalizeServerKey(serverUrl);
 		if (!key || syncOnLoginRef.current[key]) return;
@@ -1039,7 +1115,7 @@ export function SettingsProvider({children}) {
 			// Anything queued while the sync ran goes out now, carrying the
 			// merged settings rather than the snapshot it was queued with.
 			if (pendingPush && !pushTimer) {
-				pushTimer = setTimeout(flushTvProfile, PUSH_DEBOUNCE_MS);
+				pushTimer = setTimeout(flushProfilePush, PUSH_DEBOUNCE_MS);
 			}
 			setInitialSyncSettled(true);
 		}
@@ -1058,6 +1134,8 @@ export function SettingsProvider({children}) {
 			selectThemeById,
 			resetSettings,
 			restoreSyncedDefaults,
+			applyServerProfile,
+			selectSyncProfile,
 			syncFromServer,
 			syncOnLogin,
 			saveStoreTheme,

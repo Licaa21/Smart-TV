@@ -103,9 +103,32 @@ describe('buildSettingsIndex', () => {
 		expect(ids).not.toContain('playback.video.advanced');
 	});
 
-	test('a section title becomes part of the breadcrumb of the rows under it', () => {
+	test('a section title is searchable but stays out of the breadcrumb', () => {
 		const entry = build().find((e) => e.id === 'playback.video.forceDirectPlay');
-		expect(entry.breadcrumb).toBe('Playback › Video › Advanced');
+		expect(entry.breadcrumb).toBe('Playback › Video');
+		expect(entry.haystackBody).toContain('advanced');
+	});
+
+	test('a nested screen names the screen it opens from, and a root page is not named twice', () => {
+		const nested = [{
+			id: 'appearance',
+			label: 'Appearance',
+			subcategories: [
+				{id: 'appearance', label: 'Appearance', rows: [{kind: 'toggle', key: 'cardFocusZoom', label: 'Focus Expansion'}]},
+				{id: 'homeScreen', label: 'Home Screen', menu: false, rows: [{kind: 'toggle', key: 'fullScreenRows', label: 'Expanded Rows'}]},
+				{id: 'rowOptions', label: 'Row Options', menu: false, parent: 'homeScreen', rows: [
+					{kind: 'section', id: 'genres', label: 'Genres'},
+					{kind: 'toggle', key: 'displayGenresRows', label: 'Display Genres Rows'}
+				]}
+			]
+		}];
+		const entries = buildSettingsIndex(nested, {}, deps);
+		const byId = (id) => entries.find((entry) => entry.id === id);
+
+		expect(byId('appearance.appearance.cardFocusZoom').breadcrumb).toBe('Appearance');
+		expect(byId('appearance.homeScreen.fullScreenRows').breadcrumb).toBe('Appearance › Home Screen');
+		expect(byId('appearance.rowOptions.displayGenresRows').breadcrumb).toBe('Appearance › Home Screen › Row Options');
+		expect(byId('screen:appearance.rowOptions').breadcrumb).toBe('Appearance › Home Screen');
 	});
 
 	test('screens with no rows are not offered as destinations', () => {

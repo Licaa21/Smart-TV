@@ -1,13 +1,12 @@
 /* eslint-disable react/jsx-no-bind */
 import $L from '@enact/i18n/$L';
-import Button from '@enact/sandstone/Button';
 
 import {LOG_FILTERS, logLevelColor} from './useDiagnosticsLog';
-import {SectionTitle} from './settingsRows';
 import {SpottableButton} from './settingsSpottables';
 import SettingsView from './SettingsView';
 
 import css from './Settings.module.less';
+import SettingsButton from './SettingsButton';
 
 // Newest first, which is the order anyone reading a log after something went wrong wants.
 const DiagnosticsView = ({
@@ -29,8 +28,7 @@ const DiagnosticsView = ({
 	const shown = entries.slice(0, logRenderLimit);
 
 	return (
-		<SettingsView spotlightId='diagnostics-view'>
-			<SectionTitle>{$L('Logs')}</SectionTitle>
+		<SettingsView spotlightId='diagnostics-view' title={$L('Logs')} clean>
 			<div className={css.viewDescription}>
 				{$L('Server requests recorded on this device. Video and image traffic is not included.')}
 			</div>
@@ -70,25 +68,24 @@ const DiagnosticsView = ({
 			</div>
 			{entries.length > logRenderLimit && (
 				<div className={css.actionBar}>
-					<Button
+					<SettingsButton
 						onClick={onShowMore}
-						size='small'
 						spotlightId='log-show-more'
 					>
 						{$L('Show More')} ({entries.length - logRenderLimit})
-					</Button>
+					</SettingsButton>
 				</div>
 			)}
 			{sendUnavailableReason && <div className={css.viewDescription}>{sendUnavailableReason}</div>}
 			{/* Next to the buttons, since a long log leaves the top of the screen far out of view. */}
 			{logMessage && <div className={css.statusMessage}>{logMessage}</div>}
 			<div className={css.actionBar}>
-				<Button onClick={onClearLogs} size='small' spotlightId='log-clear'>
+				<SettingsButton onClick={onClearLogs} spotlightId='log-clear'>
 					{$L('Clear')}
-				</Button>
-				<Button onClick={onSendReport} size='small' disabled={sendingReport || Boolean(sendUnavailableReason)} spotlightId='log-send'>
+				</SettingsButton>
+				<SettingsButton primary onClick={onSendReport} disabled={sendingReport || Boolean(sendUnavailableReason)} spotlightId='log-send'>
 					{sendingReport ? $L('Sending...') : $L('Send Report')}
-				</Button>
+				</SettingsButton>
 			</div>
 		</SettingsView>
 	);

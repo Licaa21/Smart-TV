@@ -3,7 +3,6 @@ import $L from '@enact/i18n/$L';
 
 import {drawQrCode} from '../../utils/qrCanvas';
 import {SpottableDiv} from './settingsSpottables';
-import {SectionTitle} from './settingsRows';
 import SettingsView from './SettingsView';
 
 import css from './Settings.module.less';
@@ -16,8 +15,7 @@ const QrLinkView = ({title, url, onClose}) => {
 	}, [url]);
 
 	return (
-		<SettingsView spotlightId='qr-link-view'>
-			<SectionTitle>{title}</SectionTitle>
+		<SettingsView spotlightId='qr-link-view' title={title}>
 			<div className={css.viewDescription}>{$L('Scan with your phone to open this link')}</div>
 			<div className={css.qrContainer}>
 				<canvas ref={canvasRef} className={css.qrCanvas} />

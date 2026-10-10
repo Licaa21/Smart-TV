@@ -53,7 +53,10 @@
 }
 
 .title {
-	margin: 0 0 10px;
+	margin: 0;
+	// Room under the clip for Roboto's descenders, keeping the 10px gap below the title
+	padding-bottom: 0.25em;
+	margin-bottom: ~"calc(10px - 0.25em)";
 	font-size: 38px;
 	color: var(--theme-text-primary, #ffffff);
 	white-space: nowrap;

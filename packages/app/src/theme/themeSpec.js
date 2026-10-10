@@ -330,37 +330,6 @@ export const contrastRatio = (hex, other) => {
 	return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 };
 
-// What a line of ordinary text needs against the surface behind it.
-export const MIN_LIGHT_INK_CONTRAST = 4.5;
-
-const WHITE = '#ffffffff';
-
-/**
- * A colour taken down until light text reads against it, keeping its hue.
- *
- * A theme names anything from near white to a saturated cyan for a focused fill. Dark text on
- * the bright ones measures well and still reads muddy across a room, so the fill is deepened and
- * keeps the light text the rows around it already use. Something dark enough comes back as it is.
- *
- * @param {string} hex - the fill the theme asked for
- * @returns {string} the same colour, dark enough to carry light text
- */
-export const deepenForLightInk = (hex) => {
-	const normalized = normalizeHexColor(hex, 'color');
-	const alpha = normalized.slice(1, 3).toLowerCase();
-	const pair = (value) => `0${Math.round(value).toString(16)}`.slice(-2);
-	const build = (rgb) => `#${alpha}${rgb.map(pair).join('')}`;
-
-	let channels = toRgbTriplet(normalized).split(', ').map(Number);
-	let current = build(channels);
-	// Fifteen percent a step reaches black from anywhere inside twenty, so this always ends.
-	for (let step = 0; step < 20 && contrastRatio(current, WHITE) < MIN_LIGHT_INK_CONTRAST; step++) {
-		channels = channels.map((value) => value * 0.85);
-		current = build(channels);
-	}
-	return current;
-};
-
 export const radiusToCss = (radius) => {
 	if (!radius) return '0px';
 	const {topLeft, topRight, bottomRight, bottomLeft} = radius;

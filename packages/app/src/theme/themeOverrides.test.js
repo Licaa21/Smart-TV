@@ -1,31 +1,6 @@
 import {buildThemeOverrideCss} from './themeOverrides';
 import {resolveThemeById} from './themeRegistry';
-import {contrastRatio, deepenForLightInk, inkOn, toCssColor, MIN_BUTTON_CONTRAST, MIN_LIGHT_INK_CONTRAST} from './themeSpec';
-
-describe('deepenForLightInk', () => {
-	const white = '#ffffffff';
-
-	it('takes a bright fill down until light text reads on it', () => {
-		const deepened = deepenForLightInk('#ff00a4dc');
-		expect(contrastRatio('#ff00a4dc', white)).toBeLessThan(MIN_LIGHT_INK_CONTRAST);
-		expect(contrastRatio(deepened, white)).toBeGreaterThanOrEqual(MIN_LIGHT_INK_CONTRAST);
-		expect(inkOn(deepened)).toBe('255, 255, 255');
-	});
-
-	it('leaves a fill that is already dark enough alone', () => {
-		expect(deepenForLightInk('#ff101010')).toBe('#ff101010');
-	});
-
-	// Near white is the worst case, since it has the furthest to travel.
-	it('gets there even from the palest fill a theme can name', () => {
-		expect(contrastRatio(deepenForLightInk('#fffefefe'), white))
-			.toBeGreaterThanOrEqual(MIN_LIGHT_INK_CONTRAST);
-	});
-
-	it('keeps the alpha the theme asked for', () => {
-		expect(deepenForLightInk('#8000a4dc').slice(0, 3)).toBe('#80');
-	});
-});
+import {contrastRatio, inkOn, toCssColor, MIN_BUTTON_CONTRAST} from './themeSpec';
 
 describe('buildThemeOverrideCss', () => {
 	it('scopes every rule to the active theme id', () => {
@@ -94,18 +69,17 @@ describe('ink on a focused row', () => {
 		expect(inkOn('#FF2A2A2A')).toBe('255, 255, 255');
 	});
 
-	// A focused row is deepened rather than inverted, so every theme writes it in light ink on a
-	// fill taken far enough down to carry it.
-	it('writes every theme\'s focused rows in light ink on a fill deepened to take it', () => {
+	// A focused settings row fills with the theme's focused button colour and writes on it in that
+	// colour's ink.
+	it('fills every theme\'s focused settings rows with its focused button colour and writes in its ink', () => {
 		for (const id of ['moonfin', 'neon_pulse', '8bit_hero']) {
 			const theme = resolveThemeById(id);
-			const fill = deepenForLightInk(theme.colors.buttonFocused);
+			const fill = theme.colors.buttonFocused;
+			const ink = inkOn(fill);
 			const css = buildThemeOverrideCss(theme);
 
-			expect(inkOn(fill)).toBe('255, 255, 255');
-			expect(contrastRatio(fill, '#ffffffff')).toBeGreaterThanOrEqual(MIN_LIGHT_INK_CONTRAST);
-			expect(css).toContain('rgba(255, 255, 255, 0.96)');
-			expect(css).toContain('rgba(255, 255, 255, 0.78)');
+			expect(css).toContain(`rgba(${ink}, 0.87)`);
+			expect(css).toContain(`rgba(${ink}, 0.54)`);
 			expect(css).toContain(`background: ${toCssColor(fill)};`);
 		}
 	});
