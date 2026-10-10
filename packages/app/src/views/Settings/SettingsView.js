@@ -1,5 +1,6 @@
 import {createContext, useCallback, useContext, useRef, useState} from 'react';
 
+import {useSettings} from '../../context/SettingsContext';
 import {SettingsGlyph} from './settingsIcons';
 import {SpottableDiv, ViewContainer} from './settingsSpottables';
 
@@ -34,17 +35,29 @@ const scrollListTo = (list, top) => {
 	list._settingsScroll = window.requestAnimationFrame(step);
 };
 
-// Lines the focused row up within the list, which is the offset parent of everything in it
+// Lines the focused row up within the list. The row is measured on screen, since Settings Size can zoom it
 export const followFocus = (ev) => {
 	const list = ev.currentTarget;
 	const target = ev.target;
 	if (!list || !target || target === list) return;
-	let offset = 0;
-	for (let node = target; node && node !== list; node = node.offsetParent) {
-		offset += node.offsetTop;
+	let rowTop;
+	let rowHeight;
+	const zoomed = target.closest('[data-settings-zoom]');
+	if (zoomed && list.contains(zoomed)) {
+		// Older engines report a zoomed row in its own unzoomed units while the list is in screen ones. The zoomed
+		// block is as wide as the list on screen, so how wide it reports itself says which of the two it is.
+		const frame = zoomed.getBoundingClientRect();
+		const row = target.getBoundingClientRect();
+		const scale = frame.width > 0 ? list.clientWidth / frame.width : 1;
+		rowTop = (row.top - frame.top) * scale;
+		rowHeight = row.height * scale;
+	} else {
+		const row = target.getBoundingClientRect();
+		rowTop = row.top - list.getBoundingClientRect().top + list.scrollTop;
+		rowHeight = row.height;
 	}
 	const view = list.clientHeight;
-	const wanted = offset - FOLLOW_ALIGNMENT * (view - target.offsetHeight);
+	const wanted = rowTop - FOLLOW_ALIGNMENT * (view - rowHeight);
 	const top = Math.max(0, Math.min(list.scrollHeight - view, wanted));
 	scrollListTo(list, top);
 };
@@ -54,6 +67,9 @@ export const followFocus = (ev) => {
 // fallback lands on when a screen has nothing better to offer.
 const SettingsView = ({spotlightId, title, root, header, clean, action, children}) => {
 	const fallbackTitle = useContext(SettingsTitleContext);
+	// The rows and text shrink with the Settings Size pick, and the window around them stays as it is
+	const {settings} = useSettings();
+	const zoom = settings.settingsScale > 0 && settings.settingsScale < 1 ? settings.settingsScale : null;
 	const entering = useContext(SettingsEnterContext);
 	const shownTitle = title ?? fallbackTitle;
 	// The first screen's title takes a tint while the list is scrolled under it
@@ -81,7 +97,7 @@ const SettingsView = ({spotlightId, title, root, header, clean, action, children
 			)}
 			{header}
 			<div className={css.listContent} onFocus={followFocus} onScroll={root ? handleScroll : undefined}>
-				<div className={css.listInner}>
+				<div className={css.listInner} style={zoom ? {zoom} : undefined} data-settings-zoom={zoom || undefined}>
 					{children}
 				</div>
 			</div>

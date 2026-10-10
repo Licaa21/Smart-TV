@@ -26,7 +26,10 @@ const useWraps = (text) => {
 			return;
 		}
 		const line = parseFloat(window.getComputedStyle(node).lineHeight);
-		setWraps(line > 0 && node.offsetHeight > line * 1.5);
+		// Settings Size zooms the row, and an older engine reports its height zoomed or not. One line and two lines are
+		// told apart at a height that sits between them in both.
+		const zoom = parseFloat(node.closest('[data-settings-zoom]')?.dataset.settingsZoom) || 1;
+		setWraps(line > 0 && node.getBoundingClientRect().height > line * (1 + 2 * zoom) / 2);
 	}, [text]);
 	return [ref, wraps];
 };
