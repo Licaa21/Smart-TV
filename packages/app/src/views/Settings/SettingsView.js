@@ -1,4 +1,4 @@
-import {createContext, useCallback, useContext, useRef, useState} from 'react';
+import {createContext, useCallback, useContext, useLayoutEffect, useRef, useState} from 'react';
 
 import {useSettings} from '../../context/SettingsContext';
 import {SettingsGlyph} from './settingsIcons';
@@ -35,27 +35,14 @@ const scrollListTo = (list, top) => {
 	list._settingsScroll = window.requestAnimationFrame(step);
 };
 
-// Lines the focused row up within the list. The row is measured on screen, since Settings Size can zoom it
+// Lines the focused row up within the list. The row is measured on screen, since Settings Size can scale it
 export const followFocus = (ev) => {
 	const list = ev.currentTarget;
 	const target = ev.target;
 	if (!list || !target || target === list) return;
-	let rowTop;
-	let rowHeight;
-	const zoomed = target.closest('[data-settings-zoom]');
-	if (zoomed && list.contains(zoomed)) {
-		// Older engines report a zoomed row in its own unzoomed units while the list is in screen ones. The zoomed
-		// block is as wide as the list on screen, so how wide it reports itself says which of the two it is.
-		const frame = zoomed.getBoundingClientRect();
-		const row = target.getBoundingClientRect();
-		const scale = frame.width > 0 ? list.clientWidth / frame.width : 1;
-		rowTop = (row.top - frame.top) * scale;
-		rowHeight = row.height * scale;
-	} else {
-		const row = target.getBoundingClientRect();
-		rowTop = row.top - list.getBoundingClientRect().top + list.scrollTop;
-		rowHeight = row.height;
-	}
+	const row = target.getBoundingClientRect();
+	const rowTop = row.top - list.getBoundingClientRect().top + list.scrollTop;
+	const rowHeight = row.height;
 	const view = list.clientHeight;
 	const wanted = rowTop - FOLLOW_ALIGNMENT * (view - rowHeight);
 	const top = Math.max(0, Math.min(list.scrollHeight - view, wanted));
@@ -67,9 +54,24 @@ export const followFocus = (ev) => {
 // fallback lands on when a screen has nothing better to offer.
 const SettingsView = ({spotlightId, title, root, header, clean, action, children}) => {
 	const fallbackTitle = useContext(SettingsTitleContext);
-	// The rows and text shrink with the Settings Size pick, and the window around them stays as it is
+	// The rows, their boxes and the text shrink with the Settings Size pick, and the window around them stays as it
+	// is. The list is laid out wider by the same factor and scaled down to fit, so everything in it shrinks together
+	// whichever engine the set has. The frame around it is given the height the scaled list ends up with.
 	const {settings} = useSettings();
 	const zoom = settings.settingsScale > 0 && settings.settingsScale < 1 ? settings.settingsScale : null;
+	const frameRef = useRef(null);
+	const innerRef = useRef(null);
+	useLayoutEffect(() => {
+		const frame = frameRef.current;
+		const inner = innerRef.current;
+		if (!zoom || !frame || !inner) return undefined;
+		const fit = () => { frame.style.height = `${Math.ceil(inner.offsetHeight * zoom)}px`; };
+		fit();
+		if (typeof window.ResizeObserver !== 'function') return undefined;
+		const observer = new window.ResizeObserver(fit);
+		observer.observe(inner);
+		return () => observer.disconnect();
+	}, [zoom]);
 	const entering = useContext(SettingsEnterContext);
 	const shownTitle = title ?? fallbackTitle;
 	// The first screen's title takes a tint while the list is scrolled under it
@@ -97,9 +99,28 @@ const SettingsView = ({spotlightId, title, root, header, clean, action, children
 			)}
 			{header}
 			<div className={css.listContent} onFocus={followFocus} onScroll={root ? handleScroll : undefined}>
-				<div className={css.listInner} style={zoom ? {zoom} : undefined} data-settings-zoom={zoom || undefined}>
-					{children}
-				</div>
+				{zoom ? (
+					<div ref={frameRef}>
+						<div
+							ref={innerRef}
+							className={css.listInner}
+							data-settings-zoom={zoom}
+							style={{
+								width: `${100 / zoom}%`,
+								transform: `scale(${zoom})`,
+								WebkitTransform: `scale(${zoom})`,
+								transformOrigin: '0 0',
+								WebkitTransformOrigin: '0 0'
+							}}
+						>
+							{children}
+						</div>
+					</div>
+				) : (
+					<div className={css.listInner}>
+						{children}
+					</div>
+				)}
 			</div>
 		</ViewContainer>
 	);
