@@ -26,9 +26,10 @@ const useWraps = (text) => {
 			return;
 		}
 		const line = parseFloat(window.getComputedStyle(node).lineHeight);
-		// the line is measured unzoomed and the row on screen, so Settings Size is allowed for
+		// Settings Size zooms the row, and an older engine reports its height zoomed or not. One line and two lines are
+		// told apart at a height that sits between them in both.
 		const zoom = parseFloat(node.closest('[data-settings-zoom]')?.dataset.settingsZoom) || 1;
-		setWraps(line > 0 && node.getBoundingClientRect().height > line * zoom * 1.5);
+		setWraps(line > 0 && node.getBoundingClientRect().height > line * (1 + 2 * zoom) / 2);
 	}, [text]);
 	return [ref, wraps];
 };

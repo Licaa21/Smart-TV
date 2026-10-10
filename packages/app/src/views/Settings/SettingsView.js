@@ -40,10 +40,24 @@ export const followFocus = (ev) => {
 	const list = ev.currentTarget;
 	const target = ev.target;
 	if (!list || !target || target === list) return;
-	const row = target.getBoundingClientRect();
-	const offset = row.top - list.getBoundingClientRect().top + list.scrollTop;
+	let rowTop;
+	let rowHeight;
+	const zoomed = target.closest('[data-settings-zoom]');
+	if (zoomed && list.contains(zoomed)) {
+		// Older engines report a zoomed row in its own unzoomed units while the list is in screen ones. The zoomed
+		// block is as wide as the list on screen, so how wide it reports itself says which of the two it is.
+		const frame = zoomed.getBoundingClientRect();
+		const row = target.getBoundingClientRect();
+		const scale = frame.width > 0 ? list.clientWidth / frame.width : 1;
+		rowTop = (row.top - frame.top) * scale;
+		rowHeight = row.height * scale;
+	} else {
+		const row = target.getBoundingClientRect();
+		rowTop = row.top - list.getBoundingClientRect().top + list.scrollTop;
+		rowHeight = row.height;
+	}
 	const view = list.clientHeight;
-	const wanted = offset - FOLLOW_ALIGNMENT * (view - row.height);
+	const wanted = rowTop - FOLLOW_ALIGNMENT * (view - rowHeight);
 	const top = Math.max(0, Math.min(list.scrollHeight - view, wanted));
 	scrollListTo(list, top);
 };
