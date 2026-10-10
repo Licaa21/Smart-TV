@@ -25,6 +25,7 @@ import {createSkipGovernor, chooseCorrection} from '../../utils/syncCorrection';
 import {getImageUrl, getLogoUrl} from '../../utils/helpers';
 import {initPgsCanvasRenderer, disposePgsRenderer, clearPgsCanvas} from '../../utils/pgsRenderer';
 import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTime} from '../../utils/assRenderer';
+import {describeHlsManifest} from '../../utils/hlsManifestProbe';
 import {getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
@@ -916,6 +917,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				playMethod: playback.getCurrentSession()?.playMethod,
 				selectedAudioStreamIndex: playback.getCurrentSession()?.audioStreamIndex
 			});
+			// a refused stream gives a bare error code, so the playlist it was offered goes in the report too
+			if (isTranscode && isHls) {
+				describeHlsManifest(url)
+					.then((info) => serverLogger.playbackError('Playback: the playlist the TV refused', info))
+					.catch(() => {});
+			}
 			throw prepareErr;
 		} finally {
 			clearTimeout(prepareTimer);
