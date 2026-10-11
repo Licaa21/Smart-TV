@@ -126,7 +126,17 @@ const msToSeconds = (v) => (typeof v === 'number' ? Math.round(v / 1000) : undef
 // A choice this app doesn't offer is left out, so the one already picked stays.
 const oneOf = (values) => ({fromServer: v => (values.includes(v) ? v : undefined)});
 
+// The other clients call two of the card sizes medium and extraLarge. Older
+// builds of this app pushed default and xlarge, so those still read back.
+const POSTER_SIZES_TO_SERVER = {default: 'medium', xlarge: 'extraLarge'};
+const POSTER_SIZES_FROM_SERVER = {medium: 'default', extraLarge: 'xlarge'};
+const posterSizeFromServer = oneOf(['small', 'default', 'large', 'xlarge', 'grandparents']).fromServer;
+
 const VALUE_CONVERSIONS = {
+	homeRowsPosterSize: {
+		toServer: v => POSTER_SIZES_TO_SERVER[v] || v,
+		fromServer: v => posterSizeFromServer(POSTER_SIZES_FROM_SERVER[v] || v)
+	},
 	clockDisplay: {
 		toServer: v => v === '24-hour',
 		fromServer: v => v ? '24-hour' : '12-hour'

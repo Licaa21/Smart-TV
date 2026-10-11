@@ -143,7 +143,7 @@ const Browse = ({
 	// The other clients size these sliders in their own units, so the stored value
 	// lands here as the space below each row. Full screen rows pace themselves.
 	const rowSpacing = settings.fullScreenRows ? null : useModernRows
-		? Math.max(0, Math.min(Math.max((settings.modernHomeRowsPadding ?? 460) - 400, -40), 200) - 34)
+		? Math.max(0, Math.min(Math.max((settings.modernHomeRowsPadding ?? 420) - 400, -40), 200) - 34)
 		: Math.max(0, settings.classicHomeRowsPadding ?? 30);
 
 	const {

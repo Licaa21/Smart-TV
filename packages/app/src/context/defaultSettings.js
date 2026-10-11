@@ -224,7 +224,7 @@ export const defaultSettings = {
 	useSeriesThumbnails: false,
 	homeRowsPosterSize: 'default',
 	classicHomeRowsPadding: 30,
-	modernHomeRowsPadding: 460,
+	modernHomeRowsPadding: 420,
 	homeRowsImageType: 'poster',
 	// Per row overrides keyed by row id. An absent id uses the global type above.
 	homeRowImageTypes: {},

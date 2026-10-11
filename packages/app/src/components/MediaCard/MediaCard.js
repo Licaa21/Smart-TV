@@ -12,7 +12,7 @@ import css from './MediaCard.module.less';
 
 const SpottableDiv = Spottable('div');
 
-const POSTER_SIZE_MULTIPLIERS = {small: 0.8, default: 1, large: 1.2, xlarge: 1.4};
+const POSTER_SIZE_MULTIPLIERS = {small: 0.8, default: 1, large: 1.2, xlarge: 1.4, grandparents: 2};
 const BASE_SIZES = {portrait: [240, 360], landscape: [384, 216], square: [240, 240], banner: [1168, 216]};
 
 // How big a card of each shape draws, grown or shrunk by the poster size setting.

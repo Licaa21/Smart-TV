@@ -10,6 +10,7 @@
 [![License](https://img.shields.io/github/license/Moonfin-Client/Smart-TV.svg)](https://github.com/Moonfin-Client/Smart-TV)
 [![Release](https://img.shields.io/github/release/Moonfin-Client/Smart-TV.svg)](https://github.com/Moonfin-Client/Smart-TV/releases)
 [![github](https://img.shields.io/github/downloads/Moonfin-Client/Smart-TV/total?logo=github&label=Downloads)](https://github.com/Moonfin-Client/Smart-TV/releases)
+[![Amazon Appstore](https://img.shields.io/badge/Amazon%20Appstore-FF9900?logo=amazon&logoColor=white)](https://www.amazon.com/Moonfin/dp/B0H76BG3DW)
 [![BuyMeACoffee](https://raw.githubusercontent.com/pachadotdev/buymeacoffee-badges/main/bmc-yellow.svg)](https://www.buymeacoffee.com/moonfin) 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-5865F2?logo=discord&logoColor=white)](https://discord.gg/moonfin)
 
@@ -43,17 +44,31 @@ The full list is on the [Features](https://github.com/Moonfin-Client/Smart-TV/wi
 
 ## Screenshots
 
-<img width="1950" height="1060" alt="Home screen" src="https://github.com/user-attachments/assets/660712d2-1893-4c71-afff-5ddc9aa674e0" />
-<img width="1950" height="1060" alt="Details screen" src="https://github.com/user-attachments/assets/11f74fad-fd72-43c4-9c6d-7f23c9672751" />
-<img width="1950" height="1060" alt="Seerr discovery" src="https://github.com/user-attachments/assets/27eef61b-3295-4949-a34f-58b6166e6e94" />
-
-More in the [Screenshots](https://github.com/Moonfin-Client/Smart-TV/wiki/Screenshots) gallery.
+<p align="center">
+  <img src="images/1-home.png" width="100%" alt="Home screen with the featured media bar" />
+</p>
+<p align="center">
+  <img src="images/2-playback.png" width="49%" alt="Player with trickplay thumbnails and the subtitle menu" />
+  <img src="images/5-livetv.png" width="49%" alt="Live TV guide, channel changer and player" />
+</p>
+<p align="center">
+  <img src="images/3-details.png" width="49%" alt="The five detail screen styles" />
+  <img src="images/4-mediabars.png" width="49%" alt="The six media bar styles" />
+</p>
+<p align="center">
+  <img src="images/8-home-rows.png" width="49%" alt="Modern and Classic home rows" />
+  <img src="images/6-navigation.png" width="49%" alt="Top and Sidebar navigation" />
+</p>
+<p align="center">
+  <img src="images/7-books-games.png" width="49%" alt="Books library and retro game library" />
+  <img src="images/9-music.png" width="49%" alt="Music player with synced lyrics" />
+</p>
 
 **Disclaimer:** Screenshots shown in this documentation feature media content, artwork, and actor likenesses for demonstration purposes only. None of the media, studios, actors, or other content depicted are affiliated with, sponsored by, or endorsing the Moonfin client or the Jellyfin project. All rights to the portrayed content belong to their respective copyright holders. These screenshots are used solely to demonstrate the functionality and interface of the application.
 
 ## Installation
 
-Samsung and LG don't carry Moonfin in their TV app stores, so it's installed by sideloading. On LG the closest thing to a store is the **Homebrew Channel**, which lists Moonfin and updates it like any other app, no root needed. Everyone else downloads a package from the [Releases page](https://github.com/Moonfin-Client/Smart-TV/releases) and picks the file that matches the TV:
+Fire TV sticks running Vega OS can get Moonfin from the [Amazon Appstore](https://www.amazon.com/Moonfin/dp/B0H76BG3DW). Samsung and LG don't carry it in their TV app stores (yet), so there it's installed by sideloading. On LG the closest thing to a store is the **Homebrew Channel**, which lists Moonfin and updates it like any other app, no root needed. Everyone else downloads a package from the [Releases page](https://github.com/Moonfin-Client/Smart-TV/releases) and picks the file that matches the TV:
 
 | Platform | File | Supported Devices |
 |---|---|---|
@@ -67,7 +82,7 @@ The easiest route on each brand:
 
 - **LG:** the Homebrew Channel if your TV has it. Otherwise LG's Developer Mode app plus [Dev Manager Desktop](https://github.com/webosbrew/dev-manager-desktop), a free desktop program that installs the `.ipk` in a few clicks. The webOS CLI (`ares-install`) works too.
 - **Samsung:** the [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung) tool, which signs and installs the `.wgt` for you.
-- **Fire TV (Vega OS):** Developer Mode on the stick and the Vega SDK's `vega device install-app` on a computer, until the app is in the Amazon Appstore.
+- **Fire TV (Vega OS):** the [Amazon Appstore](https://www.amazon.com/Moonfin/dp/B0H76BG3DW). The `.vpkg` from the Releases page can still be sideloaded with Developer Mode on the stick and the Vega SDK's `vega device install-app` on a computer.
 - **Xbox:** coming to the Microsoft Store, where the listing is in review. Until then the `.zip` on the Releases page installs on a console in Developer Mode through the Xbox Device Portal.
   - The console draws every app's interface at 1080p and scales it up to the TV, so on a 4K set the text and posters look a little softer than the TV's own apps. That is how Xbox runs apps, Plex and Jellyfin look the same, and video is not affected: it goes through the console's own player at 4K and in HDR.
 

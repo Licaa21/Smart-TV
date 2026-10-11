@@ -210,7 +210,8 @@ export const getPosterSizeOptions = () => [
 	{ value: 'small', label: $L('Small') },
 	{ value: 'default', label: $L('Default') },
 	{ value: 'large', label: $L('Large') },
-	{ value: 'xlarge', label: $L('Extra Large') }
+	{ value: 'xlarge', label: $L('Extra Large') },
+	{ value: 'grandparents', label: $L('Grandparents') }
 ];
 
 export const getImageTypeOptions = () => [

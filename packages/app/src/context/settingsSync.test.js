@@ -66,6 +66,14 @@ describe('profileToLocal', () => {
 		expect(local).toEqual({});
 	});
 
+	test("reads the other clients' card size names", () => {
+		expect(profileToLocal({posterSize: 'medium'}).homeRowsPosterSize).toBe('default');
+		expect(profileToLocal({posterSize: 'extraLarge'}).homeRowsPosterSize).toBe('xlarge');
+		expect(profileToLocal({posterSize: 'grandparents'}).homeRowsPosterSize).toBe('grandparents');
+		expect(profileToLocal({posterSize: 'xlarge'}).homeRowsPosterSize).toBe('xlarge');
+		expect(profileToLocal({posterSize: 'huge'}).homeRowsPosterSize).toBeUndefined();
+	});
+
 	test('ignores a screensaver mode this app has no way to draw', () => {
 		expect(profileToLocal({screensaverMode: 'off'}).screensaverMode).toBeUndefined();
 		expect(profileToLocal({screensaverMode: 'logo'}).screensaverMode).toBe('logo');
@@ -192,7 +200,17 @@ describe('localToProfile', () => {
 		const profile = localToProfile(defaultSettings);
 
 		expect(profile.classicHomeRowsPadding).toBe(30);
-		expect(profile.modernHomeRowsPadding).toBe(460);
+		expect(profile.modernHomeRowsPadding).toBe(420);
+	});
+
+	test('sends the card size under the names the other clients use', () => {
+		const sizeFor = (homeRowsPosterSize) =>
+			localToProfile({...defaultSettings, homeRowsPosterSize}, ['homeRowsPosterSize']).posterSize;
+
+		expect(sizeFor('default')).toBe('medium');
+		expect(sizeFor('xlarge')).toBe('extraLarge');
+		expect(sizeFor('grandparents')).toBe('grandparents');
+		expect(sizeFor('small')).toBe('small');
 	});
 
 	test('keeps the local only home row list out of the profile', () => {
