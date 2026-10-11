@@ -34,6 +34,10 @@ describe('modernCardMetrics', () => {
 		expect(metrics({posterSize: 'nonsense'}).imageHeight).toBe(360);
 	});
 
+	test('keeps Grandparents at the Extra Large height', () => {
+		expect(metrics({posterSize: 'grandparents'}).imageHeight).toBe(504);
+	});
+
 	test('a poster is two thirds of its height and a sleeve is square', () => {
 		expect(metrics().cardWidth).toBe(240);
 		expect(metrics({isSquareItem: true}).cardWidth).toBe(360);

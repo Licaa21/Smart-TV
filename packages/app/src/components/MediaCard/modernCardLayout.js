@@ -1,6 +1,8 @@
 // The widths a modern home row card is laid out from.
 
-const POSTER_SIZE_MULTIPLIERS = {small: 0.8, default: 1, large: 1.2, xlarge: 1.4};
+// Grandparents stops at the Extra Large height here, since a modern row any
+// taller no longer fits on the screen.
+const POSTER_SIZE_MULTIPLIERS = {small: 0.8, default: 1, large: 1.2, xlarge: 1.4, grandparents: 1.4};
 
 // Only the My Media row answers to the setting. Live TV draws its Guide and
 // Recordings tiles as collection folders too, and going by the item would

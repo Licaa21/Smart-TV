@@ -70,6 +70,7 @@ const ModernMediaCard = ({
 	onSpotlightLeft,
 	onSpotlightRight,
 	isFocused = false,
+	detailsWidth,
 	isLibraryRow = false,
 	rowImageType,
 	menuOptions
@@ -297,6 +298,7 @@ const ModernMediaCard = ({
 		item?._seerr === true
 	);
 	const expanded = isFocused && canRenderExpanded;
+	const extendedSectionWidth = Math.max(detailsWidth || 0, expandedWidth);
 
 	const cardClassName = [
 		css.card,
@@ -407,11 +409,12 @@ const ModernMediaCard = ({
 			) : null}
 
 			{expanded && (
-				<div className={css.extendedSection} style={{width: `${expandedWidth}px`}}>
+				<div className={css.extendedSection} style={{width: `${extendedSectionWidth}px`}}>
 					<RatingsRow
 						item={item}
 						serverUrl={itemServerUrl}
 						compact
+						singleLineWidth={extendedSectionWidth}
 						pluginEnabled={isMdblistEnabled(settings)}
 					/>
 					{shouldShowOverview && <div className={css.overview}>{overviewText}</div>}
