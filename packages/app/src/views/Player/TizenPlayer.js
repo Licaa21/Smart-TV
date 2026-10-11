@@ -2553,23 +2553,18 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		return true;
 	}, [noteViewerActivity, executeDeferredSeek, verifyResumeHealthy]);
 
-	// A held scrub lands by itself once the presses stop, so there is no waiting on OK. Playback
-	// carries on if it was playing, and a video that was paused to begin with stays paused.
+	// A held scrub of a video that was paused to begin with lands by itself once the presses stop, and the
+	// video stays paused. One that Pause While Scrubbing paused waits for Play, which is what that setting says.
 	const commitHeldScrub = useCallback(() => {
 		holdCommitTimerRef.current = null;
 		const held = scrubHoldRef.current;
-		if (!held.active) return;
+		if (!held.active || held.wasPlaying) return;
 		serverLogger.playback('Seek: scrub landed by itself', {
-			targetMs: pendingSeekMsRef.current != null ? Math.round(pendingSeekMsRef.current) : null,
-			wasPlaying: held.wasPlaying
+			targetMs: pendingSeekMsRef.current != null ? Math.round(pendingSeekMsRef.current) : null
 		});
-		if (held.wasPlaying) {
-			resumeHeldScrub();
-			return;
-		}
 		scrubHoldRef.current = {active: false, wasPlaying: false};
 		executeDeferredSeek();
-	}, [resumeHeldScrub, executeDeferredSeek]);
+	}, [executeDeferredSeek]);
 
 	// A skip or a chapter jump lands somewhere the scrub knows nothing about, so a pending scrub is
 	// dropped rather than committed over it later, and a held one lets playback carry on.
@@ -3013,7 +3008,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (scrubHoldRef.current.active) {
 			pendingSeekMsRef.current = newMs;
 			clearTimeout(holdCommitTimerRef.current);
-			holdCommitTimerRef.current = setTimeout(commitHeldScrub, SCRUB_COMMIT_DELAY);
+			if (!scrubHoldRef.current.wasPlaying) holdCommitTimerRef.current = setTimeout(commitHeldScrub, SCRUB_COMMIT_DELAY);
 		} else {
 			scheduleDeferredSeek(newMs);
 		}
