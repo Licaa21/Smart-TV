@@ -2275,27 +2275,22 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		scrubHoldRef.current = {...held, ticks: null};
 	}, [seekToTicks, noteSeek]);
 
-	// A held scrub lands by itself once the presses stop, so there is no waiting on OK. Playback
-	// carries on if it was playing, and a video that was paused to begin with stays paused.
+	// A held scrub of a video that was paused to begin with lands by itself once the presses stop, and the
+	// video stays paused. One that Pause While Scrubbing paused waits for Play, which is what that setting says.
 	const commitHeldScrub = useCallback(() => {
 		holdCommitTimerRef.current = null;
 		const held = scrubHoldRef.current;
-		if (!held.active) return;
+		if (!held.active || held.wasPlaying) return;
 		serverLogger.playback('Seek: scrub landed by itself', {
-			targetMs: held.ticks != null ? Math.round(held.ticks / 10000) : null,
-			wasPlaying: held.wasPlaying
+			targetMs: held.ticks != null ? Math.round(held.ticks / 10000) : null
 		});
-		if (held.wasPlaying) {
-			resumeHeldScrub();
-			return;
-		}
 		scrubHoldRef.current = {active: false, wasPlaying: false, ticks: null};
 		if (held.ticks != null) {
 			noteSeek();
 			seekToTicks(held.ticks);
 		}
 		setIsSeeking(false);
-	}, [resumeHeldScrub, seekToTicks, noteSeek]);
+	}, [seekToTicks, noteSeek]);
 
 	// A skip or a chapter jump lands somewhere the scrub knows nothing about, so a held scrub is
 	// dropped and playback carries on as it was.
@@ -2347,7 +2342,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		scrubHoldRef.current = {...held, ticks};
 		setSeekPosition(ticks);
 		clearTimeout(holdCommitTimerRef.current);
-		holdCommitTimerRef.current = setTimeout(commitHeldScrub, SCRUB_COMMIT_DELAY);
+		if (!held.wasPlaying) holdCommitTimerRef.current = setTimeout(commitHeldScrub, SCRUB_COMMIT_DELAY);
 	}, [noteViewerActivity, beginScrub, seekByOffset, duration, noteSeek, commitHeldScrub]);
 
 	const handlePlayPause = useCallback(() => {
