@@ -163,10 +163,11 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 - **Force Compatible AV1 Transcode:** an opt-in setting that re-encodes AV1 to HEVC when transcoding, for Tizen sets that fail on AV1 over fragmented-MP4 HLS.
 - **Channel keys:** CH +/- seek far, by five times the seek step or 3% of the runtime, wherever focus is. Previous plays the previous episode, and the TV's own channel, guide and streaming-service keys no longer close the app.
 - **Seeking lands by itself:** a held seek is applied about half a second after you stop, without pressing OK.
-- **Episode browser:** an Episodes button in the player opens the current season on the playing episode, with season tabs, CH +/- to change season, and resume on pick. It can be arranged in Player Buttons.
+- **Episode browser:** an Episodes button in the player opens the current season on the playing episode, with season tabs, resume on pick, and CH +/- to change season. Upstream later dropped the channel keys from its copy, and this fork keeps them. It can be arranged in Player Buttons.
 - **Skip prompt:** its auto-hide starts over for every episode, so it no longer vanishes early after Previous or Next.
 - **Seek bar:** the focused thumb is easier to see on Tizen.
-- **Back to the player from a person:** opening a person from the cast and crew list closes the player, and Back from there returns to it at the same place, with the same audio and subtitle picks and still paused if it was. That person screen has no navbar, so the only way on is Back. A person opened from anywhere else keeps it.
+- **Back to the player from a person:** opening a person from the cast and crew list closes the player, and Back from there returns to it at the same place, with the same audio and subtitle picks and still paused if it was. The person screen, and any title opened from it, has no navbar, so the only way on is Back. The Guide, Channel List and Previous Channel buttons go straight back to the player from any of those screens. Back lands on the screen it left, the title you started playing from, and not on the last one you opened. A person opened from anywhere else keeps the navbar.
+- **Subtitles move out of the way:** they slide up above the controls bar while it shows, and above the description when Show Description on Pause is on, then slide back down.
 - **Direct play where the set allows it:**
   - A file that opens on a track the TV cannot decode, such as TrueHD first, is played from the first track the TV can decode, and a pick in the same codec is switched by the player.
   - A pick in another codec is built on the server with the video copied, the way a manual pick already was, so the screen and the sound agree.
@@ -174,6 +175,7 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
   - A direct stream the server gives no address for is opened as a direct play.
 - **Play Dolby Vision Profile 7 as HDR10:** an opt-in setting that direct plays Dolby Vision files with an enhancement layer as plain HDR10 on sets that report HDR10.
 - **Allow Files With Many Streams:** an opt-in setting that lifts the 32 stream limit older Tizen sets are given, so a remux with dozens of subtitle tracks can direct play.
+- **Allow HEVC Level 5.2:** an opt-in setting that lets 4K HEVC files at level 5.2 direct play on 4K Tizen sets, which the profile otherwise stops at 5.1 and sends to be re-encoded.
 
 **Subtitles and audio**
 - **Preferred Languages** subtitle mode: your preferred language, then your secondary one, and off when neither is in the file.
@@ -187,19 +189,19 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 - **Accent colors:** a color per part of the app, or one for everything, with focus fills kept readable.
 - **Skip Intro/Recap/Credits editor:** capsule, rectangle and sweep layouts with position, size, colors and a live preview, plus card, banner and button layouts for the Next Episode prompt.
 - **Search:** results drawn with the Home cards and rows, best matches first, and a setting for which tab a search opens on when Seerr has results.
-- **Person pages:** redesigned with a portrait, backdrop and de-duplicated credits.
-- **Details:** action button rows ranked like Settings, "Read more" only when the text is cut off, anime marker pills on every layout, and a Press BACK to close hint on trailers.
-- **Seerr:** Discover drawn with the Home cards, rows and settings, and a browse grid that reads the Movies or TV Shows library's own size, shape and direction settings, so a card is the same in both.
+- **Person pages:** redesigned with a portrait, backdrop and de-duplicated credits. The backdrop is the one title the person is known for: the series they were in for the most episodes when one ran 20 or more, and otherwise the title they are billed highest in. Cameos, walk-ons, guest spots and appearances as themselves are never picked.
+- **Details:** action button rows ranked like Settings, "Read more" only when the text is cut off, anime marker pills on every layout, and a Press BACK to close hint on trailers. The classic layout offers Change Artwork, and on an episode its row of the season's episodes opens on that episode and marks it.
+- **Seerr:** Discover drawn with the Home cards, rows and settings, and a browse grid that reads the Movies or TV Shows library's own size, shape and direction settings, so a card is the same in both. A title from a Seerr recommendation on a details screen opens as a Seerr title, with the trailer and request, and no longer as if it were in the library.
 - **Sort and filter popups:** one shared popup, with the groups on the left and the options beside them.
 - **Backdrops behind the cards:** the focused card's backdrop, dimmed and blurred, now sits behind the Modern home rows, Search and the Seerr Discover and Browse screens too. It follows the same Background Backdrops switch and blur amount as before.
 - **Home Rows Image Type in every row style:** Poster, Thumb, Backdrop, Banner and Logo now apply to the Modern rows as well as the Classic ones, and to the TMDB, IMDb, Seerr and Because you watched rows, which take their backdrop for the wide types.
-- **Theme music on Home:** episodes in Continue Watching and Next Up play their series' theme, a theme fades out when focus moves to a card without one, and moving back to the same card keeps it going.
+- **Theme music on Home:** episodes in Continue Watching and Next Up play their series' theme, a theme fades out when focus moves to a card without one, and moving back to the same card keeps it going. It fades out when the screensaver comes up and comes back when the screensaver goes, on the same card or details screen.
 - **Seasonal effects:** the number of particles follows the Density setting alone, and the performance level no longer thins them out.
 - **Performance levels:** Ultra, High, Medium-High, Medium, Low and Performance, with the lower ones turning off idle animations and drawing long rows in steps, so a slow TV stays responsive while looking almost the same.
-- **Settings in sub-pages:** the long Playback, Audio, Subtitles and Home pages open short lists of sub-pages, such as Seeking and Resume, Direct Play and Quality Limits, Audio Output and Passthrough, Subtitle Appearance and Row Style and Layout.
+- **Settings:** upstream's 2.10.0 Settings layout, with this fork's own screens placed in it: Accent Colors under Appearance, the skip button look under Skipping & Autoplay, and the audio, direct play and Seerr search settings in their screens. **Settings Size** (Appearance, Display) shrinks the whole Settings list, boxes and text, to 90, 80 or 70 percent, and leaves the Settings window at its size.
 
 **Diagnostics and translations**
-- **Diagnostic log:** the in-app log keeps its recent non-network lines across restarts, so a report still has them after the app reopens. It also prints the commit the package was built from, why each start picked its audio track, the server's reason for not direct playing, and why a media load failed.
+- **Diagnostic log:** the in-app log keeps its recent non-network lines across restarts, so a report still has them after the app reopens. It also prints the commit the package was built from, why each start picked its audio track, the server's reason for not direct playing, why a media load failed, and the HLS playlist the TV refused, with the access token hidden.
 - **Romanian:** strings added by this fork are translated by hand in `packages/app/resources/ro/strings.json`, since this fork has no Weblate project. Every English string now has a Romanian one, the strings the code used but never listed are added, and dates and prices follow the app's language and not the TV's. The Series button on an episode's details reads Serial.
 
 ### Branches and updating
@@ -208,4 +210,4 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 - `implement` is where my changes live. They are committed here and nowhere else.
 - `daily` is `main` merged with `implement`, and it is only used to build the app for daily use. Nothing is committed on it by hand.
 - `feature/episodeselector-skipperlayout-accentcolors` is the one change proposed upstream (the in-player episode browser, [#494](https://github.com/Moonfin-Client/Smart-TV/pull/494)).
-- To pick up upstream's latest, run `bash fork-tools/update-daily.sh` on `daily`, then `bash fork-tools/build-daily-wgt.sh`. The Tizen package is the regular build, named after the upstream one with `_Lica_Fork` added, for example `Moonfin_Tizen_Regular_2.9.0_Lica_Fork.wgt`.
+- To pick up upstream's latest, run `bash fork-tools/update-daily.sh` on `daily`, then `bash fork-tools/build-daily-wgt.sh`. The Tizen package is the regular build, named after the upstream one with `_Lica_Fork` added, for example `Moonfin_Tizen_Regular_v2.10.0_Lica_Fork.wgt`.
