@@ -10,6 +10,8 @@ const BackdropLayer = memo(({targetUrl, blurAmount, overlayOpacity, scrimWhenEmp
 	const activeLayerRef = useRef('a');
 	const currentUrlRef = useRef('');
 	const timeoutRef = useRef(null);
+	// What the screen wants now. A picture still loading for an earlier card is not drawn once focus has moved on.
+	const wantedUrlRef = useRef('');
 
 	useEffect(() => {
 		return () => {
@@ -18,6 +20,7 @@ const BackdropLayer = memo(({targetUrl, blurAmount, overlayOpacity, scrimWhenEmp
 	}, []);
 
 	useEffect(() => {
+		wantedUrlRef.current = targetUrl || '';
 		if (!targetUrl) {
 			if (currentUrlRef.current) {
 				currentUrlRef.current = '';
@@ -38,6 +41,7 @@ const BackdropLayer = memo(({targetUrl, blurAmount, overlayOpacity, scrimWhenEmp
 		timeoutRef.current = setTimeout(() => {
 			const img = new window.Image();
 			const apply = () => {
+				if (wantedUrlRef.current !== targetUrl) return;
 				const isA = activeLayerRef.current === 'a';
 				const incoming = isA ? layerBRef.current : layerARef.current;
 				const outgoing = isA ? layerARef.current : layerBRef.current;
