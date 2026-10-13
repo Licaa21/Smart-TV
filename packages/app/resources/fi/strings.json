@@ -2442,5 +2442,9 @@
     "Grandparents": "Isovanhemmat",
     "If your Xbox rejects a server's security certificate, accept it anyway. Use only for servers you trust.": "Jos Xbox hylkää palvelimen suojausvarmenteen, hyväksy se silti. Käytä tätä vain palvelimille, joihin luotat.",
     "Test what this device can play and send the report to your server": "Testaa, mitä tämä laite pystyy toistamaan, ja lähetä raportti palvelimellesi",
-    "Xbox OS Version": "Xbox-käyttöjärjestelmän versio"
+    "Xbox OS Version": "Xbox-käyttöjärjestelmän versio",
+    "Media Preview": "Median esikatselu",
+    "Play a short clip of the focused card after a moment.": "Näytä hetken kuluttua lyhyt pätkä kyseisestä kortista.",
+    "Play the preview with sound.": "Toista esikatselu äänellä.",
+    "Preview Audio": "Äänen esikatselu"
 }
