@@ -446,6 +446,11 @@ const ModernMediaCard = ({
 						<div className={css.secondaryTitle}>{episodeLabels.full}</div>
 						{metadata && <div className={css.secondaryTitle}>{metadata}</div>}
 					</>
+				) : item?._calendarDate && item.Subtitle ? (
+					<>
+						<div className={css.secondaryTitle}>{item.Subtitle}</div>
+						{metadata && <div className={css.secondaryTitle}>{metadata}</div>}
+					</>
 				) : (metadata || item?.Subtitle) ? (
 					<div className={css.secondaryTitle}>{metadata || item.Subtitle}</div>
 				) : null
