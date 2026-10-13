@@ -1,4 +1,4 @@
-import {api, setServer, setServerType, setAuth, resolveItemsByProviderIds, resetLibraryIndexForTests} from './jellyfinApi';
+import {api, createApiForServer, setServer, setServerType, setAuth, resolveItemsByProviderIds, resetLibraryIndexForTests} from './jellyfinApi';
 import {platformFetch} from './secureFetch';
 
 jest.mock('./secureFetch', () => ({platformFetch: jest.fn()}));
@@ -154,5 +154,24 @@ describe('matching outside list items to the library', () => {
 		const url = urlOf(platformFetch.mock.calls[0]);
 		expect(url).toContain('AnyProviderIdEquals=tmdb.1585');
 		expect(url).toContain('IncludeItemTypes=Movie,Series');
+	});
+});
+
+describe('stopActiveEncodings', () => {
+	test('tells the server to drop the transcode for this device and play session', async () => {
+		setServerType('jellyfin');
+		await api.stopActiveEncodings('session-1');
+		const [url, options] = platformFetch.mock.calls[0];
+		expect(url).toContain('http://server/Videos/ActiveEncodings?deviceId=');
+		expect(url).toContain('&playSessionId=session-1');
+		expect(options.method).toBe('DELETE');
+	});
+
+	test('goes to the other server when the row came from one', async () => {
+		await createApiForServer('http://other', 'tok', 'u2').stopActiveEncodings('session-2');
+		const [url, options] = platformFetch.mock.calls[0];
+		expect(url).toContain('http://other/Videos/ActiveEncodings?deviceId=');
+		expect(url).toContain('&playSessionId=session-2');
+		expect(options.method).toBe('DELETE');
 	});
 });

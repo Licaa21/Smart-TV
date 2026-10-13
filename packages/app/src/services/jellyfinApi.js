@@ -581,6 +581,13 @@ export const api = {
 		method: 'POST'
 	}),
 
+	// Tears down a transcode that was started by URL alone, with no playback session
+	// behind it, so the server stops encoding the moment the card lets go of it.
+	stopActiveEncodings: (playSessionId) =>
+		request(`/Videos/ActiveEncodings?deviceId=${encodeURIComponent(deviceId)}&playSessionId=${encodeURIComponent(playSessionId)}`, {
+			method: 'DELETE'
+		}),
+
 	search: (query, limit = 240) =>
 		request(`${userRoutes.items()}searchTerm=${encodeURIComponent(query)}&Limit=${limit}&Recursive=true&IncludeItemTypes=Book,Movie,Series,Season,Episode,Video,MusicVideo,Trailer,Program,Playlist,MusicArtist,MusicAlbum,Audio,PhotoAlbum,Photo,BoxSet,Folder&Fields=PrimaryImageAspectRatio,ProductionYear,AlbumArtist,SeriesName,ParentIndexNumber,IndexNumber,ProviderIds,UserData,OfficialRating`),
 
@@ -1162,6 +1169,12 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 			method: 'POST',
 			body: data
 		}),
+
+		// The preview URL carries this app's device id whichever server it goes to.
+		stopActiveEncodings: (playSessionId) =>
+			serverRequest(`/Videos/ActiveEncodings?deviceId=${encodeURIComponent(deviceId)}&playSessionId=${encodeURIComponent(playSessionId)}`, {
+				method: 'DELETE'
+			}),
 
 		closeLiveStream: (liveStreamId) => serverRequest(`/LiveStreams/Close?LiveStreamId=${encodeURIComponent(liveStreamId)}`, {
 			method: 'POST'

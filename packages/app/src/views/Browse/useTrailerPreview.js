@@ -1,32 +1,20 @@
 import {useState, useEffect, useCallback, useRef} from 'react';
 import {buildQueryString} from '../../utils/urlCompat';
 import {stopPlaybackForTrailer} from '../../utils/trailerPlayback';
+import {claimSharedVideo, ownsSharedVideo, releaseSharedVideo} from '../../utils/sharedVideoOwner';
+import {coverVideoInBox} from '../../utils/videoCover';
 import {createApiForServer, getApiKey, getServerUrl as getDefaultServerUrl} from '../../services/jellyfinApi';
 import serverLogger from '../../services/serverLogger';
 import css from './Browse.module.less';
 
 const TRAILER_REVEAL_MS = 3000;
+// The element keeps the trailer's own shape and overhangs the container, which crops
+// it instead of squashing it into a frame that isnt 16:9.
 const TRAILER_ZOOM = 1.15;
 // the preview plays into a plain HTML5 video element which cant decode a server
 // transcode on Tizen, so direct play the original trailer file instead
 const LOCAL_TRAILER_STREAM_PARAMS = {
 	Static: 'true'
-};
-
-// The shared video element fills its box, and TVs draw video on a plane that ignores
-// object-fit and transforms anyway. So the element keeps the trailer's own shape and
-// overhangs the container, which crops it instead of squashing it into a frame that
-// isnt 16:9.
-const coverContainer = (video) => {
-	const box = video.parentNode;
-	if (!box || !video.videoWidth || !video.videoHeight) return;
-	const scale = Math.max(box.clientWidth / video.videoWidth, box.clientHeight / video.videoHeight) * TRAILER_ZOOM;
-	const width = Math.round(video.videoWidth * scale);
-	const height = Math.round(video.videoHeight * scale);
-	video.style.width = `${width}px`;
-	video.style.height = `${height}px`;
-	video.style.left = `${Math.round((box.clientWidth - width) / 2)}px`;
-	video.style.top = `${Math.round((box.clientHeight - height) / 2)}px`;
 };
 
 // Shared trailer preview engine for the home banners. Resolves a local or
@@ -105,7 +93,9 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 		}
 		setTrailerActive(false);
 		setTrailerHolding(false);
-		const video = trailerVideoRef.current;
+		// The element is only touched while this is its owner, so the cleanups that run
+		// on an item change or a hide can't clear a card preview that took it over.
+		const video = ownsSharedVideo('trailer') ? trailerVideoRef.current : null;
 		if (video) {
 			try { video.pause(); } catch (e) { /* ignore */ }
 			try {
@@ -120,9 +110,10 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 			video.onerror = null;
 			video.onloadedmetadata = null;
 			video.onresize = null;
+			releaseStream();
 		}
 		removeCaptionTrack(video);
-		releaseStream();
+		releaseSharedVideo('trailer');
 		trailerStateRef.current = 'idle';
 		trailerVideoIdRef.current = null;
 		sponsorSegmentsRef.current = [];
@@ -193,6 +184,8 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 			video = getSharedVideoElement();
 			trailerVideoRef.current = video;
 		}
+		// A card preview still holding the element is stopped before it's touched.
+		claimSharedVideo('trailer', stopTrailer);
 		video.className = css.trailerVideo;
 		video.playsInline = true;
 		video.controls = false;
@@ -205,7 +198,7 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 		if (!container.contains(video)) {
 			container.appendChild(video);
 		}
-		video.onloadedmetadata = () => coverContainer(video);
+		video.onloadedmetadata = () => coverVideoInBox(video, container, TRAILER_ZOOM);
 		video.onresize = video.onloadedmetadata;
 
 		const clearSkipInterval = () => {

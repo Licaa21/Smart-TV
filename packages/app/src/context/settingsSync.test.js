@@ -309,6 +309,29 @@ describe('SYNCABLE_KEYS', () => {
 	test('includes seasonalDensity', () => {
 		expect(SYNCABLE_KEYS).toContain('seasonalDensity');
 	});
+
+	test('includes the media preview switches', () => {
+		expect(SYNCABLE_KEYS).toContain('episodePreviewEnabled');
+		expect(SYNCABLE_KEYS).toContain('previewAudioEnabled');
+	});
+});
+
+describe('the media preview switches', () => {
+	test('default to off with sound on', () => {
+		expect(defaultSettings.episodePreviewEnabled).toBe(false);
+		expect(defaultSettings.previewAudioEnabled).toBe(true);
+	});
+
+	test('travel under the server keys as they are', () => {
+		const profile = localToProfile({...defaultSettings, episodePreviewEnabled: true, previewAudioEnabled: false}, ['episodePreviewEnabled', 'previewAudioEnabled']);
+
+		expect(profile).toEqual({episodePreviewEnabled: true, previewAudioEnabled: false});
+
+		const local = profileToLocal({episodePreviewEnabled: true, previewAudioEnabled: false});
+
+		expect(local.episodePreviewEnabled).toBe(true);
+		expect(local.previewAudioEnabled).toBe(false);
+	});
 });
 
 describe('localToProfile for the seasonal effect', () => {

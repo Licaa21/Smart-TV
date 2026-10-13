@@ -1,4 +1,4 @@
-import {memo, useCallback, useMemo, useRef, useEffect} from 'react';
+import {memo, useCallback, useMemo, useRef, useEffect, useState} from 'react';
 import {isMdblistEnabled} from '../../services/mdblistApi';
 import Spottable from '@enact/spotlight/Spottable';
 import $L from '@enact/i18n/$L';
@@ -12,7 +12,9 @@ import {requestedArtwork, episodeArtwork} from './MediaCard';
 import {externalArtwork} from '../../utils/externalArtwork';
 import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
+import {isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
+import {useMediaPreviewSlot} from './MediaPreviewContext';
 
 import css from './ModernMediaCard.module.less';
 
@@ -114,8 +116,18 @@ const ModernMediaCard = ({
 		return requestedArtwork(item, type, itemServerUrl, width);
 	}, [item, rowImageType, isLibraryRow, itemServerUrl, platform, settings.homeRowsPosterSize, settings.useSeriesThumbnails]);
 
+	// A focused Seerr or outside list title grows into the titled thumb the plugin picks
+	// for it, and a thumb that fails to load hands over to the plain backdrop.
+	const [failedThumb, setFailedThumb] = useState(null);
+	const wantsSeerrWide = isFocused && isUnownedSeerrTitle(item);
+	useTmdbThumbsAvailable(wantsSeerrWide);
+	const seerrThumb = wantsSeerrWide ? seerrThumbUrl(item) : null;
+	const seerrWide = wantsSeerrWide ? seerrWideArtUrl(item, failedThumb) : null;
+
 	const imageUrl = useMemo(() => {
 		if (!item) return null;
+		// The titled thumb a focused Seerr title grows into comes ahead of the plain backdrop its row asked for
+		if (seerrWide) return toAbsoluteImageUrl(seerrWide, itemServerUrl);
 		if (rowArtwork) return rowArtwork;
 
 		const providerIds = item.ProviderIds || {};
@@ -126,7 +138,9 @@ const ModernMediaCard = ({
 			providerIds.LidarrPoster ||
 			providerIds.ReadarrPoster;
 
-		if (item._external || externalPoster) {
+		// A title the server owns shows the library's own art, with the outside poster as the
+		// last resort further down.
+		if ((item._external || externalPoster) && !item._resolvedFromExternal) {
 			if (isFocused && item._externalBackdropUrl) {
 				return toAbsoluteImageUrl(item._externalBackdropUrl, itemServerUrl);
 			}
@@ -245,14 +259,27 @@ const ModernMediaCard = ({
 		}
 
 		return null;
-	}, [item, itemServerUrl, isFocused, isStaticMyMedia, rowArtwork, settings.useSeriesThumbnails]);
+	}, [item, itemServerUrl, isFocused, isStaticMyMedia, rowArtwork, seerrWide, settings.useSeriesThumbnails]);
+
+	const handleImageError = useCallback(() => {
+		if (seerrThumb && imageUrl === seerrThumb) setFailedThumb(seerrThumb);
+	}, [imageUrl, seerrThumb]);
+
+	const {
+		phase: previewPhase,
+		frameRef: previewFrameRef,
+		onFocus: onPreviewFocus,
+		onBlur: onPreviewBlur,
+		stopForSelect: stopPreviewForSelect
+	} = useMediaPreviewSlot(spotlightId, item);
 
 	const handleClick = useCallback(() => {
+		stopPreviewForSelect();
 		onSelect?.(item);
-	}, [item, onSelect]);
+	}, [item, onSelect, stopPreviewForSelect]);
 
 	const itemAt = useCallback(() => item, [item]);
-	const menuHold = useItemMenuHold(itemAt, menuOptions);
+	const {onMouseLeave: onMenuMouseLeave, ...menuHold} = useItemMenuHold(itemAt, menuOptions);
 
 	const handleFocus = useCallback(() => {
 		onFocused?.(item?.Id || null);
@@ -262,7 +289,14 @@ const ModernMediaCard = ({
 		focusTimeoutRef.current = setTimeout(() => {
 			onFocusItem?.(item);
 		}, 50);
-	}, [item, onFocusItem, onFocused]);
+		onPreviewFocus();
+	}, [item, onFocusItem, onFocused, onPreviewFocus]);
+
+	// The menu hold watches the pointer leaving too, so both hear it.
+	const handleMouseLeave = useCallback((e) => {
+		onMenuMouseLeave?.(e);
+		onPreviewBlur();
+	}, [onMenuMouseLeave, onPreviewBlur]);
 
 	const progress = item?.UserData?.PlayedPercentage || 0;
 	const watchedBehavior = settings.watchedIndicatorBehavior || 'always';
@@ -316,6 +350,9 @@ const ModernMediaCard = ({
 			className={cardClassName}
 			onClick={handleClick}
 			onFocus={handleFocus}
+			onBlur={onPreviewBlur}
+			onMouseEnter={onPreviewFocus}
+			onMouseLeave={handleMouseLeave}
 			style={{
 				width: `${expanded ? expandedWidth : cardWidth}px`,
 				transition,
@@ -326,7 +363,7 @@ const ModernMediaCard = ({
 			onSpotlightLeft={onSpotlightLeft}
 			onSpotlightRight={onSpotlightRight}
 		>
-			<div className={css.imageContainer}>
+			<div className={previewPhase !== 'idle' ? `${css.imageContainer} ${css.previewHost}` : css.imageContainer}>
 				{imageUrl ? (
 					<>
 						<img
@@ -337,6 +374,7 @@ const ModernMediaCard = ({
 							width={cardWidth}
 							height={imageHeight}
 							style={{height: `${imageHeight}px`, ...(rowArtwork && rowImageType === 'logo' ? {objectFit: 'contain'} : null)}}
+							onError={handleImageError}
 						/>
 						{(item?.Type === 'Genre' || item?.Type === 'MusicGenre') && (
 							<>
@@ -355,6 +393,13 @@ const ModernMediaCard = ({
 							<span className={css.placeholderTitle}>{item?.Name}</span>
 						)}
 					</div>
+				)}
+
+				{previewPhase !== 'idle' && (
+					<>
+						<div ref={previewFrameRef} className={previewPhase === 'playing' ? `${css.previewFrame} ${css.previewVisible}` : css.previewFrame} />
+						<div className={css.previewRing} />
+					</>
 				)}
 
 				{showIndicators && progress > 0 && (

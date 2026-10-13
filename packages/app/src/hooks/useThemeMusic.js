@@ -27,6 +27,11 @@ export const useThemeMusic = () => {
 	const suspendedIdRef = useRef(null);
 	// the screensaver is up, when no theme starts and focus moving about behind it is not the viewer's doing
 	const suspendedRef = useRef(false);
+	// Set while a card preview plays. The track fades out, and the item that was
+	// playing or the last one asked for is kept so it can come back afterwards.
+	const heldRef = useRef(false);
+	const heldItemIdRef = useRef(null);
+	const requestedItemIdRef = useRef(null);
 
 	const getTargetVolume = useCallback(() => {
 		return Math.max(0, Math.min(100, settings.themeMusicVolume || 30)) / 100;
@@ -111,6 +116,10 @@ export const useThemeMusic = () => {
 			return;
 		}
 		suspendedIdRef.current = null;
+		if (heldRef.current) {
+			heldItemIdRef.current = itemId;
+			return;
+		}
 
 		if (currentItemIdRef.current === itemId && audioRef.current) {
 			if (fadingOutRef.current) fadeIn(audioRef.current, audioRef.current.volume);
@@ -123,7 +132,7 @@ export const useThemeMusic = () => {
 		try {
 			const result = await jellyfinApi.api.getThemeSongs(itemId, true);
 			const songs = result?.Items || [];
-			if (songs.length === 0 || currentItemIdRef.current !== itemId) return;
+			if (songs.length === 0 || currentItemIdRef.current !== itemId || heldRef.current) return;
 
 			const song = songs[Math.floor(Math.random() * songs.length)];
 			const url = buildAudioUrl(song.Id);
@@ -158,11 +167,16 @@ export const useThemeMusic = () => {
 	const playThemeMusicDelayed = useCallback((itemId) => {
 		if (!settings.themeMusicEnabled || !settings.themeMusicOnHomeRows) return;
 		if (!itemId) return;
+		requestedItemIdRef.current = itemId;
 		if (suspendedRef.current) {
 			suspendedIdRef.current = itemId;
 			return;
 		}
 		suspendedIdRef.current = null;
+		if (heldRef.current) {
+			heldItemIdRef.current = itemId;
+			return;
+		}
 
 		pendingIdRef.current = null;
 		if (delayTimerRef.current) {
@@ -224,6 +238,22 @@ export const useThemeMusic = () => {
 		suspendedIdRef.current = null;
 		if (id && shouldPlay) playThemeMusic(id);
 	}, [playThemeMusic]);
+	// A card preview takes the speakers while it plays. Holding fades the track out
+	// and keeps the item, releasing re-arms the home row delay for it, so the music
+	// comes back the way it would after a focus.
+	const holdThemeMusic = useCallback((held) => {
+		if (heldRef.current === !!held) return;
+		heldRef.current = !!held;
+		if (held) {
+			heldItemIdRef.current = currentItemIdRef.current || requestedItemIdRef.current;
+			cancelDelayed();
+			fadeOutAndStop();
+			return;
+		}
+		const itemId = heldItemIdRef.current;
+		heldItemIdRef.current = null;
+		if (itemId) playThemeMusicDelayed(itemId);
+	}, [cancelDelayed, fadeOutAndStop, playThemeMusicDelayed]);
 
 	useEffect(() => {
 		if (audioRef.current && targetVolumeRef.current > 0) {
@@ -261,6 +291,7 @@ export const useThemeMusic = () => {
 		stopForFocus,
 		suspend,
 		resume,
+		holdThemeMusic,
 		stopThemeMusic: fadeOutAndStop,
 		stopThemeMusicImmediate: stopImmediate,
 		isPlaying: () => !!(audioRef.current && !audioRef.current.paused)

@@ -9,6 +9,8 @@ import {useAuth} from '../../context/AuthContext';
 import {useSettings} from '../../context/SettingsContext';
 import {useSeerr} from '../../context/SeerrContext';
 import {ClassicMediaRow, ModernMediaRow} from '../../components/MediaRow';
+import MediaPreviewContext from '../../components/MediaCard/MediaPreviewContext';
+import {modernRowSpacing} from '../../components/MediaCard/modernCardLayout';
 import SeerrTileRow from '../../components/SeerrTileRow';
 import LibraryButtonRow from '../../components/LibraryButtonRow';
 import {SkeletonShimmer, skeletonTitleWidths} from '../../components/Skeleton';
@@ -27,6 +29,7 @@ import {FocusBackdrop} from '../../components/ScreenBackdrop';
 import useBrowseData from './useBrowseData';
 import useSeerrRows from './useSeerrRows';
 import useExternalRows from './useExternalRows';
+import useMediaPreview from './useMediaPreview';
 import {buildBrowseRows, sameRowList} from './buildBrowseRows';
 
 import css from './Browse.module.less';
@@ -54,6 +57,7 @@ const Browse = ({
 	onBlurItemThemeMusic,
 	onUnfocusItemThemeMusic,
 	onLeaveThemeMusic,
+	onHoldThemeMusic,
 	backHandlerRef
 }) => {
 	const {api, serverUrl, accessToken, hasMultipleServers, user} = useAuth();
@@ -147,7 +151,7 @@ const Browse = ({
 	// The other clients size these sliders in their own units, so the stored value
 	// lands here as the space below each row. Full screen rows pace themselves.
 	const rowSpacing = settings.fullScreenRows ? null : useModernRows
-		? Math.max(0, Math.min(Math.max((settings.modernHomeRowsPadding ?? 420) - 400, -40), 200) - 34)
+		? modernRowSpacing(settings)
 		: Math.max(0, settings.classicHomeRowsPadding ?? 30);
 
 	const {
@@ -396,6 +400,10 @@ const Browse = ({
 		initialFocusSetRef.current = false;
 	}, [accessToken]);
 
+	// The card preview for the home rows. Only the rows get the provider, so the
+	// same cards drawn by Seerr Discover and the library never start one.
+	const mediaPreview = useMediaPreview({api, settings, isVisible, browseMode, onThemeMusicHold: onHoldThemeMusic});
+
 	const targetBackdropUrl = useMemo(() => {
 		// The aya frame floats inside the page, so its ambient backdrop stays up
 		// in featured mode where the full screen bars blank it.
@@ -427,6 +435,7 @@ const Browse = ({
 	}, []);
 
 	const handleSelectItem = useCallback((item) => {
+		mediaPreview.stop('select');
 		onBlurItemThemeMusic?.();
 		onLeaveThemeMusic?.();
 		rememberFocus();
@@ -439,9 +448,10 @@ const Browse = ({
 		} else {
 			onSelectItem?.(item);
 		}
-	}, [onSelectItem, onSelectLibrary, onOpenRecordings, onPlayRecording, onBlurItemThemeMusic, onLeaveThemeMusic, rememberFocus]);
+	}, [onSelectItem, onSelectLibrary, onOpenRecordings, onPlayRecording, onBlurItemThemeMusic, onLeaveThemeMusic, rememberFocus, mediaPreview]);
 
 	const handleSelectGenreItem = useCallback((item) => {
+		mediaPreview.stop('select');
 		onBlurItemThemeMusic?.();
 		onLeaveThemeMusic?.();
 		rememberFocus();
@@ -455,7 +465,7 @@ const Browse = ({
 			_serverUserId: item._serverUserId,
 			_serverId: item._serverId
 		});
-	}, [onSelectGenre, onBlurItemThemeMusic, onLeaveThemeMusic, rememberFocus]);
+	}, [onSelectGenre, onBlurItemThemeMusic, onLeaveThemeMusic, rememberFocus, mediaPreview]);
 
 	const handleSelectSeerrItem = useCallback((item) => {
 		const raw = item._seerrRaw || {};
@@ -699,6 +709,7 @@ const Browse = ({
 					/>
 				)}
 
+				<MediaPreviewContext.Provider value={mediaPreview}>
 				<div
 					ref={contentRowsRef}
 					className={`${css.contentRows} ${browseMode === 'rows' ? css.rowsMode : ''} ${rowsClipClass}`}
@@ -790,6 +801,7 @@ const Browse = ({
 						<div className={css.empty}>{$L('No content found')}</div>
 					)}
 				</div>
+				</MediaPreviewContext.Provider>
 			</div>
 		</div>
 	);
