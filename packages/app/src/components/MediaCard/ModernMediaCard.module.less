@@ -6,14 +6,15 @@
 	outline: none;
 	position: relative;
 	text-align: left;
-	transform: translateZ(0);
-	will-change: transform;
 	--modern-card-expanded-width: 520px;
 	--modern-card-image-height: 360px;
 }
 
+// Only the card in focus is given a layer of its own. Every card having one meant hundreds of them on a row-heavy Home.
 .focused {
 	z-index: 16;
+	transform: translateZ(0);
+	will-change: transform;
 }
 
 .card:focus {

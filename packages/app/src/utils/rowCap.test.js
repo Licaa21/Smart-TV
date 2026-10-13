@@ -20,9 +20,10 @@ describe('row cap', () => {
 	});
 
 	test('draws more once focus is near the end of what is drawn, up to the total', () => {
-		expect(grownRowCount(40, 10, 300)).toBe(40);
-		expect(grownRowCount(40, 33, 300)).toBe(60);
-		expect(grownRowCount(40, 39, 50)).toBe(50);
+		expect(grownRowCount(12, 4, 300)).toBe(12);
+		expect(grownRowCount(12, 5, 300)).toBe(22);
+		expect(grownRowCount(22, 15, 300)).toBe(32);
+		expect(grownRowCount(12, 11, 15)).toBe(15);
 	});
 
 	test('forgets the cards drawn for every row but the one focus returns to', () => {

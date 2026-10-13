@@ -1,4 +1,4 @@
-import {createContext, useContext, useState, useEffect, useCallback, useRef} from 'react';
+import {createContext, useContext, useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import * as seerrApi from '../services/seerrApi';
 import {getFromStorage, saveToStorage, removeFromStorage} from '../services/storage';
 import {useSettings} from './SettingsContext';
@@ -350,29 +350,32 @@ export const SeerrProvider = ({children}) => {
 		setMoonfinAuthTypeState('jellyfin');
 	}, [stopSettingsStream]);
 
+	// One value until something it holds changes, so a settings update or a signal does not render every screen that reads it
+	const value = useMemo(() => ({
+		isEnabled,
+		isAuthenticated,
+		isLoading,
+		user,
+		serverUrl,
+		isMoonfin,
+		variant,
+		displayName,
+		pluginInfo,
+		moonfinAuthType,
+		api: seerrApi,
+		configureWithMoonfin,
+		refreshPluginInfo,
+		loginWithMoonfin,
+		setMoonfinAuthType,
+		logout,
+		disable,
+		streamNotification,
+		dismissStreamNotification,
+		messagesSignal
+	}), [isEnabled, isAuthenticated, isLoading, user, serverUrl, isMoonfin, variant, displayName, pluginInfo, moonfinAuthType, configureWithMoonfin, refreshPluginInfo, loginWithMoonfin, setMoonfinAuthType, logout, disable, streamNotification, dismissStreamNotification, messagesSignal]);
+
 	return (
-		<SeerrContext.Provider value={{
-			isEnabled,
-			isAuthenticated,
-			isLoading,
-			user,
-			serverUrl,
-			isMoonfin,
-			variant,
-			displayName,
-			pluginInfo,
-			moonfinAuthType,
-			api: seerrApi,
-			configureWithMoonfin,
-			refreshPluginInfo,
-			loginWithMoonfin,
-			setMoonfinAuthType,
-			logout,
-			disable,
-			streamNotification,
-			dismissStreamNotification,
-			messagesSignal
-		}}>
+		<SeerrContext.Provider value={value}>
 			{children}
 		</SeerrContext.Provider>
 	);

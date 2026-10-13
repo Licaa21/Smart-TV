@@ -39,11 +39,14 @@ const useInactivityTimer = (timeoutSeconds = 90, enabled = true) => {
 		}
 
 		const handleActivity = () => {
-			inactiveRef.current = false;
 			if (timerRef.current) {
 				clearTimeout(timerRef.current);
 			}
-			setIsInactive(false);
+			// Only when it was inactive, so a key press does not ask the whole app to render again
+			if (inactiveRef.current) {
+				inactiveRef.current = false;
+				setIsInactive(false);
+			}
 			timerRef.current = setTimeout(() => {
 				setIsInactive(true);
 			}, timeoutRef.current * 1000);
