@@ -41,6 +41,20 @@ const loadSignatureOf = (settings, homeRowsConfig, unifiedMode, seerrEnabled, se
 		settings.featuredBarStyle, homeRowsConfig, unifiedMode, seerrEnabled, seerrAuthenticated, recommendationsSupported
 	]);
 
+// Rows that are only built by a full load. The stored cache has none of them, so a screen with any is loaded from the
+// server each time and never reads the cache back, and writing it only costs the main thread a large write.
+const hasDynamicRows = (settings, homeRowsConfig) => (
+	!!(settings.displayFavoritesRows ||
+		settings.displayCollectionsRows ||
+		settings.displayGenresRows ||
+		settings.displayPlaylistsRows ||
+		// Recommendation rows are only built by fetchAllData, so treat an enabled one
+		// as dynamic config. Otherwise enabling it shows nothing until the cache expires.
+		homeRowsConfig.some((row) => row.enabled && (row.id.startsWith('sinceyouwatched') || row.id === 'rewatch')) ||
+		homeRowsConfig.some((row) => row.enabled && ['audioartists', 'audioalbums', 'audioplaylists', 'resumeaudio', 'activerecordings'].includes(row.id)) ||
+		(settings.pluginSections || []).some((section) => section?.enabled))
+);
+
 // Everything the home screen shows and how it gets there. Rows come from three places, the
 // in memory cache, the stored cache and the server, and each one dispatches as it arrives so
 // the screen fills in rather than waiting for the slowest.
@@ -104,6 +118,8 @@ const useBrowseData = ({
 
 	const settingsRef = useRef(settings);
 	settingsRef.current = settings;
+	const homeRowsConfigRef = useRef(homeRowsConfig);
+	homeRowsConfigRef.current = homeRowsConfig;
 
 	const fetchFreshFeaturedItems = useCallback(async (fallbackItems = null) => {
 		const s = settingsRef.current;
@@ -231,7 +247,7 @@ const useBrowseData = ({
 				const filtered = memoryCache.rowData.filter(r => r.id !== 'resume' && r.id !== 'nextup');
 				memoryCache.rowData = [...volatileRows, ...filtered];
 				memoryCache.timestamp = Date.now();
-				if (!unifiedMode) {
+				if (!unifiedMode && !hasDynamicRows(settingsRef.current, homeRowsConfigRef.current)) {
 					saveBrowseCache(memoryCache.rowData, memoryCache.libraries, memoryCache.featuredItems, cacheOwner);
 				}
 			}
@@ -306,22 +322,7 @@ const useBrowseData = ({
 
 		const loadData = async () => {
 			dispatch({type: 'SET_PENDING_SECTIONS', sections: []});
-			// Recommendation rows are only built by fetchAllData, so treat an enabled one
-			// as dynamic config. Otherwise enabling it shows nothing until the cache expires.
-			const hasEnabledRecommendationRow = homeRowsConfig.some(
-				(row) => row.enabled && (row.id.startsWith('sinceyouwatched') || row.id === 'rewatch')
-			);
-			const hasEnabledMediaSectionRow = homeRowsConfig.some(
-				(row) => row.enabled && ['audioartists', 'audioalbums', 'audioplaylists', 'resumeaudio', 'activerecordings'].includes(row.id)
-			);
-			const hasDynamicRowConfig =
-				settings.displayFavoritesRows ||
-				settings.displayCollectionsRows ||
-				settings.displayGenresRows ||
-				settings.displayPlaylistsRows ||
-				hasEnabledRecommendationRow ||
-				hasEnabledMediaSectionRow ||
-				(settings.pluginSections || []).some((section) => section?.enabled);
+			const hasDynamicRowConfig = hasDynamicRows(settings, homeRowsConfig);
 
 			// The recent rows come out per library or merged by type, and a cache of
 			// one shape must not answer for the other.
@@ -564,8 +565,9 @@ const useBrowseData = ({
 					dispatch({type: 'APPEND_ROWS', rows});
 					memoryCache.rowData = mergeRowsById(memoryCache.rowData || [], rows);
 					memoryCache.timestamp = Date.now();
-					// Unified mode spans several servers, so its rows never go to the disk cache.
-					if (!unifiedMode) {
+					// Unified mode spans several servers, so its rows never go to the disk cache. A screen with rows that only a full
+					// load builds never reads it back either.
+					if (!unifiedMode && !hasDynamicRows(settings, homeRowsConfig)) {
 						saveBrowseCache(memoryCache.rowData, libs, memoryCache.featuredItems, cacheOwner);
 					}
 				};

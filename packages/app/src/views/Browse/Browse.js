@@ -1,4 +1,4 @@
-import {useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo} from 'react';
+import {useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, memo} from 'react';
 import {isKidsMode, kidsModeRows, mergesContinueWatchingNextUp} from '../../utils/kidsMode';
 import {withoutBlocked} from '../../utils/parentalFilter';
 import useParentalFilter from '../../hooks/useParentalFilter';
@@ -39,7 +39,9 @@ import css from './Browse.module.less';
 
 const FOCUS_DELAY_MS = 100;
 // Between the steps that draw the rows a return held the place of
-const FILL_ROW_DELAY_MS = 30;
+const FILL_ROW_DELAY_MS = 80;
+// The longest a step waits for an idle moment
+const FILL_ROW_IDLE_TIMEOUT_MS = 250;
 // A row's height when a return does not know it
 const GUESSED_ROW_HEIGHT = 330;
 const TRANSITION_DELAY_MS = 450;
@@ -471,9 +473,15 @@ const Browse = ({
 		initialFocusSetRef.current = false;
 	}, [accessToken]);
 
+	// Each step waits for the main thread to be idle, so a key pressed meanwhile is not queued behind drawing rows
 	useEffect(() => {
 		if (!filling) return undefined;
-		const timer = setTimeout(() => setFillStep((step) => step + 1), FILL_ROW_DELAY_MS);
+		const step = () => setFillStep((count) => count + 1);
+		if (typeof window.requestIdleCallback === 'function') {
+			const id = window.requestIdleCallback(step, {timeout: FILL_ROW_IDLE_TIMEOUT_MS});
+			return () => window.cancelIdleCallback(id);
+		}
+		const timer = setTimeout(step, FILL_ROW_DELAY_MS);
 		return () => clearTimeout(timer);
 	}, [filling, fillStep]);
 
@@ -641,7 +649,6 @@ const Browse = ({
 				// Focus scrolling lands wherever the engine likes, sometimes with the
 				// row's bottom past the screen, and it lands after this handler, so the
 				// focused row is put back at its resting spot on the frames behind it.
-				restRowScroll(rowIndex);
 				window.requestAnimationFrame(() => restRowScroll(rowIndex));
 				window.requestAnimationFrame(() => window.requestAnimationFrame(() => restRowScroll(rowIndex)));
 			}
@@ -912,4 +919,4 @@ const Browse = ({
 	);
 };
 
-export default Browse;
+export default memo(Browse);

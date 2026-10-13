@@ -170,7 +170,11 @@ export const cancelPendingCacheSave = () => {
 // than running once per burst.
 export const saveBrowseCache = (rowData, libraries, featuredItems, {serverUrl, userId}) => {
 	const signature = cacheSignature(rowData);
-	if (signature === lastSignature) return;
+	if (signature === lastSignature) {
+		// A write still waiting is for rows that have since changed back to what was saved
+		cancelPendingCacheSave();
+		return;
+	}
 	// Read now, since a draw that lands before the write runs would otherwise save its key with these items.
 	const featuredConfigKey = memoryCache.featuredConfigKey;
 
