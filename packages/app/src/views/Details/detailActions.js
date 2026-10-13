@@ -55,7 +55,7 @@ export const detailActionCatalogue = (props) => {
 		supportsMediaSourceSelection, hasMultipleVersions, hasMultipleAudio,
 		handleShuffle, handleTrailer, handleToggleWatched, handleToggleFavorite, handleGoToSeries,
 		showsPersonalRating, personalRatingStyle, handleOpenRatingDialog,
-		handleOpenVersionModal, handleOpenAudioModal, handleOpenSubtitleModal, handleOpenPlaylistModal,
+		handleOpenVersionModal, handleOpenAudioModal, handleOpenSubtitleModal, handleOpenPlaybackInfoModal, handleOpenPlaylistModal,
 		handleOpenCollectionModal, handleOpenDeleteDialog, handleOpenIdentifyModal,
 		canChangeArtwork, handleOpenArtworkModal
 	} = props;
@@ -104,6 +104,7 @@ export const detailActionCatalogue = (props) => {
 		{id: 'version', when: hasMultipleVersions, render: () => <ActionButton path={DETAIL_ICON_PATHS.version} label={$L('Version')} onClick={handleOpenVersionModal} />},
 		{id: 'audio', when: hasMultipleAudio, render: () => <ActionButton path={DETAIL_ICON_PATHS.audio} label={$L('Audio')} onClick={handleOpenAudioModal} />},
 		{id: 'subtitles', when: supportsMediaSourceSelection, render: () => <ActionButton path={DETAIL_ICON_PATHS.subtitle} label={$L('Subtitle')} onClick={handleOpenSubtitleModal} />},
+		{id: 'playbackInfo', when: supportsMediaSourceSelection && !isSeries && !isSeason && !isBoxSet, render: () => <ActionButton path={DETAIL_ICON_PATHS.info} label={$L('Playback Info')} onClick={handleOpenPlaybackInfoModal} />},
 		{id: 'trailer', when: hasTrailer, render: () => <ActionButton path={DETAIL_ICON_PATHS.trailer} label={$L('Trailer')} onClick={handleTrailer} />},
 		// Offered while in a SyncPlay group and lit in the accent so it reads
 		// as the group's, next to a Play that stays as it is.

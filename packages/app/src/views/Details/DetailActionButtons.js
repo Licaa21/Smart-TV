@@ -63,6 +63,7 @@ const DetailActionButtons = ({
 	onOpenVersionModal,
 	onOpenAudioModal,
 	onOpenSubtitleModal,
+	onOpenPlaybackInfoModal,
 	onTrailer,
 	onToggleWatched,
 	onToggleFavorite,
@@ -170,6 +171,14 @@ const DetailActionButtons = ({
 				) : (
 					<span className={css.btnDetail}>{$L('Off')}</span>
 				)}
+			</SpottableDiv>
+		)},
+		{id: 'playbackInfo', when: supportsMediaSourceSelection && !isSeries && !isSeason && !isBoxSet, render: () => (
+			<SpottableDiv className={css.btnWrapper} onClick={onOpenPlaybackInfoModal}>
+				<div className={css.btnAction}>
+					<BtnIcon path={DETAIL_ICON_PATHS.info}/>
+				</div>
+				<span className={css.btnLabel}>{$L('Playback Info')}</span>
 			</SpottableDiv>
 		)},
 		{id: 'trailer', when: item.LocalTrailerCount > 0 || item.RemoteTrailers?.length > 0, render: () => (

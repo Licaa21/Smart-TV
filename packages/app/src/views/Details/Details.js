@@ -993,6 +993,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	const overlays = (
 		<>
 			<DetailTrackModals
+				api={effectiveApi}
 				activeModal={activeModal}
 				onCloseModal={closeModal}
 				item={item}
@@ -1121,6 +1122,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 					handleOpenVersionModal={modals.handleOpenVersionModal}
 					handleOpenAudioModal={modals.handleOpenAudioModal}
 					handleOpenSubtitleModal={modals.handleOpenSubtitleModal}
+					handleOpenPlaybackInfoModal={modals.handleOpenPlaybackInfoModal}
 					handleOpenPlaylistModal={modals.handleOpenPlaylistModal}
 					handleOpenCollectionModal={canAddToCollection ? modals.handleOpenCollectionModal : null}
 					handleOpenIdentifyModal={canIdentify ? modals.handleOpenIdentifyModal : null}
@@ -1313,6 +1315,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 			onOpenVersionModal={modals.handleOpenVersionModal}
 			onOpenAudioModal={modals.handleOpenAudioModal}
 			onOpenSubtitleModal={modals.handleOpenSubtitleModal}
+			onOpenPlaybackInfoModal={modals.handleOpenPlaybackInfoModal}
 			onTrailer={trailer.handleTrailer}
 			onToggleWatched={handleToggleWatched}
 			onToggleFavorite={handleToggleFavorite}
