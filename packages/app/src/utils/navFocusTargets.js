@@ -41,8 +41,17 @@ export const SIDEBAR_CONTENT_FOCUS_TARGETS = [
 	...CONTENT_FOCUS_TARGETS.slice(detailsRowIndex)
 ];
 
+// Where focus was last in the view that is up, so leaving the navigation for it comes back to that card and not to the
+// first row. A view that keeps its place sets it as focus moves and clears it when it goes away. It is the card itself,
+// since an id built from a title can be anything and focusing by it would read it as a selector.
+let contentFocusHint = null;
+export const setContentFocusHint = (element) => {
+	contentFocusHint = element || null;
+};
+
 // Falls back to a plain directional move when no known container is mounted.
 export const focusFirstContentTarget = (targets, fallbackDirection) => {
+	if (contentFocusHint && contentFocusHint.isConnected && Spotlight.focus(contentFocusHint)) return;
 	for (const target of targets) {
 		if (Spotlight.focus(target)) return;
 	}
