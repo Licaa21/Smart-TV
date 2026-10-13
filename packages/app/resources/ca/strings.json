@@ -2442,5 +2442,9 @@
     "Device Probe": "Sondeig del dispositiu",
     "If your Xbox rejects a server's security certificate, accept it anyway. Use only for servers you trust.": "Si la Xbox rebutja el certificat de seguretat d'un servidor, accepta'l igualment. Fes-ho servir només amb servidors de confiança.",
     "Test what this device can play and send the report to your server": "Prova què pot reproduir aquest dispositiu i envia l'informe al servidor",
-    "Xbox OS Version": "Versió del sistema operatiu de la Xbox"
+    "Xbox OS Version": "Versió del sistema operatiu de la Xbox",
+    "Media Preview": "Vista prèvia dels mitjans",
+    "Play a short clip of the focused card after a moment.": "Reprodueix un clip breu de la targeta enfocada al cap d'un moment.",
+    "Play the preview with sound.": "Reprodueix la vista prèvia amb so.",
+    "Preview Audio": "Vista prèvia d'àudio"
 }
