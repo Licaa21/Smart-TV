@@ -57,9 +57,19 @@ const getShortcuts = (trendingResults = []) => {
 	}));
 };
 
-// How far below the top and above the bottom edge a focused row has to sit.
-const ROW_TOP_MARGIN = 20;
-const ROW_BOTTOM_MARGIN = 40;
+// Where a request stands, as its card words it. Request status wins only for declined and failed.
+const requestStatusText = (request) => {
+	const requestStatus = request.status;
+	const mediaStatus = request.media?.status;
+	if (requestStatus === 1) return $L('Pending');
+	if (requestStatus === 3) return $L('Declined');
+	if (requestStatus === 4) return $L('Failed');
+	if (requestStatus === 5 || mediaStatus === 5) return $L('Available');
+	if (mediaStatus === 4) return $L('Partial');
+	if (mediaStatus === 3) return $L('Requested');
+	if (requestStatus === 2) return $L('Approved');
+	return $L('Unknown');
+};
 
 // The rows that are showing, in order. Rows arrive one at a time and the ones above push the rest
 // down, so a row's focus id is its own name: ids by position were forgotten by Spotlight when the
@@ -73,7 +83,12 @@ let lastFocusedCardIndex = -1;
 // The poster cards are Home's own, in whichever style Home is set to, so they follow its card size,
 // image type and focus behaviour. Each is handed what Seerr sent and shaped like a library item here.
 const HomeCard = memo(function HomeCard({entry, index, isRequest, mediaType, modern, serverUrl, isFocused, onSelect, onFocusItem, onFocused}) {
-	const item = useMemo(() => (isRequest ? normalizeRequestItem(entry) : normalizeMediaItem(entry)), [entry, isRequest]);
+	const item = useMemo(() => (isRequest ? {
+		...normalizeRequestItem(entry),
+		// One title can carry more than one request, and each keeps a card of its own
+		Id: `seerr-request-${entry.id}`,
+		Subtitle: requestStatusText(entry)
+	} : normalizeMediaItem(entry)), [entry, isRequest]);
 
 	const handleSelect = useCallback(() => {
 		if (!isRequest) {
@@ -116,15 +131,18 @@ const HomeCard = memo(function HomeCard({entry, index, isRequest, mediaType, mod
 	);
 });
 
-const ShortcutCard = memo(function ShortcutCard({shortcut, onSelect}) {
+// A tile stands for a way of browsing and not a title, so focusing one takes the backdrop of the last card away.
+const ShortcutCard = memo(function ShortcutCard({shortcut, onSelect, onFocus}) {
 	const backdropUrl = shortcut.backdrop ? seerrApi.getImageUrl(shortcut.backdrop, 'w780') : '';
 
 	const handleClick = useCallback(() => {
 		onSelect?.(shortcut.key);
 	}, [shortcut.key, onSelect]);
 
+	const handleFocus = useCallback(() => onFocus?.(null), [onFocus]);
+
 	return (
-		<SpottableDiv className={css.genreCard} onClick={handleClick}>
+		<SpottableDiv className={css.genreCard} onClick={handleClick} onFocus={handleFocus}>
 			{backdropUrl && <img className={css.genreBackdrop} src={backdropUrl} alt={shortcut.name} loading="lazy" />}
 			<div className={css.genreOverlay}>
 				<span className={css.genreTitle}>{shortcut.name}</span>
@@ -141,9 +159,7 @@ const GenreCard = memo(function GenreCard({genre, mediaType, onSelect, onFocus})
 		onSelect?.(genre.id, genre.name, mediaType);
 	}, [genre.id, genre.name, mediaType, onSelect]);
 
-	const handleFocus = useCallback(() => {
-		onFocus?.({backdrops: genre.backdrops});
-	}, [genre.backdrops, onFocus]);
+	const handleFocus = useCallback(() => onFocus?.(null), [onFocus]);
 
 	return (
 		<SpottableDiv className={css.genreCard} onClick={handleClick} onFocus={handleFocus}>
@@ -155,15 +171,17 @@ const GenreCard = memo(function GenreCard({genre, mediaType, onSelect, onFocus})
 	);
 });
 
-const NetworkCard = memo(function NetworkCard({network, onSelect}) {
+const NetworkCard = memo(function NetworkCard({network, onSelect, onFocus}) {
 	const logoUrl = seerrApi.getImageUrl('/' + network.logo, 'w185');
 
 	const handleClick = useCallback(() => {
 		onSelect?.(network.id, network.name);
 	}, [network.id, network.name, onSelect]);
 
+	const handleFocus = useCallback(() => onFocus?.(null), [onFocus]);
+
 	return (
-		<SpottableDiv className={css.networkCard} onClick={handleClick}>
+		<SpottableDiv className={css.networkCard} onClick={handleClick} onFocus={handleFocus}>
 			<div className={css.networkLogoContainer}>
 				<img className={css.networkLogo} src={logoUrl} alt={network.name} loading="lazy" />
 			</div>
@@ -171,15 +189,17 @@ const NetworkCard = memo(function NetworkCard({network, onSelect}) {
 	);
 });
 
-const StudioCard = memo(function StudioCard({studio, onSelect}) {
+const StudioCard = memo(function StudioCard({studio, onSelect, onFocus}) {
 	const logoUrl = seerrApi.getImageUrl('/' + studio.logo, 'w185');
 
 	const handleClick = useCallback(() => {
 		onSelect?.(studio.id, studio.name);
 	}, [studio.id, studio.name, onSelect]);
 
+	const handleFocus = useCallback(() => onFocus?.(null), [onFocus]);
+
 	return (
-		<SpottableDiv className={css.networkCard} onClick={handleClick}>
+		<SpottableDiv className={css.networkCard} onClick={handleClick} onFocus={handleFocus}>
 			<div className={css.networkLogoContainer}>
 				<img className={css.networkLogo} src={logoUrl} alt={studio.name} loading="lazy" />
 			</div>
@@ -265,7 +285,7 @@ const DiscoverRow = memo(function DiscoverRow({
 		switch (config.type) {
 			case 'shortcut':
 				return items.map(item => (
-					<ShortcutCard key={item.key} shortcut={item} onSelect={onOpenShortcut} />
+					<ShortcutCard key={item.key} shortcut={item} onSelect={onOpenShortcut} onFocus={onFocusItem} />
 				));
 			case 'request':
 				return items.filter((entry) => entry?.media?.tmdbId).map((entry, index) => (
@@ -276,7 +296,7 @@ const DiscoverRow = memo(function DiscoverRow({
 						isRequest
 						modern={modern}
 						serverUrl={serverUrl}
-						isFocused={focusedId === `seerr-${entry.type || entry.media?.mediaType}-${entry.media?.tmdbId}`}
+						isFocused={focusedId === `seerr-request-${entry.id}`}
 						onSelect={onSelectItem}
 						onFocusItem={handleCardFocus}
 						onFocused={setFocusedId}
@@ -294,11 +314,11 @@ const DiscoverRow = memo(function DiscoverRow({
 				));
 			case 'network':
 				return items.map(item => (
-					<NetworkCard key={item.id} network={item} onSelect={onSelectNetwork} />
+					<NetworkCard key={item.id} network={item} onSelect={onSelectNetwork} onFocus={onFocusItem} />
 				));
 			case 'studio':
 				return items.map(item => (
-					<StudioCard key={item.id} studio={item} onSelect={onSelectStudio} />
+					<StudioCard key={item.id} studio={item} onSelect={onSelectStudio} onFocus={onFocusItem} />
 				));
 			default:
 				return items.map((entry, index) => (
@@ -529,27 +549,23 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		setFocusedItem(item);
 	}, []);
 
-	// A focused modern card grows after the list has already scrolled for the size it had, so the
-	// row is brought into view again once it has settled. Coming up from the row below leaves this
-	// row's title above the top edge, and the last row can be left running off the bottom.
+	// A row rests at the top of the list, the way Home rests its rows, with the details of the focused card
+	// growing below it. Focus scrolling lands wherever the engine likes and after the handler, and the card
+	// that just lost focus is still shrinking, so the row is put back on the frames behind it too.
 	const keepRowInView = useCallback((rowIndex) => {
-		const reveal = () => {
+		const rest = () => {
 			const container = rowsContainerRef.current;
 			const row = container && container.querySelector(`[data-row-index="${rowIndex}"]`);
 			if (!container || !row) return;
-			const view = container.getBoundingClientRect();
-			const rect = row.getBoundingClientRect();
-			const hidden = view.top + ROW_TOP_MARGIN - rect.top;
-			if (hidden > 0) {
-				container.scrollTop -= hidden;
-				return;
-			}
-			const overflow = rect.bottom - (view.bottom - ROW_BOTTOM_MARGIN);
-			if (overflow > 0) container.scrollTop += Math.min(overflow, Math.max(0, rect.top - view.top));
+			const offset = showDetailSection && settings.navbarPosition !== 'left' ? 20 : 0;
+			// the first row sits under a margin of its own, which is not scrolled away
+			const top = rowIndex === 0 ? 0 : row.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - offset;
+			if (Math.abs(container.scrollTop - top) > 1) container.scrollTop = Math.max(0, top);
 		};
-		window.requestAnimationFrame(reveal);
-		window.setTimeout(reveal, 200);
-	}, []);
+		rest();
+		window.requestAnimationFrame(rest);
+		window.requestAnimationFrame(() => window.requestAnimationFrame(rest));
+	}, [showDetailSection, settings.navbarPosition]);
 
 	const handleSelectItem = useCallback((item, mediaType) => {
 		const type = mediaType || item.media_type || item.mediaType || (item.title ? 'movie' : 'tv');

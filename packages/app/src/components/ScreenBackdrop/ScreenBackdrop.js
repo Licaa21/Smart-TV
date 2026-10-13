@@ -3,6 +3,7 @@ import {forwardRef, memo, useImperativeHandle, useMemo, useState} from 'react';
 import {useSettings} from '../../context/SettingsContext';
 import * as seerrApi from '../../services/seerrApi';
 import {getBackdropId, getImageUrl} from '../../utils/helpers';
+import {isSeerrTile} from '../../utils/seerrHomeRows';
 import BackdropLayer from '../BackdropLayer';
 
 import css from './ScreenBackdrop.module.less';
@@ -12,7 +13,7 @@ const isLegacyBuild = () => typeof document !== 'undefined' && document.document
 // The wide picture of a focused card, whether it is a library item or one Seerr found on TMDB. Nothing
 // comes back for an item with no backdrop, and the layer then shows the plain page background.
 export const backdropUrlFor = (item, serverUrl) => {
-	if (!item) return '';
+	if (!item || isSeerrTile(item)) return '';
 	if (item._externalBackdropUrl) return item._externalBackdropUrl;
 	// a genre card draws on one of its own titles
 	if (item.Type === 'Genre' && item._representative) return backdropUrlFor(item._representative, serverUrl);
