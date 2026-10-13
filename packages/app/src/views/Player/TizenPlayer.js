@@ -3553,6 +3553,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					exitAudioPanel(setFocusRow);
 					return;
 				}
+				// Back during a held scrub cancels it: nothing is seeked to, and playback carries on if it was playing
+				if (scrubHoldRef.current.active) {
+					dropScrub();
+					hideControls();
+					return;
+				}
 				if (controlsVisible) {
 					hideControls();
 					return;
