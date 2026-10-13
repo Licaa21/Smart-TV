@@ -12,14 +12,14 @@
 	align-items: center;
 	-webkit-justify-content: center;
 	justify-content: center;
-	padding: 28px;
+	padding: 30px;
 	border-radius: 8px;
 	border: 4px solid transparent;
 	overflow: hidden;
 	cursor: pointer;
 	outline: none;
-	// A light tile, so that dark logos are read as well as the colored ones, and the tile is the same focused or not
-	background: #e9ebf0;
+	// A grey tile, the same focused or not apart from a little lighter, so no tile glares
+	background: #2b2d36;
 	// A border colour cant be handed to the compositor, so the tile moves on its own layer and nothing but the
 	// transform animates, the way the other rows do
 	transform: translateZ(0);
@@ -27,19 +27,10 @@
 	transition: transform 0.15s ease;
 
 	&:focus {
-		transform: scale(1.08) translateZ(0);
+		transform: scale(1.05) translateZ(0);
 		z-index: 10;
-		background: #ffffff;
+		background: #3d4050;
 		border-color: var(--theme-focus-border-color, #ffffff);
-	}
-}
-
-// A logo that is white goes on a dark tile
-.pale {
-	background: #2a2c35;
-
-	&:focus {
-		background: #3b3e4b;
 	}
 }
 
@@ -49,4 +40,10 @@
 	width: auto;
 	height: auto;
 	object-fit: contain;
+}
+
+// A logo too dark to be read on the tile is drawn white. The rest keep their own colors.
+.white .logoImage {
+	-webkit-filter: brightness(0) invert(1);
+	filter: brightness(0) invert(1);
 }

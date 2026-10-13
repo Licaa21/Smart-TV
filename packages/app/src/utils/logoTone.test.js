@@ -1,26 +1,31 @@
-import {toneOfPixels} from './logoTone';
+import {logoNeedsWhite} from './logoTone';
 
 const pixels = (...rgba) => Uint8ClampedArray.from(rgba.flat());
 
-describe('toneOfPixels', () => {
-	it('calls a white logo pale', () => {
-		expect(toneOfPixels(pixels([255, 255, 255, 255], [250, 250, 250, 255], [0, 0, 0, 0]))).toBe(true);
+describe('logoNeedsWhite', () => {
+	it('draws a black logo white', () => {
+		expect(logoNeedsWhite(pixels([10, 10, 10, 255], [0, 0, 0, 255], [0, 0, 0, 0]))).toBe(true);
 	});
 
-	it('does not call a dark logo pale', () => {
-		expect(toneOfPixels(pixels([10, 10, 10, 255], [0, 0, 0, 255], [0, 0, 0, 0]))).toBe(false);
+	it('draws a navy logo white', () => {
+		expect(logoNeedsWhite(pixels([0, 51, 160, 255], [0, 51, 160, 255]))).toBe(true);
 	});
 
-	it('does not call a colored logo pale', () => {
-		expect(toneOfPixels(pixels([229, 9, 20, 255], [229, 9, 20, 255]))).toBe(false);
-		expect(toneOfPixels(pixels([28, 231, 131, 255]))).toBe(false);
+	it('keeps a white logo as it is', () => {
+		expect(logoNeedsWhite(pixels([255, 255, 255, 255], [250, 250, 250, 255], [0, 0, 0, 0]))).toBe(false);
+	});
+
+	it('keeps the colors of a logo that stands out from the tile', () => {
+		expect(logoNeedsWhite(pixels([229, 9, 20, 255], [229, 9, 20, 255]))).toBe(false);
+		expect(logoNeedsWhite(pixels([28, 231, 131, 255]))).toBe(false);
+		expect(logoNeedsWhite(pixels([31, 107, 255, 255]))).toBe(false);
 	});
 
 	it('leaves the see-through parts out', () => {
-		expect(toneOfPixels(pixels([255, 255, 255, 255], [0, 0, 0, 20], [0, 0, 0, 20], [0, 0, 0, 20]))).toBe(true);
+		expect(logoNeedsWhite(pixels([0, 0, 0, 255], [255, 255, 255, 20], [255, 255, 255, 20], [255, 255, 255, 20]))).toBe(true);
 	});
 
-	it('does not call an empty picture pale', () => {
-		expect(toneOfPixels(pixels([255, 255, 255, 0]))).toBe(false);
+	it('leaves a picture with nothing in it alone', () => {
+		expect(logoNeedsWhite(pixels([0, 0, 0, 0]))).toBe(false);
 	});
 });
