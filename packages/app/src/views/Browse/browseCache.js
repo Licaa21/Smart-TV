@@ -31,6 +31,9 @@ export const memoryCache = {
 	// Set when playback ended or something was marked watched while the home screen was away, since nothing
 	// was listening for it then
 	volatileStale: false,
+	// The whole home screen as it stood once everything had loaded: its rows, the media bar, whose they are and
+	// what they were loaded for. A return from a title starts from it, so nothing is loaded again.
+	screen: null,
 	// The media bar settings the shown items were drawn for; a set drawn for other settings replaces them.
 	featuredConfigKey: null,
 	// Whose rows these are. Kept so a fresh mount can tell an account change, which has to
@@ -41,8 +44,14 @@ export const memoryCache = {
 };
 
 if (typeof window !== 'undefined') {
-	window.addEventListener('moonfin:browseRefresh', () => {
+	window.addEventListener('moonfin:browseRefresh', (e) => {
 		memoryCache.volatileStale = true;
+		// Hiding or ordering a library, or changing the media bar, changes the rows themselves
+		if (e?.detail?.libraries || e?.detail?.featured) memoryCache.screen = null;
+	});
+	// A favorite or a playlist changed, which moves the rows built from them
+	window.addEventListener('moonfin:homeRowsChanged', () => {
+		memoryCache.screen = null;
 	});
 	// The kept Seerr and outside list rows carry the request status of their titles
 	window.addEventListener('moonfin:seerrChanged', () => {
@@ -59,6 +68,7 @@ export const clearMemoryCache = ({keepFeatured = false} = {}) => {
 	memoryCache.rowConfigKey = null;
 	memoryCache.seerrRows = null;
 	memoryCache.externalRows = null;
+	memoryCache.screen = null;
 	if (keepFeatured) return;
 	memoryCache.featuredItems = null;
 	memoryCache.featuredConfigKey = null;
