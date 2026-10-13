@@ -42,6 +42,24 @@ describe('focusFirstContentTarget', () => {
 	});
 });
 
+describe('the card focus was last on', () => {
+	it('is kept for any screen, and not for the navigation', () => {
+		const nav = document.createElement('div');
+		nav.setAttribute('data-spotlight-id', 'navbar');
+		const navButton = document.createElement('div');
+		navButton.className = 'spottable';
+		nav.appendChild(navButton);
+		document.body.appendChild(nav);
+		const button = card();
+		button.className = 'spottable';
+		button.dispatchEvent(new window.FocusEvent('focusin', {bubbles: true}));
+		navButton.dispatchEvent(new window.FocusEvent('focusin', {bubbles: true}));
+		Spotlight.focus.mockReturnValue(true);
+		focusFirstContentTarget(CONTENT_FOCUS_TARGETS, 'down');
+		expect(Spotlight.focus).toHaveBeenCalledWith(button);
+	});
+});
+
 describe('toggleNavigationFocus', () => {
 	it('enters the navigation from the content', () => {
 		Spotlight.focus.mockImplementation((target) => target === 'navbar-home');

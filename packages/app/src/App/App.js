@@ -818,8 +818,8 @@ const AppContent = (props) => {
 			}
 			// Not over a dialog, which would be left open on top of what the press goes to. An open item menu is closed by
 			// the press, the way Back would, and what it goes to waits for the next one. A screen reached from the player
-			// goes straight back to it. On Home it moves focus between the cards and the navigation, so the navigation is
-			// reached from any row without Left or Up.
+			// goes straight back to it. Anywhere else with a navigation it moves focus between the screen and the navigation, so
+			// the navigation is reached from any row or button without Left or Up.
 			if (isChannelMenuKey(e) && !isPinGateActive && !setupWizardActive && !showExitDialog &&
 				!syncPlayDialogOpen && !updateInfo && !showAccountModal && !showServerMessages && !showSettingsPanel) {
 				if (itemMenuBackRef.current?.()) {
@@ -828,7 +828,7 @@ const AppContent = (props) => {
 					return;
 				}
 				if ((playerReturnRef.current && handleReturnToPlayer()) ||
-					(panelIndex === PANELS.BROWSE && !showScreensaver && toggleNavigationFocus(settings.navbarPosition))) {
+					(!showScreensaver && toggleNavigationFocus(settings.navbarPosition))) {
 					e.preventDefault();
 					e.stopPropagation();
 					return;
