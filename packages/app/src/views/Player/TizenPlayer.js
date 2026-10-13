@@ -3001,6 +3001,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		serverLogger.playback('Seek: long jump', {source, jumpSeconds, durationSeconds: Math.round(duration)});
 	}, [duration]);
 
+	// Leaving the bar. A held scrub is only landed by OK or Play, so anything else leaves it forgotten and playback as it
+	// was, and a scrub that does not hold lands where it is.
+	const leaveProgressBar = useCallback(() => {
+		if (scrubHoldRef.current.active) dropScrub();
+		else executeDeferredSeek();
+	}, [dropScrub, executeDeferredSeek]);
+
 	// Progress bar keyboard control - deferred seeking
 	const handleProgressKeyDown = useCallback((e) => {
 		if (!avplayReadyRef.current) return;
@@ -3022,19 +3029,19 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			if (!hadPendingSeek) handlePlayPause();
 		} else if (e.key === 'ArrowUp' || e.keyCode === 38) {
 			e.preventDefault();
-			executeDeferredSeek();
+			leaveProgressBar();
 			const next = isAudioMode ? nextAudioFocusRow('progress', 'up') : 'bottom';
 			setFocusRow(next);
 			window.requestAnimationFrame(() => Spotlight.focus(isAudioMode ? AUDIO_FOCUS_IDS[next] : 'play-pause-btn'));
 		} else if (e.key === 'ArrowDown' || e.keyCode === 40) {
 			e.preventDefault();
-			executeDeferredSeek();
+			leaveProgressBar();
 			setFocusRow('bottom');
 			if (isAudioMode) {
 				window.requestAnimationFrame(() => Spotlight.focus('play-pause-btn'));
 			}
 		}
-	}, [settings.seekStep, showControls, scrubBy, executeDeferredSeek, resumeHeldScrub, handlePlayPause, isAudioMode]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [settings.seekStep, showControls, scrubBy, executeDeferredSeek, leaveProgressBar, resumeHeldScrub, handlePlayPause, isAudioMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const handleToggleFavorite = useCallback(async () => {
 		if (!item?.Id) return;
@@ -3858,7 +3865,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				handleControlButtonClick={handleControlButtonClick}
 				handleProgressClick={handleProgressClick}
 				handleProgressKeyDown={handleProgressKeyDown}
-				handleProgressBlur={executeDeferredSeek}
+				handleProgressBlur={leaveProgressBar}
 				handleSelectAudio={handleSelectAudio}
 				handleSelectSubtitle={handleSelectSubtitle}
 				handleSubtitleKeyDown={handleSubtitleItemKeyDown}

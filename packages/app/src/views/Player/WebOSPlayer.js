@@ -2261,18 +2261,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		return true;
 	}, [noteViewerActivity, seekToTicks, noteSeek]);
 
-	// Moving off the bar lands a held scrub where it is and stays paused, and play then carries on
-	// from there.
-	const settleHeldScrub = useCallback(() => {
-		const held = scrubHoldRef.current;
-		if (!held.active || held.ticks == null) return;
-		noteSeek();
-		seekToTicks(held.ticks);
-		scrubHoldRef.current = {...held, ticks: null};
-	}, [seekToTicks, noteSeek]);
-
-	// A skip or a chapter jump lands somewhere the scrub knows nothing about, so a held scrub is
-	// dropped and playback carries on as it was.
+	// A held scrub is only landed by OK or Play. A skip, a chapter jump, Back, or moving off the bar leaves it
+	// forgotten, and playback carries on as it was.
 	const dropScrub = useCallback(() => {
 		const held = scrubHoldRef.current;
 		if (!held.active) return;
@@ -2784,26 +2774,26 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			handlePlayPause();
 		} else if (e.key === 'ArrowUp' || e.keyCode === 38) {
 			e.preventDefault();
-			settleHeldScrub();
+			dropScrub();
 			const next = isAudioMode ? nextAudioFocusRow('progress', 'up') : 'bottom';
 			setFocusRow(next);
 			setIsSeeking(false);
 			window.requestAnimationFrame(() => Spotlight.focus(isAudioMode ? AUDIO_FOCUS_IDS[next] : 'play-pause-btn'));
 		} else if (e.key === 'ArrowDown' || e.keyCode === 40) {
 			e.preventDefault();
-			settleHeldScrub();
+			dropScrub();
 			setFocusRow('bottom');
 			setIsSeeking(false);
 			if (isAudioMode) {
 				window.requestAnimationFrame(() => Spotlight.focus('play-pause-btn'));
 			}
 		}
-	}, [settings.seekStep, scrubBy, resumeHeldScrub, settleHeldScrub, showControls, handlePlayPause, isAudioMode]);
+	}, [settings.seekStep, scrubBy, resumeHeldScrub, dropScrub, showControls, handlePlayPause, isAudioMode]);
 
 	const handleProgressBlur = useCallback(() => {
-		settleHeldScrub();
+		dropScrub();
 		setIsSeeking(false);
-	}, [settleHeldScrub]);
+	}, [dropScrub]);
 
 	const handleToggleFavorite = useCallback(async () => {
 		if (!item?.Id) return;
