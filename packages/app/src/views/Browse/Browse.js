@@ -15,7 +15,7 @@ import SeerrTileRow from '../../components/SeerrTileRow';
 import LibraryButtonRow from '../../components/LibraryButtonRow';
 import {SkeletonShimmer, skeletonTitleWidths} from '../../components/Skeleton';
 import {getImageUrl, getBackdropId} from '../../utils/helpers';
-import {focusedCardIndex, cardToRestore, focusedRowIndex} from '../../utils/rowFocusMemory';
+import {focusedCardIndex, rowEntryCardIndex, cardToRestore, focusedRowIndex} from '../../utils/rowFocusMemory';
 import {radiusToCss, shadowToCss, toCssColor} from '../../theme/themeSpec';
 import DetailSection from './DetailSection';
 import FeaturedBanner from './FeaturedBanner';
@@ -29,6 +29,7 @@ import {FocusBackdrop} from '../../components/ScreenBackdrop';
 import useBrowseData from './useBrowseData';
 import useSeerrRows from './useSeerrRows';
 import {isSeerrTile} from '../../utils/seerrHomeRows';
+import {setContentFocusHint} from '../../utils/navFocusTargets';
 import {memoryCache} from './browseCache';
 import {forgetRowCountsExcept} from '../../utils/rowCap';
 import useExternalRows from './useExternalRows';
@@ -282,6 +283,10 @@ const Browse = ({
 	// With the info overlay above the rows the row pins right under the overlay,
 	// leaving a tall row its room below at every UI scale. Without the overlay
 	// the scroller itself starts under the navbar, so the row pins at its top.
+	// Read when a key is pressed, since the rows keep the functions they were given when their own props did not change
+	const settingsRef = useRef(settings);
+	settingsRef.current = settings;
+
 	const restRowScroll = useCallback((rowIndex) => {
 		const container = contentRowsRef.current;
 		if (!container) return;
@@ -364,7 +369,7 @@ const Browse = ({
 			}
 			return;
 		}
-		scrollToRow(targetIndex, true);
+		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current, `row-${targetIndex}`, document.activeElement));
 	}, [showFeaturedBar, settings.navbarPosition, scrollToRow, setBrowseMode, focusableRowFrom]);
 
 	filteredRowsRef.current = filteredRows;
@@ -379,7 +384,7 @@ const Browse = ({
 	const handleNavigateDown = useCallback((fromRowIndex) => {
 		const targetIndex = focusableRowFrom(fromRowIndex + 1, 1);
 		if (targetIndex < 0) return;
-		scrollToRow(targetIndex, true);
+		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current, `row-${targetIndex}`, document.activeElement));
 	}, [scrollToRow, focusableRowFrom]);
 
 	useEffect(() => {
@@ -607,8 +612,9 @@ const Browse = ({
 
 	const handleNavigateDownFromFeatured = useCallback(() => {
 		setBrowseMode('rows');
+		const entry = rowEntryCardIndex(settingsRef.current, `row-${focusableRowFrom(0, 1)}`, document.activeElement);
 		setTimeout(() => {
-			scrollToRow(focusableRowFrom(0, 1), true);
+			scrollToRow(focusableRowFrom(0, 1), true, entry);
 		}, TRANSITION_DELAY_MS);
 	}, [scrollToRow, setBrowseMode, focusableRowFrom]);
 
@@ -619,7 +625,7 @@ const Browse = ({
 		const handler = () => {
 			const top = focusableRowFrom(0, 1);
 			if (browseMode === 'featured' || focusedRowIndex(document.activeElement) === top) return false;
-			scrollToRow(top, true);
+			scrollToRow(top, true, rowEntryCardIndex(settingsRef.current, `row-${top}`, document.activeElement));
 			return true;
 		};
 		backHandlerRef.current = handler;
@@ -628,10 +634,18 @@ const Browse = ({
 		};
 	}, [backHandlerRef, isVisible, browseMode, scrollToRow, focusableRowFrom]);
 
+	// The card focus is on, for the navigation to come back to when it is left for and entered again
+	const handleContentFocus = useCallback((e) => {
+		setContentFocusHint(e.target.closest ? e.target.closest('.spottable') : null);
+	}, []);
+
+	useEffect(() => () => setContentFocusHint(null), []);
+
 	const handleFeaturedFocusCallback = useCallback(() => {
 		setBrowseMode('featured');
 		// Picking from the bar should come back to the bar, not to a row left earlier.
 		lastFocusedRowRef.current = null;
+		setContentFocusHint(null);
 		detailSectionRef.current?.clearFocusedItem();
 	}, [setBrowseMode]);
 
@@ -816,6 +830,7 @@ const Browse = ({
 				<div
 					ref={contentRowsRef}
 					className={`${css.contentRows} ${browseMode === 'rows' ? css.rowsMode : ''} ${rowsClipClass}`}
+					onFocus={handleContentFocus}
 					onBlur={handleRowsBlur}
 				>
 					{filteredRows.map((row, index) => {

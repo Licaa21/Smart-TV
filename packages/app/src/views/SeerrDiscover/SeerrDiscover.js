@@ -18,7 +18,7 @@ import hydrateRequestMediaItems from '../../utils/seerrHydration';
 import {STREAMING_NETWORKS, MOVIE_STUDIOS, SEERR_SHORTCUTS, pickShortcutBackdrops, normalizeMediaItem, normalizeRequestItem} from '../../utils/seerrHomeRows';
 import {libraryIdOf} from '../../utils/seerrTarget';
 import {isScrolledAway} from '../../utils/quickReturn';
-import {focusedCardIndex, cardToRestore} from '../../utils/rowFocusMemory';
+import {focusedCardIndex, cardToRestore, rowEntryCardIndex} from '../../utils/rowFocusMemory';
 import {rememberedRowCount, rememberRowCount} from '../../utils/rowCap';
 
 import css from './SeerrDiscover.module.less';
@@ -601,6 +601,14 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		}
 	}, []);
 
+	// Focus moves into a row by the settings: the card the row remembers, its first card, or the one at the same spot
+	const enterRow = useCallback((targetIndex) => {
+		const rowId = rowSpotlightId(targetIndex);
+		const index = rowEntryCardIndex(settings, rowId, document.activeElement);
+		const card = typeof index === 'number' ? cardToRestore(rowId, index) : null;
+		if (!card || !Spotlight.focus(card)) Spotlight.focus(rowId);
+	}, [settings]);
+
 	const handleNavigateUp = useCallback((fromRowIndex) => {
 		if (fromRowIndex === 0) {
 			// The requests pill sits between the rows and the navbar.
@@ -611,16 +619,16 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 			return;
 		}
 		const targetIndex = fromRowIndex - 1;
-		Spotlight.focus(rowSpotlightId(targetIndex));
+		enterRow(targetIndex);
 		keepRowInView(targetIndex);
-	}, [keepRowInView]);
+	}, [keepRowInView, enterRow]);
 
 	const handleNavigateDown = useCallback((fromRowIndex) => {
 		const targetIndex = fromRowIndex + 1;
 		if (targetIndex >= visibleRows.length) return;
-		Spotlight.focus(rowSpotlightId(targetIndex));
+		enterRow(targetIndex);
 		keepRowInView(targetIndex);
-	}, [visibleRows.length, keepRowInView]);
+	}, [visibleRows.length, keepRowInView, enterRow]);
 
 	const handleRowFocus = useCallback((rowIndex) => {
 		if (typeof rowIndex === 'number') {

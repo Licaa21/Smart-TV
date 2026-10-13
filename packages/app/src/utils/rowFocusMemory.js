@@ -34,3 +34,33 @@ export const focusedRowIndex = (active) => {
 	const index = wrapper ? Number(wrapper.getAttribute('data-row-index')) : 0;
 	return index > 0 ? index : 0;
 };
+
+// The card of a row whose left edge is nearest to a position on screen, for moving between rows without the row's own
+// memory deciding where focus lands. -1 when the row is not drawn.
+export const cardIndexNearX = (spotlightId, left) => {
+	const cards = rowCards(spotlightId);
+	if (!cards || cards.length === 0 || typeof left !== 'number') return -1;
+	let best = -1;
+	let bestDistance = Infinity;
+	for (let i = 0; i < cards.length; i++) {
+		const distance = Math.abs(cards[i].getBoundingClientRect().left - left);
+		if (distance < bestDistance) {
+			best = i;
+			bestDistance = distance;
+		}
+	}
+	return best;
+};
+
+// Which card focus is to land on when it moves into a row from another, by the settings. None given leaves it to the
+// row's own memory of the card it was left on. With that off it is the card at the same spot on screen as the one left
+// when asked for, and otherwise the first card.
+export const rowEntryCardIndex = (settings, spotlightId, activeElement) => {
+	if (settings.rememberRowCard !== false) return undefined;
+	if (settings.rowEntryKeepsPosition) {
+		const left = activeElement && activeElement.getBoundingClientRect ? activeElement.getBoundingClientRect().left : null;
+		const index = cardIndexNearX(spotlightId, left);
+		return index >= 0 ? index : 0;
+	}
+	return 0;
+};
