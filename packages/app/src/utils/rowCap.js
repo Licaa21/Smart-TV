@@ -21,3 +21,10 @@ export const rememberedRowCount = (rowKey) => (drawn[rowKey] === undefined ? nul
 export const rememberRowCount = (rowKey, count) => {
 	drawn[rowKey] = count;
 };
+// Only the row focus returns to needs the cards it had drawn. The others start short again, as they did the first time,
+// which is less to draw when the screen comes back. The Seerr screen keeps its own.
+export const forgetRowCountsExcept = (rowKey) => {
+	Object.keys(drawn).forEach((key) => {
+		if (key !== rowKey && key.indexOf('discover-') !== 0) delete drawn[key];
+	});
+};

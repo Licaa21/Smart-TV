@@ -30,6 +30,7 @@ import useBrowseData from './useBrowseData';
 import useSeerrRows from './useSeerrRows';
 import {isSeerrTile} from '../../utils/seerrHomeRows';
 import {memoryCache} from './browseCache';
+import {forgetRowCountsExcept} from '../../utils/rowCap';
 import useExternalRows from './useExternalRows';
 import useMediaPreview from './useMediaPreview';
 import {buildBrowseRows, sameRowList} from './buildBrowseRows';
@@ -37,6 +38,10 @@ import {buildBrowseRows, sameRowList} from './buildBrowseRows';
 import css from './Browse.module.less';
 
 const FOCUS_DELAY_MS = 100;
+// Between the steps that draw the rows a return held the place of
+const FILL_ROW_DELAY_MS = 30;
+// A row's height when a return does not know it
+const GUESSED_ROW_HEIGHT = 330;
 const TRANSITION_DELAY_MS = 450;
 
 const LOADING_ROW_TITLE_WIDTHS = skeletonTitleWidths(4, 24);
@@ -84,6 +89,12 @@ const Browse = ({
 	// Home is built again on the way back from a title, with a place to return to. It then takes the rows it left
 	// as they were, since fetching them again brings them back late and different.
 	const [returning] = useState(() => lastFocusState !== null);
+	// Drawing every row of a kept screen in one go held Back up for seconds on the TV. A return draws the row it
+	// lands on and its neighbours, holds the place of the rest at the height they had, and draws them a few at a
+	// time afterwards, nearest first.
+	const [keptLayout] = useState(() => (lastFocusState && lastFocusState.heights ? lastFocusState : null));
+	const [fillStep, setFillStep] = useState(0);
+	const fillModeRef = useRef(null);
 	const homeOwner = `${accessToken}:${user?.Id}`;
 	const {rows: seerrRows, pending: seerrPending} = useSeerrRows({
 		seerrEnabled,
@@ -290,7 +301,19 @@ const Browse = ({
 		const targetRow = rowRefsMap.current.get(rowIndex);
 		const container = contentRowsRef.current;
 		if (!targetRow || !container) {
-			if (thenFocus) focusRow(rowIndex, cardIndex);
+			// A row held for a return is not drawn yet, and a key pressed meanwhile waits for it
+			if (thenFocus) {
+				let waits = 0;
+				const retry = () => {
+					waits += 1;
+					if (focusRow(rowIndex, cardIndex)) {
+						restRowScroll(rowIndex);
+						return;
+					}
+					if (waits < 30) scrollTimeoutRef.current = setTimeout(retry, 50);
+				};
+				retry();
+			}
 			return;
 		}
 
@@ -343,6 +366,13 @@ const Browse = ({
 	}, [showFeaturedBar, settings.navbarPosition, scrollToRow, setBrowseMode, focusableRowFrom]);
 
 	filteredRowsRef.current = filteredRows;
+	const landingIndex = keptLayout ? filteredRows.findIndex((row) => row.id === keptLayout.rowId && !row.isPlaceholder) : -1;
+	const farthestRow = landingIndex < 0 ? 0 : Math.max(landingIndex, filteredRows.length - 1 - landingIndex);
+	// Decided once, on the first render: a landing row that arrives later would turn rows already drawn back into
+	// placeholders, and so would rows inserted after the fill has finished
+	if (fillModeRef.current === null) fillModeRef.current = landingIndex >= 0 && farthestRow > 0;
+	if (fillModeRef.current && fillStep >= farthestRow) fillModeRef.current = false;
+	const filling = fillModeRef.current === true;
 
 	const handleNavigateDown = useCallback((fromRowIndex) => {
 		const targetIndex = focusableRowFrom(fromRowIndex + 1, 1);
@@ -441,6 +471,12 @@ const Browse = ({
 		initialFocusSetRef.current = false;
 	}, [accessToken]);
 
+	useEffect(() => {
+		if (!filling) return undefined;
+		const timer = setTimeout(() => setFillStep((step) => step + 1), FILL_ROW_DELAY_MS);
+		return () => clearTimeout(timer);
+	}, [filling, fillStep]);
+
 	// The card preview for the home rows. Only the rows get the provider, so the
 	// same cards drawn by Seerr Discover and the library never start one.
 	const mediaPreview = useMediaPreview({api, settings, isVisible, browseMode, onThemeMusicHold: onHoldThemeMusic});
@@ -471,10 +507,26 @@ const Browse = ({
 	const rememberFocus = useCallback(() => {
 		const rowIndex = lastFocusedRowRef.current;
 		if (rowIndex === null) return;
+		// How tall each row stood, so a return can hold the place of the rows it has not drawn yet
+		const heights = {};
+		const nodes = contentRowsRef.current ? contentRowsRef.current.querySelectorAll('[data-row-index]') : [];
+		const tops = [];
+		Array.prototype.forEach.call(nodes, (node) => {
+			tops[Number(node.getAttribute('data-row-index'))] = {top: node.offsetTop, node};
+		});
+		filteredRowsRef.current.forEach((row, i) => {
+			const here = tops[i];
+			if (!here) return;
+			const next = tops[i + 1];
+			const marginBottom = parseFloat(window.getComputedStyle(here.node).marginBottom) || 0;
+			heights[row.id] = next ? next.top - here.top : here.node.offsetHeight + marginBottom;
+		});
+		forgetRowCountsExcept(filteredRowsRef.current[rowIndex]?.id);
 		lastFocusState = {
 			rowIndex,
 			rowId: filteredRowsRef.current[rowIndex]?.id,
-			cardIndex: focusedCardIndex(`row-${rowIndex}`, document.activeElement)
+			cardIndex: focusedCardIndex(`row-${rowIndex}`, document.activeElement),
+			heights
 		};
 	}, []);
 
@@ -760,6 +812,15 @@ const Browse = ({
 					onBlur={handleRowsBlur}
 				>
 					{filteredRows.map((row, index) => {
+						if (filling && Math.abs(index - landingIndex) > fillStep + 1) {
+							return (
+								<div
+									key={row.id}
+									data-row-index={index}
+									style={{height: keptLayout.heights[row.id] || GUESSED_ROW_HEIGHT}}
+								/>
+							);
+						}
 						if (row.isPlaceholder) {
 							return (
 								<RowComponent

@@ -1,5 +1,5 @@
 import {applyPerfTier} from './perfTier';
-import {ROW_CAP, grownRowCount, initialRowCount} from './rowCap';
+import {ROW_CAP, forgetRowCountsExcept, grownRowCount, initialRowCount, rememberRowCount, rememberedRowCount} from './rowCap';
 
 describe('row cap', () => {
 	afterEach(() => applyPerfTier(null));
@@ -23,5 +23,15 @@ describe('row cap', () => {
 		expect(grownRowCount(40, 10, 300)).toBe(40);
 		expect(grownRowCount(40, 33, 300)).toBe(60);
 		expect(grownRowCount(40, 39, 50)).toBe(50);
+	});
+
+	test('forgets the cards drawn for every row but the one focus returns to', () => {
+		rememberRowCount('resume', 60);
+		rememberRowCount('latest', 80);
+		rememberRowCount('discover-trending', 27);
+		forgetRowCountsExcept('latest');
+		expect(rememberedRowCount('resume')).toBeNull();
+		expect(rememberedRowCount('latest')).toBe(80);
+		expect(rememberedRowCount('discover-trending')).toBe(27);
 	});
 });
