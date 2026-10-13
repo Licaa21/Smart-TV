@@ -29,7 +29,8 @@
 		}
 	}
 
-	&.noZoom:focus {
+	&.noZoom:focus,
+	&.previewing:focus {
 		transform: translateZ(0);
 	}
 }
@@ -345,4 +346,21 @@
 	text-transform: uppercase;
 	pointer-events: none;
 	word-break: break-word;
+}
+
+.previewFrame {
+	.media-preview-frame();
+}
+
+.previewVisible {
+	opacity: 1;
+}
+
+.previewRing {
+	.media-preview-ring();
+}
+
+// The container's own corners come off on the Fire TV too, for the same reason as the frame's
+:global(.vega) .imageContainer.previewHost {
+	border-radius: 0;
 }

@@ -222,6 +222,9 @@ export const defaultSettings = {
 	showMediaDetailsOnLibraryPage: true,
 	hideBackdropsInLibraries: false,
 	useSeriesThumbnails: false,
+	// The server keys, as the other clients store them, so they sync as they are.
+	episodePreviewEnabled: false,
+	previewAudioEnabled: true,
 	homeRowsPosterSize: 'default',
 	classicHomeRowsPadding: 30,
 	modernHomeRowsPadding: 420,

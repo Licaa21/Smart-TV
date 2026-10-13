@@ -19,6 +19,11 @@ export const useThemeMusic = () => {
 	const fadeTimerRef = useRef(null);
 	const delayTimerRef = useRef(null);
 	const targetVolumeRef = useRef(0);
+	// Set while a card preview plays. The track fades out, and the item that was
+	// playing or the last one asked for is kept so it can come back afterwards.
+	const heldRef = useRef(false);
+	const heldItemIdRef = useRef(null);
+	const requestedItemIdRef = useRef(null);
 
 	const getTargetVolume = useCallback(() => {
 		return Math.max(0, Math.min(100, settings.themeMusicVolume || 30)) / 100;
@@ -87,6 +92,10 @@ export const useThemeMusic = () => {
 	const playThemeMusic = useCallback(async (itemId) => {
 		if (!settings.themeMusicEnabled) return;
 		if (!itemId) return;
+		if (heldRef.current) {
+			heldItemIdRef.current = itemId;
+			return;
+		}
 
 		if (currentItemIdRef.current === itemId && audioRef.current) return;
 
@@ -96,7 +105,7 @@ export const useThemeMusic = () => {
 		try {
 			const result = await jellyfinApi.api.getThemeSongs(itemId, true);
 			const songs = result?.Items || [];
-			if (songs.length === 0 || currentItemIdRef.current !== itemId) return;
+			if (songs.length === 0 || currentItemIdRef.current !== itemId || heldRef.current) return;
 
 			const song = songs[Math.floor(Math.random() * songs.length)];
 			const url = buildAudioUrl(song.Id);
@@ -131,6 +140,11 @@ export const useThemeMusic = () => {
 	const playThemeMusicDelayed = useCallback((itemId) => {
 		if (!settings.themeMusicEnabled || !settings.themeMusicOnHomeRows) return;
 		if (!itemId) return;
+		requestedItemIdRef.current = itemId;
+		if (heldRef.current) {
+			heldItemIdRef.current = itemId;
+			return;
+		}
 
 		if (delayTimerRef.current) {
 			clearTimeout(delayTimerRef.current);
@@ -150,6 +164,23 @@ export const useThemeMusic = () => {
 			delayTimerRef.current = null;
 		}
 	}, []);
+
+	// A card preview takes the speakers while it plays. Holding fades the track out
+	// and keeps the item, releasing re-arms the home row delay for it, so the music
+	// comes back the way it would after a focus.
+	const holdThemeMusic = useCallback((held) => {
+		if (heldRef.current === !!held) return;
+		heldRef.current = !!held;
+		if (held) {
+			heldItemIdRef.current = currentItemIdRef.current || requestedItemIdRef.current;
+			cancelDelayed();
+			fadeOutAndStop();
+			return;
+		}
+		const itemId = heldItemIdRef.current;
+		heldItemIdRef.current = null;
+		if (itemId) playThemeMusicDelayed(itemId);
+	}, [cancelDelayed, fadeOutAndStop, playThemeMusicDelayed]);
 
 	useEffect(() => {
 		if (audioRef.current && targetVolumeRef.current > 0) {
@@ -184,6 +215,7 @@ export const useThemeMusic = () => {
 		playThemeMusic,
 		playThemeMusicDelayed,
 		cancelDelayed,
+		holdThemeMusic,
 		stopThemeMusic: fadeOutAndStop,
 		stopThemeMusicImmediate: stopImmediate,
 		isPlaying: () => !!(audioRef.current && !audioRef.current.paused)

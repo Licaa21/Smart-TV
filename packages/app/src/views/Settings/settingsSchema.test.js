@@ -187,3 +187,24 @@ describe('settings schema', () => {
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 });
+
+describe('the media preview switches', () => {
+	const homeScreen = () => SETTINGS_SCHEMA
+		.find((category) => category.id === 'appearance').subcategories
+		.find((sub) => sub.id === 'homeScreen');
+
+	test('sit in the Home Screen looks as toggles', () => {
+		const rows = homeScreen().rows;
+		const preview = rows.find((row) => row.key === 'episodePreviewEnabled');
+		const audio = rows.find((row) => row.key === 'previewAudioEnabled');
+		expect(preview.kind).toBe(KIND.TOGGLE);
+		expect(audio.kind).toBe(KIND.TOGGLE);
+		expect(rows.indexOf(audio)).toBe(rows.indexOf(preview) + 1);
+	});
+
+	test('the audio switch only shows while previews are on', () => {
+		const audio = homeScreen().rows.find((row) => row.key === 'previewAudioEnabled');
+		expect(audio.when({...ctx, settings: {...defaultSettings, episodePreviewEnabled: false}})).toBe(false);
+		expect(audio.when({...ctx, settings: {...defaultSettings, episodePreviewEnabled: true}})).toBe(true);
+	});
+});

@@ -1,4 +1,4 @@
-import {memo, useCallback, useMemo, useRef, useEffect} from 'react';
+import {memo, useCallback, useMemo, useRef, useEffect, useState} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import {getImageUrl, toAbsoluteImageUrl} from '../../utils/helpers';
 import {useSettings} from '../../context/SettingsContext';
@@ -7,6 +7,8 @@ import {showsWatchedCheck} from '../../utils/playedState';
 import SeerrIcon from '../icons/SeerrIcon';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
+import {isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
+import {useMediaPreviewSlot} from './MediaPreviewContext';
 
 import css from './MediaCard.module.less';
 
@@ -116,6 +118,14 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 	const imageType = rowImageType || 'poster';
 	const artworkItem = (item.Type === 'Genre' && item._representative) || item;
 	const rowArtwork = requestedArtwork(artworkItem, imageType, itemServerUrl);
+	// A Seerr or outside list title has no library art, so a thumb row shows the titled
+	// thumb the plugin picks for it, or its plain backdrop, and turns landscape like a
+	// library thumb. A thumb that fails to load hands over to the backdrop.
+	const [failedThumb, setFailedThumb] = useState(null);
+	const wantsSeerrWide = imageType === 'thumb' && (cardType === 'portrait' || cardType === 'landscape') && isUnownedSeerrTitle(item);
+	useTmdbThumbsAvailable(wantsSeerrWide);
+	const seerrThumb = wantsSeerrWide ? seerrThumbUrl(item) : null;
+	const seerrWide = wantsSeerrWide ? toAbsoluteImageUrl(seerrWideArtUrl(item, failedThumb), itemServerUrl) : null;
 	const isBanner = imageType === 'banner' && cardType !== 'square' && cardType !== 'circle';
 	// An episode is the one item the series switch speaks for, so its picture is
 	// picked here instead of taking whatever wide art the row asked for. A banner
@@ -125,7 +135,7 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 		: null;
 	// The url rather than the object, so the memo below still holds between renders.
 	const episodeArtUrl = episodeArt?.url || null;
-	const wideArtwork = episodeArt ? episodeArt.wide : Boolean(rowArtwork);
+	const wideArtwork = episodeArt ? episodeArt.wide : Boolean(rowArtwork || seerrWide);
 	const isLandscape = !isBanner && (cardType === 'landscape' || (cardType === 'portrait' && wideArtwork));
 	// Artists read as circles in the music library. It rides on the square path
 	// since the art is the same 1:1 either way, only the radius differs.
@@ -133,6 +143,9 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 	const isSquare = !isBanner && (isCircle || cardType === 'square' || (cardType === 'portrait' && !isLandscape && (item.Type === 'MusicAlbum' || item.Type === 'MusicArtist' || item.Type === 'Audio')));
 
 	const imageUrl = useMemo(() => {
+		// Ahead of the external poster, which would otherwise keep the card a poster.
+		if (seerrWide) return seerrWide;
+
 		const providerIds = item.ProviderIds || {};
 		const externalPoster = item._externalPosterUrl ||
 			providerIds.SeerrPoster ||
@@ -141,7 +154,8 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 			providerIds.LidarrPoster ||
 			providerIds.ReadarrPoster;
 
-		if (externalPoster && (item._external || !item.ImageTags?.Primary)) {
+		// A title the server owns shows the library's own art.
+		if (externalPoster && ((item._external && !item._resolvedFromExternal) || !item.ImageTags?.Primary)) {
 			return toAbsoluteImageUrl(externalPoster, itemServerUrl);
 		}
 
@@ -186,14 +200,27 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 		// The card shows its lettered placeholder rather than guessing at a url the
 		// item already said it has nothing behind.
 		return null;
-	}, [isLandscape, item, itemServerUrl, rowArtwork, episodeArtUrl]);
+	}, [isLandscape, item, itemServerUrl, rowArtwork, episodeArtUrl, seerrWide]);
+
+	const handleImageError = useCallback(() => {
+		if (seerrThumb && imageUrl === seerrThumb) setFailedThumb(seerrThumb);
+	}, [imageUrl, seerrThumb]);
+
+	const {
+		phase: previewPhase,
+		frameRef: previewFrameRef,
+		onFocus: onPreviewFocus,
+		onBlur: onPreviewBlur,
+		stopForSelect: stopPreviewForSelect
+	} = useMediaPreviewSlot(spotlightId, item);
 
 	const handleClick = useCallback(() => {
+		stopPreviewForSelect();
 		onSelect?.(item);
-	}, [item, onSelect]);
+	}, [item, onSelect, stopPreviewForSelect]);
 
 	const itemAt = useCallback(() => item, [item]);
-	const menuHold = useItemMenuHold(itemAt, menuOptions);
+	const {onMouseLeave: onMenuMouseLeave, ...menuHold} = useItemMenuHold(itemAt, menuOptions);
 
 	const handleFocus = useCallback(() => {
 		if (focusTimeoutRef.current) {
@@ -202,7 +229,14 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 		focusTimeoutRef.current = setTimeout(() => {
 			onFocusItem?.(item);
 		}, 50);
-	}, [item, onFocusItem]);
+		onPreviewFocus();
+	}, [item, onFocusItem, onPreviewFocus]);
+
+	// The menu hold watches the pointer leaving too, so both hear it.
+	const handleMouseLeave = useCallback((e) => {
+		onMenuMouseLeave?.(e);
+		onPreviewBlur();
+	}, [onMenuMouseLeave, onPreviewBlur]);
 
 	const progress = item.UserData?.PlayedPercentage || 0;
 	const watchedBehavior = settings.watchedIndicatorBehavior || 'always';
@@ -237,7 +271,8 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 		return null;
 	}, [item.Type, item.AlbumArtist, item.AlbumArtists, item.Artists]);
 
-	const cardClass = `${css.card} ${isBanner ? css.banner : isLandscape ? css.landscape : isSquare ? css.square : css.portrait}${isCircle ? ' ' + css.circle : ''}${settings.cardFocusZoom ? '' : ' ' + css.noZoom}`;
+	// The zoom comes off while the video shows so the card holds still under it.
+	const cardClass = `${css.card} ${isBanner ? css.banner : isLandscape ? css.landscape : isSquare ? css.square : css.portrait}${isCircle ? ' ' + css.circle : ''}${settings.cardFocusZoom ? '' : ' ' + css.noZoom}${previewPhase === 'playing' ? ' ' + css.previewing : ''}`;
 
 	const sizeMultiplier = POSTER_SIZE_MULTIPLIERS[settings.homeRowsPosterSize] || 1;
 	const shapeKey = isBanner ? 'banner' : isLandscape ? 'landscape' : isSquare ? 'square' : 'portrait';
@@ -254,8 +289,8 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 		: imgSizeStyle;
 
 	return (
-		<SpottableDiv {...menuHold} className={cardClass} data-media-card onClick={handleClick} onFocus={handleFocus} style={sizeStyle} spotlightId={spotlightId} onSpotlightLeft={onSpotlightLeft} onSpotlightRight={onSpotlightRight}>
-			<div className={css.imageContainer}>
+		<SpottableDiv {...menuHold} className={cardClass} data-media-card onClick={handleClick} onFocus={handleFocus} onBlur={onPreviewBlur} onMouseEnter={onPreviewFocus} onMouseLeave={handleMouseLeave} style={sizeStyle} spotlightId={spotlightId} onSpotlightLeft={onSpotlightLeft} onSpotlightRight={onSpotlightRight}>
+			<div className={previewPhase !== 'idle' ? `${css.imageContainer} ${css.previewHost}` : css.imageContainer}>
 				{imageUrl ? (
 					<>
 						<img
@@ -266,6 +301,7 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 							width={cardWidth}
 							height={cardHeight}
 							style={imgStyle}
+							onError={handleImageError}
 						/>
 						{(item?.Type === 'Genre' || item?.Type === 'MusicGenre') && (
 							<>
@@ -283,6 +319,13 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 					<div className={css.placeholder} style={imgSizeStyle}>
 						<div className={css.placeholderTitle}>{item.Name}</div>
 					</div>
+				)}
+
+				{previewPhase !== 'idle' && (
+					<>
+						<div ref={previewFrameRef} className={previewPhase === 'playing' ? `${css.previewFrame} ${css.previewVisible}` : css.previewFrame} />
+						<div className={css.previewRing} />
+					</>
 				)}
 
 				{showIndicators && progress > 0 && (

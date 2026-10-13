@@ -1120,6 +1120,9 @@ export const getImageUrl = (path, size = 'w500') => {
 		return normalizedPath.replace(/^https?/, proto);
 	}
 
+	// Another site's picture, like the IMDb charts' own posters, is used as it is.
+	if (/^https?:\/\//i.test(normalizedPath)) return normalizedPath;
+
 	if (normalizedPath.startsWith('/t/p/')) {
 		return `${proto}://image.tmdb.org${normalizedPath}`;
 	}

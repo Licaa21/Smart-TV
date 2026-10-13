@@ -94,7 +94,7 @@ export const normalizeMediaItem = (item) => {
 	};
 };
 
-const normalizeRequestItem = (request) => {
+export const normalizeRequestItem = (request) => {
 	const media = request.media || {};
 	const mediaType = request.type || media.mediaType || 'movie';
 	const poster = media.posterPath || media.poster_path;

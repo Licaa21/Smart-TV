@@ -2,6 +2,7 @@ import {Component, memo} from 'react';
 import {Pause} from '@enact/spotlight/Pause';
 
 import {useSettings} from '../../context/SettingsContext';
+import {isXbox} from '../../platform';
 import {toCssColor, toCssColorWithAlpha, radiusToCss, shadowToCss} from '../../theme/themeSpec';
 import {getPerfTier} from '../../utils/perfTier';
 import {
@@ -25,6 +26,26 @@ const EMAIL_CHIPS = ['@gmail.com', '@outlook.com', '@icloud.com', '@yahoo.com', 
 const SUGGESTION_DEBOUNCE_MS = 280;
 const LONG_PRESS_MS = 500;
 const MIN_POPUP_EDGE_GAP = 16;
+
+// The shortcuts the Xbox's own keyboard takes, by the key each one presses. X and Menu
+// already come in as Backspace and the context menu key.
+const XBOX_SHORTCUTS = {
+	// Y
+	198: ['SPACE'],
+	// Right and left bumper
+	199: ['CURSORR'],
+	200: ['CURSORL'],
+	// Left stick press
+	209: ['SHIFT'],
+	// Left trigger, which comes in as rewind
+	227: ['123', 'ABC']
+};
+
+// Right stick right and left
+const XBOX_CHIP_STEPS = {
+	217: 1,
+	218: -1
+};
 
 const ICON_PATHS = {
 	BACKSPACE: 'M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H7.07L2.4 12l4.66-7H22v14zm-11.59-2L14 13.41 17.59 17 19 15.59 15.41 12 19 8.41 17.59 7 14 10.59 10.41 7 9 8.41 12.59 12 9 15.59z',
@@ -491,6 +512,24 @@ class TVKeyboardHost extends Component {
 		return true;
 	}
 
+	// A shortcut presses a key of the layout on screen, so one whose key isnt there,
+	// like space on the number pad, does nothing.
+	shortcutKey(code) {
+		const keys = XBOX_SHORTCUTS[code];
+		if (!keys) return null;
+		const layout = this.layout();
+		return keys.find((key) => layout.some((line) => line.indexOf(key) >= 0)) || null;
+	}
+
+	// The first step lands on the suggestion at that end, the next ones walk along.
+	stepChips(step) {
+		const count = this.chips().length;
+		if (!count) return;
+		this.setState((prev) => (prev.row === -1
+			? {col: (Math.min(prev.col, count - 1) + step + count) % count}
+			: {row: -1, col: step > 0 ? 0 : count - 1}));
+	}
+
 	move(dRow, dCol) {
 		const layout = this.layout();
 		const chips = this.chips();
@@ -589,6 +628,17 @@ class TVKeyboardHost extends Component {
 		if (code === 93) {
 			this.act('DONE');
 			return;
+		}
+		if (isXbox()) {
+			const shortcut = this.shortcutKey(code);
+			if (shortcut) {
+				this.act(shortcut);
+				return;
+			}
+			if (XBOX_CHIP_STEPS[code]) {
+				this.stepChips(XBOX_CHIP_STEPS[code]);
+				return;
+			}
 		}
 		if (code === 37) return this.move(0, -1);
 		if (code === 39) return this.move(0, 1);

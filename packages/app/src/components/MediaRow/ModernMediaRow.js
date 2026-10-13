@@ -33,7 +33,9 @@ const ModernMediaRow = ({
 	registerRowRef,
 	loading,
 	titleWidth,
-	cardType
+	cardType,
+	spotlightId: rowSpotlightId,
+	onLoadMore
 }) => {
 	const {settings} = useSettings();
 	const scrollerRef = useRef(null);
@@ -45,6 +47,7 @@ const ModernMediaRow = ({
 	const platform = useRef(getPlatform()).current;
 
 	const keyPrefix = rowId || title || rowIndex || '';
+	const itemCount = items?.length || 0;
 
 	useEffect(() => {
 		const el = document.querySelector(`[data-row-index="${rowIndex}"]`) || rowElementRef.current;
@@ -84,6 +87,13 @@ const ModernMediaRow = ({
 	const handleFocus = useCallback((e) => {
 		onFocus?.(rowIndex);
 
+		const card = e.target.closest('.spottable');
+		// A row that pages asks for more once focus is among its last few cards.
+		if (onLoadMore && card && card.parentNode) {
+			const index = Array.prototype.indexOf.call(card.parentNode.children, card);
+			if (index >= 0 && index >= itemCount - 3) onLoadMore(rowId);
+		}
+
 		// A hovered card already sits under the cursor, so nudging the lane
 		// would only slide it away from the pointer.
 		if (Spotlight.getPointerMode()) {
@@ -91,7 +101,6 @@ const ModernMediaRow = ({
 			return;
 		}
 
-		const card = e.target.closest('.spottable');
 		const scroller = scrollerRef.current;
 		if (card && scroller) {
 			if (scrollTimeoutRef.current) {
@@ -128,7 +137,7 @@ const ModernMediaRow = ({
 				});
 			});
 		}
-	}, [onFocus, rowIndex]);
+	}, [onFocus, rowIndex, onLoadMore, itemCount, rowId]);
 
 	const handleBlur = useCallback((e) => {
 		const nextTarget = e.relatedTarget;
@@ -208,7 +217,7 @@ const ModernMediaRow = ({
 		<RowContainer
 			ref={rowElementRef}
 			className={rowClassName}
-			spotlightId={`row-${rowIndex}`}
+			spotlightId={rowSpotlightId || `row-${rowIndex}`}
 			data-row-index={rowIndex}
 			onKeyDown={handleKeyDown}
 			onBlur={handleBlur}
@@ -256,6 +265,9 @@ const areRowPropsEqual = (prev, next) => {
 	if (prev.subtitle !== next.subtitle) return false;
 	if (prev.rowSpacing !== next.rowSpacing) return false;
 	if (prev.className !== next.className) return false;
+	if (prev.spotlightId !== next.spotlightId) return false;
+	// Presence only, since a caller's inline arrow would defeat the comparator.
+	if (!prev.onLoadMore !== !next.onLoadMore) return false;
 	if (prev.loading !== next.loading || prev.titleWidth !== next.titleWidth || prev.cardType !== next.cardType) return false;
 	if (prev.items === next.items) return true;
 	if (prev.items?.length !== next.items?.length) return false;

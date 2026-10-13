@@ -18,6 +18,7 @@ import * as connectionPool from '../services/connectionPool';
 import * as jellyfinApi from '../services/jellyfinApi';
 import {adoptLegacyBlockedRatings, loadParentalControls, parentalScopeKey, setParentalScope} from '../services/parentalControls';
 import {libraryIdOf, seerrDetailStub} from '../utils/seerrTarget';
+import {setTmdbThumbsAvailable} from '../utils/tmdbThumb';
 import serverLogger from '../services/serverLogger';
 import * as remoteControl from '../services/remoteControl';
 import {isBackKey, KEYS} from '../utils/keys';
@@ -127,6 +128,9 @@ const PanelLoader = () => (
 		<LoadingSpinner />
 	</div>
 );
+
+// Puts a class on the Browse panel's body so the stylesheet can turn its fade off on the Fire TV
+const browsePanelCss = {body: css.browseBody};
 
 const PANELS = {
 	LOGIN: 0,
@@ -337,6 +341,14 @@ const AppContent = (props) => {
 	useEffect(() => {
 		serverLogger.setClientLogSupported(pluginInfo?.clientLogSupported === true);
 	}, [pluginInfo]);
+
+	// The cards read this without the Seerr context, so a title the server doesn't hold
+	// can grow into the plugin's titled thumb.
+	useEffect(() => {
+		setTmdbThumbsAvailable(!!settings.useMoonfinPlugin &&
+			pluginInfo?.tmdbAvailable === true &&
+			pluginInfo?.tmdbThumbsSupported === true);
+	}, [pluginInfo, settings.useMoonfinPlugin]);
 
 	useEffect(() => {
 		serverLogger.setEnabled(settings.serverLogging === true);
@@ -1580,7 +1592,7 @@ const AppContent = (props) => {
 						<Panel>
 							<Login onLoggedIn={handleLoggedIn} backHandlerRef={backHandlerRef} />
 						</Panel>
-						<Panel>
+						<Panel css={browsePanelCss}>
 							<Browse
 								onSelectItem={handleSelectItem}
 								onSelectLibrary={handleSelectLibrary}
@@ -1597,6 +1609,7 @@ const AppContent = (props) => {
 								onFocusItemThemeMusic={themeMusic.playThemeMusicDelayed}
 								onBlurItemThemeMusic={themeMusic.cancelDelayed}
 								onLeaveThemeMusic={themeMusic.stopThemeMusic}
+								onHoldThemeMusic={themeMusic.holdThemeMusic}
 							/>
 						</Panel>
 						<Panel>

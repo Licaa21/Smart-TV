@@ -1,4 +1,4 @@
-import {isStaticLibraryCard, modernCardMetrics, getCardDisplayTitle, getEpisodeLabels} from './modernCardLayout';
+import {isStaticLibraryCard, modernCardMetrics, modernRowSpacing, getCardDisplayTitle, getEpisodeLabels} from './modernCardLayout';
 
 const metrics = (over = {}) => modernCardMetrics({
 	posterSize: 'default',
@@ -101,5 +101,19 @@ describe('Modern card labels and titles', () => {
 
 		expect(getEpisodeLabels({Type: 'Movie', Name: 'The Matrix'})).toBeNull();
 		expect(getEpisodeLabels({Type: 'Series', Name: 'Firefly'})).toBeNull();
+	});
+});
+
+describe('modernRowSpacing', () => {
+	test('turns the padding slider into the space below a row', () => {
+		expect(modernRowSpacing({})).toBe(0);
+		expect(modernRowSpacing({modernHomeRowsPadding: 420})).toBe(0);
+		expect(modernRowSpacing({modernHomeRowsPadding: 500})).toBe(66);
+		expect(modernRowSpacing({modernHomeRowsPadding: 560})).toBe(126);
+		expect(modernRowSpacing({modernHomeRowsPadding: 360})).toBe(0);
+	});
+
+	test('leaves full screen rows to pace themselves', () => {
+		expect(modernRowSpacing({fullScreenRows: true, modernHomeRowsPadding: 500})).toBeNull();
 	});
 });

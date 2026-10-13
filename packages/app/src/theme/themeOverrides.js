@@ -478,6 +478,12 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		rule(`.${cardCss.image}, .${cardCss.placeholder}, .${cardCss.imageContainer}, .${cardCss.genreOverlay}`, `border-radius: ${cardRadius};`);
 		rule(`.${cardCss.image}, .${cardCss.placeholder}`, `border: ${b.cardBorder.width}px solid ${toCssColor(b.cardBorder.color)};`);
 		rule(`.${cardCss.card}:focus .${cardCss.image}`, `border-color: ${focusColor}; border-width: 4px; box-shadow: ${glowOr('0 8px 24px rgba(0, 0, 0, 0.6)')};`);
+		rule(`.${cardCss.previewFrame}`, `border-radius: ${cardRadius};`);
+		rule(`.${cardCss.previewRing}`, `border-color: ${focusColor}; border-radius: ${cardRadius}; box-shadow: ${glowOr('0 8px 24px rgba(0, 0, 0, 0.6)')};`);
+		// The Fire TV WebView only shows a video it can put on its own hardware plane and a
+		// rounded clip keeps it off one, so the stylesheet squares the frame, the ring and the
+		// container around them while a preview is up, which this sheet would otherwise round back
+		rules.push(`${prefix}.vega .${cardCss.previewFrame}, ${prefix}.vega .${cardCss.previewRing}, ${prefix}.vega .${cardCss.imageContainer}.${cardCss.previewHost} { border-radius: 0; }`);
 		rule(`.${cardCss.placeholder}`, `background: linear-gradient(135deg, ${accentA(0.25)} 0%, ${accentA(0.05)} 50%, transparent 100%), ${surfaceVariant};`);
 		rule(`.${cardCss.placeholderTitle}`, `color: ${onSurface};`);
 		rule(`.${cardCss.title}`, `color: ${theme.id === 'neon_pulse' ? accent : onSurface};`);
@@ -501,6 +507,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${modernCardCss.placeholderIcon}`, `color: ${os(0.45)};`);
 	rule(`.${modernCardCss.overview}`, `color: ${theme.id === 'neon_pulse' ? onSurface : os(0.7)};`);
 	rule(`.${modernCardCss.platformWebos} .${modernCardCss.image}`, `border-radius: ${bumpRadius(b.cardRadius, 2)};`);
+	rule(`.${modernCardCss.platformWebos} .${modernCardCss.previewFrame}, .${modernCardCss.platformWebos} .${modernCardCss.previewRing}`, `border-radius: ${bumpRadius(b.cardRadius, 2)};`);
 
 	// Row shells
 	rule(`.${mediaRowCss.title}, .${modernRowCss.title}`, `color: ${onSurface}; text-shadow: ${textGlow};`);

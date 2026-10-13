@@ -30,7 +30,18 @@ describe('buildThemeOverrideCss', () => {
 		const css = buildThemeOverrideCss(resolveThemeById('8bit_hero'));
 		expect(css).toContain('border-radius: 0;');
 		const moonfin = buildThemeOverrideCss(resolveThemeById('moonfin'));
-		expect(moonfin).not.toContain('border-radius: 0;');
+		const rounded = moonfin.split('\n').filter((line) => !line.includes('].vega '));
+		expect(rounded.join('\n')).not.toContain('border-radius: 0;');
+	});
+
+	it('squares the preview frame, ring and container on the Fire TV for both card styles', () => {
+		const css = buildThemeOverrideCss(resolveThemeById('moonfin'));
+		const squared = css.split('\n').filter((line) => line.includes('border-radius: 0;'));
+		expect(squared).toHaveLength(2);
+		for (const line of squared) {
+			expect(line.startsWith("html[data-theme-id='moonfin'][data-theme-id].vega .")).toBe(true);
+			expect(line.split('].vega .')).toHaveLength(4);
+		}
 	});
 
 	it('carries theme fonts as far as the wrapper that names its own', () => {
