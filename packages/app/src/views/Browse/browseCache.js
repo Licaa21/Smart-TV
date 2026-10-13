@@ -24,6 +24,13 @@ export const memoryCache = {
 	// Which shape of the recent rows these were built for, since a cache of per
 	// library rows says nothing about the merged ones and the other way round.
 	rowConfigKey: null,
+	// The Seerr and outside list rows, each with the key of what it was built from. They are fetched by
+	// their own hooks, and a return to the home screen takes them from here instead of fetching again.
+	seerrRows: null,
+	externalRows: null,
+	// Set when playback ended or something was marked watched while the home screen was away, since nothing
+	// was listening for it then
+	volatileStale: false,
 	// The media bar settings the shown items were drawn for; a set drawn for other settings replaces them.
 	featuredConfigKey: null,
 	// Whose rows these are. Kept so a fresh mount can tell an account change, which has to
@@ -33,12 +40,25 @@ export const memoryCache = {
 	owner: null
 };
 
+if (typeof window !== 'undefined') {
+	window.addEventListener('moonfin:browseRefresh', () => {
+		memoryCache.volatileStale = true;
+	});
+	// The kept Seerr and outside list rows carry the request status of their titles
+	window.addEventListener('moonfin:seerrChanged', () => {
+		memoryCache.seerrRows = null;
+		memoryCache.externalRows = null;
+	});
+}
+
 // A refresh keeps the media bar unless the caller asks for it, or an account change clears everything.
 export const clearMemoryCache = ({keepFeatured = false} = {}) => {
 	memoryCache.rowData = null;
 	memoryCache.libraries = null;
 	memoryCache.timestamp = null;
 	memoryCache.rowConfigKey = null;
+	memoryCache.seerrRows = null;
+	memoryCache.externalRows = null;
 	if (keepFeatured) return;
 	memoryCache.featuredItems = null;
 	memoryCache.featuredConfigKey = null;
