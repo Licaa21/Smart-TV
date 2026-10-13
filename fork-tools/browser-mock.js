@@ -20,6 +20,12 @@ async (page) => {
 	});
 	await ctx.route('**/image.tmdb.org/**', (route) => {
 		const u = route.request().url();
+		// Studio and network logos are see-through, some white and some dark or colored, as the real ones are
+		if (/\/w185\//.test(u)) {
+			const mark = [...u].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+			const fill = ['#ffffff', '#111111', '#e50914', '#1ce783', '#0033a0'][mark % 5];
+			return route.fulfill({status: 200, contentType: 'image/svg+xml', headers: {'access-control-allow-origin': '*'}, body: `<svg xmlns="http://www.w3.org/2000/svg" width="185" height="80"><rect x="10" y="20" width="165" height="40" rx="8" fill="${fill}"/></svg>`});
+		}
 		const isBackdrop = /\/b\d+/.test(u) || /w(780|1280|300)/.test(u);
 		const label = (u.match(/\/([pb]\d+)\./) || [, 'img'])[1];
 		return route.fulfill({status: 200, contentType: 'image/svg+xml', body: svg(label, isBackdrop ? 640 : 300, isBackdrop ? 360 : 450, (label.length * 53 + n++ * 37) % 360)});
