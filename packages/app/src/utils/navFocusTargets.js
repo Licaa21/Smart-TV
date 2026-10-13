@@ -58,3 +58,16 @@ export const focusFirstContentTarget = (targets, fallbackDirection) => {
 	Spotlight.setPointerMode(false);
 	Spotlight.move(fallbackDirection);
 };
+
+// The navigation is left for the content, or entered from it. Entered from the content it goes to the Home button, which
+// is where the navigation starts, and left again it goes back to where the content was. False when there is no navigation up.
+export const toggleNavigationFocus = (navbarPosition) => {
+	// Focus can only be moved by the app once the pointer is put down
+	Spotlight.setPointerMode(false);
+	const active = document.activeElement;
+	if (active && active.closest && active.closest('[data-spotlight-id="navbar"]')) {
+		focusFirstContentTarget(SIDEBAR_CONTENT_FOCUS_TARGETS, navbarPosition === 'left' ? 'right' : 'down');
+		return true;
+	}
+	return Spotlight.focus('navbar-home') || Spotlight.focus('navbar');
+};
