@@ -79,7 +79,7 @@ jobs:
             const needsImage = tagged('ui') || has('UI');
             const needsLog = tagged('playback') || has('Playback');
 
-            const GENERIC = /^(bug|issue|issues|problem|problems|help|help me|crash|crashes|broken|error|errors|fix|please fix|question|feature|request|title|test|n\/?a|none|ui|playback|tizen|webos|seerr|jellyseerr|not working|doesn'?t work|does not work|no work)$/i;
+            const GENERIC = /^(bug|issue|issues|problem|problems|help|help me|crash|crashes|broken|error|errors|fix|please fix|question|feature|request|title|test|n\/?a|none|ui|playback|tizen|webos|xbox|seerr|jellyseerr|not working|doesn'?t work|does not work|no work)$/i;
 
             const badTitle = rest.length < MIN_TITLE || GENERIC.test(rest);
 
@@ -240,7 +240,7 @@ jobs:
               "2. Reproduce the problem. Don't close the app afterwards, closing it clears the buffer, and only the last 500 entries are kept.",
               '3. Go to **Settings > About > Debugging > View Logs** and press **Send Report**.',
               '',
-              "**Send Report** uploads to *your own* Jellyfin server, not to us, so pressing it isn't the last step. Fetch it from that server under **Administration > Logs**, where it is the newest file whose name starts with `upload_Moonfin for Tizen_` or `upload_Moonfin for webOS_`, and attach that file here.",
+              "**Send Report** uploads to *your own* Jellyfin server, not to us, so pressing it isn't the last step. Fetch it from that server under **Administration > Logs**, where it is the newest file whose name starts with `upload_Moonfin for Tizen_`, `upload_Moonfin for webOS_`, `upload_Moonfin for Fire TV_` or `upload_Moonfin for Xbox_`, and attach that file here.",
               '',
               "If the app says the server isn't accepting client logs, turn client logging on in your server dashboard and send the report again.",
               '',
