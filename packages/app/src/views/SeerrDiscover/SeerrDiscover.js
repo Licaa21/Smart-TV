@@ -18,6 +18,7 @@ import {STREAMING_NETWORKS, MOVIE_STUDIOS, SEERR_SHORTCUTS, pickShortcutBackdrop
 import {libraryIdOf} from '../../utils/seerrTarget';
 import {isScrolledAway} from '../../utils/quickReturn';
 import {focusedCardIndex, cardToRestore} from '../../utils/rowFocusMemory';
+import {rememberedRowCount, rememberRowCount} from '../../utils/rowCap';
 
 import css from './SeerrDiscover.module.less';
 
@@ -27,7 +28,11 @@ const RowContainer = SpotlightContainerDecorator({
 	restrict: 'self-first'
 }, 'div');
 
-const ITEMS_PER_PAGE = 9;
+// A row draws this many of the titles it holds, and as many more each time focus nears the last of them. Every title
+// a page brings is kept, so none is skipped, and only the drawing is spread out.
+const ITEMS_DRAWN = 9;
+// Nearer than this to the last drawn card, the next ones are drawn
+const NEAR_END = 3;
 
 let _rowConfigs;
 const getRowConfigs = () => (_rowConfigs ??= [
@@ -230,6 +235,14 @@ const DiscoverRow = memo(function DiscoverRow({
 	rowSpacing
 }) {
 	const scrollerRef = useRef(null);
+	// How many of the titles are drawn. A row that comes back, as they do after a details screen, starts where
+	// it left off, so the card focus is put back on is drawn.
+	const countKey = `discover-${config.id}`;
+	const [drawn, setDrawn] = useState(() => rememberedRowCount(countKey) ?? ITEMS_DRAWN);
+	useEffect(() => {
+		rememberRowCount(countKey, drawn);
+	}, [countKey, drawn]);
+	const visibleItems = config.type === 'media' ? items.slice(0, drawn) : items;
 	// A modern card opens up to show its details while it holds focus, which the row has to know.
 	const [focusedId, setFocusedId] = useState(null);
 	const handleBlur = useCallback((e) => {
@@ -237,11 +250,14 @@ const DiscoverRow = memo(function DiscoverRow({
 		setFocusedId(null);
 	}, []);
 
-	// Near the end of a row that can go on, the next page is asked for.
+	// Near the last drawn card the next ones are drawn, and near the last one held the next page is asked for.
 	const handleCardFocus = useCallback((info, index) => {
 		onFocusItem?.(info);
-		if (index >= items.length - 3) onLoadMore?.(config.id);
-	}, [onFocusItem, onLoadMore, items.length, config.id]);
+		if (config.type === 'media' && index >= drawn - NEAR_END) {
+			setDrawn((current) => (current < items.length ? Math.min(items.length, current + ITEMS_DRAWN) : current));
+		}
+		if (index >= items.length - NEAR_END) onLoadMore?.(config.id);
+	}, [onFocusItem, onLoadMore, items.length, config.id, config.type, drawn]);
 
 	const handleKeyDown = useCallback((e) => {
 		if (e.keyCode === KEYS.UP) {
@@ -321,7 +337,7 @@ const DiscoverRow = memo(function DiscoverRow({
 					<StudioCard key={item.id} studio={item} onSelect={onSelectStudio} onFocus={onFocusItem} />
 				));
 			default:
-				return items.map((entry, index) => (
+				return visibleItems.map((entry, index) => (
 					<HomeCard
 						key={entry.id}
 						entry={entry}
@@ -336,7 +352,7 @@ const DiscoverRow = memo(function DiscoverRow({
 					/>
 				));
 		}
-	}, [config.type, config.mediaType, items, onSelectItem, onSelectGenre, onSelectNetwork, onSelectStudio, onOpenShortcut, onFocusItem, handleCardFocus, focusedId, modern, serverUrl]);
+	}, [config.type, config.mediaType, items, visibleItems, onSelectItem, onSelectGenre, onSelectNetwork, onSelectStudio, onOpenShortcut, onFocusItem, handleCardFocus, focusedId, modern, serverUrl]);
 
 	return (
 		<div
@@ -456,7 +472,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		const paged = (id, response) => {
 			if (stale) return;
 			const results = response?.results || [];
-			put({[id]: results.slice(0, ITEMS_PER_PAGE)});
+			put({[id]: results});
 			setRowPages((prev) => ({...prev, [id]: 1}));
 			// The API returns 20 per page, so a full page means there is probably more.
 			setRowHasMore((prev) => ({...prev, [id]: results.length >= 20}));
@@ -530,7 +546,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 				setRows(prev => {
 					const existingIds = new Set((prev[rowId] || []).map(item => item.id));
 					const uniqueNew = newItems.filter(item => !existingIds.has(item.id));
-					return {...prev, [rowId]: [...(prev[rowId] || []), ...uniqueNew.slice(0, ITEMS_PER_PAGE)]};
+					return {...prev, [rowId]: [...(prev[rowId] || []), ...uniqueNew]};
 				});
 				setRowPages(prev => ({...prev, [rowId]: nextPage}));
 				setRowHasMore(prev => ({...prev, [rowId]: newItems.length >= 20}));
