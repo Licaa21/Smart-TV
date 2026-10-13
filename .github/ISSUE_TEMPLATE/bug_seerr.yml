@@ -20,6 +20,7 @@ body:
         - Tizen (Samsung)
         - webOS (LG)
         - Vega (Fire TV)
+        - Xbox
     validations:
       required: true
 

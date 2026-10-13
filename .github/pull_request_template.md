@@ -31,6 +31,7 @@ List the key changes included in this PR.
 - [ ] Tizen (Samsung)
 - [ ] webOS (LG)
 - [ ] Vega (Fire TV)
+- [ ] Xbox
 - [ ] All / Shared code
 
 ## Testing
