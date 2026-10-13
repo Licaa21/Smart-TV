@@ -225,7 +225,16 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 
 **Diagnostics and translations**
 - **Diagnostic log:** the in-app log keeps its recent non-network lines across restarts, so a report still has them after the app reopens. It also prints the commit the package was built from, why each start picked its audio track, the server's reason for not direct playing, why a media load failed, and the HLS playlist the TV refused, with the access token hidden.
-- **Romanian:** strings added by this fork are translated by hand in `packages/app/resources/ro/strings.json`, since this fork has no Weblate project. Every English string now has a Romanian one, the strings the code used but never listed are added, and dates and prices follow the app's language and not the TV's. The Series button on an episode's details reads Serial.
+- **Romanian:** strings added by this fork are translated by hand in `packages/app/resources/ro/strings.json`, since this fork has no Weblate project. Every English string now has a Romanian one, the strings the code used but never listed are added, and dates and prices follow the app's language and not the TV's. The Series button on an episode's details reads Serial. Watched reads Vizionat, and the subtitle position labels read Jos, Puțin mai sus, Mijloc and Sus. `node fork-tools/check-romanian.js` lists any string the code uses that has no English entry or no Romanian one, and is run after every merge from upstream.
+
+### Where this fork differs from upstream on purpose
+
+A merge from upstream never overwrites these. The fork keeps its own version of each:
+
+- **Channel keys in the episode browser:** CH +/- steps between seasons and the hint stays, where upstream removed both.
+- **The Seerr Discover screen:** every card is drawn with Home's cards and settings, rows rest like Home's, and every title of a page is kept. The request status, one card per request and the titled TMDB thumbnail were taken from upstream's version.
+- **Studio and network tiles, and backdrops behind tiles:** one shared tile on Home and on the Seerr screen, and no backdrop behind a studio, network, genre or shortcut tile.
+- **Home kept on a return:** Back from a title brings Home back as it was left instead of building and loading it again.
 
 ### Branches and updating
 
@@ -234,3 +243,5 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 - `daily` is `main` merged with `implement`, and it is only used to build the app for daily use. Nothing is committed on it by hand.
 - `feature/episodeselector-skipperlayout-accentcolors` is the one change proposed upstream (the in-player episode browser, [#494](https://github.com/Moonfin-Client/Smart-TV/pull/494)).
 - To pick up upstream's latest, run `bash fork-tools/update-daily.sh` on `daily`, then `bash fork-tools/build-daily-wgt.sh`. The Tizen package is the regular build, named after the upstream one with `_Lica_Fork` added, for example `Moonfin_Tizen_Regular_v2.10.0_Lica_Fork.wgt`.
+- The scripts in `fork-tools/` are `update-daily.sh`, `build-daily-wgt.sh`, `link-modules.ps1` (links a branch folder's dependencies to the ones in `main`), `check-romanian.js` and `browser-mock.js` (a fake Jellyfin server with a library of 100 movies, and Seerr, for looking at screens in a browser).
+- Each branch folder has a `CLAUDE.md` (ignored by git) with the working rules and what a merge must keep, and `implement` has a `TODO.md` with what is planned next. Every item in it is asked about before it is built.
