@@ -1,4 +1,4 @@
-import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
+import {useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo} from 'react';
 import {isKidsMode, kidsModeRows, mergesContinueWatchingNextUp} from '../../utils/kidsMode';
 import {withoutBlocked} from '../../utils/parentalFilter';
 import useParentalFilter from '../../hooks/useParentalFilter';
@@ -177,7 +177,8 @@ const Browse = ({
 		seerrAuthenticated,
 		recommendationsSupported,
 		getItemServerUrl,
-		homeRowsConfig
+		homeRowsConfig,
+		reuse: returning
 	});
 
 	// Filtered here rather than where the bar loads, so slides cached before a rating was blocked
@@ -354,6 +355,23 @@ const Browse = ({
 			setBrowseMode('rows');
 		}
 	}, [showFeaturedBar, setBrowseMode]);
+
+	// A return from a title lands on the row and card that were left in the first frame, since the rows came back with
+	// it. If anything is missing, the effect below does it as the rows arrive.
+	useLayoutEffect(() => {
+		if (!returning || !lastFocusState || isLoading || !hasFocusableRow) return;
+		const {rowId, cardIndex} = lastFocusState;
+		const index = rowId ? filteredRowsRef.current.findIndex((row) => row.id === rowId && !row.isPlaceholder) : -1;
+		if (index < 0) return;
+		restRowScroll(index);
+		if (!focusRow(index, cardIndex)) return;
+		initialFocusSetRef.current = true;
+		// Does nothing unless the media bar settings changed while away
+		fetchFreshFeaturedItems();
+		if (memoryCache.volatileStale) refreshVolatileData(true);
+		memoryCache.volatileStale = false;
+		lastFocusState = null;
+	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 	useEffect(() => {
 		if (!isVisible) {

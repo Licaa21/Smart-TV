@@ -443,6 +443,12 @@ const refreshItemVia = (send) => (itemId, {recursive, replaceAllMetadata, replac
 	return send(`/Items/${itemId}/Refresh${params.length ? `?${params.join('&')}` : ''}`, {method: 'POST'});
 };
 
+// The favorite and playlist rows on the home screen are built from these, and a kept home screen is told to drop them
+const homeRowsChanged = (result) => {
+	if (typeof window !== 'undefined') window.dispatchEvent(new window.CustomEvent('moonfin:homeRowsChanged'));
+	return result;
+};
+
 // What a change the server has taken does to the item's user data, published so every screen
 // still holding the item can repaint it.
 const publishUserData = (itemId, patch) => (response) => {
@@ -684,7 +690,7 @@ export const api = {
 
 	setFavorite: (itemId, isFavorite) => request(userRoutes.favorite(itemId), {
 		method: isFavorite ? 'POST' : 'DELETE'
-	}).then(publishUserData(itemId, {IsFavorite: isFavorite})),
+	}).then(publishUserData(itemId, {IsFavorite: isFavorite})).then(homeRowsChanged),
 
 	setWatched: (itemId, watched) => request(userRoutes.played(itemId), {
 		method: watched ? 'POST' : 'DELETE'
@@ -888,7 +894,7 @@ export const api = {
 	movePlaylistItem: (playlistId, itemId, newIndex) =>
 		request(`/Playlists/${playlistId}/Items/${itemId}/Move/${newIndex}`, {
 			method: 'POST'
-		}),
+		}).then(homeRowsChanged),
 
 	getPlaylists: (sortBy = 'SortName', sortOrder = 'Ascending') =>
 		request(`${userRoutes.items()}IncludeItemTypes=Playlist&Recursive=true&SortBy=${sortBy}&SortOrder=${sortOrder}`),
@@ -901,17 +907,17 @@ export const api = {
 				Ids: itemIds,
 				UserId: currentUser
 			}
-		}),
+		}).then(homeRowsChanged),
 
 	addToPlaylist: (playlistId, itemIds) =>
 		request(`/Playlists/${playlistId}/Items?Ids=${itemIds.join(',')}`, {
 			method: 'POST'
-		}),
+		}).then(homeRowsChanged),
 
 	removeFromPlaylist: (playlistId, entryIds) =>
 		request(`/Playlists/${playlistId}/Items?EntryIds=${entryIds.join(',')}`, {
 			method: 'DELETE'
-		}),
+		}).then(homeRowsChanged),
 
 	createCollection: createCollectionVia(request),
 	addToCollection: collectionItemsVia(request, 'POST'),
@@ -1182,7 +1188,7 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 
 		setFavorite: (itemId, isFavorite) => serverRequest(serverUserRoutes.favorite(itemId), {
 			method: isFavorite ? 'POST' : 'DELETE'
-		}).then(publishUserData(itemId, {IsFavorite: isFavorite})),
+		}).then(publishUserData(itemId, {IsFavorite: isFavorite})).then(homeRowsChanged),
 
 		setWatched: (itemId, watched) => serverRequest(serverUserRoutes.played(itemId), {
 			method: watched ? 'POST' : 'DELETE'
@@ -1237,7 +1243,7 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		movePlaylistItem: (playlistId, itemId, newIndex) =>
 			serverRequest(`/Playlists/${playlistId}/Items/${itemId}/Move/${newIndex}`, {
 				method: 'POST'
-			}),
+			}).then(homeRowsChanged),
 
 		getPlaylists: (sortBy = 'SortName', sortOrder = 'Ascending') =>
 			serverRequest(`${serverUserRoutes.items()}IncludeItemTypes=Playlist&Recursive=true&SortBy=${sortBy}&SortOrder=${sortOrder}`),
@@ -1250,12 +1256,12 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 					Ids: itemIds,
 					UserId: userId
 				}
-			}),
+			}).then(homeRowsChanged),
 
 		addToPlaylist: (playlistId, itemIds) =>
 			serverRequest(`/Playlists/${playlistId}/Items?Ids=${itemIds.join(',')}`, {
 				method: 'POST'
-			}),
+			}).then(homeRowsChanged),
 
 		createCollection: createCollectionVia(serverRequest),
 		addToCollection: collectionItemsVia(serverRequest, 'POST'),
@@ -1264,7 +1270,7 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		removeFromPlaylist: (playlistId, entryIds) =>
 			serverRequest(`/Playlists/${playlistId}/Items?EntryIds=${entryIds.join(',')}`, {
 				method: 'DELETE'
-			}),
+			}).then(homeRowsChanged),
 
 		getSpecialFeatures: (itemId) =>
 			serverRequest(serverUserRoutes.extras(itemId, 'SpecialFeatures')),

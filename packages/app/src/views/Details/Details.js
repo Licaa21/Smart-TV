@@ -795,6 +795,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	const handleConfirmDelete = useCallback(async () => {
 		try {
 			await effectiveApi.deleteItem(item.Id);
+			// the kept home screen may hold the item
+			window.dispatchEvent(new CustomEvent('moonfin:homeRowsChanged'));
 			closeDeleteDialog();
 			onItemDeleted?.();
 		} catch {

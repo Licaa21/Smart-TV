@@ -25,6 +25,22 @@ const emptyRowAfter = (label, err) => {
 	return {Items: []};
 };
 
+// What the rows are loaded for. A screen kept from before is only taken back when it was loaded for the same.
+const loadSignatureOf = (settings, homeRowsConfig, unifiedMode, seerrEnabled, seerrAuthenticated, recommendationsSupported) => JSON.stringify([
+		settings.featuredContentType, settings.featuredItemCount, settings.displayFavoritesRows, settings.displayCollectionsRows,
+		settings.displayGenresRows, settings.displayPlaylistsRows, settings.favoritesRowSortBy, settings.collectionsRowSortBy,
+		settings.genresRowSortBy, settings.genresRowItemFilter, settings.playlistsRowSortBy, settings.audioRowsSortBy,
+		settings.favoritesRowSortOrder, settings.collectionsRowSortOrder, settings.genresRowSortOrder,
+		settings.playlistsRowSortOrder, settings.audioRowsSortOrder, settings.collectionsRowShowEpisodes, settings.uiLanguage,
+		settings.pluginSections, settings.mergeRecentRowsByType, settings.mergeContinueWatchingNextUp, settings.kidsModeEnabled,
+		settings.nextUpMaxDays, settings.sinceYouWatchedSource, settings.sinceYouWatchedSourceItem,
+		settings.sinceYouWatchedSourceType, settings.sinceYouWatchedIncludeWatched, settings.tmdbApiKey,
+		settings.rewatchIncludeMovies, settings.rewatchIncludeShows, settings.rewatchIncludeCollections, settings.rewatchSortBy,
+		settings.displayAudioRows, settings.displayRewatchRow, settings.displayStudiosRows, settings.studiosRowSortBy,
+		settings.studiosRowSortOrder, settings.playlistsRowShowEpisodes, settings.recentlyReleasedSeriesType,
+		settings.featuredBarStyle, homeRowsConfig, unifiedMode, seerrEnabled, seerrAuthenticated, recommendationsSupported
+	]);
+
 // Everything the home screen shows and how it gets there. Rows come from three places, the
 // in memory cache, the stored cache and the server, and each one dispatches as it arrives so
 // the screen fills in rather than waiting for the slowest.
@@ -39,9 +55,47 @@ const useBrowseData = ({
 	seerrAuthenticated,
 	recommendationsSupported,
 	getItemServerUrl,
-	homeRowsConfig
+	homeRowsConfig,
+	reuse = false
 }) => {
-	const [state, dispatch] = useReducer(browseReducer, browseInitialState);
+	const rowsOwner = `${accessToken}:${userId}`;
+	// A return from a title comes back to the screen as it was left, rows and media bar included, in the first frame
+	// and without loading anything. The rows only came back one wave at a time before, which is what the viewer saw.
+	// Unified mode lets the home screen show before its latest rows are in, and a screen kept then would lack them
+	const unifiedLatestDoneRef = useRef(false);
+	// Asks for the kept screen to be taken again from what is on screen
+	const [snapshotTick, setSnapshotTick] = useState(0);
+	// Set when a favorite or a playlist changed while this screen was up, since what it shows is then out of date
+	const rowsStaleRef = useRef(false);
+	const keptRef = useRef(undefined);
+	if (keptRef.current === undefined) {
+		const screen = memoryCache.screen;
+		const signature = screen && reuse ? loadSignatureOf(settings, homeRowsConfig, unifiedMode, seerrEnabled, seerrAuthenticated, recommendationsSupported) : null;
+		keptRef.current = screen && reuse && screen.owner === rowsOwner && screen.signature === signature ? screen : null;
+		// A screen taken back already has its latest rows
+		if (keptRef.current) unifiedLatestDoneRef.current = true;
+	}
+	const [state, dispatch] = useReducer(browseReducer, undefined, () => (keptRef.current ? {
+		...browseInitialState,
+		isLoading: false,
+		browseMode: 'rows',
+		allRowData: keptRef.current.rowData,
+		featuredItems: keptRef.current.featuredItems
+	} : browseInitialState));
+
+	// Once everything has arrived, the screen is kept for the next return
+	useEffect(() => {
+		memoryCache.screen = !state.isLoading && state.pendingSections.length === 0 && state.allRowData.length > 0 &&
+			(!unifiedMode || unifiedLatestDoneRef.current) && !rowsStaleRef.current
+			? {
+				owner: rowsOwner,
+				signature: loadSignatureOf(settings, homeRowsConfig, unifiedMode, seerrEnabled, seerrAuthenticated, recommendationsSupported),
+				rowData: state.allRowData,
+				featuredItems: state.featuredItems
+			}
+			: null;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [state.isLoading, state.pendingSections, state.allRowData, state.featuredItems, rowsOwner, snapshotTick]);
 	const [reloadKey, setReloadKey] = useState(0);
 
 	const cacheOwner = useMemo(() => ({serverUrl, userId}), [serverUrl, userId]);
@@ -206,18 +260,32 @@ const useBrowseData = ({
 		const handleBrowseRefresh = (e) => {
 			clearMemoryCache({keepFeatured: !e?.detail?.featured});
 			if (e?.detail?.libraries) clearBrowseCache().then(() => setReloadKey((key) => key + 1));
+			// The screen on view is still the right one for a refresh that changes nothing in it
+			else if (!e?.detail?.featured) setSnapshotTick((tick) => tick + 1);
+		};
+
+		const handleHomeRowsChanged = () => {
+			rowsStaleRef.current = true;
 		};
 
 		window.addEventListener('moonfin:browseRefresh', handleBrowseRefresh);
+		window.addEventListener('moonfin:homeRowsChanged', handleHomeRowsChanged);
 		return () => {
 			window.removeEventListener('moonfin:browseRefresh', handleBrowseRefresh);
+			window.removeEventListener('moonfin:homeRowsChanged', handleHomeRowsChanged);
 		};
 	}, []);
 
 	useEffect(() => cancelPendingCacheSave, []);
 
 	useEffect(() => {
+		// The screen came back from memory, so the first run has nothing to load
+		if (keptRef.current) {
+			keptRef.current = null;
+			return undefined;
+		}
 		let cancelled = false;
+		rowsStaleRef.current = false;
 
 		// Loading cant clear until the media bar has something, or the first focus lands
 		// on a row rather than on the bar. Items we already remember do that on the spot,
@@ -439,6 +507,7 @@ const useBrowseData = ({
 				});
 
 				if (unifiedMode) {
+					unifiedLatestDoneRef.current = false;
 					const latestResults = await connectionPool.getLatestPerLibraryFromAllServers(
 						latestItemsExcludes,
 						EXCLUDED_COLLECTION_TYPES
@@ -485,6 +554,7 @@ const useBrowseData = ({
 					dispatch({type: 'APPEND_ROWS', rows: newRows});
 					memoryCache.rowData = [...rowData, ...newRows];
 					memoryCache.timestamp = Date.now();
+					unifiedLatestDoneRef.current = true;
 					dispatch({type: 'SET_LOADING', value: false});
 					return;
 				}
@@ -579,6 +649,13 @@ const useBrowseData = ({
 		settings.rewatchIncludeShows,
 		settings.rewatchIncludeCollections,
 		settings.rewatchSortBy,
+		settings.displayAudioRows,
+		settings.displayRewatchRow,
+		settings.displayStudiosRows,
+		settings.studiosRowSortBy,
+		settings.studiosRowSortOrder,
+		settings.playlistsRowShowEpisodes,
+		settings.recentlyReleasedSeriesType,
 		cacheOwner,
 		fetchFreshFeaturedItems,
 		unifiedMode,
