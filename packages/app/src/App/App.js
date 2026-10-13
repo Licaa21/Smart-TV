@@ -23,6 +23,7 @@ import serverLogger from '../services/serverLogger';
 import * as remoteControl from '../services/remoteControl';
 import * as serverSocket from '../services/serverSocket';
 import {isBackKey, isChannelMenuKey, KEYS} from '../utils/keys';
+import {toggleNavigationFocus} from '../utils/navFocusTargets';
 import {applyPerfTier} from '../utils/perfTier';
 import {isLiveTvChannel, isLiveTvLibrary} from '../utils/liveTvLibrary';
 import {OLED_TUNING} from '../utils/oledMode';
@@ -815,14 +816,23 @@ const AppContent = (props) => {
 			if (e.keyCode === KEYS.BACKSPACE && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
 				return;
 			}
-			// Not over a dialog, which would be left open on top of the player. An open item menu is closed by the press,
-			// the way Back would, and the player waits for the next one.
-			if (isChannelMenuKey(e) && playerReturnRef.current && !isPinGateActive && !setupWizardActive && !showExitDialog &&
-				!syncPlayDialogOpen && !updateInfo && !showAccountModal && !showServerMessages && !showSettingsPanel &&
-				!itemMenuBackRef.current?.() && handleReturnToPlayer()) {
-				e.preventDefault();
-				e.stopPropagation();
-				return;
+			// Not over a dialog, which would be left open on top of what the press goes to. An open item menu is closed by
+			// the press, the way Back would, and what it goes to waits for the next one. A screen reached from the player
+			// goes straight back to it. On Home it moves focus between the cards and the navigation, so the navigation is
+			// reached from any row without Left or Up.
+			if (isChannelMenuKey(e) && !isPinGateActive && !setupWizardActive && !showExitDialog &&
+				!syncPlayDialogOpen && !updateInfo && !showAccountModal && !showServerMessages && !showSettingsPanel) {
+				if (itemMenuBackRef.current?.()) {
+					e.preventDefault();
+					e.stopPropagation();
+					return;
+				}
+				if ((playerReturnRef.current && handleReturnToPlayer()) ||
+					(panelIndex === PANELS.BROWSE && !showScreensaver && toggleNavigationFocus(settings.navbarPosition))) {
+					e.preventDefault();
+					e.stopPropagation();
+					return;
+				}
 			}
 			if (isBackKey(e)) {
 				e.preventDefault();
@@ -900,7 +910,7 @@ const AppContent = (props) => {
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [panelIndex, handleBack, handleReturnToPlayer, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay]);
+	}, [panelIndex, handleBack, handleReturnToPlayer, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition]);
 
 	const handleLoggedIn = useCallback(() => {
 		setPanelHistory([]);
