@@ -4,6 +4,7 @@ import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDeco
 import Spotlight from '@enact/spotlight';
 import $L from '@enact/i18n/$L';
 import MediaCard, {ModernMediaCard} from '../../components/MediaCard';
+import LogoTile from '../../components/LogoTile';
 import {useAuth} from '../../context/AuthContext';
 import {useSeerr} from '../../context/SeerrContext';
 import {pointerHover} from '../../utils/focusScroll';
@@ -185,13 +186,7 @@ const NetworkCard = memo(function NetworkCard({network, onSelect, onFocus}) {
 
 	const handleFocus = useCallback(() => onFocus?.(null), [onFocus]);
 
-	return (
-		<SpottableDiv className={css.networkCard} onClick={handleClick} onFocus={handleFocus}>
-			<div className={css.networkLogoContainer}>
-				<img className={css.networkLogo} src={logoUrl} alt={network.name} loading="lazy" />
-			</div>
-		</SpottableDiv>
-	);
+	return <LogoTile url={logoUrl} name={network.name} onClick={handleClick} onFocus={handleFocus} />;
 });
 
 const StudioCard = memo(function StudioCard({studio, onSelect, onFocus}) {
@@ -203,13 +198,7 @@ const StudioCard = memo(function StudioCard({studio, onSelect, onFocus}) {
 
 	const handleFocus = useCallback(() => onFocus?.(null), [onFocus]);
 
-	return (
-		<SpottableDiv className={css.networkCard} onClick={handleClick} onFocus={handleFocus}>
-			<div className={css.networkLogoContainer}>
-				<img className={css.networkLogo} src={logoUrl} alt={studio.name} loading="lazy" />
-			</div>
-		</SpottableDiv>
-	);
+	return <LogoTile url={logoUrl} name={studio.name} onClick={handleClick} onFocus={handleFocus} />;
 });
 
 // Memoized row component

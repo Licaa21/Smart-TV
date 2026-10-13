@@ -4,6 +4,7 @@ import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDeco
 import Spotlight from '@enact/spotlight';
 import {KEYS} from '../../utils/keys';
 import {useSettings} from '../../context/SettingsContext';
+import LogoTile from '../LogoTile';
 
 import css from './SeerrTileRow.module.less';
 
@@ -32,24 +33,35 @@ const TileCard = memo(function TileCard({item, cardType, spotlightId, onSelect, 
 		focusTimeoutRef.current = setTimeout(() => onFocusItem?.(item), FOCUS_SETTLE_MS);
 	}, [item, onFocusItem]);
 
-	const isLogo = cardType === 'logo';
-	const image = isLogo ? item._externalLogoUrl : item._externalTileUrl;
+	// Studio and network logos are the same tile as on the Seerr screen
+	if (cardType === 'logo') {
+		return (
+			<LogoTile
+				url={item._externalLogoUrl}
+				name={item.Name}
+				spotlightId={spotlightId}
+				onClick={handleClick}
+				onFocus={handleFocus}
+				onSpotlightLeft={onSpotlightLeft}
+				onSpotlightRight={onSpotlightRight}
+			/>
+		);
+	}
+	const image = item._externalTileUrl;
 
 	return (
 		<SpottableDiv
-			className={`${css.tile} ${isLogo ? css.logoTile : css.genreTile}`}
+			className={`${css.tile} ${css.genreTile}`}
 			spotlightId={spotlightId}
 			onClick={handleClick}
 			onFocus={handleFocus}
 			onSpotlightLeft={onSpotlightLeft}
 			onSpotlightRight={onSpotlightRight}
 		>
-			{image && <img className={isLogo ? css.logo : css.backdrop} src={image} alt={item.Name} loading="lazy" />}
-			{!isLogo && (
-				<div className={css.overlay}>
-					<span className={css.label}>{item.Name}</span>
-				</div>
-			)}
+			{image && <img className={css.backdrop} src={image} alt={item.Name} loading="lazy" />}
+			<div className={css.overlay}>
+				<span className={css.label}>{item.Name}</span>
+			</div>
 		</SpottableDiv>
 	);
 });
