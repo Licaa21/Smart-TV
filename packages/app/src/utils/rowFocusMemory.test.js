@@ -1,4 +1,4 @@
-import {focusedCardIndex, cardToRestore, focusedRowIndex, cardIndexNearX, rowEntryCardIndex} from './rowFocusMemory';
+import {focusedCardIndex, cardToRestore, focusedRowIndex, rowEntryCardIndex} from './rowFocusMemory';
 
 const buildRow = (count, spotlightId = 'row-0') => {
 	const row = document.createElement('div');
@@ -148,54 +148,13 @@ describe('going back to a row that was rebuilt', () => {
 	});
 });
 
-// jsdom lays nothing out, so the cards are given the positions they would have
-const place = (row, lefts) => {
-	Array.prototype.forEach.call(row.children, (card, i) => {
-		card.getBoundingClientRect = () => ({left: lefts[i]});
-	});
-};
-
-describe('cardIndexNearX', () => {
-	it('picks the card whose left edge is nearest', () => {
-		const row = buildRow(4);
-		place(row, [60, 300, 540, 780]);
-		expect(cardIndexNearX('row-0', 70)).toBe(0);
-		expect(cardIndexNearX('row-0', 330)).toBe(1);
-		expect(cardIndexNearX('row-0', 900)).toBe(3);
-	});
-
-	it('is -1 for a row that is not drawn', () => {
-		expect(cardIndexNearX('row-9', 60)).toBe(-1);
-	});
-});
-
 describe('rowEntryCardIndex', () => {
 	it('leaves it to the row when the card is remembered', () => {
-		buildRow(3);
-		expect(rowEntryCardIndex({rememberRowCard: true}, 'row-0', null)).toBeUndefined();
-		expect(rowEntryCardIndex({}, 'row-0', null)).toBeUndefined();
+		expect(rowEntryCardIndex({rememberRowCard: true})).toBeUndefined();
+		expect(rowEntryCardIndex({})).toBeUndefined();
 	});
 
 	it('starts at the first card when the card is not remembered', () => {
-		expect(rowEntryCardIndex({rememberRowCard: false}, 'row-0', null)).toBe(0);
-	});
-
-	it('lands on the same spot on screen when the card is not remembered and it is asked for', () => {
-		const row = buildRow(4);
-		place(row, [60, 300, 540, 780]);
-		const active = {getBoundingClientRect: () => ({left: 520})};
-		expect(rowEntryCardIndex({rowEntryKeepsPosition: true, rememberRowCard: false}, 'row-0', active)).toBe(2);
-	});
-
-	it('keeps the remembered card when it is remembered, whatever the position setting says', () => {
-		const row = buildRow(4);
-		place(row, [60, 300, 540, 780]);
-		const active = {getBoundingClientRect: () => ({left: 520})};
-		expect(rowEntryCardIndex({rowEntryKeepsPosition: true, rememberRowCard: true}, 'row-0', active)).toBeUndefined();
-	});
-
-	it('starts at the first card when the row is not drawn', () => {
-		const active = {getBoundingClientRect: () => ({left: 520})};
-		expect(rowEntryCardIndex({rowEntryKeepsPosition: true, rememberRowCard: false}, 'row-9', active)).toBe(0);
+		expect(rowEntryCardIndex({rememberRowCard: false})).toBe(0);
 	});
 });

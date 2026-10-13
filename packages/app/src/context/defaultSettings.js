@@ -128,7 +128,6 @@ export const defaultSettings = {
 	collectionsRowShowEpisodes: false,
 	fullScreenRows: false,
 	rememberRowCard: true,
-	rowEntryKeepsPosition: false,
 	showShuffleButton: true,
 	shuffleContentType: 'both',
 	showGenresButton: true,

@@ -604,7 +604,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 	// Focus moves into a row by the settings: the card the row remembers, its first card, or the one at the same spot
 	const enterRow = useCallback((targetIndex) => {
 		const rowId = rowSpotlightId(targetIndex);
-		const index = rowEntryCardIndex(settings, rowId, document.activeElement);
+		const index = rowEntryCardIndex(settings);
 		const card = typeof index === 'number' ? cardToRestore(rowId, index) : null;
 		if (!card || !Spotlight.focus(card)) Spotlight.focus(rowId);
 	}, [settings]);
