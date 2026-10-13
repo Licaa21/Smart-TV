@@ -369,7 +369,7 @@ const Browse = ({
 			}
 			return;
 		}
-		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current, `row-${targetIndex}`, document.activeElement));
+		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current));
 	}, [showFeaturedBar, settings.navbarPosition, scrollToRow, setBrowseMode, focusableRowFrom]);
 
 	filteredRowsRef.current = filteredRows;
@@ -384,7 +384,7 @@ const Browse = ({
 	const handleNavigateDown = useCallback((fromRowIndex) => {
 		const targetIndex = focusableRowFrom(fromRowIndex + 1, 1);
 		if (targetIndex < 0) return;
-		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current, `row-${targetIndex}`, document.activeElement));
+		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current));
 	}, [scrollToRow, focusableRowFrom]);
 
 	useEffect(() => {
@@ -612,7 +612,7 @@ const Browse = ({
 
 	const handleNavigateDownFromFeatured = useCallback(() => {
 		setBrowseMode('rows');
-		const entry = rowEntryCardIndex(settingsRef.current, `row-${focusableRowFrom(0, 1)}`, document.activeElement);
+		const entry = rowEntryCardIndex(settingsRef.current);
 		setTimeout(() => {
 			scrollToRow(focusableRowFrom(0, 1), true, entry);
 		}, TRANSITION_DELAY_MS);
@@ -625,7 +625,7 @@ const Browse = ({
 		const handler = () => {
 			const top = focusableRowFrom(0, 1);
 			if (browseMode === 'featured' || focusedRowIndex(document.activeElement) === top) return false;
-			scrollToRow(top, true, rowEntryCardIndex(settingsRef.current, `row-${top}`, document.activeElement));
+			scrollToRow(top, true, rowEntryCardIndex(settingsRef.current));
 			return true;
 		};
 		backHandlerRef.current = handler;
