@@ -125,11 +125,18 @@
 	flex: 1;
 	overflow-y: auto;
 	overflow-x: hidden;
-	padding-bottom: 60px;
 	scrollbar-width: none;
 
 	&::-webkit-scrollbar {
 		display: none;
+	}
+
+	// Scroll past the last row, as Home does, so that it can rest at the top like the others. As padding this
+	// would set a floor under the height of the list, so the room is scroll content instead.
+	&::after {
+		content: '';
+		display: block;
+		height: 60vh;
 	}
 }
 

@@ -83,17 +83,27 @@
 	height: 180px;
 }
 
+// The studio and network logos are the same as on the Seerr screen: white on a pale tile that comes up
+// when it is focused. The logos are dark on their own and cannot be read on the dark surface.
 .logoTile {
-	width: 220px;
-	height: 132px;
+	width: 280px;
+	height: 160px;
 	display: -webkit-flex;
 	display: flex;
 	-webkit-align-items: center;
 	align-items: center;
 	-webkit-justify-content: center;
 	justify-content: center;
-	padding: 24px;
+	padding: 30px;
 	box-sizing: border-box;
+	background: rgba(255, 255, 255, 0.08);
+	opacity: 0.7;
+
+	&:focus {
+		transform: scale(1.08) translateZ(0);
+		background: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.15);
+		opacity: 1;
+	}
 }
 
 .backdrop {
@@ -106,6 +116,9 @@
 	max-width: 100%;
 	max-height: 100%;
 	object-fit: contain;
+	-webkit-filter: brightness(0) invert(1);
+	filter: brightness(0) invert(1);
+	opacity: 0.9;
 }
 
 .overlay {

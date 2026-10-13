@@ -1,6 +1,7 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
 
+import {memoryCache} from './browseCache';
 import {getExternalHomeRowConfigs, fetchExternalPresetRow, fetchCustomHomeRow, fetchCalendarRows, buildSeasonalRow} from '../../utils/externalHomeRows';
 import {fetchSeasonalRow} from '../../services/externalRowsApi';
 import {resolveItemsByProviderIds} from '../../services/jellyfinApi';
@@ -11,9 +12,11 @@ import {resolveDeviceCountry} from '../../utils/deviceCountry';
 // Radarr and Sonarr calendars. Items arrive as provider ids, so every row is resolved against
 // the local library first: what the server owns becomes playable, the rest falls back to Seerr.
 // The rows still on their way come back as [pending], so they can hold their place.
-const useExternalRows = ({settings, homeRows, kidsMode}) => {
-	const [externalRows, setExternalRows] = useState([]);
+// A return to the home screen takes the rows it left from memory, and does not fetch and resolve them again.
+const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = ''}) => {
+	const [externalRows, setExternalRows] = useState(() => (reuse && memoryCache.externalRows?.owner === owner ? memoryCache.externalRows.rows : []));
 	const [pending, setPending] = useState([]);
+	const reuseRef = useRef(reuse);
 
 	useEffect(() => {
 		if (!settings.useMoonfinPlugin) {
@@ -37,9 +40,24 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 			return undefined;
 		}
 
+		const mergedCalendars = radarrEnabled && sonarrEnabled && settings.mergeRadarrSonarrCalendars;
+		// Everything the fetch reads, so that rows made for other settings are not taken back
+		const key = JSON.stringify([
+			enabledPresets, customRows, radarrEnabled, sonarrEnabled, mergedCalendars, seasonalEnabled,
+			settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays,
+			settings.radarrCalendarShowCinema, settings.radarrCalendarShowDigital, settings.radarrCalendarShowPhysical,
+			settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo
+		]);
+		const reusing = reuseRef.current && memoryCache.externalRows?.key === key && memoryCache.externalRows.owner === owner;
+		reuseRef.current = false;
+		if (reusing) {
+			setExternalRows(memoryCache.externalRows.rows);
+			setPending([]);
+			return undefined;
+		}
+
 		let cancelled = false;
 		const presetConfigs = getExternalHomeRowConfigs();
-		const mergedCalendars = radarrEnabled && sonarrEnabled && settings.mergeRadarrSonarrCalendars;
 		setPending([
 			...enabledPresets
 				.map((id) => presetConfigs.find((c) => c.id === id))
@@ -130,7 +148,9 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 				}
 
 				if (!cancelled) {
-					setExternalRows([...presetRows, ...builtCustomRows, seasonalRow, ...resolvedCalendarRows].filter(Boolean));
+					const built = [...presetRows, ...builtCustomRows, seasonalRow, ...resolvedCalendarRows].filter(Boolean);
+					memoryCache.externalRows = {key, owner, rows: built};
+					setExternalRows(built);
 				}
 			} catch (err) {
 				console.warn('[Browse] Failed to fetch and resolve external rows:', err);
@@ -145,7 +165,7 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 		settings.seasonalRowEnabled, settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays,
 		settings.mergeRadarrSonarrCalendars,
 		settings.radarrCalendarShowCinema, settings.radarrCalendarShowDigital, settings.radarrCalendarShowPhysical,
-		settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo]);
+		settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo, owner]);
 
 	return {rows: externalRows, pending};
 };

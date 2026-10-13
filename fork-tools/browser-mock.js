@@ -51,8 +51,14 @@ async (page) => {
 		if (path.startsWith('/Moonfin/') ) return json(route, {});
 		if (path === '/System/Info/Public') return json(route, {Id: 'srv1', ServerName: 'Mock', Version: '10.10.0', ProductName: 'Jellyfin Server'});
 		if (/^\/Users\/[^/]+$/.test(path)) return json(route, {Id: 'u1', Name: 'tester', ServerId: 'srv1', Configuration: {}, Policy: {IsAdministrator: true}});
-		if (path.startsWith('/Users/') && path.includes('/Views') || path === '/UserViews') return json(route, {Items: [], TotalRecordCount: 0});
-		if (/Items|Shows|Persons|Genres|Studios|Artists|Playlists|Collections|Sessions/.test(path)) return json(route, {Items: [], TotalRecordCount: 0});
+		if (path.includes('/Images/')) return route.fulfill({status: 200, contentType: 'image/svg+xml', headers: {'access-control-allow-origin': '*'}, body: svg('lib', 300, 450, (path.length * 41) % 360)});
+		if (path.startsWith('/Users/') && path.includes('/Views') || path === '/UserViews') return json(route, {Items: [{Id: 'lib1', Name: 'Movies', Type: 'CollectionFolder', CollectionType: 'movies', ImageTags: {Primary: 'x'}}], TotalRecordCount: 1});
+		// A library of movies, so the home rows have cards to move about. Latest answers with a bare list.
+		if (/Items|Shows|Sessions/.test(path)) {
+			const items = Array.from({length: 100}, (_, i) => ({Id: 'm' + i, Name: 'Library Movie ' + i, Type: 'Movie', ServerId: 'srv1', ProductionYear: 2000 + i, RunTimeTicks: 72000000000, ImageTags: {Primary: 'p'}, BackdropImageTags: ['b'], UserData: {Played: false}}));
+			return json(route, /Latest/.test(path) ? items : {Items: items, TotalRecordCount: items.length});
+		}
+		if (/Persons|Genres|Studios|Artists|Playlists|Collections/.test(path)) return json(route, {Items: [], TotalRecordCount: 0});
 		return json(route, {});
 	});
 	await page.goto('http://127.0.0.1:8123/');

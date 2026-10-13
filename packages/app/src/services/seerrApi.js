@@ -697,7 +697,13 @@ export const getMoonfinMediaBar = async (serverUrl, token, profile = 'tv') => {
 };
 
 const request = async (endpoint, options = {}) => {
-	return moonfinRequest(endpoint, options);
+	const result = await moonfinRequest(endpoint, options);
+	// A request or a watchlist change alters what the cards of Seerr rows say, and the home screen keeps those rows
+	// for a return, so it is told to fetch them again
+	if (options.method && options.method !== 'GET' && typeof window !== 'undefined') {
+		window.dispatchEvent(new window.CustomEvent('moonfin:seerrChanged'));
+	}
+	return result;
 };
 
 export const getUser = async () => {

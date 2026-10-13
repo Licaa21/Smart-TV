@@ -28,6 +28,8 @@ import BackdropLayer from '../../components/BackdropLayer';
 import {FocusBackdrop} from '../../components/ScreenBackdrop';
 import useBrowseData from './useBrowseData';
 import useSeerrRows from './useSeerrRows';
+import {isSeerrTile} from '../../utils/seerrHomeRows';
+import {memoryCache} from './browseCache';
 import useExternalRows from './useExternalRows';
 import useMediaPreview from './useMediaPreview';
 import {buildBrowseRows, sameRowList} from './buildBrowseRows';
@@ -79,13 +81,19 @@ const Browse = ({
 	const {isEnabled: seerrEnabled, isAuthenticated: seerrAuthenticated, user: seerrUser, pluginInfo} = useSeerr();
 	const recommendationsSupported = pluginInfo?.recommendationsSupported === true;
 	const seerrUserId = seerrUser?.seerrUserId;
+	// Home is built again on the way back from a title, with a place to return to. It then takes the rows it left
+	// as they were, since fetching them again brings them back late and different.
+	const [returning] = useState(() => lastFocusState !== null);
+	const homeOwner = `${accessToken}:${user?.Id}`;
 	const {rows: seerrRows, pending: seerrPending} = useSeerrRows({
 		seerrEnabled,
 		seerrAuthenticated,
 		seerrUserId,
-		homeRows: homeRowsConfig
+		homeRows: homeRowsConfig,
+		reuse: returning,
+		owner: homeOwner
 	});
-	const {rows: externalRows, pending: externalPending} = useExternalRows({settings, homeRows: homeRowsConfig, kidsMode});
+	const {rows: externalRows, pending: externalPending} = useExternalRows({settings, homeRows: homeRowsConfig, kidsMode, reuse: returning, owner: homeOwner});
 	const pendingRows = useMemo(() => [...seerrPending, ...externalPending], [seerrPending, externalPending]);
 	const unifiedMode = settings.unifiedLibraryMode && hasMultipleServers;
 	const isLegacy = typeof document !== 'undefined' && (' ' + document.documentElement.className + ' ').indexOf(' legacy ') >= 0;
@@ -111,6 +119,7 @@ const Browse = ({
 	const filteredRowsRef = useRef([]);
 	const rowRefsMap = useRef(new Map());
 	const initialFocusSetRef = useRef(false);
+	const restoreTimerRef = useRef(null);
 	const scrollTimeoutRef = useRef(null);
 	const contentRowsRef = useRef(null);
 
@@ -230,6 +239,7 @@ const Browse = ({
 	// known now is laid over them rather than fetched again.
 	const filteredRows = useUserDataRows(builtRows);
 	const hasFocusableRow = filteredRows.some((row) => !row.isPlaceholder);
+	const loadingRowCount = filteredRows.filter((row) => row.isPlaceholder).length;
 
 	const focusRow = useCallback((rowIndex, cardIndex) => {
 		const card = cardToRestore(`row-${rowIndex}`, cardIndex);
@@ -357,14 +367,27 @@ const Browse = ({
 		wasVisibleRef.current = true;
 
 		fetchFreshFeaturedItems();
-		refreshVolatileData(true);
+		// Coming back from a title keeps the rows as they were left, unless something was played or marked watched
+		// while away, which moves what Continue Watching and Next Up hold. A visit of its own brings them up to date.
+		if (lastFocusState === null || memoryCache.volatileStale) refreshVolatileData(true);
+		memoryCache.volatileStale = false;
 
-		setTimeout(() => {
+		// Rows arriving change what this effect watches, and each run used to leave its own timer behind. The first
+		// of them took the place to return to, and the next found none and handed the screen to the banner.
+		clearTimeout(restoreTimerRef.current);
+		restoreTimerRef.current = setTimeout(() => {
 			// The first row is somewhere the user was too, so it comes back like any other
 			// rather than handing the screen to the banner.
 			if (lastFocusState && lastFocusState.rowIndex >= 0) {
-				const {rowIndex, cardIndex} = lastFocusState;
+				const {rowId, cardIndex} = lastFocusState;
+				// The row is looked for by name, since the rows above it can have changed in number
+				const named = rowId ? filteredRowsRef.current.findIndex((row) => row.id === rowId && !row.isPlaceholder) : -1;
+				// A row still on its way is waited for. The effect runs again when it arrives.
+				if (named < 0 && rowId && filteredRowsRef.current.some((row) => row.isPlaceholder)) return;
+				const rowIndex = named >= 0 ? named : lastFocusState.rowIndex;
 				const nearest = Math.min(rowIndex, filteredRows.length - 1);
+				// The first focus below is not to be taken over by the one for a first visit
+				initialFocusSetRef.current = true;
 				const above = focusableRowFrom(nearest, -1);
 				setBrowseMode('rows');
 				scrollToRow(above >= 0 ? above : focusableRowFrom(nearest, 1), true, cardIndex);
@@ -376,7 +399,7 @@ const Browse = ({
 			}
 			lastFocusState = null;
 		}, FOCUS_DELAY_MS);
-	}, [isVisible, isLoading, filteredRows.length, hasFocusableRow, fetchFreshFeaturedItems, refreshVolatileData, showFeaturedBar, featuredItems.length, scrollToRow, setBrowseMode, focusableRowFrom]);
+	}, [isVisible, isLoading, filteredRows.length, loadingRowCount, hasFocusableRow, fetchFreshFeaturedItems, refreshVolatileData, showFeaturedBar, featuredItems.length, scrollToRow, setBrowseMode, focusableRowFrom]);
 
 	useEffect(() => {
 		if (!isVisible) return;
@@ -409,6 +432,8 @@ const Browse = ({
 		// in featured mode where the full screen bars blank it.
 		if (browseMode === 'featured' && settings.featuredBarStyle !== 'aya') return '';
 		if (!focusedItemForBackdrop || isLegacy || settings.showHomeBackdrop === false) return '';
+		// a studio, network, genre or shortcut tile has no title to draw
+		if (isSeerrTile(focusedItemForBackdrop)) return '';
 
 		if (focusedItemForBackdrop._externalBackdropUrl) {
 			return focusedItemForBackdrop._externalBackdropUrl;
@@ -430,6 +455,7 @@ const Browse = ({
 		if (rowIndex === null) return;
 		lastFocusState = {
 			rowIndex,
+			rowId: filteredRowsRef.current[rowIndex]?.id,
 			cardIndex: focusedCardIndex(`row-${rowIndex}`, document.activeElement)
 		};
 	}, []);

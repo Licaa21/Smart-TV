@@ -131,6 +131,11 @@ export const SEERR_SHORTCUTS = [
 const TILE_STILL = 'w300';
 const BACKDROP_STILL = 'w780';
 
+// The jump, genre, studio and network tiles stand for a way of browsing rather than a title, so there is no
+// picture of a title to draw behind them.
+const TILE_TYPES = ['shortcut', 'genre', 'studio', 'network'];
+export const isSeerrTile = (item) => TILE_TYPES.indexOf(item?._seerrType) >= 0;
+
 export const normalizeShortcutItem = (shortcut, backdrop) => ({
 	Id: `seerr-shortcut-${shortcut.key}`,
 	Name: shortcut.name(),
