@@ -49,6 +49,15 @@ export const setContentFocusHint = (element) => {
 	contentFocusHint = element || null;
 };
 
+// Every screen keeps its place this way, not only the ones that say so: the card focus was last on, outside the
+// navigation. A screen that is gone leaves a card that is no longer on the page, which is skipped.
+if (typeof document !== 'undefined') {
+	document.addEventListener('focusin', (e) => {
+		const card = e.target && e.target.closest ? e.target.closest('.spottable') : null;
+		if (card && !card.closest('[data-spotlight-id="navbar"]')) contentFocusHint = card;
+	}, true);
+}
+
 // Falls back to a plain directional move when no known container is mounted.
 export const focusFirstContentTarget = (targets, fallbackDirection) => {
 	if (contentFocusHint && contentFocusHint.isConnected && Spotlight.focus(contentFocusHint)) return;
