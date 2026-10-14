@@ -5,7 +5,10 @@
 import {useEffect, useMemo, useState} from 'react';
 import $L from '@enact/i18n/$L';
 
+import {api as jellyfinApi, getServerUrl, getUserId} from '../../services/jellyfinApi';
 import seerrApi from '../../services/seerrApi';
+import {resolveMetadataLanguage} from '../../utils/metadataLanguage';
+import {fetchSeerrTitle} from '../../utils/seerrTitle';
 import {getMediaDownloadSummary, isMediaInFlight} from '../../utils/seerrStatus';
 
 const DOWNLOAD_POLL_MS = 15000;
@@ -21,6 +24,7 @@ export const statusPollInterval = (media) => {
 };
 
 const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
+	const [language, setLanguage] = useState(null);
 	const [details, setDetails] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
@@ -54,10 +58,12 @@ const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 			setLoading(true);
 			setError(null);
 			try {
+				// The language is looked up beside the other requests, since only the title waits for it.
 				const [data, userData, serversData, publicSettings] = await Promise.all([
-					mediaType === 'movie'
-						? seerrApi.getMovie(mediaId)
-						: seerrApi.getTv(mediaId),
+					resolveMetadataLanguage(jellyfinApi, `${getServerUrl() || ''}|${getUserId() || ''}`).then((metadataLanguage) => {
+						if (!cancelled) setLanguage(metadataLanguage);
+						return fetchSeerrTitle(mediaType, mediaId, metadataLanguage);
+					}),
 					seerrApi.getUser().catch(() => null),
 					(mediaType === 'movie'
 						? seerrApi.getRadarrServers()
@@ -158,25 +164,26 @@ const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 	// the Play button show up without leaving the page. Only the details payload is swapped
 	// and a failed tick is ignored, so a blip never replaces the screen with an error.
 	useEffect(() => {
-		if (loading || !mediaId || !mediaType || !pollInterval) return;
+		if (loading || !mediaId || !mediaType || !pollInterval || !language) return;
 		let closed = false;
 		const id = setInterval(() => {
 			// Nobody is looking at the page while the app is in the background.
 			if (document.hidden) return;
-			(mediaType === 'movie'
-				? seerrApi.getMovie(mediaId)
-				: seerrApi.getTv(mediaId)
-			).then((data) => {
-				if (data && !closed) setDetails(data);
+			// The English text is kept from the first load, so a tick is one request.
+			fetchSeerrTitle(mediaType, mediaId, language, {fallback: false}).then((data) => {
+				if (data && !closed) {
+					setDetails((previous) => ({...data, overview: data.overview || previous?.overview, tagline: data.tagline || previous?.tagline}));
+				}
 			}).catch(() => {});
 		}, pollInterval);
 		return () => {
 			closed = true;
 			clearInterval(id);
 		};
-	}, [loading, pollInterval, mediaId, mediaType]);
+	}, [loading, pollInterval, mediaId, mediaType, language]);
 
 	return {
+		language,
 		details,
 		setDetails,
 		loading,

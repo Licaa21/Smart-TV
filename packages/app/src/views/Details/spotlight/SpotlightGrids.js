@@ -8,6 +8,7 @@ import {getImageUrl} from '../../../utils/helpers';
 import {formatPlaybackDuration} from '../../../utils/playbackTimeLabels';
 import {castPhotoUrl} from '../detailsMedia';
 import {SpottableDiv, RowContainer} from '../detailsSpottables';
+import SeerrEpisodes from '../SeerrEpisodes';
 import {DETAIL_ICON_PATHS} from '../detailIcons';
 import {iconViewBox} from '../../../components/icons/iconViewBox';
 
@@ -177,6 +178,8 @@ const SpotlightSection = ({section, serverUrl, actions, seerr, firstSpotlightId}
 					firstSpotlightId={firstSpotlightId}
 				/>
 			);
+		case 'seerrEpisodes':
+			return <SeerrEpisodes seasons={section.seasons} episodes={section.episodes} settings={section.settings} spotlightId="spotlight-seerr-episodes" firstSpotlightId={firstSpotlightId} />;
 		case 'seerrChips':
 			return (
 				<div className={css.chipRow}>

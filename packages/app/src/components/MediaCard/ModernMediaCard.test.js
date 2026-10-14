@@ -103,6 +103,21 @@ describe('ModernMediaCard with a Seerr title', () => {
 	});
 });
 
+describe('ModernMediaCard with an upcoming calendar title', () => {
+	const upcoming = () => seerrShow({_calendarDate: '2027-01-01T00:00:00.000Z', Subtitle: 'Digital: Jan 1', ProductionYear: 2027});
+	const lines = (isFocused) => {
+		const {unmount} = render(<ModernMediaCard item={upcoming()} serverUrl="http://server" isFocused={isFocused} />);
+		const text = [...document.querySelectorAll('[class~="secondaryTitle"]')].map((el) => el.textContent);
+		unmount();
+		return text;
+	};
+
+	it('keeps the release date when the card is focused', () => {
+		expect(lines(false)).toEqual(['Digital: Jan 1']);
+		expect(lines(true)).toEqual(['Digital: Jan 1', '2027']);
+	});
+});
+
 // A controller that records what the card asks of it and lets a test move the phase.
 const fakeController = () => {
 	const listeners = {};

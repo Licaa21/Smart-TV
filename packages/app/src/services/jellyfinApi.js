@@ -463,6 +463,9 @@ const playedUserData = (played) => ({Played: played, PlayedPercentage: null, Pla
 export const api = {
 	getPublicInfo: () => request('/System/Info/Public'),
 
+	// The server's own settings, which only an administrator can read. They hold the metadata language.
+	getServerConfiguration: () => request('/System/Configuration'),
+
 	getPublicUsers: () => request('/Users/Public'),
 
 	authenticateByName: (username, password) => request('/Users/AuthenticateByName', {

@@ -26,6 +26,7 @@ export const DETAIL_BUTTONS = [
 	{id: 'version', label: 'Version'},
 	{id: 'audio', label: 'Audio'},
 	{id: 'subtitles', label: 'Subtitle'},
+	{id: 'playbackInfo', label: 'Playback Info'},
 	{id: 'trailer', label: 'Trailer'},
 	{id: 'watchWithGroup', label: 'Watch with group'},
 	{id: 'watched', label: 'Mark Watched'},

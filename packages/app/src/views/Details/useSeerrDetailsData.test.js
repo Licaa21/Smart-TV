@@ -1,6 +1,7 @@
 import {act, renderHook} from '@testing-library/react';
 
 import seerrApi from '../../services/seerrApi';
+import {resolveMetadataLanguage} from '../../utils/metadataLanguage';
 import {MEDIA_STATUS} from '../../utils/seerrStatus';
 import useSeerrDetailsData, {statusPollInterval} from './useSeerrDetailsData';
 
@@ -22,10 +23,17 @@ jest.mock('../../services/seerrApi', () => ({
 	}
 }));
 
+// The language lookup talks to the media server, which a test has none of.
+jest.mock('../../services/jellyfinApi', () => ({api: {}, getServerUrl: () => 'http://server', getUserId: () => 'u1'}));
+jest.mock('../../utils/metadataLanguage', () => ({
+	...jest.requireActual('../../utils/metadataLanguage'),
+	resolveMetadataLanguage: jest.fn()
+}));
+
 // What the server says about the title, changed between ticks.
 let mediaInfo;
 let hidden;
-const movie = () => ({id: 299534, title: 'Avengers: Endgame', mediaInfo});
+const movie = () => ({id: 299534, title: 'Avengers: Endgame', overview: 'Răzbunătorii.', tagline: 'Final.', mediaInfo});
 // The first fetch is the page loading, every later one is a refresh.
 const refreshes = () => seerrApi.getMovie.mock.calls.length - 1;
 
@@ -48,6 +56,8 @@ beforeEach(() => {
 	jest.clearAllMocks();
 	mediaInfo = {status: MEDIA_STATUS.UNKNOWN};
 	hidden = false;
+	// The test config resets mocks between tests, so their answers are given here.
+	resolveMetadataLanguage.mockResolvedValue('ro-RO');
 	seerrApi.getMovie.mockImplementation(async () => movie());
 	seerrApi.getUser.mockResolvedValue({id: 1});
 	seerrApi.getUserQuota.mockResolvedValue(null);
@@ -66,6 +76,30 @@ describe('the refresh interval', () => {
 		expect(statusPollInterval({status: MEDIA_STATUS.PENDING})).toBe(30000);
 		expect(statusPollInterval({status: MEDIA_STATUS.AVAILABLE})).toBe(null);
 		expect(statusPollInterval(undefined)).toBe(null);
+	});
+});
+
+describe('the language of the title', () => {
+	test('asks Seerr for the metadata language and says which it was', async () => {
+		const {result} = await open();
+		expect(seerrApi.getMovie).toHaveBeenCalledWith(299534, 'ro-RO');
+		expect(result.current.language).toBe('ro-RO');
+	});
+
+	test('fills a description that language lacks from English', async () => {
+		seerrApi.getMovie.mockImplementation(async (id, language) => (language === 'en-US'
+			? {id, title: 'Avengers: Endgame', overview: 'The Avengers.', tagline: 'Part of the journey.', mediaInfo}
+			: {id, title: 'Avengers: Endgame', overview: '', tagline: '', mediaInfo}));
+		const {result} = await open();
+		expect(result.current.details.overview).toBe('The Avengers.');
+		expect(result.current.details.tagline).toBe('Part of the journey.');
+	});
+
+	test('does not ask twice when the language is English', async () => {
+		resolveMetadataLanguage.mockResolvedValue('en-US');
+		seerrApi.getMovie.mockImplementation(async (id) => ({id, title: 'Avengers: Endgame', overview: '', mediaInfo}));
+		await open();
+		expect(seerrApi.getMovie).toHaveBeenCalledTimes(1);
 	});
 });
 

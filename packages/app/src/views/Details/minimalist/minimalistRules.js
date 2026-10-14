@@ -54,6 +54,9 @@ export const minimalistStillUrl = (serverUrl, item, {settings, width}) => {
 // Specials are the case worth knowing about: an episode outside a numbered season often has no
 // still of its own, so the series thumbnail is all there is.
 export const minimalistCardUrl = (serverUrl, episode, {settings, cardWidth}) => {
+	// A title only Seerr knows brings its still as a finished url.
+	if (episode?._externalPosterUrl) return episode._externalPosterUrl;
+
 	const options = {maxWidth: Math.round(cardWidth * 2), quality: 90};
 
 	if (settings?.detailUseSeriesThumbnails) {

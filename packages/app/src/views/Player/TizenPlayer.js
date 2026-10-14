@@ -15,6 +15,8 @@ import {useSettings} from '../../context/SettingsContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import * as syncPlayService from '../../services/syncPlay';
 import {KEYS, isBackKey} from '../../utils/keys';
+import {getPerfTier} from '../../utils/perfTier';
+import {playerClockStale, playerClockWanted} from '../../utils/playerClock';
 import {channelKeyStep} from '../../utils/channelKeys';
 import {blockedKeysReport} from '../../utils/blockedKeys';
 import {channelSeekSeconds} from '../../utils/channelSeek';
@@ -50,7 +52,7 @@ import useAudioTransport from './audio/useAudioTransport';
 import useLyrics from './audio/useLyrics';
 import {handleAudioFocusKey, exitAudioPanel, nextAudioFocusRow, AUDIO_FOCUS_IDS} from './audio/audioFocus';
 import useSegmentPopups from './useSegmentPopups';
-import {NextEpisodeContainer, CONTROLS_HIDE_DELAY, withTimeout, SEGMENT_FETCH_TIMEOUT} from './PlayerConstants';
+import {NextEpisodeContainer, CONTROLS_HIDE_DELAY, withTimeout, SEGMENT_FETCH_TIMEOUT, SKIP_LANDING_CHECK_MS, SKIP_LANDING_TOLERANCE_TICKS, SKIP_LANDING_SNAP_TICKS} from './PlayerConstants';
 import NextUpOverlay from './NextUpOverlay';
 import SkipSegmentOverlay from './SkipSegmentOverlay';
 import StillWatchingDialog from './StillWatchingDialog';
@@ -256,6 +258,27 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const lyrics = useLyrics(item, isAudioMode, currentTime);
 
 	const positionRef = useRef(0);
+	// The item on screen, for what is checked a moment after it was asked.
+	const itemIdRef = useRef(item?.Id);
+	itemIdRef.current = item?.Id;
+
+	// The time is only redrawn when something shows it, so it is brought up to date the moment that
+	// changes, rather than a half second later.
+	const clockWantedRef = useRef(true);
+	const shownSecondRef = useRef(-1);
+	// A new item starts its clock over, so its first reading is drawn whatever second the last one ended on.
+	useEffect(() => {
+		shownSecondRef.current = -1;
+	}, [item?.Id]);
+	// Read by the time update, which runs from an interval or a media event and so sees no fresh state.
+	const clockAudioRef = useRef(false);
+	clockAudioRef.current = isAudioMode;
+	clockWantedRef.current = playerClockWanted({tier: getPerfTier(), controlsVisible, activeModal, isAudioMode});
+	useEffect(() => {
+		if (getPerfTier() === 'high' || !(controlsVisible || activeModal) || !(positionRef.current > 0)) return;
+		shownSecondRef.current = Math.floor(positionRef.current / 10000000);
+		setCurrentTime(positionRef.current / 10000000);
+	}, [controlsVisible, activeModal]); // eslint-disable-line react-hooks/exhaustive-deps
 	const playSessionRef = useRef(null);
 	const runTimeRef = useRef(0);
 	const healthMonitorRef = useRef(null);
@@ -491,8 +514,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 		// Nothing on screen reads the time while the episode panel is up, and each update redraws the
 		// whole player, which is what makes that panel drag. The first tick after it closes catches up.
-		if (!episodesOpenRef.current) setCurrentTime(time);
 		positionRef.current = ticks;
+		if (!episodesOpenRef.current && clockWantedRef.current && playerClockStale({tier: getPerfTier(), time, shownSecond: shownSecondRef.current, isAudioMode: clockAudioRef.current})) {
+			shownSecondRef.current = Math.floor(time);
+			setCurrentTime(time);
+		}
 
 		// A corrective skip is judged on every reading rather than only at the
 		// drift check, so it is seen landing without waiting for the next one.
@@ -2265,9 +2291,27 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (!isLoading && !error) markChannelPlaying();
 	}, [isLoading, error, markChannelPlaying]);
 
+	// Where a skip started, where it was sent and where the player reported itself a moment later, in
+	// seconds, so a report says whether a skip landed.
 	const seekToSegmentTarget = useCallback((target) => {
-		avplaySeek(Math.floor(target / 10000)).catch(e => console.warn('[Player] Seek failed:', e));
-	}, []);
+		const seconds = (ticks) => Math.round(ticks / 10000000);
+		const itemId = item?.Id;
+		const skipTo = (retried) => avplaySeek(Math.floor(target / 10000)).then(() => {
+			setTimeout(() => {
+				// The viewer may have left, or moved to another episode, in the time it took to look.
+				if (!avplayReadyRef.current || itemIdRef.current !== itemId) return;
+				const landed = avplayGetCurrentTime() * 10000;
+				serverLogger.playback('Segment skip landed', {to: seconds(target), landed: seconds(landed), retried});
+				// A seek that snaps back to an earlier keyframe leaves the skip inside the segment it was
+				// meant to clear, so it is made once more. Only a landing a little short counts: one far off is
+				// the viewer having gone somewhere else.
+				const short = target - landed;
+				if (!retried && short > SKIP_LANDING_TOLERANCE_TICKS && short < SKIP_LANDING_SNAP_TICKS && avplayGetState() === 'PLAYING') skipTo(true);
+			}, SKIP_LANDING_CHECK_MS);
+		}).catch(e => console.warn('[Player] Seek failed:', e));
+		serverLogger.playback('Segment skip', {from: seconds(positionRef.current), to: seconds(target)});
+		skipTo(false);
+	}, [item?.Id]);
 
 	// Every user seek inside a group goes through here to the server, which then
 	// seeks everyone. A local seek would only be reported as buffering and

@@ -18,6 +18,7 @@ import {castPhotoUrl, hidesMediaDescription} from './detailsMedia';
 import {studioCardsFor, studioLogoIndex} from './studioLogos';
 import ExpandableOverview from './ExpandableOverview';
 import ModernFileInformation from './ModernFileInformation';
+import SeerrEpisodes from './SeerrEpisodes';
 import {KEYS} from '../../utils/keys';
 import {DETAIL_ICON_PATHS} from './detailIcons';
 import {iconViewBox} from '../../components/icons/iconViewBox';
@@ -59,7 +60,7 @@ const ModernDetailContent = (props) => {
 		isEpisode, isSeries, isSeason, isPerson, isBoxSet, isAlbum, isMusicArtist, isPlaylist,
 		backdropUrl, posterUrl, logoUrl, onLogoError,
 		year, runtime, endsAt, officialRating, seasonCount, genres, tagline,
-		seasons, episodes, similar, extras, cast, crew = [], nextUp, collectionItems, collectionSections = [], albumTracks, artistAlbums, playlistItems, personMovies, personSeries, birthDate, birthPlace, episodeRatings,
+		seerrOnly, seasons, episodes, seriesEpisodes = [], similar, extras, cast, crew = [], nextUp, collectionItems, collectionSections = [], albumTracks, artistAlbums, playlistItems, personMovies, personSeries, birthDate, birthPlace, episodeRatings,
 		techBadges = [], techSize, overviewBackRef,
 		mediaSource, supportsMediaSourceSelection, selectedAudioIndex, selectedSubtitleIndex,
 		handleChapterSelect, handleExtraSelect, playTrack, playlistMenu,
@@ -271,7 +272,7 @@ const ModernDetailContent = (props) => {
 	// switched off counts as one with nothing in it, so its tab goes the same way.
 	const tabs = useMemo(() => {
 		const list = [];
-		if (isSeries && seasons.length) list.push({id: 'seasons', label: $L('Seasons')});
+		if (isSeries && (seerrOnly ? seriesEpisodes.length : seasons.length)) list.push({id: 'seasons', label: seerrOnly ? $L('Episodes') : $L('Seasons')});
 		if (listsEpisodes && episodes.length) list.push({id: 'episodes', label: $L('Episodes')});
 		if (isPerson) {
 			if (personMovies.length) list.push({id: 'movies', label: $L('Movies')});
@@ -290,7 +291,7 @@ const ModernDetailContent = (props) => {
 		if (similar.length) list.push({id: 'similar', label: $L('More Like This')});
 		if (seerr.hasTabContent) list.push({id: 'seerr', label: seerr.displayName});
 		return list;
-	}, [isSeries, seasons.length, listsEpisodes, episodes.length, isPerson, personMovies.length, personSeries.length, isAlbum, isPlaylist, albumTracks.length, playlistItems.length, isMusicArtist, artistAlbums.length, isBoxSet, collectionItems.length, collectionSections.length, collectionTabLabel, cast.length, crew.length, studios, chapters, extras.length, showsDetails, similar.length, seerr.hasTabContent, seerr.displayName]);
+	}, [isSeries, seerrOnly, seriesEpisodes.length, seasons.length, listsEpisodes, episodes.length, isPerson, personMovies.length, personSeries.length, isAlbum, isPlaylist, albumTracks.length, playlistItems.length, isMusicArtist, artistAlbums.length, isBoxSet, collectionItems.length, collectionSections.length, collectionTabLabel, cast.length, crew.length, studios, chapters, extras.length, showsDetails, similar.length, seerr.hasTabContent, seerr.displayName]);
 
 	const [activeTab, setActiveTab] = useState(null);
 	// Expanded Tabs on keeps the first tab open and lets focus follow selection.
@@ -541,7 +542,11 @@ const ModernDetailContent = (props) => {
 	const renderTabContent = () => {
 		switch (currentTab) {
 			case 'seasons':
-				return renderSeasonsGrid();
+				// A series the library lacks has no season pages to open, so its seasons are tabs over
+				// the episodes, which Seerr describes.
+				return seerrOnly
+					? <SeerrEpisodes seasons={seasons} episodes={seriesEpisodes} navbarPosition={settings.navbarPosition} settings={settings} />
+					: renderSeasonsGrid();
 			case 'episodes':
 				return renderEpisodesTab();
 			case 'movies':

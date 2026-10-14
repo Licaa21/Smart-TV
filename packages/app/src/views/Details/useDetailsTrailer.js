@@ -8,6 +8,10 @@ import {
 } from '../../services/youtubeTrailer';
 import serverLogger from '../../services/serverLogger';
 
+// What the trailer's element is listened to for, and how many of them a trailer logs.
+const TRAILER_EVENTS = ['waiting', 'stalled', 'seeking', 'seeked', 'playing', 'pause', 'error', 'ended'];
+const TRAILER_EVENTS_LOGGED = 40;
+
 // Plays a title's trailer. A local one goes to the real player, and a YouTube link plays in
 // an overlay here, since the player has no way to open a stream that isn't on the server.
 const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly, backRef}) => {
@@ -149,6 +153,22 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 		let stopWatch = null;
 		const nativeManifest = playsManifestNatively(trailerStreamUrl);
 
+		// A trailer that stalls or drifts leaves nothing in the log to explain it, so what the element
+		// reports while it plays is kept, capped so a stuttering one cannot fill the report.
+		let logged = 0;
+		const reportEvent = (event) => {
+			if (logged >= TRAILER_EVENTS_LOGGED) return;
+			logged += 1;
+			const ranges = video.buffered;
+			serverLogger.playback(`Trailer ${event.type}`, {
+				at: Math.round(video.currentTime * 10) / 10,
+				ready: video.readyState,
+				bufferedTo: ranges && ranges.length ? Math.round(ranges.end(ranges.length - 1) * 10) / 10 : null,
+				manifest: isManifestUrl(trailerStreamUrl)
+			});
+		};
+		TRAILER_EVENTS.forEach((name) => video.addEventListener(name, reportEvent));
+
 		// A manifest that errors, never starts or stops partway gives way to the muxed file, picking up
 		// where it stopped.
 		const fallBack = (reason = 'failed to play') => {
@@ -182,6 +202,7 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 		return () => {
 			cancelled = true;
 			video.onerror = null;
+			TRAILER_EVENTS.forEach((name) => video.removeEventListener(name, reportEvent));
 			if (stopWatch) stopWatch();
 			if (release) release();
 		};
@@ -192,12 +213,19 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 		const segments = sponsorSegmentsRef.current;
 		if (!trailerStreamUrl || segments.length === 0) return undefined;
 
+		let skipsLogged = 0;
 		sponsorSkipIntervalRef.current = setInterval(() => {
 			const video = trailerVideoRef.current;
-			if (!video || video.paused) return;
+			// Not while it is still starting up. A seek before there is picture and sound to seek in
+			// sends the video one way while the audio, which hls.js loads apart from it, plays on.
+			if (!video || video.paused || video.seeking || video.readyState < 3) return;
 			const t = video.currentTime;
 			for (let i = 0; i < segments.length; i++) {
 				if (t >= segments[i].start && t < segments[i].end - 0.5) {
+					if (skipsLogged < 5) {
+						skipsLogged += 1;
+						serverLogger.playback('Trailer skipped a segment', {from: Math.round(t * 10) / 10, to: Math.round(segments[i].end * 10) / 10});
+					}
 					video.currentTime = segments[i].end;
 					break;
 				}

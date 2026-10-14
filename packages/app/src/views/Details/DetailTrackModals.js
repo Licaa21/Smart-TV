@@ -6,6 +6,7 @@ import {ModalContainer} from '../../utils/spotlightContainers';
 import {numberedTrackName, subtitleTrackDetail, audioTrackDetail, isExternalSubtitleStream} from '../../utils/trackLabels';
 import TrackOptionRow, {TrackDivider} from '../../components/TrackOptionRow';
 import {SpottableButton, SpottableDiv} from './detailsSpottables';
+import DetailPlaybackInfoModal from './DetailPlaybackInfoModal';
 
 import css from './Details.module.less';
 
@@ -14,6 +15,7 @@ import css from './Details.module.less';
 const DetailTrackModals = ({
 	activeModal,
 	onCloseModal,
+	api,
 	item,
 	audioStreams,
 	subtitleStreams,
@@ -51,6 +53,16 @@ const DetailTrackModals = ({
 
 	return (
 		<>
+			{activeModal === 'playbackInfo' && (
+				<DetailPlaybackInfoModal
+					api={api}
+					item={item}
+					mediaSource={item.MediaSources?.[selectedVersionIndex] || item.MediaSources?.[0]}
+					audioStreamIndex={audioStreams[selectedAudioIndex]?.Index}
+					subtitleStreamIndex={selectedSubtitleIndex >= 0 ? subtitleStreams[selectedSubtitleIndex]?.Index : undefined}
+					onClose={onCloseModal}
+				/>
+			)}
 			{activeModal === 'advancedPlayback' && (
 				<div className={css.trackModal} onClick={onCloseModal}>
 					<ModalContainer className={css.trackModalPanel} onClick={stopPropagation} data-modal="advancedPlayback" spotlightId="advancedPlayback-modal">
