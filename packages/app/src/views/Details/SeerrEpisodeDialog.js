@@ -71,7 +71,7 @@ const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onClose}) => {
 	const chips = chipsOf(episode, airDate);
 	const credits = creditsOf(episode);
 	const season = episode.ParentIndexNumber;
-	const code = season != null && episode.IndexNumber != null ? `S${season} E${episode.IndexNumber}` : '';
+	const code = season != null && episode.IndexNumber != null ? `S${season}E${episode.IndexNumber}` : '';
 	const description = hideOverview ? '' : episode.Overview || $L('No description available.');
 	const still = episode._externalPosterUrl;
 

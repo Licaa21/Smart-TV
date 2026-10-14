@@ -25,9 +25,9 @@ const airDateText = (episode) => {
 	return date.toLocaleDateString(appLocale(), {year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC'});
 };
 
-// The card's heading, with the season in it since the cards of a season all start again at one: S2 E3: Name.
+// The card's heading, with the season in it since the cards of a season all start again at one: S2E3: Name.
 const cardTitle = (episode) => {
-	const number = episode.IndexNumber == null ? '' : `${episode.ParentIndexNumber == null ? '' : `S${episode.ParentIndexNumber} `}E${episode.IndexNumber}`;
+	const number = episode.IndexNumber == null ? '' : `${episode.ParentIndexNumber == null ? '' : `S${episode.ParentIndexNumber}`}E${episode.IndexNumber}`;
 	if (!number) return episode.Name || '';
 	return episode.Name ? `${number}: ${episode.Name}` : number;
 };
