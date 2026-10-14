@@ -208,3 +208,14 @@ describe('the media preview switches', () => {
 		expect(audio.when({...ctx, settings: {...defaultSettings, episodePreviewEnabled: true}})).toBe(true);
 	});
 });
+
+// The Playback Info popup sends a viewer to these settings by key, so each has to be on the screen it names.
+describe('the settings the Playback Info popup points at', () => {
+	const screen = SETTINGS_SCHEMA.find((category) => category.id === 'playback').subcategories.find((sub) => sub.id === 'qualityDecoding');
+
+	it.each(['allowManyStreams', 'forceCompatibleAv1Transcode', 'dolbyVisionAsHdr10', 'allowHevcLevel52'])('%s is a row of Playback, Quality & Decoding', (key) => {
+		const row = screen.rows.find((candidate) => candidate.key === key);
+		expect(row).toBeDefined();
+		expect(spotlightIdOf(row)).toBe(`setting-${key}`);
+	});
+});

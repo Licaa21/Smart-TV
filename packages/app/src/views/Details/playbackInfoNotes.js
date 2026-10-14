@@ -9,8 +9,8 @@ const STREAM_LIMIT = 32;
 const HEVC_LEVEL_51 = 153;
 const lower = (value) => String(value || '').toLowerCase();
 
-// Each note is {id, title, text, tone}. A tip is something a setting could change, and info is a setting
-// that is already doing its work.
+// Each note is {id, settingKey, title, text, tone}, the key being the setting it is about. A tip is something a
+// setting could change, and info is a setting that is already doing its work.
 export const buildForkNotes = ({method, source, reasonKeys = [], settings = {}, tizen = false}) => {
 	// These settings, and the limits they lift, are the Samsung player's.
 	if (!tizen) return [];
@@ -24,6 +24,7 @@ export const buildForkNotes = ({method, source, reasonKeys = [], settings = {}, 
 		const alone = reasonKeys.length === 1;
 		notes.push({
 			id: 'streams',
+			settingKey: 'allowManyStreams',
 			tone: 'tip',
 			title: $L('Allow Files With Many Streams'),
 			text: $L('{count} streams, and this TV plays 32 in a file, so the server remuxes it. Turn this setting on to play it as it is.')
@@ -32,6 +33,7 @@ export const buildForkNotes = ({method, source, reasonKeys = [], settings = {}, 
 	} else if (settings.allowManyStreams === true && method === 'direct' && streams.length > STREAM_LIMIT) {
 		notes.push({
 			id: 'streams',
+			settingKey: 'allowManyStreams',
 			tone: 'info',
 			title: $L('Allow Files With Many Streams'),
 			text: $L('{count} streams, over the usual 32. It plays as it is because this setting is on.')
@@ -44,6 +46,7 @@ export const buildForkNotes = ({method, source, reasonKeys = [], settings = {}, 
 	if (lower(video?.Codec) === 'av1' && method !== 'direct') {
 		notes.push({
 			id: 'av1',
+			settingKey: 'forceCompatibleAv1Transcode',
 			tone: settings.forceCompatibleAv1Transcode === true ? 'info' : 'tip',
 			title: $L('Force Compatible AV1 Transcode'),
 			text: settings.forceCompatibleAv1Transcode === true
@@ -57,6 +60,7 @@ export const buildForkNotes = ({method, source, reasonKeys = [], settings = {}, 
 		if (settings.dolbyVisionAsHdr10 === true && method === 'direct') {
 			notes.push({
 				id: 'dolby',
+				settingKey: 'dolbyVisionAsHdr10',
 				tone: 'info',
 				title: $L('Play Dolby Vision Profile 7 as HDR10'),
 				text: $L('Plays as plain HDR10, without its enhancement layer, because this setting is on.')
@@ -64,6 +68,7 @@ export const buildForkNotes = ({method, source, reasonKeys = [], settings = {}, 
 		} else if (settings.dolbyVisionAsHdr10 !== true && method !== 'direct' && has('videorangetypenotsupported')) {
 			notes.push({
 				id: 'dolby',
+				settingKey: 'dolbyVisionAsHdr10',
 				tone: 'tip',
 				title: $L('Play Dolby Vision Profile 7 as HDR10'),
 				text: $L('The enhancement layer is why it is not played as it is. Turn this setting on to play it as plain HDR10.')
@@ -77,6 +82,7 @@ export const buildForkNotes = ({method, source, reasonKeys = [], settings = {}, 
 		if (settings.allowHevcLevel52 === true && method === 'direct') {
 			notes.push({
 				id: 'hevc',
+				settingKey: 'allowHevcLevel52',
 				tone: 'info',
 				title: $L('Allow HEVC Level 5.2'),
 				text: $L('Level {level}, above the 5.1 this TV is held to. It plays as it is because this setting is on.').replace('{level}', level)
@@ -84,6 +90,7 @@ export const buildForkNotes = ({method, source, reasonKeys = [], settings = {}, 
 		} else if (settings.allowHevcLevel52 !== true && method !== 'direct' && has('videolevelnotsupported')) {
 			notes.push({
 				id: 'hevc',
+				settingKey: 'allowHevcLevel52',
 				tone: 'tip',
 				title: $L('Allow HEVC Level 5.2'),
 				text: $L('Level {level}, above the 5.1 this TV is held to, so it is re-encoded. Turn this setting on to play it as it is.').replace('{level}', level)

@@ -4,6 +4,7 @@ import Spotlight from '@enact/spotlight';
 
 import DetailsTabBar from '../../components/DetailsTabBar';
 import {appLocale} from '../../utils/appLocale';
+import {channelKeyStep} from '../../utils/channelKeys';
 import {keepEpisodeDialog, takeEpisodeDialog} from '../../utils/episodeDialogReturn';
 import {formatDuration} from '../../utils/helpers';
 import {KEYS} from '../../utils/keys';
@@ -55,6 +56,26 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 	const handleActivate = useCallback((id) => {
 		setPicked(Number(id));
 	}, []);
+
+	// Channel up and down step through the seasons from the season bar or from the episodes. The episodes of a season are
+	// drawn anew, so focus is put back where it was: on the episodes, the first one, or on the bar, the season in it.
+	const handleChannelKey = useCallback((ev) => {
+		const step = channelKeyStep(ev);
+		if (!step || numbers.length < 2) return;
+		ev.preventDefault();
+		ev.stopPropagation();
+		const at = numbers.indexOf(active);
+		const next = numbers[Math.min(numbers.length - 1, Math.max(0, at + step))];
+		if (next === active) return;
+		const inEpisodes = Boolean(ev.target.closest && ev.target.closest('[data-episode-id]'));
+		setPicked(next);
+		window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+			const root = rootRef.current;
+			if (!root) return;
+			const target = inEpisodes ? root.querySelector('[data-episode-id]') : root.querySelector('[data-enter-from-above="true"]');
+			if (target) Spotlight.focus(target);
+		}));
+	}, [numbers, active]);
 	const handleOpen = useCallback((ev) => {
 		const id = ev.currentTarget.dataset.episodeId;
 		setOpened(shown.find((episode) => episode.Id === id) || null);
@@ -139,7 +160,7 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 	if (!shown.length) return null;
 
 	return (
-		<div className={css.episodes} ref={rootRef}>
+		<div className={css.episodes} ref={rootRef} onKeyDown={handleChannelKey}>
 			{hasTabs && (
 				<div onKeyDown={handleTabsKeyDown}>
 					<DetailsTabBar

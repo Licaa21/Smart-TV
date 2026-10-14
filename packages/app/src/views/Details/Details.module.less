@@ -2065,6 +2065,33 @@
 	color: var(--theme-text-primary, #ffffff);
 }
 
+// A note that opens its setting takes focus and shows it, with an arrow at its right end.
+.infoNoteLink {
+	position: relative;
+	border-radius: 10px;
+	outline: none;
+
+	&::after {
+		content: '\203A';
+		position: absolute;
+		top: 50%;
+		right: 14px;
+		margin-top: -20px;
+		font-size: 36px;
+		line-height: 40px;
+		opacity: 0.5;
+	}
+
+	&:focus {
+		background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.22);
+		box-shadow: 0 0 0 2px var(--theme-focus-border-color, #ffffff);
+
+		&::after {
+			opacity: 1;
+		}
+	}
+}
+
 .infoNote_tip {
 	border-left: 4px solid #f0a73a;
 	margin-top: 6px;

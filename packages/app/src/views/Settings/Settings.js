@@ -151,9 +151,24 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 
 	// Opened on a screen of its own when the shell asked for one, with the categories under it
 	// so BACK still walks out the usual way.
-	const [navStack, setNavStack] = useState(() => (initialView ? [{view: 'categories'}, {view: initialView}] : [{view: 'categories'}]));
+	// A name is a screen of its own. An object, {categoryId, subcategoryId, focus}, is one screen of the schema with the
+	// row to focus on it.
+	const initialTarget = initialView && typeof initialView === 'object' ? initialView : null;
+	const [navStack, setNavStack] = useState(() => {
+		if (!initialView) return [{view: 'categories'}];
+		if (!initialTarget) return [{view: 'categories'}, {view: initialView}];
+		const screen = SCHEMA_BY_KEY[`${initialTarget.categoryId}.${initialTarget.subcategoryId}`];
+		if (!screen) return [{view: 'categories'}];
+		return [{view: 'categories'}, {
+			view: 'subcategory',
+			categoryId: initialTarget.categoryId,
+			subcategoryId: initialTarget.subcategoryId,
+			label: resolve(screen.label, {seerrLabel}),
+			returnFocusTo: `cat-${initialTarget.categoryId}`
+		}];
+	});
 	const currentView = navStack[navStack.length - 1];
-	const pendingFocusRef = useRef(null);
+	const pendingFocusRef = useRef(initialTarget?.focus || null);
 	const navStackRef = useRef(navStack);
 	navStackRef.current = navStack;
 
