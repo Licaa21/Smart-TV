@@ -8,7 +8,7 @@ const PARALLEL = 3;
 
 // A Seerr series' seasons, and its episodes as each season's answer arrives, so the first season is
 // on screen while a long run is still coming in.
-const useSeerrEpisodes = ({details, enabled, language}) => {
+const useSeerrEpisodes = ({details, enabled, language, tmdbApiKey = ''}) => {
 	const seriesId = details?.id;
 	const seasons = useMemo(() => (enabled ? seerrSeasonItems(details) : []), [enabled, details]);
 	const [episodes, setEpisodes] = useState([]);
@@ -37,7 +37,7 @@ const useSeerrEpisodes = ({details, enabled, language}) => {
 				const number = queue.shift();
 				let loaded = [];
 				try {
-					loaded = await loadSeerrSeason(series, number, language);
+					loaded = await loadSeerrSeason(series, number, language, tmdbApiKey);
 				} catch (err) {
 					// A season that cannot be had is left out rather than held against the rest.
 					void err;
@@ -59,7 +59,7 @@ const useSeerrEpisodes = ({details, enabled, language}) => {
 		};
 		// details is read for the series' name only, and only when the series changes.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [enabled, seriesId, language]);
+	}, [enabled, seriesId, language, tmdbApiKey]);
 
 	// The previous series' episodes are dropped for the one render before the effect clears them.
 	const own = useMemo(() => episodes.filter((episode) => episode.ProviderIds?.Tmdb === String(seriesId)), [episodes, seriesId]);

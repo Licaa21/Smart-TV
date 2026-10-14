@@ -7,6 +7,7 @@
 import seerrApi from '../services/seerrApi';
 import serverLogger from '../services/serverLogger';
 import {isEnglish} from './metadataLanguage';
+import {seasonFromTmdb, tmdbGet} from './tmdbText';
 
 const TICKS_PER_MINUTE = 600000000;
 const FALLBACK_LANGUAGE = 'en-US';
@@ -79,24 +80,43 @@ export const withEnglishGaps = (episodes, english) => {
 	});
 };
 
-// One season's episodes in the viewer's language, with English asked for only when there is a gap.
-export const loadSeerrSeason = async (details, seasonNumber, language) => {
-	const season = await seerrApi.getTvSeason(details.id, seasonNumber, language);
-	let episodes = seerrEpisodeItems(season, details);
-	// Once a series, to tell a language Seerr never applied from one TMDB has no text in.
+// One season's episodes in the metadata language. With the TMDB key the plugin syncs down they come from
+// TMDB, with English asked for only when an aired episode has no name or description in that language. Without
+// the key, or when TMDB cannot be reached, they are Seerr's, in its own language, as they always were.
+export const loadSeerrSeason = async (details, seasonNumber, language, tmdbApiKey = '') => {
+	const fromSeerr = async () => seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber), details);
+	if (!tmdbApiKey || !language) return fromSeerr();
+
+	const path = `/tv/${details.id}/season/${seasonNumber}`;
+	let episodes;
+	try {
+		const raw = await tmdbGet(path, language, tmdbApiKey);
+		if (!Array.isArray(raw.episodes)) throw new Error('TMDB gave no episodes');
+		episodes = seerrEpisodeItems(seasonFromTmdb(raw), details);
+	} catch (err) {
+		// Once a series, since a bad key fails every season of it.
+		if (lastLogged !== `${details.id}|failed`) {
+			lastLogged = `${details.id}|failed`;
+			serverLogger.playback('Seerr season text', {from: 'Seerr, TMDB did not answer', error: err.message});
+		}
+		return fromSeerr();
+	}
+
+	// Once a series, to say where the words came from.
 	const logKey = `${details.id}|${language}`;
 	if (episodes.length && lastLogged !== logKey) {
 		lastLogged = logKey;
-		serverLogger.playback('Seerr season language', {asked: language, season: seasonNumber, name: String(episodes[0].Name || '').slice(0, 30), got: String(episodes[0].Overview || '').slice(0, 40)});
+		serverLogger.playback('Seerr season text', {from: 'TMDB', language, season: seasonNumber, name: String(episodes[0].Name || '').slice(0, 30)});
 	}
+
 	// An episode that has not aired has no text in any language yet, so it is no reason to ask again.
 	const now = Date.now();
 	const aired = (episode) => !episode.PremiereDate || new Date(episode.PremiereDate).getTime() <= now;
 	const gaps = episodes.some((episode) => aired(episode) && (!episode.Overview || !episode.Name));
 	if (gaps && !isEnglish(language)) {
 		try {
-			const english = await seerrApi.getTvSeason(details.id, seasonNumber, FALLBACK_LANGUAGE);
-			episodes = withEnglishGaps(episodes, seerrEpisodeItems(english, details));
+			const english = seerrEpisodeItems(seasonFromTmdb(await tmdbGet(path, FALLBACK_LANGUAGE, tmdbApiKey)), details);
+			episodes = withEnglishGaps(episodes, english);
 		} catch (err) {
 			void err;
 		}

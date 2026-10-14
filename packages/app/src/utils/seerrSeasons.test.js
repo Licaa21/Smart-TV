@@ -1,6 +1,8 @@
 import seerrApi from '../services/seerrApi';
+import {tmdbGet} from './tmdbText';
 import {isSeerrPseudo, loadSeerrSeason, seerrEpisodeItems, seerrSeasonItems, withEnglishGaps} from './seerrSeasons';
 
+jest.mock('./tmdbText', () => ({...jest.requireActual('./tmdbText'), tmdbGet: jest.fn()}));
 jest.mock('../services/seerrApi', () => ({
 	__esModule: true,
 	default: {getTvSeason: jest.fn(), getImageUrl: (path, size) => `tmdb/${size}${path}`}
@@ -54,40 +56,60 @@ describe('withEnglishGaps', () => {
 	});
 });
 
-describe('loadSeerrSeason', () => {
-	beforeEach(() => seerrApi.getTvSeason.mockReset());
+// What TMDB answers, which is not the shape Seerr's answer has.
+const tmdbSeason = (episodes) => ({season_number: 1, episodes: episodes.map((e, i) => ({season_number: 1, episode_number: i + 1, ...e}))});
 
-	it('asks for the language and only asks English when something is missing', async () => {
-		seerrApi.getTvSeason.mockResolvedValueOnce(season([{name: 'Pilot', overview: 'Complet.'}]));
-		const episodes = await loadSeerrSeason(details, 1, 'ro-RO');
-		expect(seerrApi.getTvSeason).toHaveBeenCalledTimes(1);
-		expect(seerrApi.getTvSeason).toHaveBeenCalledWith(1396, 1, 'ro-RO');
+describe('loadSeerrSeason', () => {
+	beforeEach(() => {
+		seerrApi.getTvSeason.mockReset();
+		tmdbGet.mockReset();
+	});
+
+	it('is the Seerr answer, with no language asked, when there is no TMDB key', async () => {
+		seerrApi.getTvSeason.mockResolvedValueOnce(season([{name: 'Pilot', overview: 'In English.'}]));
+		const episodes = await loadSeerrSeason(details, 1, 'ro');
+		expect(seerrApi.getTvSeason).toHaveBeenCalledWith(1396, 1);
+		expect(tmdbGet).not.toHaveBeenCalled();
+		expect(episodes[0].Overview).toBe('In English.');
+	});
+
+	it('reads the language from TMDB, and only asks English when an aired episode lacks text', async () => {
+		tmdbGet.mockResolvedValueOnce(tmdbSeason([{name: 'Pilot', overview: 'Complet.', air_date: '2008-01-20'}]));
+		const episodes = await loadSeerrSeason(details, 1, 'ro', 'key');
+		expect(tmdbGet).toHaveBeenCalledTimes(1);
+		expect(tmdbGet).toHaveBeenCalledWith('/tv/1396/season/1', 'ro', 'key');
 		expect(episodes[0].Overview).toBe('Complet.');
+		expect(seerrApi.getTvSeason).not.toHaveBeenCalled();
 	});
 
 	it('fills a missing description from English', async () => {
-		seerrApi.getTvSeason
-			.mockResolvedValueOnce(season([{name: 'Pilot', overview: ''}]))
-			.mockResolvedValueOnce(season([{name: 'Pilot', overview: 'In English.'}]));
-		const episodes = await loadSeerrSeason(details, 1, 'ro-RO');
-		expect(seerrApi.getTvSeason).toHaveBeenLastCalledWith(1396, 1, 'en-US');
+		tmdbGet
+			.mockResolvedValueOnce(tmdbSeason([{name: 'Pilot', overview: '', air_date: '2008-01-20'}]))
+			.mockResolvedValueOnce(tmdbSeason([{name: 'Pilot', overview: 'In English.', air_date: '2008-01-20'}]));
+		const episodes = await loadSeerrSeason(details, 1, 'ro', 'key');
+		expect(tmdbGet).toHaveBeenLastCalledWith('/tv/1396/season/1', 'en-US', 'key');
 		expect(episodes[0].Overview).toBe('In English.');
 	});
 
 	it('does not ask English about episodes that have not aired', async () => {
-		seerrApi.getTvSeason.mockResolvedValueOnce({seasonNumber: 1, episodes: [{seasonNumber: 1, episodeNumber: 1, name: 'Soon', overview: '', airDate: '2999-01-01'}]});
-		await loadSeerrSeason(details, 1, 'ro-RO');
-		expect(seerrApi.getTvSeason).toHaveBeenCalledTimes(1);
+		tmdbGet.mockResolvedValueOnce(tmdbSeason([{name: 'Soon', overview: '', air_date: '2999-01-01'}]));
+		await loadSeerrSeason(details, 1, 'ro', 'key');
+		expect(tmdbGet).toHaveBeenCalledTimes(1);
 	});
 
-	it('keeps what it has when English cannot be reached, and never asks it twice for English', async () => {
-		seerrApi.getTvSeason
-			.mockResolvedValueOnce(season([{name: 'Pilot', overview: ''}]))
-			.mockRejectedValueOnce(new Error('down'));
-		await expect(loadSeerrSeason(details, 1, 'ro-RO')).resolves.toHaveLength(1);
+	it('keeps what it has when English cannot be reached, and never asks English for English', async () => {
+		tmdbGet.mockResolvedValueOnce(tmdbSeason([{name: 'Pilot', overview: '', air_date: '2008-01-20'}])).mockRejectedValueOnce(new Error('down'));
+		await expect(loadSeerrSeason(details, 1, 'ro', 'key')).resolves.toHaveLength(1);
 
-		seerrApi.getTvSeason.mockReset().mockResolvedValueOnce(season([{name: 'Pilot', overview: ''}]));
-		await loadSeerrSeason(details, 1, 'en-US');
-		expect(seerrApi.getTvSeason).toHaveBeenCalledTimes(1);
+		tmdbGet.mockReset().mockResolvedValueOnce(tmdbSeason([{name: 'Pilot', overview: '', air_date: '2008-01-20'}]));
+		await loadSeerrSeason(details, 1, 'en-US', 'key');
+		expect(tmdbGet).toHaveBeenCalledTimes(1);
+	});
+
+	it('is the Seerr answer when TMDB cannot be reached', async () => {
+		tmdbGet.mockRejectedValueOnce(new Error('401'));
+		seerrApi.getTvSeason.mockResolvedValueOnce(season([{name: 'Pilot', overview: 'In English.'}]));
+		const episodes = await loadSeerrSeason(details, 1, 'ro', 'bad');
+		expect(episodes[0].Overview).toBe('In English.');
 	});
 });

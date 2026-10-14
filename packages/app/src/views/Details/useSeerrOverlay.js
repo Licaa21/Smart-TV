@@ -79,6 +79,7 @@ const useSeerrOverlay = ({item, seerrOnly, showsSection}) => {
 		mediaType: target.mediaType,
 		details: data.details,
 		language: data.language,
+		tmdbApiKey: data.tmdbApiKey,
 		setDetails: data.setDetails,
 		setError: setActionError,
 		isAuthenticated,

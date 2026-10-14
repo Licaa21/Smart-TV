@@ -3,6 +3,7 @@ import {act, renderHook} from '@testing-library/react';
 import seerrApi from '../../services/seerrApi';
 import {resolveMetadataLanguage} from '../../utils/metadataLanguage';
 import {MEDIA_STATUS} from '../../utils/seerrStatus';
+import {tmdbGet} from '../../utils/tmdbText';
 import useSeerrDetailsData, {statusPollInterval} from './useSeerrDetailsData';
 
 jest.mock('@enact/i18n/$L', () => ({__esModule: true, default: (str) => str}));
@@ -24,6 +25,10 @@ jest.mock('../../services/seerrApi', () => ({
 }));
 
 // The language lookup talks to the media server, which a test has none of.
+// What the plugin syncs down, which is where the words in the metadata language come from.
+let mockSettings = {};
+jest.mock('../../context/SettingsContext', () => ({useSettings: () => ({settings: mockSettings})}));
+jest.mock('../../utils/tmdbText', () => ({...jest.requireActual('../../utils/tmdbText'), tmdbGet: jest.fn()}));
 jest.mock('../../services/jellyfinApi', () => ({api: {}, getServerUrl: () => 'http://server', getUserId: () => 'u1'}));
 jest.mock('../../utils/metadataLanguage', () => ({
 	...jest.requireActual('../../utils/metadataLanguage'),
@@ -57,7 +62,9 @@ beforeEach(() => {
 	mediaInfo = {status: MEDIA_STATUS.UNKNOWN};
 	hidden = false;
 	// The test config resets mocks between tests, so their answers are given here.
-	resolveMetadataLanguage.mockResolvedValue('ro-RO');
+	resolveMetadataLanguage.mockResolvedValue('ro');
+	mockSettings = {};
+	tmdbGet.mockReset();
 	seerrApi.getMovie.mockImplementation(async () => movie());
 	seerrApi.getUser.mockResolvedValue({id: 1});
 	seerrApi.getUserQuota.mockResolvedValue(null);
@@ -80,26 +87,20 @@ describe('the refresh interval', () => {
 });
 
 describe('the language of the title', () => {
-	test('asks Seerr for the metadata language and says which it was', async () => {
+	test('is the Seerr answer, with no language asked, when there is no TMDB key', async () => {
 		const {result} = await open();
-		expect(seerrApi.getMovie).toHaveBeenCalledWith(299534, 'ro-RO');
-		expect(result.current.language).toBe('ro-RO');
+		expect(seerrApi.getMovie).toHaveBeenCalledWith(299534);
+		expect(tmdbGet).not.toHaveBeenCalled();
+		expect(result.current.details.overview).toBe('Răzbunătorii.');
 	});
 
-	test('fills a description that language lacks from English', async () => {
-		seerrApi.getMovie.mockImplementation(async (id, language) => (language === 'en-US'
-			? {id, title: 'Avengers: Endgame', overview: 'The Avengers.', tagline: 'Part of the journey.', mediaInfo}
-			: {id, title: 'Avengers: Endgame', overview: '', tagline: '', mediaInfo}));
+	test('takes its words from TMDB in the metadata language when the plugin has given a key', async () => {
+		mockSettings = {tmdbApiKey: 'key'};
+		tmdbGet.mockResolvedValue({title: 'Răzbunătorii: Sfârșitul', overview: 'Descriere.', tagline: ''});
 		const {result} = await open();
-		expect(result.current.details.overview).toBe('The Avengers.');
-		expect(result.current.details.tagline).toBe('Part of the journey.');
-	});
-
-	test('does not ask twice when the language is English', async () => {
-		resolveMetadataLanguage.mockResolvedValue('en-US');
-		seerrApi.getMovie.mockImplementation(async (id) => ({id, title: 'Avengers: Endgame', overview: '', mediaInfo}));
-		await open();
-		expect(seerrApi.getMovie).toHaveBeenCalledTimes(1);
+		expect(tmdbGet).toHaveBeenCalledWith('/movie/299534', 'ro', 'key');
+		expect(result.current.language).toBe('ro');
+		expect(result.current.details).toMatchObject({title: 'Răzbunătorii: Sfârșitul', overview: 'Descriere.'});
 	});
 });
 

@@ -2,13 +2,15 @@
 // rows, and the viewer's permissions, quota and configured servers. Without a media id it sits
 // idle, which is how a title Seerr has nothing to say about costs nothing.
 
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
 
+import {useSettings} from '../../context/SettingsContext';
 import {api as jellyfinApi, getServerUrl, getUserId} from '../../services/jellyfinApi';
 import seerrApi from '../../services/seerrApi';
 import {resolveMetadataLanguage} from '../../utils/metadataLanguage';
 import {fetchSeerrTitle} from '../../utils/seerrTitle';
+import {keepingText} from '../../utils/tmdbText';
 import {getMediaDownloadSummary, isMediaInFlight} from '../../utils/seerrStatus';
 
 const DOWNLOAD_POLL_MS = 15000;
@@ -24,6 +26,15 @@ export const statusPollInterval = (media) => {
 };
 
 const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
+	// The key the plugin syncs down, which is where the words in the metadata language come from. Read through a
+	// ref, since a change of it should not load the title again.
+	const {settings} = useSettings();
+	const tmdbApiKey = settings.tmdbApiKey || '';
+	const tmdbKeyRef = useRef(tmdbApiKey);
+	tmdbKeyRef.current = tmdbApiKey;
+	// The key a title was loaded with. The plugin syncs it down after sign in, so a page opened before that
+	// is loaded again once it is there.
+	const loadedWithKeyRef = useRef('');
 	const [language, setLanguage] = useState(null);
 	const [details, setDetails] = useState(null);
 	const [loading, setLoading] = useState(true);
@@ -62,7 +73,8 @@ const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 				const [data, userData, serversData, publicSettings] = await Promise.all([
 					resolveMetadataLanguage(jellyfinApi, `${getServerUrl() || ''}|${getUserId() || ''}`).then((metadataLanguage) => {
 						if (!cancelled) setLanguage(metadataLanguage);
-						return fetchSeerrTitle(mediaType, mediaId, metadataLanguage);
+						loadedWithKeyRef.current = tmdbKeyRef.current;
+						return fetchSeerrTitle(mediaType, mediaId, metadataLanguage, {tmdbApiKey: tmdbKeyRef.current});
 					}),
 					seerrApi.getUser().catch(() => null),
 					(mediaType === 'movie'
@@ -145,6 +157,18 @@ const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 		return () => { cancelled = true; };
 	}, [mediaId, mediaType, contextUser]);
 
+	useEffect(() => {
+		if (!tmdbApiKey || loading || !details || !language || !mediaId || loadedWithKeyRef.current === tmdbApiKey) return undefined;
+		let closed = false;
+		loadedWithKeyRef.current = tmdbApiKey;
+		fetchSeerrTitle(mediaType, mediaId, language, {tmdbApiKey}).then((data) => {
+			if (data && !closed) setDetails((previous) => keepingText(previous || data, data));
+		}).catch(() => {});
+		return () => {
+			closed = true;
+		};
+	}, [tmdbApiKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
 	const hdStatus = useMemo(() => details?.mediaInfo?.status ?? null, [details]);
 	const status4k = useMemo(() => details?.mediaInfo?.status4k ?? null, [details]);
 
@@ -169,11 +193,9 @@ const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 		const id = setInterval(() => {
 			// Nobody is looking at the page while the app is in the background.
 			if (document.hidden) return;
-			// The English text is kept from the first load, so a tick is one request.
-			fetchSeerrTitle(mediaType, mediaId, language, {fallback: false}).then((data) => {
-				if (data && !closed) {
-					setDetails((previous) => ({...data, overview: data.overview || previous?.overview, tagline: data.tagline || previous?.tagline}));
-				}
+			// Only the status is wanted, so Seerr alone is asked and the words already on screen are kept.
+			fetchSeerrTitle(mediaType, mediaId, language).then((data) => {
+				if (data && !closed) setDetails((previous) => keepingText(data, previous));
 			}).catch(() => {});
 		}, pollInterval);
 		return () => {
@@ -184,6 +206,7 @@ const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 
 	return {
 		language,
+		tmdbApiKey,
 		details,
 		setDetails,
 		loading,
