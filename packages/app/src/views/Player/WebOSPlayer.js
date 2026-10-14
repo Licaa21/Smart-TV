@@ -32,6 +32,8 @@ import {
 	notePlaybackError
 } from '../../services/video';
 import {KEYS, isBackKey} from '../../utils/keys';
+import {getPerfTier} from '../../utils/perfTier';
+import {playerClockStale, playerClockWanted} from '../../utils/playerClock';
 import {useSettings} from '../../context/SettingsContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import * as syncPlayService from '../../services/syncPlay';
@@ -303,6 +305,24 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const containerRef = useRef(null);
 	const handlersRef = useRef({});
 	const positionRef = useRef(0);
+
+	// The time is only redrawn when something shows it, so it is brought up to date the moment that
+	// changes, rather than a half second later.
+	const clockWantedRef = useRef(true);
+	const shownSecondRef = useRef(-1);
+	// A new item starts its clock over, so its first reading is drawn whatever second the last one ended on.
+	useEffect(() => {
+		shownSecondRef.current = -1;
+	}, [item?.Id]);
+	// Read by the time update, which runs from an interval or a media event and so sees no fresh state.
+	const clockAudioRef = useRef(false);
+	clockAudioRef.current = isAudioMode;
+	clockWantedRef.current = playerClockWanted({tier: getPerfTier(), controlsVisible, activeModal, isAudioMode});
+	useEffect(() => {
+		if (getPerfTier() === 'high' || !(controlsVisible || activeModal) || !(positionRef.current > 0)) return;
+		shownSecondRef.current = Math.floor(positionRef.current / 10000000);
+		setCurrentTime(positionRef.current / 10000000);
+	}, [controlsVisible, activeModal]); // eslint-disable-line react-hooks/exhaustive-deps
 	const playSessionRef = useRef(null);
 	const runTimeRef = useRef(0);
 	const healthMonitorRef = useRef(null);
@@ -1910,7 +1930,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			const time = rawTime;
 			// Nothing on screen reads the time while the episode panel is up, and each update redraws the
 			// whole player, which is what makes that panel drag. The first tick after it closes catches up.
-			if (!episodesOpenRef.current) setCurrentTime(time);
+			if (!episodesOpenRef.current && clockWantedRef.current && playerClockStale({tier: getPerfTier(), time, shownSecond: shownSecondRef.current, isAudioMode: clockAudioRef.current})) {
+				shownSecondRef.current = Math.floor(time);
+				setCurrentTime(time);
+			}
 			const ticks = Math.floor(time * 10000000);
 			if (ticks !== positionRef.current) {
 				stalledRef.current = false;

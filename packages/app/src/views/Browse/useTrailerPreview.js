@@ -316,7 +316,9 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 			clearSkipInterval();
 			if (segments.length > 0) {
 				trailerSkipIntervalRef.current = setInterval(() => {
-					if (!video || video.paused) return;
+					// Not while it is still starting up, when a seek can send the video one way and the audio, which
+					// hls.js loads apart from it, another.
+					if (!video || video.paused || video.seeking || video.readyState < 3) return;
 					const t = video.currentTime;
 					for (let i = 0; i < segments.length; i++) {
 						if (t >= segments[i].start && t < segments[i].end - 0.5) {

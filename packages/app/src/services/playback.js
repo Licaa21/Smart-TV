@@ -2,6 +2,7 @@ import * as jellyfinApi from './jellyfinApi';
 import {getDeviceProfile, getDeviceCapabilities} from './deviceProfile';
 import {getPlayMethod, getMimeType, isAudioStreamPlayable, canRenderEmbeddedPgsInBand, rendersSubtitleInHost} from './video';
 import {getFromStorage} from './storage';
+import {describeSegments, mergeOverlappingSegments} from '../utils/mediaSegments';
 import {selectCompatibleAlternateAudio} from '../utils/alternateAudio';
 import {serverLogger} from './serverLogger';
 import {TEXT_SUBTITLE_CODECS, isAssSubtitleCodec, isPgsSubtitleCodec, isBurnInSubtitleCodec, isInBandSubtitleTrack} from '../utils/subtitleCodecs';
@@ -1189,7 +1190,9 @@ const logSegments = (itemId, source, segments) => {
 		source,
 		intro: segments.introStart != null ? [segments.introStart, segments.introEnd] : null,
 		credits: segments.creditsStart != null ? [segments.creditsStart, segments.creditsEnd] : null,
-		segments: segments.list.length
+		segments: segments.list.length,
+		// Every segment the server named, in seconds, as it named them.
+		reported: segments.reported || describeSegments(segments.list)
 	});
 };
 
@@ -1222,6 +1225,19 @@ export const getMediaSegments = async (itemId) => {
 				}
 			}
 			if (segments.introStart !== null || segments.creditsStart !== null) {
+				// What the server said, before overlapping segments are joined, so a report shows both.
+				segments.reported = describeSegments(segments.list);
+				segments.list = mergeOverlappingSegments(segments.list);
+				const intros = segments.list.filter((s) => s.type === 'intro');
+				const outros = segments.list.filter((s) => s.type === 'outro');
+				if (intros.length) {
+					segments.introStart = intros[intros.length - 1].start;
+					segments.introEnd = intros[intros.length - 1].end;
+				}
+				if (outros.length) {
+					segments.creditsStart = outros[outros.length - 1].start;
+					segments.creditsEnd = outros[outros.length - 1].end;
+				}
 				console.log('[Playback] Media segments found:', segments);
 				logSegments(itemId, 'server', segments);
 				return segments;

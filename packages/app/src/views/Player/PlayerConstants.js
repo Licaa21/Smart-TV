@@ -33,6 +33,12 @@ export const CONTROLS_HIDE_DELAY = 5000;
 // a slow answer costs nothing and losing the prompt for the episode costs the viewer.
 export const SEGMENT_FETCH_TIMEOUT = 20000;
 
+// A skip is checked this long after the seek, and made once more when the player is still more than
+// this far short of where it was sent.
+export const SKIP_LANDING_CHECK_MS = 1500;
+export const SKIP_LANDING_TOLERANCE_TICKS = 20000000;
+export const SKIP_LANDING_SNAP_TICKS = 600000000;
+
 // How long a start holds for ASS subtitles when the viewer turned that on. Past this the video
 // starts anyway and the subtitles show up once the renderer catches up.
 export const ASS_READY_WAIT = 15000;
