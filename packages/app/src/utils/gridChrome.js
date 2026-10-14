@@ -64,6 +64,14 @@ export const horizontalCellPad = (cardWidth, gridWidth) => {
 	return pad;
 };
 
+// Spotlight leaves focus where it is while the pointer was the last thing used, and these handlers run before it hears
+// the press and leaves pointer mode itself, so each leaves it first. Without that, a press out of the toolbar did
+// nothing after the pointer had moved, while a press Spotlight handles on its own still worked.
+const focusFromKey = (spotlightId) => {
+	Spotlight.setPointerMode(false);
+	Spotlight.focus(spotlightId);
+};
+
 // Down out of the toolbar drops into the grid. A screen with something focusable
 // above the toolbar passes it too, since the row it sits on is too wide for the
 // five-way to find it on its own.
@@ -71,14 +79,14 @@ export const createToolbarKeyDown = (gridSpotlightId, aboveSpotlightId) => (e) =
 	if (e.keyCode === KEYS.UP && aboveSpotlightId) {
 		e.preventDefault();
 		e.stopPropagation();
-		Spotlight.focus(aboveSpotlightId);
+		focusFromKey(aboveSpotlightId);
 		return;
 	}
 	if (e.keyCode !== KEYS.DOWN) return;
 
 	e.preventDefault();
 	e.stopPropagation();
-	Spotlight.focus(gridSpotlightId);
+	focusFromKey(gridSpotlightId);
 };
 
 // Up out of the grid goes back to the toolbar, but only from the top of the list. Further
@@ -91,5 +99,5 @@ export const createGridKeyDown = (gridClassName, aboveSpotlightId) => (e) => {
 
 	e.preventDefault();
 	e.stopPropagation();
-	Spotlight.focus(aboveSpotlightId);
+	focusFromKey(aboveSpotlightId);
 };
