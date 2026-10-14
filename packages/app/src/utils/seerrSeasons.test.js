@@ -62,11 +62,15 @@ describe('seerrEpisodeItems rating', () => {
 describe('seerrEpisodeItems people', () => {
 	it('lists the director, the writers and the guests, and leaves out what is not there', () => {
 		const [full, bare] = seerrEpisodeItems(season([
-			{name: 'Pilot', voteCount: 12, crew: [{name: 'A', job: 'Director'}, {name: 'B', job: 'Writer'}, {name: 'B', job: 'Screenplay'}, {name: 'C', job: 'Editor'}], guestStars: [{name: 'D'}, {name: 'E'}]},
+			{name: 'Pilot', voteCount: 12, crew: [{name: 'A', job: 'Director'}, {name: 'B', job: 'Writer'}, {name: 'B', job: 'Screenplay'}, {name: 'C', job: 'Editor'}], guestStars: [{id: 7, name: 'D', character: 'Cop', profile_path: '/d.jpg'}, {name: 'E', profilePath: '/e.jpg'}]},
 			{name: 'Next'}
 		]), details);
-		expect(full).toMatchObject({_voteCount: 12, _directors: ['A'], _writers: ['B'], _guests: ['D', 'E']});
-		expect(bare).toMatchObject({_voteCount: 0, _directors: [], _writers: [], _guests: []});
+		expect(full).toMatchObject({_voteCount: 12, _directors: ['A'], _writers: ['B']});
+		expect(full._guestStars).toEqual([
+			{id: '7', name: 'D', character: 'Cop', photo: 'tmdb/w185/d.jpg'},
+			{id: '', name: 'E', character: '', photo: 'tmdb/w185/e.jpg'}
+		]);
+		expect(bare).toMatchObject({_voteCount: 0, _directors: [], _writers: [], _guestStars: []});
 	});
 });
 

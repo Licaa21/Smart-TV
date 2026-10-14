@@ -179,7 +179,7 @@ const SpotlightSection = ({section, serverUrl, actions, seerr, firstSpotlightId}
 				/>
 			);
 		case 'seerrEpisodes':
-			return <SeerrEpisodes seasons={section.seasons} episodes={section.episodes} settings={section.settings} spotlightId="spotlight-seerr-episodes" firstSpotlightId={firstSpotlightId} />;
+			return <SeerrEpisodes seasons={section.seasons} episodes={section.episodes} settings={section.settings} onSelectPerson={seerr?.nav?.onSelectPerson} spotlightId="spotlight-seerr-episodes" firstSpotlightId={firstSpotlightId} />;
 		case 'seerrChips':
 			return (
 				<div className={css.chipRow}>

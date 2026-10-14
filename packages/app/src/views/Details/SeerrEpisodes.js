@@ -35,7 +35,7 @@ const cardTitle = (episode) => {
 // A Seerr series' episodes, read only: season tabs over a row of cards showing the still, the number
 // and name, when it airs and the description. Every style that has no row of its own for this draws
 // it, so what an episode says reads the same in each.
-const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId = 'seerr-episodes', onNavigateUp, settings, firstSpotlightId}) => {
+const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId = 'seerr-episodes', onNavigateUp, settings, firstSpotlightId, onSelectPerson}) => {
 	const [picked, setPicked] = useState(null);
 	// The episode opened with OK, in full. Focus stays on its card while it is up.
 	const [opened, setOpened] = useState(null);
@@ -145,6 +145,7 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 					episode={opened}
 					airDate={airDateText(opened)}
 					hideOverview={hidesMediaDescription(opened, settings)}
+					onSelectPerson={onSelectPerson}
 					onClose={handleClose}
 				/>
 			)}

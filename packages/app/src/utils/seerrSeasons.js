@@ -54,6 +54,20 @@ const namesOf = (people, jobs) => (Array.isArray(people) ? people : [])
 	.map((person) => person.name)
 	.filter((name, at, all) => all.indexOf(name) === at);
 
+// A guest star with the id that opens their page and the photo TMDB has, whichever way the answer spells it.
+const guestStarsOf = (people) => (Array.isArray(people) ? people : [])
+	.filter((person) => person && person.name)
+	.slice(0, 8)
+	.map((person) => {
+		const photo = person.profilePath || person.profile_path;
+		return {
+			id: person.id != null ? String(person.id) : '',
+			name: person.name,
+			character: person.character || '',
+			photo: photo ? seerrApi.getImageUrl(photo, 'w185') : null
+		};
+	});
+
 export const seerrEpisodeItems = (season, details) => (season?.episodes || []).map((episode) => {
 	const still = episode.stillPath ? seerrApi.getImageUrl(episode.stillPath, 'w500') : null;
 	return {
@@ -69,7 +83,7 @@ export const seerrEpisodeItems = (season, details) => (season?.episodes || []).m
 		_voteCount: episode.voteCount > 0 ? episode.voteCount : 0,
 		_directors: namesOf(episode.crew, ['director']),
 		_writers: namesOf(episode.crew, ['writer', 'screenplay', 'story', 'teleplay']),
-		_guests: namesOf(episode.guestStars).slice(0, 8),
+		_guestStars: guestStarsOf(episode.guestStars),
 		SeriesName: details.name || details.title || '',
 		ProviderIds: {Tmdb: String(details.id)},
 		UserData: {},

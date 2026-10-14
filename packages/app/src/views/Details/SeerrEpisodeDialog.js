@@ -1,10 +1,14 @@
-import {useEffect, useRef} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import {createPortal} from 'react-dom';
 import $L from '@enact/i18n/$L';
+import Spotlight from '@enact/spotlight';
 
+import {keepFocusInView} from '../../utils/focusScroll';
 import {formatDuration} from '../../utils/helpers';
 import {KEYS} from '../../utils/keys';
 import {registerSeerrEpisodeDialog, unregisterSeerrEpisodeDialog} from '../../utils/seerrEpisodeDialogBack';
+import {ModalContainer} from '../../utils/spotlightContainers';
+import {SpottableDiv} from './detailsSpottables';
 
 import css from './SeerrEpisodes.module.less';
 
@@ -40,31 +44,72 @@ const chipsOf = (episode, airDate) => [
 // The people behind it, which only some answers carry.
 const creditsOf = (episode) => [
 	[$L('Director'), (episode._directors || []).join(', ')],
-	[$L('Writers'), (episode._writers || []).join(', ')],
-	[$L('Guest stars'), (episode._guests || []).join(', ')]
+	[$L('Writers'), (episode._writers || []).join(', ')]
 ].filter(([, value]) => value);
 
-// One episode of a Seerr series in full, opened with OK on its card. Nothing in it takes focus. Focus stays on
-// the card behind, so the dialog takes every key itself: up and down read a long description, and the rest do
-// nothing until Back, which closes it through the detail screen's back chain. It sits on document.body,
-// outside the rows of the detail screen.
-const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onClose}) => {
+// A guest star as a round photo and a name. One that has an id opens their page.
+const initialsOf = (name) => String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('');
+
+const Star = ({star, first, onOpen}) => {
+	const photo = star.photo ? <img src={star.photo} alt="" /> : <span className={css.castInitials}>{initialsOf(star.name)}</span>;
+	const body = (
+		<>
+			<div className={css.castPhoto}>{photo}</div>
+			<div className={css.castName}>{star.name}</div>
+			{star.character && <div className={css.castRole}>{star.character}</div>}
+		</>
+	);
+	if (!star.id) return <div className={css.cast}>{body}</div>;
+	return (
+		<SpottableDiv className={css.cast} data-person-id={star.id} data-person-name={star.name} data-selected={first ? 'true' : undefined} onClick={onOpen}>
+			{body}
+		</SpottableDiv>
+	);
+};
+
+// One episode of a Seerr series in full, opened with OK on its card. Back closes it through the detail screen's
+// back chain. With guest stars that have a page to open, focus moves into the dialog onto them, left and right
+// move along them, and OK opens one. With none, nothing in it takes focus: focus stays on the card behind and
+// the dialog takes every key itself, up and down reading a long description. It sits on document.body, outside
+// the rows of the detail screen.
+const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onSelectPerson, onClose}) => {
 	const textRef = useRef(null);
+	const stars = episode._guestStars || [];
+	const focusable = Boolean(onSelectPerson) && stars.some((star) => star.id);
+	const focusableRef = useRef(focusable);
+	focusableRef.current = focusable;
+
+	const handleOpenPerson = useCallback((ev) => {
+		const {personId, personName} = ev.currentTarget.dataset;
+		if (personId) onSelectPerson(personId, personName);
+	}, [onSelectPerson]);
 
 	useEffect(() => {
 		registerSeerrEpisodeDialog(onClose);
+		// Where focus was, so closing hands it back.
+		const opener = document.activeElement;
 		const handleKeyDown = (ev) => {
 			if (ev.keyCode === KEYS.UP || ev.keyCode === KEYS.DOWN) {
 				const el = textRef.current;
 				if (el) el.scrollTop += ev.keyCode === KEYS.DOWN ? SCROLL_STEP : -SCROLL_STEP;
+			} else if (focusableRef.current && (ev.keyCode === KEYS.LEFT || ev.keyCode === KEYS.RIGHT || ev.keyCode === KEYS.ENTER)) {
+				// The guest stars take these.
+				return;
 			}
 			ev.preventDefault();
 			ev.stopPropagation();
 		};
 		window.addEventListener('keydown', handleKeyDown, true);
+		const moveIn = focusableRef.current ? window.setTimeout(() => Spotlight.focus('seerr-episode-dialog'), 50) : 0;
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown, true);
+			window.clearTimeout(moveIn);
 			unregisterSeerrEpisodeDialog(onClose);
+			if (focusableRef.current) {
+				window.requestAnimationFrame(() => {
+					if (opener && opener.isConnected) Spotlight.focus(opener);
+				});
+			}
 		};
 	}, [onClose]);
 
@@ -77,7 +122,7 @@ const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onClose}) => {
 
 	return createPortal(
 		<div className={css.dialogBackdrop} onClick={onClose}>
-			<div className={css.dialogPanel} onClick={stopClick}>
+			<ModalContainer className={css.dialogPanel} spotlightId="seerr-episode-dialog" onClick={stopClick}>
 				{/* The still again, large and soft, behind everything, so each episode has its own colors. */}
 				{still && <div className={css.dialogArt} style={{backgroundImage: `url(${still})`}} />}
 				<div className={css.dialogShade} />
@@ -105,6 +150,11 @@ const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onClose}) => {
 								</div>
 							)}
 							{description && <div className={css.dialogText} ref={textRef}>{description}</div>}
+							{stars.length > 0 && (
+								<div className={css.dialogCast} onFocus={keepFocusInView}>
+									{stars.map((star, index) => <Star key={star.id || star.name} star={star} first={index === 0} onOpen={handleOpenPerson} />)}
+								</div>
+							)}
 							{credits.length > 0 && (
 								<div className={css.dialogCredits}>
 									{credits.map(([name, value]) => (
@@ -122,7 +172,7 @@ const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onClose}) => {
 						{$L('Press Back to close')}
 					</div>
 				</div>
-			</div>
+			</ModalContainer>
 		</div>,
 		document.body
 	);

@@ -11,6 +11,10 @@ import serverLogger from '../../services/serverLogger';
 // What the trailer's element is listened to for, and how many of them a trailer logs.
 const TRAILER_EVENTS = ['waiting', 'stalled', 'seeking', 'seeked', 'playing', 'pause', 'error', 'ended'];
 const TRAILER_EVENTS_LOGGED = 40;
+// The seek a stream makes by itself just after it starts, which can move the picture and leave the sound, loaded
+// apart from it, where it was. Only one inside this window, near the start, counts.
+const TRAILER_START_SEEK_WINDOW_MS = 3000;
+const TRAILER_START_SEEK_NEAR_S = 2;
 
 // Plays a title's trailer. A local one goes to the real player, and a YouTube link plays in
 // an overlay here, since the player has no way to open a stream that isn't on the server.
@@ -169,6 +173,28 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 		};
 		TRAILER_EVENTS.forEach((name) => video.addEventListener(name, reportEvent));
 
+		// The first seek a trailer makes by itself right after it starts is followed by one pause and play, which makes
+		// the player line the sound up with the picture again. Whatever else the viewer or the skip does is left alone.
+		let startedAt = 0;
+		let resynced = false;
+		const noteStart = () => {
+			if (!startedAt) startedAt = Date.now();
+		};
+		const resyncAfterStartSeek = () => {
+			if (resynced || !startedAt || cancelled) return;
+			if (Date.now() - startedAt > TRAILER_START_SEEK_WINDOW_MS || video.currentTime > TRAILER_START_SEEK_NEAR_S) return;
+			resynced = true;
+			serverLogger.playback('Trailer re-synced after the start seek', {at: Math.round(video.currentTime * 10) / 10});
+			video.pause();
+			window.requestAnimationFrame(() => {
+				if (cancelled) return;
+				const playing = video.play();
+				if (playing && playing.catch) playing.catch(() => {});
+			});
+		};
+		video.addEventListener('playing', noteStart);
+		video.addEventListener('seeked', resyncAfterStartSeek);
+
 		// A manifest that errors, never starts or stops partway gives way to the muxed file, picking up
 		// where it stopped.
 		const fallBack = (reason = 'failed to play') => {
@@ -203,6 +229,8 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 			cancelled = true;
 			video.onerror = null;
 			TRAILER_EVENTS.forEach((name) => video.removeEventListener(name, reportEvent));
+			video.removeEventListener('playing', noteStart);
+			video.removeEventListener('seeked', resyncAfterStartSeek);
 			if (stopWatch) stopWatch();
 			if (release) release();
 		};

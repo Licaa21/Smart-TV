@@ -273,7 +273,7 @@ const ClassicDetailScreen = ({
 					<div className={css.sectionHeader}>
 						<h3 className={css.sectionTitle}>{$L('Seasons and Episodes')}</h3>
 					</div>
-					<SeerrEpisodes seasons={seasons} episodes={seriesEpisodes} navbarPosition={settings.navbarPosition} settings={settings} />
+					<SeerrEpisodes seasons={seasons} episodes={seriesEpisodes} navbarPosition={settings.navbarPosition} settings={settings} onSelectPerson={seerrNav?.onSelectPerson} />
 				</RowContainer>
 			)}
 
