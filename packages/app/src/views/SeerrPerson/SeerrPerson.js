@@ -7,7 +7,7 @@ import {useAuth} from '../../context/AuthContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import MediaRow from '../../components/MediaRow';
 import PersonDetailShell from '../../components/PersonDetailShell';
-import {knownForBackdropPath, personDateLines, prepareCredits} from '../../utils/personCredits';
+import {knownForBackdropPath, knownForKey, personDateLines, prepareCredits} from '../../utils/personCredits';
 import {normalizeMediaItem} from '../../utils/seerrHomeRows';
 
 import css from './SeerrPerson.module.less';
@@ -69,8 +69,10 @@ const SeerrPerson = ({personId, personName, onClose, onSelectItem, onBack}) => {
 		if (item?._seerrRaw) onSelectItem?.(item._seerrRaw);
 	}, [onSelectItem]);
 
-	const appearances = useMemo(() => prepareCredits(rawCast, {isCrew: false, group: true}).map(normalizeMediaItem), [rawCast]);
-	const crewCredits = useMemo(() => prepareCredits(rawCrew, {isCrew: true, group: true}).map(normalizeMediaItem), [rawCrew]);
+	// The most popular first, with the title the backdrop comes from ahead of them all.
+	const pinKey = useMemo(() => knownForKey(rawCast, rawCrew), [rawCast, rawCrew]);
+	const appearances = useMemo(() => prepareCredits(rawCast, {isCrew: false, group: true, sortOption: 'popularity', pinKey}).map(normalizeMediaItem), [rawCast, pinKey]);
+	const crewCredits = useMemo(() => prepareCredits(rawCrew, {isCrew: true, group: true, sortOption: 'popularity', pinKey}).map(normalizeMediaItem), [rawCrew, pinKey]);
 
 	const tabs = useMemo(() => {
 		const list = [];

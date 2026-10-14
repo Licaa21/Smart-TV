@@ -168,6 +168,7 @@ const leadingCredits = (cast) => {
 		const longEnough = !Number.isFinite(episodes) || episodes >= (order === null ? MIN_EPISODES_UNBILLED : MIN_EPISODES);
 		if ((order !== null && order >= LEAD_BILLING) || !longEnough || CAMEO_CHARACTER.test(character)) return;
 		leading.push({
+			credit,
 			path,
 			order,
 			episodes: Number.isFinite(episodes) ? episodes : null,
@@ -177,26 +178,51 @@ const leadingCredits = (cast) => {
 	return leading;
 };
 
-// The backdrop of the one title this person is known for: the series they were in for the most episodes, when one
-// ran long, and otherwise the film or series where they were billed highest, the most voted of those on a tie.
-// Null when they have no leading part with a backdrop.
-export const knownForBackdropPath = (cast) => {
+// The one title this person is known for: the series they were in for the most episodes, when one ran long, and
+// otherwise the film or series where they were billed highest, the most voted of those on a tie. Null when they
+// have no leading part with a backdrop.
+export const knownForCredit = (cast) => {
 	const leading = leadingCredits(cast);
 	const longest = leading
 		.filter((entry) => entry.episodes !== null && entry.episodes >= LONG_RUN)
 		.sort((a, b) => b.episodes - a.episodes)[0];
-	if (longest) return longest.path;
+	if (longest) return longest.credit;
 	const billed = (entry) => (entry.order === null ? Infinity : entry.order);
 	const best = leading.sort((a, b) => (billed(a) - billed(b)) || (b.votes - a.votes))[0];
-	return best ? best.path : null;
+	return best ? best.credit : null;
 };
 
-export const sortCredits = (credits, sortOption = 'alphabetical') => {
+// Its backdrop, which is the picture the person's page is drawn over.
+export const knownForBackdropPath = (cast) => {
+	const credit = knownForCredit(cast);
+	return credit ? (credit.backdropPath || credit.backdrop_path) : null;
+};
+
+// A title is a film or a series, and the same number can be both, so the kind is part of what names it.
+const kindOf = (value) => (String(value || '').toLowerCase() === 'tv' ? 'tv' : 'movie');
+export const creditKey = (credit) => (credit ? `${kindOf(credit.mediaType || credit.media_type)}:${credit.id}` : null);
+
+// The title the page's backdrop comes from, in the order the page tries them: the cast, then the crew of a person
+// who only directs or writes.
+export const knownForKey = (cast, crew) => creditKey(knownForCredit(cast) || knownForCredit(crew));
+
+const creditPopularity = (credit) => (Number.isFinite(credit.popularity) ? credit.popularity : -1);
+
+// `pinKey` names a title that goes first whatever the order, which is the one the page's backdrop comes from.
+export const sortCredits = (credits, sortOption = 'alphabetical', pinKey = null) => {
 	const sorted = (Array.isArray(credits) ? credits : []).slice();
 	const byTitle = (a, b) => creditTitle(a).toLowerCase().localeCompare(creditTitle(b).toLowerCase());
 
 	if (sortOption === 'alphabetical') {
 		sorted.sort(byTitle);
+		return sorted;
+	}
+
+	// The most popular first. A title TMDB gives no popularity for goes to the end, in name order.
+	if (sortOption === 'popularity') {
+		sorted.sort((a, b) => (creditPopularity(b) - creditPopularity(a)) || byTitle(a, b));
+		const at = pinKey ? sorted.findIndex((credit) => creditKey(credit) === pinKey) : -1;
+		if (at > 0) sorted.unshift(sorted.splice(at, 1)[0]);
 		return sorted;
 	}
 
@@ -214,7 +240,40 @@ export const sortCredits = (credits, sortOption = 'alphabetical') => {
 	return sorted;
 };
 
-export const prepareCredits = (credits, {isCrew = false, group = false, sortOption = 'alphabetical'} = {}) => {
+export const prepareCredits = (credits, {isCrew = false, group = false, sortOption = 'alphabetical', pinKey = null} = {}) => {
 	const usable = usableCredits(credits, isCrew);
-	return sortCredits(group ? groupCredits(usable, isCrew) : usable, sortOption);
+	return sortCredits(group ? groupCredits(usable, isCrew) : usable, sortOption, pinKey);
+};
+
+// How the library's own titles on a person's page are ranked, taken from what Seerr knows of them: each TMDB title's
+// popularity, and the title that goes first. Null while Seerr has not answered.
+export const libraryRanking = (credits) => {
+	if (!credits) return null;
+	const popularity = new Map();
+	[...(credits.cast || []), ...(credits.crew || [])].forEach((credit) => {
+		const key = creditKey(credit);
+		if (key && creditPopularity(credit) > (popularity.get(key) ?? -1)) popularity.set(key, creditPopularity(credit));
+	});
+	return {popularity, pinKey: knownForKey(credits.cast, credits.crew)};
+};
+
+// The library's titles in that order: the pinned one first, then the most popular, and the ones Seerr does not
+// know by community rating. The order they came in settles a tie.
+export const rankLibraryItems = (items, ranking) => {
+	const list = Array.isArray(items) ? items : [];
+	if (!ranking) return list;
+	const keyOf = (item) => {
+		const tmdb = item?.ProviderIds?.Tmdb;
+		if (!tmdb) return null;
+		if (item.Type === 'Movie') return `movie:${tmdb}`;
+		return item.Type === 'Series' ? `tv:${tmdb}` : null;
+	};
+	const weigh = (item) => {
+		const key = keyOf(item);
+		return {pinned: Boolean(key) && key === ranking.pinKey, popularity: key && ranking.popularity.has(key) ? ranking.popularity.get(key) : -1, rating: item?.CommunityRating || 0};
+	};
+	return list
+		.map((item, order) => ({item, order, ...weigh(item)}))
+		.sort((a, b) => (Number(b.pinned) - Number(a.pinned)) || (b.popularity - a.popularity) || (b.rating - a.rating) || (a.order - b.order))
+		.map((entry) => entry.item);
 };

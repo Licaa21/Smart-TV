@@ -10,7 +10,7 @@ import * as seerrApi from '../../services/seerrApi';
 import usePersonSeerrCredits from '../../hooks/usePersonSeerrCredits';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import {getImageUrl} from '../../utils/helpers';
-import {personDateLines, splitFilmography} from '../../utils/personCredits';
+import {personDateLines, rankLibraryItems, splitFilmography} from '../../utils/personCredits';
 import {sectionVisibility} from '../../utils/detailSectionLayout';
 
 import css from './Person.module.less';
@@ -51,7 +51,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	}, [api, personId]);
 
 	const tmdbId = person?.ProviderIds?.Tmdb;
-	const {appearances, crewCredits, backdropPath, creditsSettled, seerrEnabled} = usePersonSeerrCredits(tmdbId);
+	const {appearances, crewCredits, ranking, backdropPath, creditsSettled, seerrEnabled} = usePersonSeerrCredits(tmdbId);
 
 	const handleSelectCredit = useCallback((item) => {
 		if (item?._seerrRaw) onSelectSeerrItem?.(item._seerrRaw);
@@ -74,7 +74,16 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	}, [tmdbId, person, onSelectSeerrPerson]);
 
 	const syncedItems = useUserDataList(items);
-	const {movies, series, guestAppearances, musicVideos} = useMemo(() => splitFilmography(syncedItems, showsSection), [syncedItems, showsSection]);
+	const {movies, series, guestAppearances, musicVideos} = useMemo(() => {
+		const split = splitFilmography(syncedItems, showsSection);
+		// The most popular first, by what Seerr says of the same titles, and the one the backdrop comes from ahead of them
+		return {
+			movies: rankLibraryItems(split.movies, ranking),
+			series: rankLibraryItems(split.series, ranking),
+			guestAppearances: rankLibraryItems(split.guestAppearances, ranking),
+			musicVideos: rankLibraryItems(split.musicVideos, ranking)
+		};
+	}, [syncedItems, showsSection, ranking]);
 
 	// The backdrop of the one title they are best known for, which the credits know and the library does not.
 	// Without Seerr it is the best rated movie or series held here. Nothing is drawn until the credits have

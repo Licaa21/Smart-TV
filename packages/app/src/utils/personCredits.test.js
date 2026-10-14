@@ -8,6 +8,10 @@ import {
 	usableCredits,
 	groupCredits,
 	knownForBackdropPath,
+	knownForKey,
+	creditKey,
+	libraryRanking,
+	rankLibraryItems,
 	sortCredits,
 	prepareCredits
 } from './personCredits';
@@ -220,5 +224,53 @@ describe('the backdrop they are best known for', () => {
 		expect(pick([{voteCount: 5}])).toBeNull();
 		expect(pick([c({order: 50})])).toBeNull();
 		expect(pick(null)).toBeNull();
+	});
+});
+
+describe('popularity order with the backdrop title first', () => {
+	const credit = (id, title, popularity, extra) => ({id, title, mediaType: 'movie', posterPath: `/${id}.jpg`, popularity, ...extra});
+
+	test('the most popular come first, and a title with no popularity goes to the end by name', () => {
+		const list = [credit(1, 'Beta', 5), credit(2, 'Alpha', undefined), credit(3, 'Gamma', 50), credit(4, 'Delta', undefined)];
+		expect(sortCredits(list, 'popularity').map((c) => c.title)).toEqual(['Gamma', 'Beta', 'Alpha', 'Delta']);
+	});
+
+	test('the pinned title goes first whatever its popularity', () => {
+		const list = [credit(1, 'Beta', 5), credit(2, 'Alpha', 1), credit(3, 'Gamma', 50)];
+		expect(sortCredits(list, 'popularity', 'movie:2').map((c) => c.title)).toEqual(['Alpha', 'Gamma', 'Beta']);
+		expect(sortCredits(list, 'popularity', 'movie:99').map((c) => c.title)).toEqual(['Gamma', 'Beta', 'Alpha']);
+	});
+
+	test('a film and a series with the same id are not the same title', () => {
+		const list = [credit(7, 'Film', 1), credit(7, 'Show', 2, {mediaType: 'tv'})];
+		expect(sortCredits(list, 'popularity', 'tv:7').map((c) => c.title)).toEqual(['Show', 'Film']);
+		expect(creditKey(list[1])).toBe('tv:7');
+	});
+
+	test('the pinned title is the one the backdrop comes from', () => {
+		const cast = [
+			credit(1, 'Big Hit', 90, {backdropPath: '/b1.jpg', order: 3}),
+			credit(2, 'Lead Role', 10, {backdropPath: '/b2.jpg', order: 0})
+		];
+		expect(knownForKey(cast, [])).toBe('movie:2');
+		expect(prepareCredits(cast, {sortOption: 'popularity', pinKey: knownForKey(cast, [])}).map((c) => c.title)).toEqual(['Lead Role', 'Big Hit']);
+	});
+
+	test('library titles follow what Seerr says of the same titles, the pinned one first, then by rating', () => {
+		const cast = [
+			credit(1, 'Big Hit', 90, {backdropPath: '/b1.jpg', order: 3}),
+			credit(2, 'Lead Role', 10, {backdropPath: '/b2.jpg', order: 0}),
+			credit(3, 'Show', 40, {mediaType: 'tv'})
+		];
+		const ranking = libraryRanking({cast, crew: []});
+		const items = [
+			{Id: 'a', Type: 'Movie', ProviderIds: {Tmdb: '1'}, CommunityRating: 5},
+			{Id: 'b', Type: 'Series', ProviderIds: {Tmdb: '3'}, CommunityRating: 9},
+			{Id: 'c', Type: 'Movie', ProviderIds: {Tmdb: '2'}},
+			{Id: 'd', Type: 'Movie', ProviderIds: {Tmdb: '404'}, CommunityRating: 8},
+			{Id: 'e', Type: 'Movie'}
+		];
+		expect(rankLibraryItems(items, ranking).map((i) => i.Id)).toEqual(['c', 'a', 'b', 'd', 'e']);
+		expect(rankLibraryItems(items, null)).toEqual(items);
 	});
 });
