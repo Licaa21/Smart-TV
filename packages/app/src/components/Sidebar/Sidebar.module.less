@@ -164,6 +164,49 @@
 	position: relative;
 }
 
+.librariesRow {
+	position: relative;
+}
+
+// The scan button, on the right of the Libraries row beside its chevron. It shows once the rail is open.
+.refreshAllBtn {
+	position: absolute;
+	top: 50%;
+	right: 46px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	margin-top: -20px;
+	padding: 0;
+	border: 2px solid transparent;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.75));
+	opacity: 0;
+	pointer-events: none;
+	outline: none !important;
+	transition: opacity 0.15s ease, background 0.15s ease;
+
+	&:focus {
+		opacity: 1;
+		background: rgba(255, 255, 255, 0.18);
+		border-color: var(--theme-focus-border-color, #ffffff);
+		color: #fff;
+	}
+}
+
+.sidebar.expanded .refreshAllBtn {
+	opacity: 0.85;
+	pointer-events: auto;
+}
+
+// The row turns white when it has focus, and the icon turns dark with it.
+.librariesToggle:focus ~ .refreshAllBtn {
+	color: rgba(0, 0, 0, 0.7);
+}
+
 .chevron {
 	width: 20px;
 	height: 20px;
@@ -194,7 +237,7 @@
 }
 
 .librariesListExpanded {
-	max-height: 560px;
+	max-height: 500px;
 }
 
 .libraryItem {

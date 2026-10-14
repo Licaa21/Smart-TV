@@ -10,10 +10,8 @@ import SidebarItem from './SidebarItem';
 
 import css from './Sidebar.module.less';
 
-// Coming in lands on a library when none was left from last time, since the button before them scans the whole server.
 const LibrariesContainer = SpotlightContainerDecorator({
-	enterTo: 'last-focused',
-	defaultElement: '[data-library-id]'
+	enterTo: 'last-focused'
 }, 'div');
 
 const SpottableButton = Spottable('button');
@@ -36,6 +34,8 @@ const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}
 
 	return (
 		<div>
+			{/* The scan button rides on the Libraries row itself, on its right, and Right from the row focuses it. */}
+			<div className={css.librariesRow}>
 			<SidebarItem
 				Icon={LibrariesIcon}
 				slot={slot}
@@ -45,16 +45,17 @@ const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}
 			>
 				<ChevronDownIcon className={css.chevron} />
 			</SidebarItem>
+			{canRefresh && (
+				<SpottableButton className={css.refreshAllBtn} onClick={refreshAll} aria-label={$L('Refresh all libraries')}>
+					<RefreshStateIcon key={note} className={`${css.refreshAllIcon} ${note === 'busy' ? css.refreshSpin : note === 'started' || note === 'failed' ? css.refreshPop : ''}`} state={note} />
+				</SpottableButton>
+			)}
+			</div>
 
 			<LibrariesContainer
 				className={`${css.librariesList} ${expanded ? css.librariesListExpanded : ''}`}
 				spotlightDisabled={!expanded}
 			>
-				{canRefresh && (
-					<SpottableButton className={css.libraryItem} onClick={refreshAll} data-nav-slot={1} aria-label={$L('Refresh all libraries')}>
-						<RefreshStateIcon key={note} className={`${css.refreshAllIcon} ${note === 'busy' ? css.refreshSpin : note === 'started' || note === 'failed' ? css.refreshPop : ''}`} state={note} />
-					</SpottableButton>
-				)}
 				{libraries.map((lib, index) => (
 					<SpottableButton
 						key={lib.Id}
