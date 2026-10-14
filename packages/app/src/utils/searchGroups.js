@@ -61,16 +61,23 @@ export const aspectClassForType = (type) => {
 
 export const isCircleType = (type) => type === 'Person';
 
-// Closer to what was typed ranks first: the exact title, then one that starts with it, then one
-// that contains it, then the rest. The order the results arrive in settles every tie, which for
-// Seerr is its own best first order. A title is judged by its best name, the shown one or the one it
-// was made under, so a translated title is found by what it is called elsewhere.
+// Closer to what was typed ranks first: the exact title, then the exact title without its leading The, A or An (so
+// Flash finds The Flash before Flash Gordon), then one that starts with it, then one that contains it, then the
+// rest. The order the results arrive in settles every tie, which for Seerr is its own best first order. A title is
+// judged by its best name, the shown one or the one it was made under, so a translated title is found by what it
+// is called elsewhere.
+const LEADING_ARTICLE = /^(the|an|a)\s+(?=\S)/;
+const withoutArticle = (name) => name.replace(LEADING_ARTICLE, '');
+
 const titleMatchRank = (title, typed) => {
 	const name = foldForSearch(title || '');
-	if (!typed) return 3;
+	if (!typed) return 4;
 	if (name === typed) return 0;
-	if (name.startsWith(typed)) return 1;
-	return name.includes(typed) ? 2 : 3;
+	const bare = withoutArticle(name);
+	const bareTyped = withoutArticle(typed);
+	if (bare === bareTyped) return 1;
+	if (name.startsWith(typed) || bare.startsWith(bareTyped)) return 2;
+	return name.includes(typed) || bare.includes(bareTyped) ? 3 : 4;
 };
 
 export const rankMostRelevant = (items, query, count) => {

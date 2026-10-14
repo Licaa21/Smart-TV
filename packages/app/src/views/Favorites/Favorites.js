@@ -107,6 +107,8 @@ const Favorites = ({onSelectItem, onSelectPerson, onHome, backHandlerRef}) => {
 		backHandlerRef,
 		sortFocusId: 'fav-sort-option-0',
 		settingsFocusId: 'fav-settings-image-size',
+		sortButtonId: 'favorites-sort-btn',
+		settingsButtonId: 'favorites-settings-btn',
 		onBack: quickReturn
 	});
 

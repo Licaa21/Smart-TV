@@ -54,7 +54,9 @@ const Genres = ({onSelectGenre, onHome, backHandlerRef}) => {
 	} = useSortSettingsPanels({
 		backHandlerRef,
 		sortFocusId: 'genre-sort-option-0',
-		settingsFocusId: 'genres-settings-card-size'
+		settingsFocusId: 'genres-settings-card-size',
+		sortButtonId: 'genres-sort-btn',
+		settingsButtonId: 'genres-settings-btn'
 	});
 
 	const sortedGenresRef = useRef([]);
