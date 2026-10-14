@@ -306,11 +306,22 @@
 	}
 }
 
+// Says these are the episode's guests and not the cast of the series.
+.castHeading {
+	flex-shrink: 0;
+	margin-top: 14px;
+	font-size: 17px;
+	font-weight: 700;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	color: rgba(var(--theme-accent-rgb, 0, 164, 220), 1);
+}
+
 // The guest stars, as round photos in a row. One with a page to open takes focus and shows a ring.
 .dialogCast {
 	display: flex;
 	flex-shrink: 0;
-	margin-top: 14px;
+	margin-top: 6px;
 	overflow: hidden;
 }
 

@@ -217,6 +217,7 @@ export const ACCENT_RULES = {
 		["views/Details/SeerrEpisodes.module.less","",".{dialogPanel}","box-shadow","0 24px 80px rgba(0, 0, 0, 0.7), 0 0 60px rgba({rgb}, 0.22)"],
 		["views/Details/SeerrEpisodes.module.less","",".{dialogCode}","background","rgba({rgb}, 0.9)"],
 		["views/Details/SeerrEpisodes.module.less","",".{creditName}","color","rgba({rgb}, 1)"],
+		["views/Details/SeerrEpisodes.module.less","",".{castHeading}","color","rgba({rgb}, 1)"],
 		["views/Details/SeerrEpisodes.module.less","",".{cast}:focus","background","rgba({rgb}, 0.25)"],
 		["views/Details/nouveau/cards/NouveauCards.module.less","",".{progressFill}","background","{accent}"],
 		["views/Details/nouveau/cards/NouveauCards.module.less","",".{nextUp}","background","{accent}"],

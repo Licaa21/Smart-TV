@@ -143,6 +143,7 @@ const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onSelectPerson, ini
 								</div>
 							)}
 							{description && <div className={css.dialogText} ref={textRef}>{description}</div>}
+							{stars.length > 0 && <div className={css.castHeading}>{$L('Guest stars')}</div>}
 							{stars.length > 0 && (
 								<div className={css.dialogCast} onFocus={keepFocusInView}>
 									{stars.map((star, index) => <Star key={star.id || star.name} star={star} first={initialPersonId ? star.id === initialPersonId : index === 0} onOpen={handleOpenPerson} />)}
