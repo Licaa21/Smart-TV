@@ -6,10 +6,17 @@ jest.mock('../services/gamesApi', () => ({}));
 const title = (Name) => ({Id: Name, Name});
 
 describe('rankMostRelevant', () => {
-	it('puts the exact title first, then titles that start with the search, then ones that contain it', () => {
+	it('puts the exact title first, then titles that start with the search (not counting a leading The), then ones that contain it', () => {
 		const items = [title('Not Outer'), title('The Outer Limits'), title('Outer Banks'), title('Outer')];
 		expect(rankMostRelevant(items, 'outer', 4).map((item) => item.Name))
-			.toEqual(['Outer', 'Outer Banks', 'Not Outer', 'The Outer Limits']);
+			.toEqual(['Outer', 'The Outer Limits', 'Outer Banks', 'Not Outer']);
+	});
+
+	it('does not let a leading The, A or An keep a title behind ones that start with the search', () => {
+		const items = [title('Flash Gordon'), title('The Flash'), title('Flashdance'), title('Flash')];
+		expect(rankMostRelevant(items, 'Flash', 4).map((item) => item.Name)).toEqual(['Flash', 'The Flash', 'Flash Gordon', 'Flashdance']);
+		expect(rankMostRelevant([title('Flash Gordon'), title('The Flash')], 'the flash', 2).map((item) => item.Name)).toEqual(['The Flash', 'Flash Gordon']);
+		expect(rankMostRelevant([title('Thelma'), title('The')], 'the', 2).map((item) => item.Name)).toEqual(['The', 'Thelma']);
 	});
 
 	it('finds a translated title by the name it was made under', () => {

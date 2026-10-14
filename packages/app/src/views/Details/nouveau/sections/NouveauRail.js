@@ -25,9 +25,10 @@ const NEAR_END_CARDS = 8;
 // Up and down belong to the page, so they are swallowed here and handed back through the callbacks.
 // Left and right belong to the rail, and only its two edges need deciding. The gap comes from the
 // caller because it isn't the same on every rail. A rail given `itemMenu`, true or the menu's
-// options, opens a card's long press menu when OK is held on it.
+// options, opens a card's long press menu when OK is held on it. A rail given `wrap` false stops at its ends
+// instead of carrying on round to the other.
 const NouveauRail = ({
-	title, items = [], spotlightId, renderItem, gap = 32,
+	title, items = [], spotlightId, renderItem, gap = 32, wrap = true,
 	navbarPosition, onNavigateUp, onNavigateDown, onNearEnd, itemMenu
 }) => {
 	const trackRef = useRef(null);
@@ -130,9 +131,11 @@ const NouveauRail = ({
 			return;
 		}
 
+		if (!wrap) return;
+
 		const target = atLeft ? cells[cells.length - 1] : cells[0];
 		if (target) Spotlight.focus(target);
-	}, [navbarPosition, onNavigateUp, onNavigateDown, spotlightId]);
+	}, [wrap, navbarPosition, onNavigateUp, onNavigateDown, spotlightId]);
 
 	if (!items.length) return null;
 

@@ -184,6 +184,7 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 				key={active}
 				items={shown}
 				gap={CARD_GAP}
+				wrap={false}
 				spotlightId={railSpotlightId || `${spotlightId}-rail`}
 				navbarPosition={navbarPosition}
 				onNavigateUp={handleUp}

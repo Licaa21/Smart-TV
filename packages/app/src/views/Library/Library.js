@@ -750,6 +750,8 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		backHandlerRef,
 		sortFocusId: 'sort-option-0',
 		settingsFocusId: 'settings-image-size',
+		sortButtonId: 'library-sort-btn',
+		settingsButtonId: 'library-settings-btn',
 		onBack: handleBackBeyondPanels,
 		enabled: !isMusicBrowseHome
 	});
