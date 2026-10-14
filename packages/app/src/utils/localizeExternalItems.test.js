@@ -1,5 +1,5 @@
 import seerrApi from '../services/seerrApi';
-import {localizeExternalItems} from './localizeExternalItems';
+import {localizeExternalItems, localizeSeerrCards} from './localizeExternalItems';
 
 jest.mock('../services/seerrApi', () => ({
 	__esModule: true,
@@ -42,5 +42,30 @@ describe('localizeExternalItems', () => {
 		await localizeExternalItems([suggestion(9)], 'fr');
 		await localizeExternalItems([suggestion(9)], 'fr');
 		expect(seerrApi.getMovie).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('localizeSeerrCards', () => {
+	beforeEach(() => {
+		seerrApi.getMovie.mockReset();
+		seerrApi.getTv.mockReset();
+	});
+
+	const card = (id, extra) => ({Id: `ext-${id}`, Name: `English ${id}`, Type: 'Movie', ProviderIds: {Tmdb: String(id)}, _external: true, _seerr: true, _externalPosterUrl: 'old', ...extra});
+
+	it('puts the cards the library does not hold into the language, and leaves a library item alone', async () => {
+		seerrApi.getMovie.mockResolvedValue({title: 'Titlu', overview: 'Descriere.', posterPath: '/ro.jpg'});
+		const owned = {Id: 'abc', Name: 'Owned', Type: 'Movie', ProviderIds: {Tmdb: '5'}};
+		const [outside, library] = await localizeSeerrCards([card(1000), owned], 'ro');
+		expect(outside).toMatchObject({Name: 'Titlu', Overview: 'Descriere.', _externalPosterUrl: 'tmdb/w342/ro.jpg', _seerr: true});
+		expect(library).toBe(owned);
+		expect(seerrApi.getMovie).toHaveBeenCalledTimes(1);
+	});
+
+	it('asks for a series as a series', async () => {
+		seerrApi.getTv.mockResolvedValue({name: 'Serial', posterPath: '/s.jpg'});
+		const [show] = await localizeSeerrCards([card(2000, {Type: 'Series'})], 'ro');
+		expect(seerrApi.getTv).toHaveBeenCalledWith('2000', 'ro');
+		expect(show.Name).toBe('Serial');
 	});
 });
