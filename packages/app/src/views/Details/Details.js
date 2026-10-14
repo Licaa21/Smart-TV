@@ -66,7 +66,7 @@ import css from './Details.module.less';
 // draws the screen.
 const DETAIL_CONTENT = {v3: SpotlightDetailContent, v4: NouveauDetailContent, v5: MinimalistDetailContent};
 
-const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectItem: onSelectItemProp, onSelectPerson, onSelectStudio, onItemDeleted, autoPlay, onAutoPlayed, seerrNav, backHandlerRef, onOpenSetting}) => {
+const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectItem: onSelectItemProp, onSelectPerson, onSelectStudio, onItemDeleted, autoPlay, onAutoPlayed, seerrNav, backHandlerRef, onOpenSetting, settingsOpen}) => {
 	const {api, serverUrl, user} = useAuth();
 	// Kids Mode has its say before anything on this screen reads a setting, and every piece below
 	// takes what it is handed rather than reaching for the context itself. Held steady across
@@ -217,6 +217,27 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	const trailerBackRef = useRef(null);
 	const modals = useDetailsModals({backHandlerRef, onArtworkClosed: refreshItem, seerrBackRef, overviewBackRef, spotlightBackRef, trailerBackRef});
 	const {activeModal, openModal, closeModal, advancedResumeRef} = modals;
+
+	// A note of the Playback Info popup that sent the viewer to Settings. When Settings closes, the popup is opened
+	// again with that note in focus, so the way back ends where it started.
+	const [infoReturnKey, setInfoReturnKey] = useState('');
+	const [infoFocusKey, setInfoFocusKey] = useState('');
+	const settingsWasOpenRef = useRef(false);
+	const handleOpenSetting = useCallback((target) => {
+		setInfoReturnKey(target.settingKey || '');
+		onOpenSetting?.(target);
+	}, [onOpenSetting]);
+	useEffect(() => {
+		const closedNow = settingsWasOpenRef.current && !settingsOpen;
+		settingsWasOpenRef.current = Boolean(settingsOpen);
+		if (!closedNow || !infoReturnKey) return;
+		setInfoFocusKey(infoReturnKey);
+		setInfoReturnKey('');
+		openModal('playbackInfo');
+	}, [settingsOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+	useEffect(() => {
+		if (activeModal !== 'playbackInfo') setInfoFocusKey('');
+	}, [activeModal]);
 
 	const trailer = useDetailsTrailer({
 		item,
@@ -1014,7 +1035,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				api={effectiveApi}
 				activeModal={activeModal}
 				onCloseModal={closeModal}
-				onOpenSetting={onOpenSetting}
+				onOpenSetting={handleOpenSetting}
+				focusNoteKey={infoFocusKey}
 				item={item}
 				audioStreams={audioStreams}
 				subtitleStreams={subtitleStreams}

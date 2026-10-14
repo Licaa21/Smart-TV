@@ -1806,6 +1806,7 @@ const AppContent = (props) => {
 									seerrNav={seerrNav}
 									backHandlerRef={backHandlerRef}
 									onOpenSetting={handleOpenSettingAt}
+									settingsOpen={showSettingsPanel}
 							/>
 							)}
 						</Panel>
