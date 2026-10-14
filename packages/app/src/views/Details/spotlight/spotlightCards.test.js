@@ -179,6 +179,34 @@ describe('spotlightCardsFor', () => {
 		expect(cards[0].sections.map((s) => s.kind)).toEqual(['seerrChips', 'seerrFacts', 'seerrCollection']);
 	});
 
+	it('gives a seerr only series a card that reads its episodes, between the details and the cast', () => {
+		const seasons = [child('s1', 'Season', {IndexNumber: 1}), child('s2', 'Season', {IndexNumber: 2})];
+		const episodes = [child('e1', 'Episode', {_externalPosterUrl: 'tmdb/e1.jpg'})];
+		const cards = spotlightCardsFor(state({
+			seerrOnly: true,
+			item: {Id: 'seerr-tv-1', Type: 'Series', Name: 'Show'},
+			seasons,
+			seriesEpisodes: episodes,
+			cast: [child('p1')],
+			seerr: {chipCount: 1, factCount: 0}
+		}));
+		expect(ids(cards)).toEqual(['seerr_details', 'episodes', 'people']);
+		const card = cards[1];
+		expect(card.modalTitle).toBe('Show');
+		expect(card.subtitle).toBe('2 seasons · 1 episode');
+		expect(card.imageUrl).toBe('tmdb/e1.jpg');
+		expect(card.sections).toEqual([{kind: 'seerrEpisodes', title: null, seasons, episodes, settings: {}}]);
+	});
+
+	it('waits for the first episodes before showing a seerr only series its episodes card', () => {
+		const cards = spotlightCardsFor(state({seerrOnly: true, item: {Id: 'seerr-tv-1', Type: 'Series', Name: 'Show'}, seasons: [child('s1', 'Season')], seriesEpisodes: []}));
+		expect(ids(cards)).toEqual([]);
+	});
+
+	it('gives a seerr only movie no episodes card', () => {
+		expect(ids(spotlightCardsFor(state({seerrOnly: true, seasons: [child('s1', 'Season')], cast: [child('p1')]})))).toEqual(['people']);
+	});
+
 	it('leaves the details card out when seerr has nothing to say', () => {
 		const cards = spotlightCardsFor(state({seerrOnly: true, cast: [child('p1')], seerr: {}}));
 		expect(ids(cards)).toEqual(['people']);

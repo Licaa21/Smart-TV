@@ -1,0 +1,69 @@
+// A Seerr series' episodes: a card is the still, the name, when it airs and the description.
+.episodes {
+	width: 100%;
+}
+
+.seasonBar {
+	margin-bottom: 8px;
+}
+
+.card {
+	box-sizing: border-box;
+	padding: 10px;
+	border-radius: 14px;
+	border: 2px solid transparent;
+	outline: none;
+
+	&:focus {
+		background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.25);
+		border-color: var(--theme-focus-border-color, #ffffff);
+	}
+}
+
+.still {
+	width: 100%;
+	height: 175px;
+	border-radius: 10px;
+	overflow: hidden;
+	background: rgba(255, 255, 255, 0.08);
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+}
+
+.noStill {
+	width: 100%;
+	height: 100%;
+}
+
+.title {
+	margin-top: 10px;
+	font-size: 22px;
+	font-weight: 700;
+	color: var(--theme-text-primary, #ffffff);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.meta {
+	margin-top: 2px;
+	font-size: 18px;
+	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+// Kept to three lines whether or not it fills them, so a row of uneven descriptions lines up.
+.overview {
+	margin-top: 6px;
+	font-size: 18px;
+	line-height: 24px;
+	max-height: 72px;
+	overflow: hidden;
+	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+}

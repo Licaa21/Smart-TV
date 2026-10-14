@@ -33,6 +33,8 @@ import {isSeerrOnlyItem, libraryIdOf, personRouteFor} from '../../utils/seerrTar
 import {buildSeerrDetailItem} from '../../utils/seerrDetailItem';
 import {COLLECTION_ITEM_TYPES, IDENTIFIABLE_TYPES, getMediaBadges, seriesThumbUrl, shuffleArray, splitCastAndCrew} from './detailsMedia';
 import useDetailsItem from './useDetailsItem';
+import useSeerrEpisodes from './useSeerrEpisodes';
+import {isSeerrPseudo} from '../../utils/seerrSeasons';
 import useDetailsModals from './useDetailsModals';
 import useDetailsTrailer from './useDetailsTrailer';
 import useSeerrOverlay from './useSeerrOverlay';
@@ -64,7 +66,7 @@ import css from './Details.module.less';
 // draws the screen.
 const DETAIL_CONTENT = {v3: SpotlightDetailContent, v4: NouveauDetailContent, v5: MinimalistDetailContent};
 
-const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelectPerson, onSelectStudio, onItemDeleted, autoPlay, onAutoPlayed, seerrNav, backHandlerRef}) => {
+const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectItem: onSelectItemProp, onSelectPerson, onSelectStudio, onItemDeleted, autoPlay, onAutoPlayed, seerrNav, backHandlerRef}) => {
 	const {api, serverUrl, user} = useAuth();
 	// Kids Mode has its say before anything on this screen reads a setting, and every piece below
 	// takes what it is handed rather than reaching for the context itself. Held steady across
@@ -78,6 +80,15 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	const {pluginInfo, isEnabled: seerrEnabled} = useSeerr();
 	const recommendationsSupported = pluginInfo?.recommendationsSupported === true;
 	const {isInGroup: isSyncPlayInGroup} = useSyncPlay();
+
+	// A Seerr series' seasons and episodes are only there to read. There is no page or file behind
+	// one, so a press on it opens and plays nothing, whichever style draws it.
+	const onSelectItem = useCallback((target, ...rest) => {
+		return isSeerrPseudo(target) ? undefined : onSelectItemProp?.(target, ...rest);
+	}, [onSelectItemProp]);
+	const onPlay = useCallback((target, ...rest) => {
+		return isSeerrPseudo(target) ? undefined : onPlayProp?.(target, ...rest);
+	}, [onPlayProp]);
 
 	const effectiveApi = useMemo(() => {
 		if (initialItem?._serverUrl && initialItem._serverAccessToken) {
@@ -145,7 +156,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 		skip: seerrOnly
 	});
 	const {
-		setItem, isLoading: libraryLoading, isBlocked: blockedByRating, isSeed, seasons, episodes, seriesEpisodes, similar, extras, cast, nextUp, nextEpisode,
+		setItem, isLoading: libraryLoading, isBlocked: blockedByRating, isSeed, seasons: librarySeasons, episodes, seriesEpisodes: librarySeriesEpisodes, similar, extras, cast, nextUp, nextEpisode,
 		collectionItems, missingCollectionItems, parentCollections, similarSource, similarLoaded, playListsLoaded, loadMoreCollectionItems, removeFromCollection, albumTracks, artistAlbums,
 		playlistItems, setPlaylistItems, episodeRatings, refreshItem,
 		selectedVersionIndex, setSelectedVersionIndex,
@@ -154,6 +165,11 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	} = data;
 
 	const seerr = useSeerrOverlay({item: seerrOnly ? initialItem : data.item, seerrOnly, showsSection});
+
+	// A title the library lacks has its seasons and episodes from Seerr, in the metadata language.
+	const seerrEpisodes = useSeerrEpisodes({details: seerr.details, enabled: seerrOnly && seerr.mediaType === 'tv', language: seerr.language});
+	const seasons = seerrOnly ? seerrEpisodes.seasons : librarySeasons;
+	const seriesEpisodes = seerrOnly ? seerrEpisodes.episodes : librarySeriesEpisodes;
 
 	// A tap that came in as a bare TMDB or IMDb id can turn out to be a title the
 	// library holds, which only Seerr's answer reveals.
@@ -311,7 +327,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 	}, [onPlay]);
 
 	const handlePlay = useCallback(async () => {
-		if (!item) return;
+		// A title only Seerr knows has nothing here to play.
+		if (!item || seerrOnly) return;
 
 		const playbackOptions = buildPlaybackOptions();
 
@@ -358,7 +375,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 				onPlay?.(item, false, playbackOptions);
 			}
 		}
-	}, [item, episodes, nextUp, seasons, collectionItems, albumTracks, playlistItems, onPlay, onSelectItem, buildPlaybackOptions, effectiveApi, settings, tagWithServerInfo, isSyncPlayInGroup, playListFrom]);
+	}, [item, seerrOnly, episodes, nextUp, seasons, collectionItems, albumTracks, playlistItems, onPlay, onSelectItem, buildPlaybackOptions, effectiveApi, settings, tagWithServerInfo, isSyncPlayInGroup, playListFrom]);
 
 	const handleResume = useCallback(() => {
 		if (!item) return;
@@ -1361,8 +1378,10 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 				seerr={seerr}
 				seerrNav={seerrNav}
 				onSelectSeerrCard={handleSelectSeerrCard}
+				seerrOnly={seerrOnly}
 				seasons={seasons}
 				episodes={episodes}
+				seriesEpisodes={seriesEpisodes}
 				episodeRatings={episodeRatings}
 				nextUp={shownNextUp}
 				nextEpisode={shownNextEpisode}

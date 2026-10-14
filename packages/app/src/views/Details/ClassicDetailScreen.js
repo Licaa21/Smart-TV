@@ -16,6 +16,7 @@ import {handleSectionKeyDown, handleScrollerFocus} from './detailsFocus';
 import {PosterBadges, WatchedCheckIcon, FavoriteHeartIcon} from './DetailBadges';
 import DetailMetadata from './DetailMetadata';
 import NextUpCard from './NextUpCard';
+import SeerrEpisodes from './SeerrEpisodes';
 import {DETAIL_METADATA, arrange} from '../../utils/detailMetadataLayout';
 import {fetchUpcomingEpisode, formatUpcomingEpisode} from '../../utils/upcomingEpisode';
 import {DETAIL_ICON_PATHS} from './detailIcons';
@@ -58,8 +59,10 @@ const ClassicDetailScreen = ({
 	seerr,
 	seerrNav,
 	onSelectSeerrCard,
+	seerrOnly,
 	seasons,
 	episodes,
+	seriesEpisodes,
 	episodeRatings,
 	nextUp,
 	nextEpisode,
@@ -264,7 +267,17 @@ const ClassicDetailScreen = ({
 				<NextUpCard episode={nextUp[0]} title={$L('Next Up')} serverUrl={serverUrl} settings={settings} onSelectItem={onSelectItem} />
 			)}
 
-			{isSeries && seasons.length > 0 && (
+			{/* A series the library lacks has no season pages to open, so Seerr's episodes are shown instead. */}
+			{isSeries && seerrOnly && seriesEpisodes.length > 0 && (
+				<RowContainer className={css.section}>
+					<div className={css.sectionHeader}>
+						<h3 className={css.sectionTitle}>{$L('Episodes')}</h3>
+					</div>
+					<SeerrEpisodes seasons={seasons} episodes={seriesEpisodes} navbarPosition={settings.navbarPosition} settings={settings} />
+				</RowContainer>
+			)}
+
+			{isSeries && !seerrOnly && seasons.length > 0 && (
 				<RowContainer className={css.section}>
 					<div className={css.sectionHeader}>
 						<h3 className={css.sectionTitle}>{$L('Seasons')}</h3>

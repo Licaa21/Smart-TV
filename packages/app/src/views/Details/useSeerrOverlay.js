@@ -78,6 +78,7 @@ const useSeerrOverlay = ({item, seerrOnly, showsSection}) => {
 		mediaId: target.mediaId,
 		mediaType: target.mediaType,
 		details: data.details,
+		language: data.language,
 		setDetails: data.setDetails,
 		setError: setActionError,
 		isAuthenticated,

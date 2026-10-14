@@ -101,6 +101,7 @@ class CardBuilder {
 		if (seerrOnly) {
 			return {
 				seerr_details: () => this.seerrDetailsCard(),
+				episodes: () => this.seerrEpisodesCard(),
 				people: () => this.peopleCard(),
 				similar: () => this.similarCard()
 			};
@@ -317,6 +318,26 @@ class CardBuilder {
 			imageUrl: firstPosterImageUrl(serverUrl, [...nextUp, ...seriesEpisodes]) || fallbackImageUrl,
 			icon: CARD_ICONS.episodes,
 			sections: [{...mediaSection($L('Seasons'), seasons), seasonStatus: seerr?.seasonMarkers}]
+		};
+	}
+
+	// A series the library lacks, whose seasons and episodes are Seerr's. They are only there to read, so
+	// the section is one that draws them as such rather than a grid of cards that open pages.
+	seerrEpisodesCard() {
+		const {seasons = [], seriesEpisodes = [], item, settings, fallbackImageUrl} = this.s;
+		if (item?.Type !== 'Series' || !seasons.length || !seriesEpisodes.length) return null;
+
+		return {
+			id: 'episodes',
+			title: $L('Episodes'),
+			modalTitle: (item.Name || '').trim() || $L('Episodes'),
+			subtitle: joinSubtitle([
+				countLabel(seasons.length, $L('1 season'), $L('{count} seasons')),
+				seriesEpisodes.length > 0 ? countLabel(seriesEpisodes.length, $L('1 episode'), $L('{count} episodes')) : null
+			]),
+			imageUrl: seriesEpisodes.find((episode) => episode._externalPosterUrl)?._externalPosterUrl || fallbackImageUrl,
+			icon: CARD_ICONS.episodes,
+			sections: [{kind: 'seerrEpisodes', title: null, seasons, episodes: seriesEpisodes, settings}]
 		};
 	}
 

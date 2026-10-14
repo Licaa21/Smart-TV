@@ -938,12 +938,20 @@ export const search = async (query, page = 1) => {
 	return request(`/search?query=${encodeURIComponent(query)}&page=${page}`);
 };
 
-export const getMovie = async (tmdbId) => {
-	return request(`/movie/${tmdbId}`);
+// Seerr answers in its own user's language unless asked for another, and passes the ask on to TMDB.
+const inLanguage = (path, language) => (language ? `${path}?language=${encodeURIComponent(language)}` : path);
+
+export const getMovie = async (tmdbId, language) => {
+	return request(inLanguage(`/movie/${tmdbId}`, language));
 };
 
-export const getTv = async (tmdbId) => {
-	return request(`/tv/${tmdbId}`);
+export const getTv = async (tmdbId, language) => {
+	return request(inLanguage(`/tv/${tmdbId}`, language));
+};
+
+// One season with its episodes, which the series payload only counts.
+export const getTvSeason = async (tmdbId, seasonNumber, language) => {
+	return request(inLanguage(`/tv/${tmdbId}/season/${seasonNumber}`, language));
 };
 
 export const getPerson = async (tmdbId) => {
@@ -1210,6 +1218,7 @@ export default {
 	search,
 	getMovie,
 	getTv,
+	getTvSeason,
 	getPerson,
 	getPersonCombinedCredits,
 	getMediaStatus,
