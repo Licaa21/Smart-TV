@@ -6,6 +6,7 @@ import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDeco
 import MediaRow from '../../components/MediaRow';
 import RatingsRow from '../../components/RatingsRow';
 import usePersonSeerrCredits from '../../hooks/usePersonSeerrCredits';
+import {rankLibraryItems} from '../../utils/personCredits';
 import {getImageUrl} from '../../utils/helpers';
 import {isMdblistEnabled} from '../../services/mdblistApi';
 import {KEYS} from '../../utils/keys';
@@ -17,8 +18,17 @@ const SpottableDiv = Spottable('div');
 const TabsContainer = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'div');
 
 const PersonScreen = ({item, serverUrl, settings, showsSection, filmography, personDates, birthPlace, onSelectItem, onSelectSeerrItem}) => {
-	const {appearances, crewCredits} = usePersonSeerrCredits(item.ProviderIds?.Tmdb);
-	const {movies, series, guestAppearances, musicVideos} = filmography || {movies: [], series: [], guestAppearances: [], musicVideos: []};
+	const {appearances, crewCredits, ranking} = usePersonSeerrCredits(item.ProviderIds?.Tmdb);
+	// The most popular first, by what Seerr says of the same titles, and the one the backdrop comes from ahead of them
+	const {movies, series, guestAppearances, musicVideos} = useMemo(() => {
+		const split = filmography || {movies: [], series: [], guestAppearances: [], musicVideos: []};
+		return {
+			movies: rankLibraryItems(split.movies, ranking),
+			series: rankLibraryItems(split.series, ranking),
+			guestAppearances: rankLibraryItems(split.guestAppearances, ranking),
+			musicVideos: rankLibraryItems(split.musicVideos, ranking)
+		};
+	}, [filmography, ranking]);
 
 	const handleSeerrSelect = useCallback((c) => {
 		if (c?._seerrRaw) onSelectSeerrItem?.(c._seerrRaw);
