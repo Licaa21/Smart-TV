@@ -113,7 +113,7 @@ const NouveauHero = (props) => {
 					{upcomingText && (
 						<span className={`${css.statusBadge} ${css.statusUpcoming}`}>{upcomingText}</span>
 					)}
-					<SeerrStatusBadge seerr={seerr} />
+					<SeerrStatusBadge seerr={seerr} className={css.seerrPills} />
 				</div>
 			)}
 			{pieces.length > 0 && (

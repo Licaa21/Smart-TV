@@ -975,3 +975,10 @@
 }
 
 .overflowList            { .flex-col-gap(10px); }
+
+// What Seerr says of the title is drawn at the size of the Continuing and Ended markers beside it. The pill has a border the markers do not, so its padding is one less.
+.metaBadge > span {
+	border-radius: 12px;
+	font-size: 16px;
+	padding: 2px 11px;
+}
