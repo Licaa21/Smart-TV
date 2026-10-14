@@ -8,7 +8,10 @@ import css from './Settings.module.less';
 // The TMDB key of this TV. The plugin keeps its own key on the server and never sends it down, so a key
 // typed here is the one thing that lets the app read TMDB itself: titles and episodes of Seerr in the
 // Jellyfin language, and the rows and dates that look for a key before asking the server. It is kept on
-// this TV and never sent back, and it is saved when the field is left.
+// this TV and never sent back. The field the keyboard fills reports no blur, so it is saved a moment after
+// the last change and again on leaving the screen.
+const SAVE_DELAY_MS = 1500;
+
 const TmdbKeyPanel = ({value, onSave}) => {
 	const [text, setText] = useState(value || '');
 	const textRef = useRef(text);
@@ -26,6 +29,11 @@ const TmdbKeyPanel = ({value, onSave}) => {
 
 	const handleChange = useCallback((ev) => setText(ev.target.value), []);
 
+	useEffect(() => {
+		const timer = setTimeout(save, SAVE_DELAY_MS);
+		return () => clearTimeout(timer);
+	}, [text, save]);
+
 	// Leaving the screen with the keyboard still up counts as leaving the field.
 	useEffect(() => save, [save]);
 
@@ -41,7 +49,6 @@ const TmdbKeyPanel = ({value, onSave}) => {
 					type='text'
 					value={text}
 					onChange={handleChange}
-					onBlur={save}
 					placeholder={$L('Paste or type the v3 API key')}
 					autoComplete='off'
 					spotlightId='tmdb-key-input'

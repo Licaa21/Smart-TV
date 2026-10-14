@@ -2,7 +2,7 @@ import {useCallback} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 
-import {pointerHover} from '../../utils/focusScroll';
+import {keepFocusInView, pointerHover} from '../../utils/focusScroll';
 
 import css from './DetailsTabBar.module.less';
 
@@ -29,7 +29,7 @@ const DetailsTabBar = ({tabs, activeId, activeSpotlightId, onSelect, onActivate,
 	if (!tabs || tabs.length === 0) return null;
 
 	return (
-		<TabContainer className={`${css.tabBar} ${className || ''}`} spotlightId={spotlightId}>
+		<TabContainer className={`${css.tabBar} ${className || ''}`} spotlightId={spotlightId} onFocus={keepFocusInView}>
 			{tabs.map((tab) => (
 				<Pill
 					key={tab.id}

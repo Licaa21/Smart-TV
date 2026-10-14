@@ -6,6 +6,11 @@
 	padding: 4px;
 	border-radius: 999px;
 	background: rgba(255, 255, 255, 0.08);
+	// A show with dozens of seasons would run off the screen, so the bar stops at the edge and slides along under
+	// focus instead, keepFocusInView doing the sliding.
+	max-width: 100%;
+	box-sizing: border-box;
+	overflow-x: hidden;
 }
 
 // The segments butt up against each other so the selected one reads as a thumb
@@ -24,6 +29,7 @@
 	line-height: 1.4;
 	white-space: nowrap;
 	box-sizing: border-box;
+	flex-shrink: 0;
 	cursor: pointer;
 	outline: none;
 	transition: background-color 0.2s ease, color 0.2s ease, border-color 0.12s ease;
