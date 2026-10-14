@@ -3,7 +3,7 @@ import Spotlight from '@enact/spotlight';
 import {capitalize, createGridKeyDown, createToolbarKeyDown, cycleValue, filterByStartLetter, stopPropagation} from './gridChrome';
 import {KEYS} from './keys';
 
-jest.mock('@enact/spotlight', () => ({__esModule: true, default: {focus: jest.fn()}}));
+jest.mock('@enact/spotlight', () => ({__esModule: true, default: {focus: jest.fn(), setPointerMode: jest.fn()}}));
 
 const keyEvent = (keyCode) => ({
 	keyCode,
@@ -70,6 +70,7 @@ describe('createToolbarKeyDown', () => {
 
 		createToolbarKeyDown('favorites-grid')(e);
 
+		expect(Spotlight.setPointerMode).toHaveBeenCalledWith(false);
 		expect(Spotlight.focus).toHaveBeenCalledWith('favorites-grid');
 		expect(e.preventDefault).toHaveBeenCalled();
 		expect(e.stopPropagation).toHaveBeenCalled();

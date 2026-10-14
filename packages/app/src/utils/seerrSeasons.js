@@ -128,18 +128,19 @@ const withGapsFilled = async (episodes, language, loadEnglish) => {
 // TMDB. Without the key, or when TMDB cannot be reached, they are Seerr's, which asks TMDB in that language with
 // the key it holds. Either way English fills what that language has none of.
 export const loadSeerrSeason = async (details, seasonNumber, language, tmdbApiKey = '') => {
-	// Once a series, to say where the words came from and how many episodes came with a description.
-	const report = (from, list) => {
+	// Once a series, to say where the words came from and how many episodes came with a description, and how many of
+	// those were in the language itself before English filled the rest in (`before` is the list before the filling).
+	const report = (from, list, before = list) => {
 		const logKey = `${details.id}|${from}|${language}`;
 		if (list.length && lastLogged !== logKey) {
 			lastLogged = logKey;
-			serverLogger.playback('Seerr season text', {from, language, keyed: Boolean(tmdbApiKey), season: seasonNumber, episodes: list.length, withDescription: list.filter((e) => e.Overview).length, name: String(list[0].Name || '').slice(0, 30)});
+			serverLogger.playback('Seerr season text', {from, language, keyed: Boolean(tmdbApiKey), season: seasonNumber, episodes: list.length, withDescription: list.filter((e) => e.Overview).length, descriptionsInLanguage: before.filter((e) => e.Overview).length, namesInLanguage: before.filter((e) => e.Name).length, name: String(list[0].Name || '').slice(0, 30)});
 		}
 		return list;
 	};
 	const fromSeerr = async () => {
-		const own = seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber, language || undefined), details);
-		return report('Seerr', await withGapsFilled(own, language, async () => seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber, FALLBACK_LANGUAGE), details)));
+		const first = seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber, language || undefined), details);
+		return report('Seerr', await withGapsFilled(first, language, async () => seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber, FALLBACK_LANGUAGE), details)), first);
 	};
 	if (!tmdbApiKey || !language) return fromSeerr();
 
@@ -158,6 +159,7 @@ export const loadSeerrSeason = async (details, seasonNumber, language, tmdbApiKe
 		return fromSeerr();
 	}
 
+	const own = episodes;
 	episodes = await withGapsFilled(episodes, language, async () => seerrEpisodeItems(seasonFromTmdb(await tmdbGet(path, FALLBACK_LANGUAGE, tmdbApiKey)), details));
-	return report('TMDB', episodes);
+	return report('TMDB', episodes, own);
 };
