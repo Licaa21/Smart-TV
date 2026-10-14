@@ -184,7 +184,11 @@
 	font-size: 21px;
 }
 
-.metaItem + .metaItem:before {
+.metaItem + .metaItem:before,
+.metaItem + .metaBadge:before,
+.metaBadge + .metaItem:before,
+.metaBadge + .metaBadge:before {
+	font-size: 21px;
 	color: rgba(255, 255, 255, 0.4);
 	content: '·';
 	padding: 0 8px;

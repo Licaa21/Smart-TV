@@ -77,4 +77,16 @@ describe('spotlightMetaPieces', () => {
 			{kind: 'text', text: '2024'}
 		]);
 	});
+
+	it('closes the line with the running status and then what Seerr says, wherever the order puts them', () => {
+		const pieces = spotlightMetaPieces({
+			item: {Type: 'Series', Status: 'Continuing'},
+			year: 2024,
+			genres: ['Drama'],
+			hasSeerrPills: true,
+			settings: {detailMetadataOrderTv: ['seerrAvailability', 'status', 'year', 'genres']}
+		});
+
+		expect(pieces.map((piece) => piece.kind)).toEqual(['text', 'text', 'status', 'seerr']);
+	});
 });
