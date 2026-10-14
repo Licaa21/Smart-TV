@@ -73,6 +73,16 @@ describe('loadSeerrSeason', () => {
 		expect(episodes[0].Overview).toBe('In English.');
 	});
 
+	it('asks Seerr for English when its own language has no description', async () => {
+		seerrApi.getTvSeason
+			.mockResolvedValueOnce(season([{name: 'Episodul 1', overview: '', airDate: '2008-01-20'}]))
+			.mockResolvedValueOnce(season([{name: 'Pilot', overview: 'In English.', airDate: '2008-01-20'}]));
+		const episodes = await loadSeerrSeason(details, 1, 'ro');
+		expect(seerrApi.getTvSeason).toHaveBeenLastCalledWith(1396, 1, 'en-US');
+		expect(episodes[0].Name).toBe('Episodul 1');
+		expect(episodes[0].Overview).toBe('In English.');
+	});
+
 	it('reads the language from TMDB, and only asks English when an aired episode lacks text', async () => {
 		tmdbGet.mockResolvedValueOnce(tmdbSeason([{name: 'Pilot', overview: 'Complet.', air_date: '2008-01-20'}]));
 		const episodes = await loadSeerrSeason(details, 1, 'ro', 'key');

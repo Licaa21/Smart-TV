@@ -3707,11 +3707,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			const draws = drawCountRef.current;
 			keyDownRef.current?.(e);
 			if (!timed) return;
+			// What ran before the browser got to draw: this handler, the buttons' own and Spotlight's.
+			let scriptMs = 0;
+			setTimeout(() => { scriptMs = Math.round(performance.now() - started); }, 0);
 			window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
 				const took = Math.round(performance.now() - started);
 				if (took < SLOW_KEY_MS) return;
 				slowKeysLoggedRef.current += 1;
-				serverLogger.playback('Control key was slow', {key: e.keyCode, ms: took, redraws: drawCountRef.current - draws});
+				serverLogger.playback('Control key was slow', {key: e.keyCode, ms: took, scriptMs, redraws: drawCountRef.current - draws});
 			}));
 		};
 		window.addEventListener('keydown', onKeyDown, true);
