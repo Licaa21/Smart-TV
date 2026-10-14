@@ -6,10 +6,14 @@ let lastLogged = '';
 
 // A Seerr title with its words in the metadata language. Seerr answers in its own language, so with the
 // TMDB key the plugin syncs down the words come from TMDB, and wherever TMDB has none Seerr's own stay,
-// which is the English fallback. Without the key, or when TMDB cannot be reached, the title is Seerr's
-// as it always was. The screen's own fetches go through this, or a refresh would lose the language.
+// which is the English fallback. Without the key the title is Seerr's in that language, and when TMDB cannot be
+// reached it is Seerr's as it always was. The screen's own fetches go through this, or a refresh would lose the language.
 export const fetchSeerrTitle = async (mediaType, mediaId, language, {tmdbApiKey = ''} = {}) => {
-	const data = await (mediaType === 'movie' ? seerrApi.getMovie(mediaId) : seerrApi.getTv(mediaId));
+	const load = (asked) => (mediaType === 'movie' ? seerrApi.getMovie(mediaId, asked) : seerrApi.getTv(mediaId, asked));
+	// Without the key Seerr is asked in the language itself, which it passes on to TMDB with its own key, and its
+	// own answer is what stays wherever that has no description.
+	const data = await load(tmdbApiKey ? undefined : language || undefined);
+	if (!tmdbApiKey && language && data && !data.overview) return (await load()) || data;
 	if (!data || !tmdbApiKey || !language) return data;
 
 	try {

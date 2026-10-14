@@ -7,6 +7,7 @@ import {normalizeOverlayColorKey} from '../theme/overlayColors';
 import {noteAnsweredSettings, SETUP_QUESTION_KEYS} from '../utils/setupWizardGate';
 import {getAvailableThemeList, getAvailableThemes, isBuiltInThemeId, registerStoreTheme, removeStoreTheme, replaceCustomThemes, resolveThemeById} from '../theme/themeRegistry';
 import {applyOledMode} from '../utils/oledMode';
+import serverLogger from '../services/serverLogger';
 import {normalizeRatingSources, ratingSourcesToServer} from '../utils/ratingSources';
 import {SEASONAL_DENSITIES, normalizeSeasonalTheme} from '../utils/seasonalEffects';
 import {normalizeSeasonalHiddenHolidays, normalizeSeasonalRowCountry} from '../utils/seasonalRow';
@@ -1014,6 +1015,16 @@ export function SettingsProvider({children}) {
 			}
 
 			const resolved = resolveFromEnvelope(serverData, adminDefaults, settingsRef.current.syncProfile);
+
+			// Whether the plugin's TMDB key came down with the settings, never the key itself, and under what names the
+			// server calls anything that looks like one, since Seerr episode text and other TMDB reads wait on it.
+			serverLogger.info('Application', 'Settings sync: TMDB key', {
+				arrived: Boolean(resolved.tmdbApiKey),
+				inAdminDefaults: Boolean(adminDefaults && adminDefaults.tmdbApiKey),
+				names: [serverData, adminDefaults, ...Object.values(serverData || {})]
+					.filter((source) => source && typeof source === 'object')
+					.reduce((all, source) => all.concat(Object.keys(source).filter((key) => /tmdb/i.test(key))), [])
+			});
 
 			const hasServerValues = resolved.tmdbApiKey !== undefined || SYNCABLE_KEYS.some(key => resolved[key] !== undefined);
 			if (!hasServerValues) return pluginAnswered ? 'empty' : 'unavailable';

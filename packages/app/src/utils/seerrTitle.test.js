@@ -15,11 +15,17 @@ describe('fetchSeerrTitle', () => {
 		tmdbGet.mockReset();
 	});
 
-	it('is Seerr\'s own answer, with no language asked, when there is no TMDB key', async () => {
-		seerrApi.getTv.mockResolvedValue({id: 1, overview: 'A teacher.'});
-		await expect(fetchSeerrTitle('tv', 1, 'ro')).resolves.toEqual({id: 1, overview: 'A teacher.'});
-		expect(seerrApi.getTv).toHaveBeenCalledWith(1);
+	it('is Seerr\'s answer in the language when there is no TMDB key', async () => {
+		seerrApi.getTv.mockResolvedValue({id: 1, overview: 'Un profesor.'});
+		await expect(fetchSeerrTitle('tv', 1, 'ro')).resolves.toEqual({id: 1, overview: 'Un profesor.'});
+		expect(seerrApi.getTv).toHaveBeenCalledWith(1, 'ro');
 		expect(tmdbGet).not.toHaveBeenCalled();
+	});
+
+	it('asks Seerr again with no language when the language has no description and there is no key', async () => {
+		seerrApi.getTv.mockResolvedValueOnce({id: 1, overview: ''}).mockResolvedValueOnce({id: 1, overview: 'A teacher.'});
+		await expect(fetchSeerrTitle('tv', 1, 'ro')).resolves.toEqual({id: 1, overview: 'A teacher.'});
+		expect(seerrApi.getTv).toHaveBeenLastCalledWith(1, undefined);
 	});
 
 	it('takes the words from TMDB in the language, and leaves the rest of Seerr\'s answer', async () => {

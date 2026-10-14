@@ -104,8 +104,8 @@ const withGapsFilled = async (episodes, language, loadEnglish) => {
 };
 
 // One season's episodes in the metadata language. With the TMDB key the plugin syncs down they come from
-// TMDB. Without the key, or when TMDB cannot be reached, they are Seerr's, in its own language, as they always
-// were. Either way English fills what that language has none of.
+// TMDB. Without the key, or when TMDB cannot be reached, they are Seerr's, which asks TMDB in that language with
+// the key it holds. Either way English fills what that language has none of.
 export const loadSeerrSeason = async (details, seasonNumber, language, tmdbApiKey = '') => {
 	// Once a series, to say where the words came from and how many episodes came with a description.
 	const report = (from, list) => {
@@ -117,7 +117,7 @@ export const loadSeerrSeason = async (details, seasonNumber, language, tmdbApiKe
 		return list;
 	};
 	const fromSeerr = async () => {
-		const own = seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber), details);
+		const own = seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber, language || undefined), details);
 		return report('Seerr', await withGapsFilled(own, language, async () => seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber, FALLBACK_LANGUAGE), details)));
 	};
 	if (!tmdbApiKey || !language) return fromSeerr();

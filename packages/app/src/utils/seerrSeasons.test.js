@@ -76,10 +76,10 @@ describe('loadSeerrSeason', () => {
 		tmdbGet.mockReset();
 	});
 
-	it('is the Seerr answer, with no language asked, when there is no TMDB key', async () => {
+	it('is the Seerr answer, asked in the metadata language, when there is no TMDB key', async () => {
 		seerrApi.getTvSeason.mockResolvedValueOnce(season([{name: 'Pilot', overview: 'In English.'}]));
 		const episodes = await loadSeerrSeason(details, 1, 'ro');
-		expect(seerrApi.getTvSeason).toHaveBeenCalledWith(1396, 1);
+		expect(seerrApi.getTvSeason).toHaveBeenCalledWith(1396, 1, 'ro');
 		expect(tmdbGet).not.toHaveBeenCalled();
 		expect(episodes[0].Overview).toBe('In English.');
 	});

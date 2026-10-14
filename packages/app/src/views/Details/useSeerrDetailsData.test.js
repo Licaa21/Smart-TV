@@ -87,9 +87,9 @@ describe('the refresh interval', () => {
 });
 
 describe('the language of the title', () => {
-	test('is the Seerr answer, with no language asked, when there is no TMDB key', async () => {
+	test('is the Seerr answer, asked in the language, when there is no TMDB key', async () => {
 		const {result} = await open();
-		expect(seerrApi.getMovie).toHaveBeenCalledWith(299534);
+		expect(seerrApi.getMovie).toHaveBeenCalledWith(299534, 'ro');
 		expect(tmdbGet).not.toHaveBeenCalled();
 		expect(result.current.details.overview).toBe('Răzbunătorii.');
 	});
