@@ -5,9 +5,9 @@ import * as playback from '../../services/playback';
 import serverLogger from '../../services/serverLogger';
 import {fetchTmdbSeasonRatings, resolveSeriesTmdbId, isRatingSourceAllowed} from '../../services/mdblistApi';
 import {getSeriesAudioPref} from '../../services/subtitlePrefs';
-import {fromServerSubtitle, resolveInitialSubtitle} from '../Player/initialSubtitle';
 import {fromServerAudio, selectPreferredAudioStream} from '../../utils/audioTrackSelection';
 import {fromServerStream, matchSeriesTrackIndex} from '../../utils/seriesTrackPrefs';
+import {detailsSubtitlePosition} from '../Player/initialSubtitle';
 import {findParentCollections} from './parentCollection';
 import {canScoreSeedLocally, getOnlineRecommendations, getRecommendations, mergeRecommendations} from '../../services/homeRecommendations';
 import {fetchMissingCollectionItems} from './seerrMissingCollectionItems';
@@ -191,7 +191,6 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			const ms = data.MediaSources?.[0];
 			if (ms) {
 				const initAudioStreams = ms.MediaStreams?.filter(s => s.Type === 'Audio') || [];
-				const initSubtitleStreams = ms.MediaStreams?.filter(s => s.Type === 'Subtitle') || [];
 				// The track playback will start on, picked the way the player picks it: a track
 				// remembered for the series, then the audio language and codec order from
 				// Settings, and only when neither names one the server's own default.
@@ -214,35 +213,19 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					audioPos = initAudioStreams.findIndex(s => s.Index === ms.DefaultAudioStreamIndex);
 				}
 				if (audioPos >= 0) setSelectedAudioIndex(audioPos);
-				// Ask the player's own question, so the button names the track playback will
-				// start on: the remembered pick for this episode or its series first, then
-				// the subtitle mode and languages from Settings. Asking only the saved picks
-				// and the server default left an episode nobody had played showing Off while
-				// playing it started on the preferred language.
-				const audioForSubtitle = initAudioStreams[Math.max(0, audioPos)];
-				const chosenSubtitle = await resolveInitialSubtitle(
-					{subtitleStreams: initSubtitleStreams.map(fromServerSubtitle), defaultSubtitleStreamIndex: ms.DefaultSubtitleStreamIndex},
-					data,
-					undefined,
-					settingsRef.current || {},
-					audioForSubtitle && {language: audioForSubtitle.Language}
-				);
+				// Show the track playback will start on as active, picked the way the player picks it: the remembered pick for
+				// this episode or its series first, then the subtitle mode and languages from Settings.
+				const subtitlePos = await detailsSubtitlePosition(data, ms, settingsRef.current, initAudioStreams[Math.max(0, audioPos)]);
+				if (cancelled) return;
 				serverLogger.playback('Details: subtitle button pick', {
 					itemId,
 					mode: settingsRef.current?.subtitleMode,
 					language: settingsRef.current?.subtitleLanguage,
 					serverDefault: ms.DefaultSubtitleStreamIndex ?? null,
-					tracks: initSubtitleStreams.map(s => `${s.Index}:${s.Language || '?'}${s.IsDefault ? ':default' : ''}${s.IsForced ? ':forced' : ''}`),
-					picked: chosenSubtitle === undefined ? 'undecided' : (chosenSubtitle ? chosenSubtitle.index : 'off')
+					tracks: (ms.MediaStreams || []).filter(s => s.Type === 'Subtitle').map(s => `${s.Index}:${s.Language || '?'}${s.IsDefault ? ':default' : ''}${s.IsForced ? ':forced' : ''}`),
+					picked: subtitlePos
 				});
-				if (chosenSubtitle !== undefined) {
-					setSelectedSubtitleIndex(chosenSubtitle ? initSubtitleStreams.findIndex(s => s.Index === chosenSubtitle.index) : -1);
-				} else if (ms.DefaultSubtitleStreamIndex != null) {
-					const idx = initSubtitleStreams.findIndex(s => s.Index === ms.DefaultSubtitleStreamIndex);
-					if (idx >= 0) setSelectedSubtitleIndex(idx);
-				} else {
-					setSelectedSubtitleIndex(-1);
-				}
+				setSelectedSubtitleIndex(subtitlePos);
 			} else {
 				setSelectedAudioIndex(0);
 				setSelectedSubtitleIndex(-1);

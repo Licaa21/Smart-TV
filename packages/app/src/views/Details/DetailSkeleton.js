@@ -103,7 +103,7 @@ const Spotlight = ({sidebar}) => {
 	return (
 		<>
 			<div className={css.spotlightBackdrop} />
-			<div className={css.spotlightPage} style={sidebar ? {paddingLeft: rem(120)} : undefined}>
+			<div className={css.spotlightPage} style={sidebar ? {paddingLeft: rem(120)} : {paddingTop: rem(135)}}>
 				<div style={{width: heroWidth}}>
 					<Box width={360} height={18} radius={3} />
 					<Gap size={10} />

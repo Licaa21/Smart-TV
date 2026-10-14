@@ -48,6 +48,7 @@ import {resolveInitialSubtitle} from './initialSubtitle';
 import PlayerControls, {usePlayerButtons} from './PlayerControls';
 import {canBrowseEpisodes} from '../../utils/episodeBrowser';
 import useLiveProgram from './useLiveProgram';
+import useHeldSeekStep from './useHeldSeekStep';
 import useMediaSession from './useMediaSession';
 import {hasTrickplayPreview} from '../../components/TrickplayPreview';
 import {isTrickplayOn} from '../../utils/trickplayLayout';
@@ -2311,6 +2312,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 	}, [settings.trickPlayPauseWhileScrubbing, settings.trickPlayMode, isInGroup, item.Id, mediaSourceId]);
 
+	const {stepBy: heldSeekStep, stepSeconds: seekStepSeconds} = useHeldSeekStep(settings.seekStep);
+
 	// One scrub step on. A held scrub only moves its target, anything else seeks as it goes.
 	const scrubBy = useCallback((deltaSeconds) => {
 		if (!videoRef.current) return;
@@ -2781,15 +2784,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	const handleProgressKeyDown = useCallback((e) => {
 		if (!videoRef.current) return;
-		const step = settings.seekStep;
 		showControls();
 
 		if (e.key === 'ArrowLeft' || e.keyCode === 37) {
 			e.preventDefault();
-			scrubBy(-step);
+			scrubBy(heldSeekStep(-1));
 		} else if (e.key === 'ArrowRight' || e.keyCode === 39) {
 			e.preventDefault();
-			scrubBy(step);
+			scrubBy(heldSeekStep(1));
 		} else if (e.key === 'Enter' || e.keyCode === 13) {
 			e.preventDefault();
 			if (resumeHeldScrub()) return;
@@ -2811,7 +2813,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				window.requestAnimationFrame(() => Spotlight.focus('play-pause-btn'));
 			}
 		}
-	}, [settings.seekStep, scrubBy, resumeHeldScrub, dropScrub, showControls, handlePlayPause, isAudioMode]);
+	}, [heldSeekStep, scrubBy, resumeHeldScrub, dropScrub, showControls, handlePlayPause, isAudioMode]);
 
 	const handleProgressBlur = useCallback(() => {
 		dropScrub();
@@ -3234,7 +3236,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					if (isLiveTV) { showControls(); return; }
 					showControls();
 					setFocusRow('progress');
-					scrubBy(key === 'ArrowLeft' || e.keyCode === 37 ? -settings.seekStep : settings.seekStep);
+					scrubBy(heldSeekStep(key === 'ArrowLeft' || e.keyCode === 37 ? -1 : 1));
 					return;
 				}
 				e.preventDefault();
@@ -3446,6 +3448,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				topButtons={topButtons}
 				bottomButtons={bottomButtons}
 				displayTime={displayTime}
+				seekStepSeconds={seekStepSeconds}
 				duration={duration}
 				progressPercent={progressPercent}
 				bufferedPercent={bufferedPercent}

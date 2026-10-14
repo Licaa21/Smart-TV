@@ -136,6 +136,9 @@ const Browse = ({
 	const restoreTimerRef = useRef(null);
 	const scrollTimeoutRef = useRef(null);
 	const contentRowsRef = useRef(null);
+	const scrollsRef = useRef(new Map());
+	const isVisibleRef = useRef(isVisible);
+	isVisibleRef.current = isVisible;
 
 	const showFeaturedBar = (settings.featuredBarStyle !== 'off');
 
@@ -256,7 +259,8 @@ const Browse = ({
 	const hasFocusableRow = filteredRows.some((row) => !row.isPlaceholder);
 	const loadingRowCount = filteredRows.filter((row) => row.isPlaceholder).length;
 
-	const focusRow = useCallback((rowIndex, cardIndex) => {
+	const focusRow = useCallback((rowIndex, cardIndex, cardId) => {
+		if (cardId && Spotlight.focus(cardId)) return true;
 		const card = cardToRestore(`row-${rowIndex}`, cardIndex);
 		if (card && Spotlight.focus(card)) {
 			return true;
@@ -302,7 +306,7 @@ const Browse = ({
 		if (Math.abs(container.scrollTop - top) > 1) container.scrollTop = top;
 	}, [settings.navbarPosition, showTopInfoArea]);
 
-	const scrollToRow = useCallback((rowIndex, thenFocus, cardIndex) => {
+	const scrollToRow = useCallback((rowIndex, thenFocus, cardIndex, cardId) => {
 		if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
 
 		const targetRow = rowRefsMap.current.get(rowIndex);
@@ -337,7 +341,7 @@ const Browse = ({
 			let attempts = 0;
 			const tryFocus = () => {
 				attempts += 1;
-				if (focusRow(rowIndex, cardIndex)) {
+				if (focusRow(rowIndex, cardIndex, cardId)) {
 					return;
 				}
 				if (attempts < 6) {
@@ -381,6 +385,22 @@ const Browse = ({
 	if (fillModeRef.current && fillStep >= farthestRow) fillModeRef.current = false;
 	const filling = fillModeRef.current === true;
 
+	// Hiding Home drops how far each row was scrolled, so that's noted as it changes and put back
+	// when Home shows again.
+	useEffect(() => {
+		const rows = contentRowsRef.current;
+		const scrolls = scrollsRef.current;
+		if (!rows) return undefined;
+		const note = (event) => {
+			if (isVisibleRef.current) scrolls.set(event.target, event.target.scrollLeft);
+		};
+		rows.addEventListener('scroll', note, true);
+		return () => {
+			rows.removeEventListener('scroll', note, true);
+			scrolls.clear();
+		};
+	}, [isLoading]);
+
 	const handleNavigateDown = useCallback((fromRowIndex) => {
 		const targetIndex = focusableRowFrom(fromRowIndex + 1, 1);
 		if (targetIndex < 0) return;
@@ -410,16 +430,20 @@ const Browse = ({
 		lastFocusState = null;
 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-	useEffect(() => {
+	// Run before paint, so a row that is back on screen has its scroll when Home shows again.
+	useLayoutEffect(() => {
 		if (!isVisible) {
 			wasVisibleRef.current = false;
 			return;
 		}
 		if (isLoading || !hasFocusableRow) return;
-		// The panel is built again on the way back in, so the ref that marks a first run
-		// starts over with it. A place to return to is what tells the two apart.
+		// Home is built again after sign in and playback, so the ref that marks a first run starts
+		// over with it. A place to return to is what tells the two apart.
 		if (wasVisibleRef.current && lastFocusState === null) return;
 		wasVisibleRef.current = true;
+		scrollsRef.current.forEach((left, node) => {
+			node.scrollLeft = left;
+		});
 
 		fetchFreshFeaturedItems();
 		// Coming back from a title keeps the rows as they were left, unless something was played or marked watched
@@ -452,7 +476,6 @@ const Browse = ({
 			} else {
 				scrollToRow(focusableRowFrom(0, 1), true);
 			}
-			lastFocusState = null;
 		}, FOCUS_DELAY_MS);
 	}, [isVisible, isLoading, filteredRows.length, loadingRowCount, hasFocusableRow, fetchFreshFeaturedItems, refreshVolatileData, showFeaturedBar, featuredItems.length, scrollToRow, setBrowseMode, focusableRowFrom]);
 

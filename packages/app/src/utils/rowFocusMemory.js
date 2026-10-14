@@ -38,3 +38,10 @@ export const focusedRowIndex = (active) => {
 // Which card focus is to land on when it moves into a row from another, by the settings. None given leaves it to the
 // row's own memory of the card it was left on, and with that off it is the first card.
 export const rowEntryCardIndex = (settings) => (settings.rememberRowCard === false ? 0 : undefined);
+
+// The row a remembered focus goes back to: the one it was left in, found by its id since rows
+// that load late shift the rest, or the same place in the list when that row isn't there.
+export const rowToRestore = (rows, target) => {
+	const byId = rows.findIndex((row) => row.id === target.rowId && !row.isPlaceholder);
+	return byId >= 0 ? byId : Math.min(target.rowIndex, rows.length - 1);
+};
