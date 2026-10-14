@@ -36,16 +36,16 @@ describe('playMethod', () => {
 });
 
 describe('buildPlaybackInfo', () => {
-	it('does not call a direct play one when the app has the server build the picked audio', () => {
-		const audioStart = {needsServer: true, openingCodec: 'eac3', wantedCodec: 'ac3'};
-		const info = buildPlaybackInfo(answer({supportsDirectPlay: true}), {audioStreamIndex: 2, audioStart, tizen: true});
+	it('says the server builds a pick that the start found the player cannot open on, with the reasons left out', () => {
+		const info = buildPlaybackInfo(answer({supportsDirectStream: true, audioBuilt: true, openingAudioCodec: 'eac3', transcodeReasons: ['DirectPlayError']}), {audioStreamIndex: 2, tizen: true});
 		expect(info.method).toBe('stream');
 		expect(info.title).toBe('Audio built on the server');
+		expect(info.reasons).toEqual([]);
 		expect(info.notes.map((note) => note.id)).toEqual(['audio']);
-		// A server that is transcoding anyway has already said everything.
-		const transcoding = buildPlaybackInfo(answer({transcodeReasons: ['AudioCodecNotSupported']}), {audioStreamIndex: 2, audioStart});
-		expect(transcoding.title).toBe('Transcoding');
-		expect(transcoding.notes).toEqual([]);
+		expect(info.notes[0].text).toContain('EAC3');
+		expect(info.notes[0].text).toContain('AC3');
+		// With nothing built the same answer is only what the server said.
+		expect(buildPlaybackInfo(answer({supportsDirectPlay: true}), {audioStreamIndex: 2, tizen: true}).notes).toEqual([]);
 	});
 
 	it('puts the fork note for the stream count beside the reason', () => {

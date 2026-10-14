@@ -8,10 +8,10 @@ import useDetailPlaybackInfo from '../../useDetailPlaybackInfo';
 import css from './NouveauDetailsFooter.module.less';
 
 // Whether the server would hand this file over as it is, and when it wouldn't, the reasons it gave.
-const NouveauDirectPlay = ({api, itemId, serverType, mediaSourceId, audioStreamIndex, subtitleStreamIndex}) => {
+const NouveauDirectPlay = ({api, item, itemId, serverType, mediaSourceId, audioStreamIndex, subtitleStreamIndex}) => {
 	const {settings} = useSettings();
 	const {status, result, retry} = useDetailPlaybackInfo({
-		api, itemId, serverType, mediaSourceId, audioStreamIndex, subtitleStreamIndex, maxBitrate: settings.maxBitrate
+		api, item, itemId, serverType, mediaSourceId, audioStreamIndex, subtitleStreamIndex, maxBitrate: settings.maxBitrate
 	});
 
 	if (status === 'empty') return null;

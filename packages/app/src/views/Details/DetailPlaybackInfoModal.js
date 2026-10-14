@@ -1,9 +1,8 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useMemo} from 'react';
 import $L from '@enact/i18n/$L';
 
 import {useSettings} from '../../context/SettingsContext';
 import {isTizen} from '../../platform';
-import {getAudioStartPlan} from '../../services/playback';
 import {iconViewBox} from '../../components/icons/iconViewBox';
 import {ModalContainer} from '../../utils/spotlightContainers';
 import TrackOptionRow, {TrackDivider} from '../../components/TrackOptionRow';
@@ -37,6 +36,7 @@ const DetailPlaybackInfoModal = ({api, item, mediaSource, audioStreamIndex, subt
 	const {settings} = useSettings();
 	const {status, result, retry} = useDetailPlaybackInfo({
 		api,
+		item,
 		itemId: item.Id,
 		serverType: item._serverType,
 		mediaSourceId: mediaSource?.Id,
@@ -47,24 +47,9 @@ const DetailPlaybackInfoModal = ({api, item, mediaSource, audioStreamIndex, subt
 
 	const stopPropagation = useCallback((e) => e.stopPropagation(), []);
 
-	// What the app would do with the audio pick, which the server's own answer knows nothing about. Only the
-	// Tizen player opens a file on one track, and Force Direct Play leaves the server out of it.
-	const [audioStart, setAudioStart] = useState(null);
-	useEffect(() => {
-		let cancelled = false;
-		setAudioStart(null);
-		if (!result?.supportsDirectPlay || !isTizen() || settings.forceDirectPlay || audioStreamIndex == null) return undefined;
-		getAudioStartPlan(mediaSource, audioStreamIndex)
-			.then((plan) => { if (!cancelled) setAudioStart(plan); })
-			.catch(() => {});
-		return () => {
-			cancelled = true;
-		};
-	}, [result, mediaSource, audioStreamIndex, settings.forceDirectPlay]);
-
 	const info = useMemo(
-		() => (result ? buildPlaybackInfo(result, {audioStreamIndex, subtitleStreamIndex, settings, audioStart, tizen: isTizen()}) : null),
-		[result, audioStreamIndex, subtitleStreamIndex, settings, audioStart]
+		() => (result ? buildPlaybackInfo(result, {audioStreamIndex: result.audioStreamIndex ?? audioStreamIndex, subtitleStreamIndex, settings, tizen: isTizen()}) : null),
+		[result, audioStreamIndex, subtitleStreamIndex, settings]
 	);
 
 	const section = (id) => info?.sections.find((candidate) => candidate.id === id);

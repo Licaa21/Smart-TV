@@ -36,8 +36,13 @@ export const SEGMENT_FETCH_TIMEOUT = 20000;
 // A skip is checked this long after the seek, and made once more when the player is still more than
 // this far short of where it was sent.
 export const SKIP_LANDING_CHECK_MS = 1500;
+
 export const SKIP_LANDING_TOLERANCE_TICKS = 20000000;
 export const SKIP_LANDING_SNAP_TICKS = 600000000;
+
+// An arrow press that takes this long to show is logged, up to this many a session.
+export const SLOW_KEY_MS = 120;
+export const SLOW_KEYS_LOGGED = 20;
 
 // How long a start holds for ASS subtitles when the viewer turned that on. Past this the video
 // starts anyway and the subtitles show up once the renderer catches up.

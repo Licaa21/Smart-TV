@@ -7,6 +7,8 @@ import {buildForkNotes} from './playbackInfoNotes';
 // What the Playback Info popup says, worked out from the server's answer for the selected tracks
 // (see detailPlaybackInfo). Nothing here asks the server anything.
 
+const audioCodecOf = (streams, index) => String(streams.find((stream) => stream.Type === 'Audio' && stream.Index === index)?.Codec || '').toLowerCase();
+
 const lower = (value) => String(value || '').toLowerCase();
 
 export const bitrateText = (bitrate) => {
@@ -59,9 +61,12 @@ const audioText = (stream) => {
 
 // `audioStreamIndex` and `subtitleStreamIndex` are the tracks' own indexes, the ones the server was
 // asked with, and a subtitle left undefined means none.
-export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex, settings, audioStart = null, tizen = false} = {}) => {
+export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex, settings, tizen = false} = {}) => {
 	const {source, deviceProfile, maxStreamingBitrate} = result;
-	const method = playMethod(result);
+	// The server builds the picked track when the player would open the file on another codec, which the
+	// start has already found out. Its answer is then a stream the server makes, whatever it was asked first.
+	const built = Boolean(result.audioBuilt);
+	const method = built ? 'stream' : playMethod(result);
 	const streams = Array.isArray(source.MediaStreams) ? source.MediaStreams : [];
 	const video = streams.find((stream) => stream.Type === 'Video');
 	const audio = streams.find((stream) => stream.Type === 'Audio' && stream.Index === audioStreamIndex)
@@ -72,7 +77,7 @@ export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex
 
 	// The server's reasons and whatever the profile shows on top of them, so the summary and the list
 	// under it come from the same set.
-	const details = method === 'direct' ? [] : resolveDirectPlayFailureDetails({
+	const details = (method === 'direct' || built) ? [] : resolveDirectPlayFailureDetails({
 		serverReasons: result.transcodeReasons,
 		mediaStreams: streams,
 		container: source.Container,
@@ -83,9 +88,6 @@ export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex
 		deviceProfile
 	});
 	const reasons = details.map((detail) => detail.reason);
-	// The server calls a pick it can play as it is a direct play, but the player opens a file on one track
-	// and the app has the server build any other codec, so it is not one.
-	const built = method === 'direct' && Boolean(audioStart?.needsServer);
 
 	const fileLines = [
 		source.Container ? $L('Container: {container}').replace('{container}', String(source.Container).toUpperCase()) : null,
@@ -107,11 +109,11 @@ export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex
 
 	return {
 		// Amber, since the picture is copied and only the sound is rebuilt.
-		method: built ? 'stream' : method,
+		method,
 		title: built ? $L('Audio built on the server') : {direct: $L('Direct Play'), stream: $L('Direct Stream'), transcode: $L('Transcoding')}[method],
 		summary: built ? $L('The server is asked to build the audio track you picked, with the picture copied.') : changesText(method, reasons),
 		reasons: details.map((detail) => formatDirectPlayReason(detail, settings)),
-		notes: buildForkNotes({tizen, method, source, reasonKeys: reasons.map((reason) => String(reason).toLowerCase()), settings, audioStart: built ? audioStart : null}),
+		notes: buildForkNotes({tizen, method, source, reasonKeys: reasons.map((reason) => String(reason).toLowerCase()), settings, audioStart: built ? {needsServer: true, openingCodec: result.openingAudioCodec, wantedCodec: audioCodecOf(streams, audioStreamIndex)} : null}),
 		sections
 	};
 };

@@ -66,6 +66,7 @@ const TrackRow = ({label, streams, activeIndex, includeForced, showAllLabel}) =>
 const DirectPlaySection = ({api, item, mediaSource, activeAudio, activeSubtitle, settings}) => {
 	const {status, result, retry} = useDetailPlaybackInfo({
 		api,
+		item,
 		itemId: item.Id,
 		serverType: item._serverType,
 		mediaSourceId: mediaSource.Id,

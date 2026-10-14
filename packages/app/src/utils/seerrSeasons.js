@@ -84,7 +84,16 @@ export const withEnglishGaps = (episodes, english) => {
 // TMDB, with English asked for only when an aired episode has no name or description in that language. Without
 // the key, or when TMDB cannot be reached, they are Seerr's, in its own language, as they always were.
 export const loadSeerrSeason = async (details, seasonNumber, language, tmdbApiKey = '') => {
-	const fromSeerr = async () => seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber), details);
+	// Once a series, to say where the words came from and how many episodes came with a description.
+	const report = (from, list) => {
+		const logKey = `${details.id}|${from}|${language}`;
+		if (list.length && lastLogged !== logKey) {
+			lastLogged = logKey;
+			serverLogger.playback('Seerr season text', {from, language, season: seasonNumber, episodes: list.length, withDescription: list.filter((e) => e.Overview).length, name: String(list[0].Name || '').slice(0, 30)});
+		}
+		return list;
+	};
+	const fromSeerr = async () => report('Seerr', seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber), details));
 	if (!tmdbApiKey || !language) return fromSeerr();
 
 	const path = `/tv/${details.id}/season/${seasonNumber}`;
@@ -102,13 +111,6 @@ export const loadSeerrSeason = async (details, seasonNumber, language, tmdbApiKe
 		return fromSeerr();
 	}
 
-	// Once a series, to say where the words came from.
-	const logKey = `${details.id}|${language}`;
-	if (episodes.length && lastLogged !== logKey) {
-		lastLogged = logKey;
-		serverLogger.playback('Seerr season text', {from: 'TMDB', language, season: seasonNumber, name: String(episodes[0].Name || '').slice(0, 30)});
-	}
-
 	// An episode that has not aired has no text in any language yet, so it is no reason to ask again.
 	const now = Date.now();
 	const aired = (episode) => !episode.PremiereDate || new Date(episode.PremiereDate).getTime() <= now;
@@ -121,5 +123,5 @@ export const loadSeerrSeason = async (details, seasonNumber, language, tmdbApiKe
 			void err;
 		}
 	}
-	return episodes;
+	return report('TMDB', episodes);
 };

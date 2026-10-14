@@ -52,7 +52,7 @@ import useAudioTransport from './audio/useAudioTransport';
 import useLyrics from './audio/useLyrics';
 import {handleAudioFocusKey, exitAudioPanel, nextAudioFocusRow, AUDIO_FOCUS_IDS} from './audio/audioFocus';
 import useSegmentPopups from './useSegmentPopups';
-import {NextEpisodeContainer, CONTROLS_HIDE_DELAY, withTimeout, SEGMENT_FETCH_TIMEOUT, SKIP_LANDING_CHECK_MS, SKIP_LANDING_TOLERANCE_TICKS, SKIP_LANDING_SNAP_TICKS} from './PlayerConstants';
+import {NextEpisodeContainer, CONTROLS_HIDE_DELAY, withTimeout, SEGMENT_FETCH_TIMEOUT, SKIP_LANDING_CHECK_MS, SKIP_LANDING_TOLERANCE_TICKS, SKIP_LANDING_SNAP_TICKS, SLOW_KEY_MS, SLOW_KEYS_LOGGED} from './PlayerConstants';
 import NextUpOverlay from './NextUpOverlay';
 import SkipSegmentOverlay from './SkipSegmentOverlay';
 import StillWatchingDialog from './StillWatchingDialog';
@@ -258,6 +258,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const lyrics = useLyrics(item, isAudioMode, currentTime);
 
 	const positionRef = useRef(0);
+	// How many times the player has been drawn, and whether the controls are up, for timing a key press.
+	const drawCountRef = useRef(0);
+	drawCountRef.current += 1;
+	const controlsUpRef = useRef(false);
+	controlsUpRef.current = controlsVisible;
+	const slowKeysLoggedRef = useRef(0);
 	// The item on screen, for what is checked a moment after it was asked.
 	const itemIdRef = useRef(item?.Id);
 	itemIdRef.current = item?.Id;
@@ -3692,7 +3698,22 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	});
 
 	useEffect(() => {
-		const onKeyDown = (e) => keyDownRef.current?.(e);
+		const onKeyDown = (e) => {
+			// How long an arrow press took to show, and whether the player was drawn again meanwhile. It is timed
+			// from before anything has seen the press. Only a slow one is kept, and only a few, so the log says where
+			// the time goes without being filled by it.
+			const timed = controlsUpRef.current && e.keyCode >= 37 && e.keyCode <= 40 && slowKeysLoggedRef.current < SLOW_KEYS_LOGGED;
+			const started = timed ? performance.now() : 0;
+			const draws = drawCountRef.current;
+			keyDownRef.current?.(e);
+			if (!timed) return;
+			window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+				const took = Math.round(performance.now() - started);
+				if (took < SLOW_KEY_MS) return;
+				slowKeysLoggedRef.current += 1;
+				serverLogger.playback('Control key was slow', {key: e.keyCode, ms: took, redraws: drawCountRef.current - draws});
+			}));
+		};
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
 	}, []);

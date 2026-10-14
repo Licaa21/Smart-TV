@@ -1,4 +1,5 @@
 import {useCallback, useMemo, useState} from 'react';
+import $L from '@enact/i18n/$L';
 import Spotlight from '@enact/spotlight';
 
 import DetailsTabBar from '../../components/DetailsTabBar';
@@ -29,6 +30,8 @@ const airDateText = (episode) => {
 // it, so what an episode says reads the same in each.
 const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId = 'seerr-episodes', onNavigateUp, settings, firstSpotlightId}) => {
 	const [picked, setPicked] = useState(null);
+	// The episode opened with OK, which shows its whole description rather than the first lines of it.
+	const [openId, setOpenId] = useState(null);
 
 	const groups = useMemo(() => groupEpisodesBySeason(episodes), [episodes]);
 	const numbers = useMemo(() => [...groups.keys()], [groups]);
@@ -38,7 +41,14 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 	// Held steady across renders so the rail does not rebuild its cards every time.
 	const shown = useMemo(() => groups.get(active) || [], [groups, active]);
 
-	const handleActivate = useCallback((id) => setPicked(Number(id)), []);
+	const handleActivate = useCallback((id) => {
+		setPicked(Number(id));
+		setOpenId(null);
+	}, []);
+	const handleToggle = useCallback((ev) => {
+		const id = ev.currentTarget.dataset.episodeId;
+		setOpenId((current) => (current === id ? null : id));
+	}, []);
 
 	// The rail keeps up and down for itself and hands them back, so leaving it is decided here: up to
 	// the season tabs when there are some, and otherwise wherever the page puts focus.
@@ -60,18 +70,35 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 	}, [spotlightId]);
 
 	const renderEpisode = useCallback((episode, index) => {
-		const meta = [airDateText(episode), episode.RunTimeTicks ? formatDuration(episode.RunTimeTicks) : ''].filter(Boolean).join(' · ');
+		const meta = [
+			airDateText(episode),
+			episode.RunTimeTicks ? formatDuration(episode.RunTimeTicks) : '',
+			episode.CommunityRating ? `\u2605 ${Number(episode.CommunityRating).toFixed(1)}` : ''
+		].filter(Boolean).join(' \u00b7 ');
+		const open = openId === episode.Id;
+		// An episode that has not aired has no description yet, which is nothing to point out on every card.
+		const unaired = episode.PremiereDate && new Date(episode.PremiereDate).getTime() > Date.now();
 		return (
-			<SpottableDiv className={css.card} style={{width: `${CARD_WIDTH}px`}} spotlightId={index === 0 ? firstSpotlightId : undefined}>
+			// The first card is where the row is entered from the sections above and below it.
+			<SpottableDiv
+				className={`${css.card} ${open ? css.cardOpen : ''}`}
+				style={{width: `${CARD_WIDTH}px`}}
+				spotlightId={index === 0 ? firstSpotlightId : undefined}
+				data-current={index === 0 ? 'true' : undefined}
+				data-episode-id={episode.Id}
+				onClick={handleToggle}
+			>
 				<div className={css.still}>
 					{episode._externalPosterUrl ? <img src={episode._externalPosterUrl} alt="" /> : <div className={css.noStill} />}
 				</div>
 				<div className={css.title}>{episodeCardTitle(episode.Name, episode.IndexNumber)}</div>
 				{meta && <div className={css.meta}>{meta}</div>}
-				{episode.Overview && !hidesMediaDescription(episode, settings) && <div className={css.overview}>{episode.Overview}</div>}
+				{!hidesMediaDescription(episode, settings) && (episode.Overview || !unaired) && (
+					<div className={css.overview}>{episode.Overview || $L('No description available.')}</div>
+				)}
 			</SpottableDiv>
 		);
-	}, [settings, firstSpotlightId]);
+	}, [openId, handleToggle, firstSpotlightId, settings]);
 
 	// The episodes arrive a season at a time, and whoever draws this waits for the first.
 	if (!shown.length) return null;

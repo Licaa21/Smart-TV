@@ -92,6 +92,7 @@ const NouveauDetailsFooter = ({
 						{sizeLine && <div className={css.fileMeta}>{sizeLine}</div>}
 						<NouveauDirectPlay
 							api={effectiveApi}
+							item={item}
 							itemId={item.Id}
 							serverType={item._serverType}
 							mediaSourceId={fileSource.Id}

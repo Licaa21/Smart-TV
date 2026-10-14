@@ -55,6 +55,12 @@
 	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
 }
 
+// Opened with OK, a card shows the whole description, and grows downward while the others stay as they were.
+.cardOpen .overview {
+	max-height: none;
+	display: block;
+}
+
 // Kept to three lines whether or not it fills them, so a row of uneven descriptions lines up.
 .overview {
 	margin-top: 6px;

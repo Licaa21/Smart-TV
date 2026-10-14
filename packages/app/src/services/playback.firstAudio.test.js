@@ -69,6 +69,18 @@ describe('direct play and the audio track', () => {
 		expect(result.playMethod).not.toBe('DirectPlay');
 	});
 
+	test('a preview decides the same thing as a start and starts nothing', async () => {
+		api.getPlaybackInfo.mockResolvedValueOnce(direct(6)).mockResolvedValueOnce(remux(6));
+		const preview = await playback.getPlaybackInfo(episode.Id, {item: episode, audioStreamIndex: 6, directPlayOpensFirstAudio: true, dryRun: true});
+		expect(preview).toMatchObject({dryRun: true, audioRebuilt: true, openingAudioCodec: 'flac', audioStreamIndex: 6});
+		expect(preview.playMethod).not.toBe('DirectPlay');
+		expect(preview.url).toBeUndefined();
+
+		api.getPlaybackInfo.mockResolvedValue(direct(4));
+		const plain = await playback.getPlaybackInfo(episode.Id, {item: episode, audioStreamIndex: 4, directPlayOpensFirstAudio: true, dryRun: true});
+		expect(plain).toMatchObject({dryRun: true, audioRebuilt: false, playMethod: 'DirectPlay'});
+	});
+
 	test('the first track stays a direct play', async () => {
 		api.getPlaybackInfo.mockResolvedValue(direct(4));
 		const result = await playback.getPlaybackInfo(episode.Id, {item: episode, audioStreamIndex: 4, directPlayOpensFirstAudio: true});

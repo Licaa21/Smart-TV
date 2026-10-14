@@ -59,7 +59,7 @@ const DetailTrackModals = ({
 					item={item}
 					mediaSource={item.MediaSources?.[selectedVersionIndex] || item.MediaSources?.[0]}
 					audioStreamIndex={audioStreams[selectedAudioIndex]?.Index}
-					subtitleStreamIndex={selectedSubtitleIndex >= 0 ? subtitleStreams[selectedSubtitleIndex]?.Index : undefined}
+					subtitleStreamIndex={selectedSubtitleIndex >= 0 ? subtitleStreams[selectedSubtitleIndex]?.Index : -1}
 					onClose={onCloseModal}
 				/>
 			)}
