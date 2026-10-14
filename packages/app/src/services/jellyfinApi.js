@@ -840,6 +840,9 @@ export const api = {
 
 	refreshItem: refreshItemVia(request),
 
+	// Scans every library for new and changed files, which is what the server's own Scan All Libraries does.
+	refreshLibraries: () => request('/Library/Refresh', {method: 'POST'}),
+
 	deleteItem: (itemId) =>
 		request(`/Items/${itemId}`, {
 			method: 'DELETE'
@@ -1295,6 +1298,8 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		applyRemoteSearchResult: applyRemoteSearchResultVia(serverRequest),
 
 		refreshItem: refreshItemVia(serverRequest),
+
+		refreshLibraries: () => serverRequest('/Library/Refresh', {method: 'POST'}),
 
 		getRemoteImages: (itemId, imageType) =>
 			serverRequest(`/Items/${itemId}/RemoteImages?Type=${imageType}&IncludeAllLanguages=true`),

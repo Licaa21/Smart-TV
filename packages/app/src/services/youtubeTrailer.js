@@ -495,6 +495,23 @@ function attachLgManifest (video, url, startTime, onError) {
 	};
 }
 
+// The one quality a trailer plays at. hls.js starts on a guess of the link and then moves to what it measures, and a
+// move flushes the picture ahead of the playhead and loads it again, while the sound, which it loads apart from the
+// picture, plays on. That is a trailer whose sound runs a second ahead. A trailer is short, so it keeps the best
+// H.264 quality that fits the starting guess and never moves. Returns the index in the list, or -1 for no choice.
+export function pickTrailerLevel (levels, bandwidth = HLS_START_BANDWIDTH) {
+	if (!Array.isArray(levels) || levels.length === 0) return -1;
+	const isH264 = function (level) { return /^avc/i.test(String(level.videoCodec || level.codecSet || '')); };
+	const candidates = levels.map(function (level, index) { return {level: level, index: index}; });
+	const h264 = candidates.filter(function (entry) { return isH264(entry.level); });
+	const pool = (h264.length ? h264 : candidates).slice().sort(function (a, b) { return (a.level.bitrate || 0) - (b.level.bitrate || 0); });
+	let pick = pool[0];
+	for (let i = 0; i < pool.length; i++) {
+		if ((pool[i].level.bitrate || 0) <= bandwidth) pick = pool[i];
+	}
+	return pick.index;
+}
+
 // Starts a trailer stream on a video element and returns what lets go of it, which has to run
 // before the element plays anything else. Hls is the hls.js class, which the caller loads when
 // needsHlsJs says so. onError hears a manifest hls.js gives up on, since that never reaches the
@@ -525,6 +542,10 @@ export function attachTrailerStream (video, url, {Hls = null, audioLanguage = ''
 	let released = false;
 	hls.on(Hls.Events.ERROR, function (event, data) {
 		if (data.fatal && !released && onError) onError();
+	});
+	hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+		const index = pickTrailerLevel(data && data.levels);
+		if (index >= 0) hls.currentLevel = index;
 	});
 	hls.loadSource(url);
 	hls.attachMedia(video);

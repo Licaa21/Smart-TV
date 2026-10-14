@@ -38,7 +38,7 @@ const bestTrailerOf = (details) => {
 
 // Shaped like the library's own remote trailers, so the screen and the overlay that plays them
 // need to know nothing about where this one came from.
-const trailersOf = (details) => {
+export const trailersOf = (details) => {
 	const video = bestTrailerOf(details);
 	if (!video) return [];
 	const url = video.url || (video.key ? `https://www.youtube.com/watch?v=${video.key}` : '');

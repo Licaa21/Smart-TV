@@ -68,6 +68,7 @@ import {resolveOverlayColor} from '../theme/overlayColors';
 import Login from '../views/Login';
 import Browse from '../views/Browse';
 import {isGameLibrary, refreshGameLibraries, resolveGameLibraryId} from '../utils/gameLibrary';
+import {dropEpisodeDialog} from '../utils/episodeDialogReturn';
 
 const Details = lazy(() => import('../views/Details'));
 const Library = lazy(() => import('../views/Library'));
@@ -257,6 +258,8 @@ const AppContent = (props) => {
 	const [isPlayerPaused, setIsPlayerPaused] = useState(false);
 	const [trailerPreviewActive, setTrailerPreviewActive] = useState(false);
 	const [panelHistory, setPanelHistory] = useState([]);
+	// Where the details screen sits in the history when a guest star was opened from one of its episode dialogs
+	const episodeReturnRef = useRef(null);
 	// The history holds only which panel was left. The item and person that panel was showing are kept beside it,
 	// entry for entry, so Back lands on the one it left and not on the last one picked since.
 	const navStateRef = useRef([]);
@@ -745,6 +748,15 @@ const AppContent = (props) => {
 
 	const playerReturnRef = useRef(null);
 
+	// On Home with nothing behind it there is no details screen left to come back to, so whatever an episode dialog kept
+	// for the way back is let go. This catches every way of emptying the history but Back.
+	useEffect(() => {
+		if (panelIndex === PANELS.BROWSE && panelHistory.length === 0) {
+			episodeReturnRef.current = null;
+			dropEpisodeDialog();
+		}
+	}, [panelIndex, panelHistory.length]);
+
 	const restoreShown = useCallback((index) => {
 		const shown = navStateRef.current[index];
 		if (shown?.item) setSelectedItem(shown.item);
@@ -763,6 +775,8 @@ const AppContent = (props) => {
 			setPanelHistory(prev => prev.slice(0, -1));
 			// Leaving the player keeps the item as it stands, since an episode played on from inside it moves that
 			if (panelIndex !== PANELS.PLAYER) restoreShown(panelHistory.length - 1);
+			// Back to the details screen an episode dialog was opened from, which brings the dialog up again
+			if (episodeReturnRef.current && panelHistory.length - 1 <= episodeReturnRef.current.depth) episodeReturnRef.current = null;
 			if (prevPanel === PANELS.PLAYER) {
 				// back to the player a person was opened from, where it left off
 				const back = playerReturnRef.current;
@@ -1519,16 +1533,24 @@ const AppContent = (props) => {
 		navigateTo(PANELS.SEERR_PERSON);
 	}, [navigateTo]);
 
+	// A guest star opened from an episode dialog. The page has Back to the dialog and nothing else, the way a person
+	// opened from the player does, so the history holds the details screen's place and the navbar stays away.
+	const handleSelectSeerrPersonFromEpisode = useCallback((personId, personName) => {
+		episodeReturnRef.current = {depth: panelHistory.length};
+		handleSelectSeerrPerson(personId, personName);
+	}, [panelHistory.length, handleSelectSeerrPerson]);
+
 	// Everywhere the detail screen can send a viewer into the Seerr side of the app, bundled
 	// into one prop rather than six.
 	const seerrNav = useMemo(() => ({
 		onSelectItem: handleSelectSeerrItem,
 		onSelectPerson: handleSelectSeerrPerson,
+		onSelectPersonFromEpisode: handleSelectSeerrPersonFromEpisode,
 		onSelectKeyword: handleSelectSeerrKeyword,
 		onSelectGenre: handleSelectSeerrGenre,
 		onSelectNetwork: handleSelectSeerrNetwork,
 		onOpenCollection: handleOpenSeerrCollection
-	}), [handleSelectSeerrItem, handleSelectSeerrPerson, handleSelectSeerrKeyword, handleSelectSeerrGenre, handleSelectSeerrNetwork, handleOpenSeerrCollection]);
+	}), [handleSelectSeerrItem, handleSelectSeerrPerson, handleSelectSeerrPersonFromEpisode, handleSelectSeerrKeyword, handleSelectSeerrGenre, handleSelectSeerrNetwork, handleOpenSeerrCollection]);
 
 	const handlePinInputChange = useCallback((e) => {
 		const nextValue = String(e.target.value || '').replace(/\D/g, '').slice(0, 4);
@@ -1659,6 +1681,8 @@ const AppContent = (props) => {
 
 	// the history holds the place of a player that a person was opened from, and nothing else has it keep the navbar off
 	const cameFromPlayer = Boolean(playerReturnRef.current) && panelHistory[playerReturnRef.current.depth] === PANELS.PLAYER;
+	// The same for a guest star opened from an episode dialog, with the details screen's place in the history.
+	const cameFromEpisode = Boolean(episodeReturnRef.current) && panelHistory[episodeReturnRef.current.depth] === PANELS.DETAILS;
 
 	const showNavBar = panelIndex !== PANELS.LOGIN &&
 		panelIndex !== PANELS.PLAYER &&
@@ -1677,7 +1701,8 @@ const AppContent = (props) => {
 		// Screens reached from the player's cast list, a person and whatever is opened from there, have Back to the
 		// player and nothing else, since a navbar would let the viewer leave the video behind. The same screens
 		// reached from anywhere else keep the navbar.
-		!cameFromPlayer;
+		!cameFromPlayer &&
+		!cameFromEpisode;
 
 	return (
 		<div className={css.app} {...props}>

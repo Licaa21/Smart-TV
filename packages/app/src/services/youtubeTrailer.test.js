@@ -5,6 +5,7 @@ import {isTizen, isWebOS, isXbox} from '../platform';
 import serverLogger from './serverLogger';
 import {
 	attachTrailerStream,
+	pickTrailerLevel,
 	buildInnertubePayload,
 	extractInnertubeStream,
 	fetchVideoStream,
@@ -38,7 +39,7 @@ class FakeHls {
 	destroy () { this.destroyed = true; }
 }
 FakeHls.instances = [];
-FakeHls.Events = {ERROR: 'hlsError'};
+FakeHls.Events = {ERROR: 'hlsError', MANIFEST_PARSED: 'hlsManifestParsed'};
 
 beforeEach(() => {
 	isTizen.mockReturnValue(false);
@@ -269,6 +270,25 @@ describe('needsHlsJs', () => {
 	});
 });
 
+describe('pickTrailerLevel', () => {
+	const level = (bitrate, codec) => ({bitrate, videoCodec: codec});
+
+	test('takes the best H.264 quality that fits the starting guess, whatever order they come in', () => {
+		const levels = [level(12000000, 'avc1.640028'), level(900000, 'avc1.4d401e'), level(5000000, 'avc1.64001f'), level(3000000, 'vp09.00.40.08')];
+		expect(pickTrailerLevel(levels, 8000000)).toBe(2);
+	});
+
+	test('takes the lowest when none fit, and any codec when there is no H.264', () => {
+		expect(pickTrailerLevel([level(9000000, 'avc1.640028'), level(20000000, 'avc1.640032')], 8000000)).toBe(0);
+		expect(pickTrailerLevel([level(2000000, 'vp09'), level(6000000, 'vp09')], 8000000)).toBe(1);
+	});
+
+	test('makes no choice with nothing to choose from', () => {
+		expect(pickTrailerLevel([])).toBe(-1);
+		expect(pickTrailerLevel(undefined)).toBe(-1);
+	});
+});
+
 describe('attachTrailerStream', () => {
 	afterEach(() => {
 		FakeHls.instances.length = 0;
@@ -297,6 +317,10 @@ describe('attachTrailerStream', () => {
 		expect(hls.media).toBe(video);
 		expect(hls.url).toBe(HLS_URL);
 		expect(hls.config).toMatchObject({startPosition: 12, videoPreference: {videoCodec: 'avc1'}, audioPreference: {lang: 'en-US'}});
+
+		// One quality for the whole trailer, so hls.js never flushes the picture to change it
+		hls.handlers.hlsManifestParsed('hlsManifestParsed', {levels: [{bitrate: 1000000, videoCodec: 'avc1.4d401e'}, {bitrate: 6000000, videoCodec: 'avc1.64001f'}, {bitrate: 16000000, videoCodec: 'avc1.640028'}]});
+		expect(hls.currentLevel).toBe(1);
 
 		hls.handlers.hlsError('hlsError', {fatal: false});
 		expect(onError).not.toHaveBeenCalled();

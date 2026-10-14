@@ -1,9 +1,10 @@
-import {useCallback, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
 import Spotlight from '@enact/spotlight';
 
 import DetailsTabBar from '../../components/DetailsTabBar';
 import {appLocale} from '../../utils/appLocale';
+import {keepEpisodeDialog, takeEpisodeDialog} from '../../utils/episodeDialogReturn';
 import {formatDuration} from '../../utils/helpers';
 import {KEYS} from '../../utils/keys';
 import {hidesMediaDescription} from './detailsMedia';
@@ -39,6 +40,8 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 	const [picked, setPicked] = useState(null);
 	// The episode opened with OK, in full. Focus stays on its card while it is up.
 	const [opened, setOpened] = useState(null);
+	// The star in focus when the dialog is opened again on the way back from their page.
+	const [restoredPerson, setRestoredPerson] = useState('');
 	const rootRef = useRef(null);
 
 	const groups = useMemo(() => groupEpisodesBySeason(episodes), [episodes]);
@@ -56,7 +59,29 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 		const id = ev.currentTarget.dataset.episodeId;
 		setOpened(shown.find((episode) => episode.Id === id) || null);
 	}, [shown]);
-	const handleClose = useCallback(() => setOpened(null), []);
+	// Back from a guest star's page comes to the dialog it was opened from, on the same season and episode.
+	useEffect(() => {
+		const back = takeEpisodeDialog(episodes);
+		if (!back) return;
+		if (Number.isInteger(back.season)) setPicked(back.season);
+		setRestoredPerson(back.personId || '');
+		setOpened(back.episode);
+	}, [episodes]);
+	const handleClose = useCallback(() => {
+		const closing = opened;
+		setOpened(null);
+		setRestoredPerson('');
+		// The card it was opened from takes focus back.
+		window.requestAnimationFrame(() => {
+			const card = closing && rootRef.current && rootRef.current.querySelector(`[data-episode-id="${closing.Id}"]`);
+			if (card) Spotlight.focus(card);
+		});
+	}, [opened]);
+	// A guest star's page, kept with where the dialog stood so it can be brought back.
+	const handleSelectPerson = useCallback((personId, personName) => {
+		if (opened) keepEpisodeDialog({episodeId: opened.Id, season: active, personId});
+		onSelectPerson?.(personId, personName);
+	}, [opened, active, onSelectPerson]);
 
 	// The rail keeps up and down for itself and hands them back, so leaving it is decided here: up to
 	// the season tabs when there are some, and otherwise wherever the page puts focus.
@@ -145,7 +170,8 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 					episode={opened}
 					airDate={airDateText(opened)}
 					hideOverview={hidesMediaDescription(opened, settings)}
-					onSelectPerson={onSelectPerson}
+					onSelectPerson={onSelectPerson ? handleSelectPerson : undefined}
+					initialPersonId={restoredPerson}
 					onClose={handleClose}
 				/>
 			)}

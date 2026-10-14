@@ -4,13 +4,16 @@ import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 
 import {ChevronDownIcon, LibrariesIcon} from '../icons/navIcons';
+import useLibraryRefresh from '../../hooks/useLibraryRefresh';
 import {pointerHover} from '../../utils/focusScroll';
 import SidebarItem from './SidebarItem';
 
 import css from './Sidebar.module.less';
 
+// Coming in lands on a library when none was left from last time, since the button before them scans the whole server.
 const LibrariesContainer = SpotlightContainerDecorator({
-	enterTo: 'last-focused'
+	enterTo: 'last-focused',
+	defaultElement: '[data-library-id]'
 }, 'div');
 
 const SpottableButton = Spottable('button');
@@ -19,6 +22,7 @@ const SpottableButton = Spottable('button');
 // the expand animation has something to grow, and only becomes focusable once
 // it's actually open.
 const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}) => {
+	const {canRefresh, note, refreshAll} = useLibraryRefresh();
 	const handleLibraryClick = useCallback((e) => {
 		const libId = e.currentTarget.dataset.libraryId;
 		const lib = libraries.find(l => l.Id === libId);
@@ -46,6 +50,11 @@ const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}
 				className={`${css.librariesList} ${expanded ? css.librariesListExpanded : ''}`}
 				spotlightDisabled={!expanded}
 			>
+				{canRefresh && (
+					<SpottableButton className={css.libraryItem} onClick={refreshAll} data-nav-slot={1}>
+						<span className={`${css.libraryName} ${css.refreshAllName}`}>{note === 'started' ? $L('Refresh started') : note === 'failed' ? $L('Refresh failed') : $L('Refresh all libraries')}</span>
+					</SpottableButton>
+				)}
 				{libraries.map((lib, index) => (
 					<SpottableButton
 						key={lib.Id}

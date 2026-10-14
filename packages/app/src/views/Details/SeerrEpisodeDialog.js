@@ -72,7 +72,7 @@ const Star = ({star, first, onOpen}) => {
 // move along them, and OK opens one. With none, nothing in it takes focus: focus stays on the card behind and
 // the dialog takes every key itself, up and down reading a long description. It sits on document.body, outside
 // the rows of the detail screen.
-const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onSelectPerson, onClose}) => {
+const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onSelectPerson, initialPersonId = '', onClose}) => {
 	const textRef = useRef(null);
 	const stars = episode._guestStars || [];
 	const focusable = Boolean(onSelectPerson) && stars.some((star) => star.id);
@@ -86,8 +86,6 @@ const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onSelectPerson, onC
 
 	useEffect(() => {
 		registerSeerrEpisodeDialog(onClose);
-		// Where focus was, so closing hands it back.
-		const opener = document.activeElement;
 		const handleKeyDown = (ev) => {
 			if (ev.keyCode === KEYS.UP || ev.keyCode === KEYS.DOWN) {
 				const el = textRef.current;
@@ -105,11 +103,6 @@ const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onSelectPerson, onC
 			window.removeEventListener('keydown', handleKeyDown, true);
 			window.clearTimeout(moveIn);
 			unregisterSeerrEpisodeDialog(onClose);
-			if (focusableRef.current) {
-				window.requestAnimationFrame(() => {
-					if (opener && opener.isConnected) Spotlight.focus(opener);
-				});
-			}
 		};
 	}, [onClose]);
 
@@ -152,7 +145,7 @@ const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onSelectPerson, onC
 							{description && <div className={css.dialogText} ref={textRef}>{description}</div>}
 							{stars.length > 0 && (
 								<div className={css.dialogCast} onFocus={keepFocusInView}>
-									{stars.map((star, index) => <Star key={star.id || star.name} star={star} first={index === 0} onOpen={handleOpenPerson} />)}
+									{stars.map((star, index) => <Star key={star.id || star.name} star={star} first={initialPersonId ? star.id === initialPersonId : index === 0} onOpen={handleOpenPerson} />)}
 								</div>
 							)}
 							{credits.length > 0 && (

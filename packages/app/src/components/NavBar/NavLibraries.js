@@ -4,6 +4,7 @@ import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import Spotlight from '@enact/spotlight';
 
+import useLibraryRefresh from '../../hooks/useLibraryRefresh';
 import {pointerHover} from '../../utils/focusScroll';
 import {LibrariesIcon} from '../icons/navIcons';
 import NavPillButton from './NavPillButton';
@@ -38,6 +39,7 @@ const NavLibraries = ({libraries, slot, activeView, onSelectLibrary, leftTargetI
 	const [byPointer, setByPointer] = useState(false);
 	const blurTimeoutRef = useRef(null);
 	const listRef = useRef(null);
+	const {canRefresh, note, refreshAll} = useLibraryRefresh();
 
 	useEffect(() => {
 		return () => {
@@ -52,7 +54,8 @@ const NavLibraries = ({libraries, slot, activeView, onSelectLibrary, leftTargetI
 			// undone by focus arriving late.
 			const current = Spotlight.getCurrent();
 			if (current && !current.classList.contains(css.librariesBtn)) return;
-			const firstLibBtn = listRef.current?.firstElementChild;
+			// On the first library, since the button before it scans the whole server and is not one to land on by mistake.
+			const firstLibBtn = listRef.current?.querySelector('[data-library-id]');
 			if (firstLibBtn) Spotlight.focus(firstLibBtn);
 		}, FOCUS_DELAY);
 		return () => clearTimeout(timer);
@@ -132,6 +135,16 @@ const NavLibraries = ({libraries, slot, activeView, onSelectLibrary, leftTargetI
 				onSpotlightLeft={handleSpotlightLeft}
 			/>
 			<div className={css.librariesList} ref={listRef}>
+				{expanded && canRefresh && (
+					<SpottableButton
+						className={`${css.navBtn} ${css.libraryBtn} ${css.refreshAllBtn}`}
+						onClick={refreshAll}
+						onSpotlightUp={handleLibraryUp}
+						data-nav-slot={1}
+					>
+						<span className={css.navLabel}>{note === 'started' ? $L('Refresh started') : note === 'failed' ? $L('Refresh failed') : $L('Refresh all libraries')}</span>
+					</SpottableButton>
+				)}
 				{expanded && libraries.map((lib, index) => (
 					<SpottableButton
 						key={lib.Id}

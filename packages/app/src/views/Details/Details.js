@@ -906,10 +906,11 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	const ratingStyle = normalizeRatingStyle(settings.personalRatingStyle);
 
 	// A series keeps the button with nothing counted against it, since a trailer sitting in a
-	// season folder belongs to that season rather than the series it came from.
+	// season folder belongs to that season rather than the series it came from. A movie keeps it too,
+	// since one the library has no trailer for is looked up on Seerr when the button is pressed.
 	const hasTrailer = seerrOnly
 		? item.RemoteTrailers?.length > 0
-		: (item.LocalTrailerCount > 0 || item.RemoteTrailers?.length > 0 || isSeries);
+		: (item.LocalTrailerCount > 0 || item.RemoteTrailers?.length > 0 || isSeries || item.Type === 'Movie');
 
 	// Collections only hold video content, so the action is hidden on people,
 	// music and playlists rather than offering a call the server would reject.

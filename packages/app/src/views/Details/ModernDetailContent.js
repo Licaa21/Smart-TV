@@ -554,7 +554,7 @@ const ModernDetailContent = (props) => {
 				// A series the library lacks has no season pages to open, so its seasons are tabs over
 				// the episodes, which Seerr describes.
 				return seerrOnly
-					? <SeerrEpisodes seasons={seasons} episodes={seriesEpisodes} navbarPosition={settings.navbarPosition} settings={settings} onSelectPerson={seerrNav?.onSelectPerson} />
+					? <SeerrEpisodes seasons={seasons} episodes={seriesEpisodes} navbarPosition={settings.navbarPosition} settings={settings} onSelectPerson={seerrNav?.onSelectPersonFromEpisode} />
 					: renderSeasonsGrid();
 			case 'episodes':
 				return renderEpisodesTab();
