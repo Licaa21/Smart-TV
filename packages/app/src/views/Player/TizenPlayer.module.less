@@ -345,6 +345,51 @@
 	}
 }
 
+// Medium and below look the same, but a focus move no longer draws anything again. The ring and fill sit in a
+// layer of their own behind the icon and are only shown or hidden, and so is the tooltip, which the slow sets
+// otherwise painted over the video on every press. Live TV's chips and a disabled button keep their own look.
+.controlBtn:not(.liveBtn):not(.controlBtnDisabled) {
+	:global(.perf-low) &,
+	:global(.perf-mid) & {
+		position: relative;
+		z-index: 0;
+
+		&::before {
+			content: '';
+			position: absolute;
+			top: -3px;
+			right: -3px;
+			bottom: -3px;
+			left: -3px;
+			z-index: -1;
+			box-sizing: border-box;
+			border: 3px solid #fff;
+			border-radius: 50%;
+			background: rgba(255, 255, 255, 0.22);
+			opacity: 0;
+			will-change: opacity;
+		}
+
+		&:hover,
+		&:focus {
+			background: rgba(255, 255, 255, 0);
+			border-color: transparent;
+		}
+
+		&:hover::before,
+		&:focus::before {
+			opacity: 1;
+		}
+	}
+}
+
+.focusTooltip {
+	:global(.perf-low) &,
+	:global(.perf-mid) & {
+		will-change: opacity;
+	}
+}
+
 .controlBtn:hover img,
 .controlBtn:focus img {
 	filter: none;

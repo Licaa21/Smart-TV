@@ -40,10 +40,11 @@ describe('buildPlaybackInfo', () => {
 		const info = buildPlaybackInfo(answer({supportsDirectStream: true, audioBuilt: true, openingAudioCodec: 'eac3', transcodeReasons: ['DirectPlayError']}), {audioStreamIndex: 2, tizen: true});
 		expect(info.method).toBe('stream');
 		expect(info.title).toBe('Audio built on the server');
-		expect(info.reasons).toEqual([]);
-		expect(info.notes.map((note) => note.id)).toEqual(['audio']);
-		expect(info.notes[0].text).toContain('EAC3');
-		expect(info.notes[0].text).toContain('AC3');
+		// It is a reason, not a setting.
+		expect(info.notes).toEqual([]);
+		expect(info.reasons).toHaveLength(1);
+		expect(info.reasons[0].description).toBe('Opens on EAC3 audio, but you picked AC3.');
+		expect(info.reasons[0].hint).toContain('cannot switch to another codec');
 		// With nothing built the same answer is only what the server said.
 		expect(buildPlaybackInfo(answer({supportsDirectPlay: true}), {audioStreamIndex: 2, tizen: true}).notes).toEqual([]);
 	});

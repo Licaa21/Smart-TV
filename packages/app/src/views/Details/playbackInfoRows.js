@@ -59,6 +59,15 @@ const audioText = (stream) => {
 	return [name, bitrateText(stream.BitRate)].filter(Boolean).join(' · ');
 };
 
+// The player opens a file on one track, and only a pick in that codec is switched by the player. Any other is
+// built by the server, with the picture copied, so the popup would be wrong to call it a plain direct play.
+const builtAudioReason = (opening, wanted) => ({
+	description: $L('Opens on {first} audio, but you picked {picked}.')
+		.replace('{first}', String(opening || '').toUpperCase())
+		.replace('{picked}', String(wanted || '').toUpperCase()),
+	hint: $L('This TV\'s player cannot switch to another codec dependably, so the server builds your track with the picture copied. If that needs a re-encode, the file plays as it is instead.')
+});
+
 // `audioStreamIndex` and `subtitleStreamIndex` are the tracks' own indexes, the ones the server was
 // asked with, and a subtitle left undefined means none.
 export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex, settings, tizen = false} = {}) => {
@@ -112,8 +121,9 @@ export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex
 		method,
 		title: built ? $L('Audio built on the server') : {direct: $L('Direct Play'), stream: $L('Direct Stream'), transcode: $L('Transcoding')}[method],
 		summary: built ? $L('The server is asked to build the audio track you picked, with the picture copied.') : changesText(method, reasons),
-		reasons: details.map((detail) => formatDirectPlayReason(detail, settings)),
-		notes: buildForkNotes({tizen, method, source, reasonKeys: reasons.map((reason) => String(reason).toLowerCase()), settings, audioStart: built ? {needsServer: true, openingCodec: result.openingAudioCodec, wantedCodec: audioCodecOf(streams, audioStreamIndex)} : null}),
+		// A pick the player cannot open the file on is not something a setting decides, so it is told as a reason.
+		reasons: built ? [builtAudioReason(result.openingAudioCodec, audioCodecOf(streams, audioStreamIndex))] : details.map((detail) => formatDirectPlayReason(detail, settings)),
+		notes: buildForkNotes({tizen, method, source, reasonKeys: reasons.map((reason) => String(reason).toLowerCase()), settings}),
 		sections
 	};
 };

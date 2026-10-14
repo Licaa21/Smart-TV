@@ -9,31 +9,15 @@ const STREAM_LIMIT = 32;
 const HEVC_LEVEL_51 = 153;
 const lower = (value) => String(value || '').toLowerCase();
 
-const codecLabel = (codec) => String(codec || '').toUpperCase();
-
 // Each note is {id, title, text, tone}. A tip is something a setting could change, and info is a setting
 // that is already doing its work.
-export const buildForkNotes = ({method, source, reasonKeys = [], settings = {}, audioStart = null, tizen = false}) => {
+export const buildForkNotes = ({method, source, reasonKeys = [], settings = {}, tizen = false}) => {
 	// These settings, and the limits they lift, are the Samsung player's.
 	if (!tizen) return [];
 	const streams = Array.isArray(source?.MediaStreams) ? source.MediaStreams : [];
 	const video = streams.find((stream) => stream.Type === 'Video');
 	const has = (reason) => reasonKeys.indexOf(reason) !== -1;
 	const notes = [];
-
-	// The player opens a file on one track, and only a pick in that codec is switched by the player. Any
-	// other is built by the server, with the picture copied, so the popup would be wrong to call it a
-	// plain direct play.
-	if (audioStart?.needsServer) {
-		notes.push({
-			id: 'audio',
-			tone: 'info',
-			title: $L('Different audio codec'),
-			text: $L('Opens on {first} audio, and the player cannot switch to {picked} dependably, so the server is asked to build your {picked} track with the picture copied. If that needs a re-encode, the file plays as it is instead.')
-				.replace('{first}', codecLabel(audioStart.openingCodec))
-				.replace(/\{picked\}/g, codecLabel(audioStart.wantedCodec))
-		});
-	}
 
 	// A set held to 32 streams in a file sends one with more through the server.
 	if (settings.allowManyStreams !== true && has('streamcountexceedslimit')) {

@@ -4,21 +4,10 @@ jest.mock('@enact/i18n/$L', () => (text) => text);
 
 const stream = (type, extra) => ({Type: type, ...extra});
 const fileOf = (streams) => ({MediaStreams: streams});
-const ids = (notes) => notes.map((note) => note.id);
 
 describe('buildForkNotes', () => {
 	it('says nothing off a Samsung, where these settings are not offered', () => {
-		expect(buildForkNotes({method: 'direct', source: {MediaStreams: []}, audioStart: {needsServer: true, openingCodec: 'eac3', wantedCodec: 'ac3'}})).toEqual([]);
-	});
-
-	it('says the server builds a pick in another codec than the file opens on, with both codecs', () => {
-		const notes = buildForkNotes({tizen: true, method: 'direct', source: fileOf([]), audioStart: {needsServer: true, openingCodec: 'eac3', wantedCodec: 'ac3'}});
-		expect(ids(notes)).toEqual(['audio']);
-		expect(notes[0].text).toBe('Opens on EAC3 audio, and the player cannot switch to AC3 dependably, so the server is asked to build your AC3 track with the picture copied. If that needs a re-encode, the file plays as it is instead.');
-	});
-
-	it('says nothing about audio when the player switches the pick itself', () => {
-		expect(buildForkNotes({tizen: true, method: 'direct', source: fileOf([]), audioStart: {needsServer: false}})).toEqual([]);
+		expect(buildForkNotes({method: 'transcode', source: {MediaStreams: Array.from({length: 40}, () => stream('Subtitle'))}, reasonKeys: ['streamcountexceedslimit']})).toEqual([]);
 	});
 
 	describe('many streams', () => {
