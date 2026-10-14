@@ -372,7 +372,8 @@
 	overflow: visible;
 	background: transparent;
 
-	&:focus {
+	&:focus,
+	&.focused {
 		outline: none;
 		z-index: 10;
 
@@ -844,7 +845,9 @@
 	}
 
 	.itemCard:focus .poster,
-	.itemCard:focus .posterPlaceholder {
+	.itemCard:focus .posterPlaceholder,
+	.itemCard.focused .poster,
+	.itemCard.focused .posterPlaceholder {
 		border-color: var(--theme-accent, #ff2e92);
 		box-shadow: 0 0 12px rgba(var(--theme-accent-rgb, 255, 46, 146), 0.35);
 	}
