@@ -16,11 +16,18 @@ import {loadGameStateWithMigration} from '../../utils/gameSaves';
 import {ModalContainer} from '../../utils/spotlightContainers';
 import {DETAIL_ICON_PATHS} from '../Details/detailIcons';
 import {coreChoices, coreLabel} from './coreChoices';
+import {scrimStyle} from '../../utils/scrimImage';
 
 import css from './GameDetails.module.less';
 
 // Adds a class to the Sandstone button's background layer, which is where its fill is drawn.
 const CORE_BUTTON_CSS = {bg: css.coreBg};
+
+// Same stops as .scrim in the stylesheet.
+const SCRIM = [
+	{to: 'right', rgb: '11, 15, 20', stops: [[0.3, 1], [0.65, 0.4], [0.95, 0]]},
+	{to: 'top', rgb: '11, 15, 20', stops: [[0.08, 1], [0.6, 0]]}
+];
 
 const focusCoreButton = () => setTimeout(() => Spotlight.focus('game-core-btn'), 0);
 
@@ -182,7 +189,7 @@ const GameDetails = ({library, gameId, initialGame, onPlay, onSelectGame, backHa
 				className={css.backdrop}
 				style={backdrop ? {backgroundImage: `url(${backdrop})`} : {background: gameFallbackColor(game.id)}}
 			/>
-			<div className={css.scrim} />
+			<div className={css.scrim} style={scrimStyle(SCRIM)} />
 			<div className={css.content}>
 				<div
 					className={css.poster}

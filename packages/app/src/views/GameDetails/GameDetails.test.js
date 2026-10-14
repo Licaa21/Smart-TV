@@ -40,6 +40,7 @@ jest.mock('../../utils/spotlightContainers', () => {
 jest.mock('../../services/gamesApi', () => ({getGame: jest.fn(), getGames: jest.fn(), gameThumbUrl: () => null, setGameCoreOverride: jest.fn()}));
 jest.mock('../../utils/gameSaves', () => ({loadGameStateWithMigration: jest.fn()}));
 jest.mock('../../utils/emulatorjs', () => ({isSupported: () => true, needsThreads: (core) => core === 'psp', unsupportedMessage: () => ''}));
+jest.mock('../../utils/scrimImage', () => ({scrimStyle: () => null}));
 
 const library = {Id: 'lib'};
 const game = {id: 'g1', core: 'nes', title: 'Game', system: 'NES'};

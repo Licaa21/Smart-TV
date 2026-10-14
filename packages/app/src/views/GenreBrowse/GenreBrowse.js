@@ -13,6 +13,7 @@ import useItemMenuHold, {cardIndexOf} from '../../hooks/useItemMenuHold';
 import {withoutBlocked} from '../../utils/parentalFilter';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import {getImageUrl, getBackdropId, getPrimaryImageId} from '../../utils/helpers';
+import {serverBlurredUrl} from '../../utils/serverBlur';
 
 import css from './GenreBrowse.module.less';
 
@@ -422,6 +423,7 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 	}
 
 	const compactHasMore = compact && rawFetchedRef.current < serverTotalCount;
+	const blurredBackdropUrl = serverBlurredUrl(backdropUrl, settings.backdropBlurHome);
 
 	return (
 		<div className={css.page}>
@@ -430,9 +432,9 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 					{backdropUrl && (
 						<img
 							className={css.backdropImage}
-							src={backdropUrl}
+							src={blurredBackdropUrl || backdropUrl}
 							alt=""
-							style={{filter: settings.backdropBlurHome > 0 ? `blur(${settings.backdropBlurHome}px)` : 'none'}}
+							style={{filter: !blurredBackdropUrl && settings.backdropBlurHome > 0 ? `blur(${settings.backdropBlurHome}px)` : 'none'}}
 						/>
 					)}
 					<div className={css.backdropOverlay} />

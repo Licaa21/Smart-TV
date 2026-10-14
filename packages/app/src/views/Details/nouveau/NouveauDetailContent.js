@@ -40,6 +40,7 @@ import {
 	SECTION_CHAPTERS, SECTION_COLLECTION, SECTION_DETAILS, SECTION_DISCOVERY, SECTION_EPISODES,
 	SECTION_EXTRAS, SECTION_PEOPLE, nouveauSectionOrder, seerrDiscoveryExpected
 } from './nouveauSections';
+import {scrimStyle} from '../../../utils/scrimImage';
 
 import sectionsCss from './sections/NouveauSections.module.less';
 import css from './NouveauDetailContent.module.less';
@@ -49,6 +50,14 @@ import css from './NouveauDetailContent.module.less';
 
 // The room a docked sidebar takes, which the stylesheet pads the content by.
 const SIDEBAR_OFFSET = 120;
+
+// Same stops as .scrim in the stylesheet.
+const SCRIM = [
+	{at: [0.65, 0.45], rgb: '0, 0, 0', stops: [[0, 0], [0.58, 0], [0.82, 0.12], [1, 0.3]]},
+	{to: 'bottom', rgb: '0, 0, 0', stops: [[0, 0.28], [0.18, 0.08], [0.42, 0]]},
+	{to: 'top', rgb: '11, 13, 16', stops: [[0, 1], [0.18, 0.96], [0.38, 0.78], [0.58, 0.48], [0.76, 0.18], [0.94, 0]]},
+	{to: 'right', rgb: '11, 13, 16', stops: [[0, 0.96], [0.18, 0.86], [0.38, 0.58], [0.6, 0.22], [0.82, 0]]}
+];
 
 const HERO_UNDER_TOP_BAR = {paddingTop: rem(TOP_BAR_CLEARANCE)};
 
@@ -757,6 +766,7 @@ const NouveauDetailContent = (props) => {
 				style={backdropStyle}
 			>
 				{backdropUrl && <img className={css.backdropImage} src={backdropUrl} alt="" />}
+				<div className={css.scrim} style={scrimStyle(SCRIM, backdropStyle['--gradient-scale'])} />
 			</div>
 			<div ref={scrollerRef} className={css.scroller}>
 				<div className={`${css.content} ${topBar ? '' : css.sidebarOffset}`}>

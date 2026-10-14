@@ -27,10 +27,19 @@ import {fetchUpcomingEpisode, formatUpcomingEpisode} from '../../utils/upcomingE
 import {episodeCardTitle} from '../../utils/episodeCardTitle';
 import useItemMenuHold, {itemWithIdAt} from '../../hooks/useItemMenuHold';
 import {AnimeEpisodePills, AnimeItemPills} from '../../components/AnimeMarkerPills';
+import {scrimStyle} from '../../utils/scrimImage';
 
 import css from './ModernDetailContent.module.less';
 
 const SpottableDiv = Spottable('div');
+
+// Same stops as .scrim and .backdropPerson .scrim in the stylesheet.
+const SCRIM = [
+	{to: 'right', rgb: '11, 13, 16', stops: [[0, 1], [0.35, 0.9], [0.6, 0.45], [0.85, 0]]},
+	{to: 'top', rgb: '11, 13, 16', stops: [[0, 1], [0.42, 0.4], [0.8, 0]]},
+	{at: [0.72, 0.28], rgb: '0, 0, 0', stops: [[0.42, 0], [1, 0.45]]}
+];
+const PERSON_SCRIM = [{to: 'top', rgb: '11, 13, 16', stops: [[0, 1], [0.5, 0.6], [1, 0.45]]}];
 
 const Icon = ({path}) => (
 	<svg className={css.icon} viewBox={iconViewBox(path)} fill="currentColor" aria-hidden="true">
@@ -709,6 +718,7 @@ const ModernDetailContent = (props) => {
 		<>
 			<div className={`${css.backdrop} ${isPerson ? css.backdropPerson : ''}`} style={backdropStyle}>
 				{backdropUrl && !isPerson && <img className={css.backdropImage} src={backdropUrl} alt="" />}
+				<div className={css.scrim} style={scrimStyle(isPerson ? PERSON_SCRIM : SCRIM, gradientScale)} />
 			</div>
 			<Scroller cbScrollTo={handleScrollTo} onScroll={handleScroll} className={css.scroller} direction="vertical" horizontalScrollbar="hidden" verticalScrollbar="hidden">
 				<div className={`${css.content} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`} ref={contentRef} onKeyDown={handleContentKeyDown}>

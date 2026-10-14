@@ -23,12 +23,20 @@ import {fetchUpcomingEpisode, formatUpcomingEpisode} from '../../../utils/upcomi
 import {summaryCardHeight, summaryCardWidth, heroWidth} from './summaryCardLayout';
 import SpotlightSummaryCard from './SpotlightSummaryCard';
 import SpotlightSectionModal from './SpotlightSectionModal';
+import {scrimStyle} from '../../../utils/scrimImage';
 
 import css from './SpotlightDetailContent.module.less';
 
 const BandContainer = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'div');
 
 const cardSpotlightId = (id) => `spotlight-card-${id}`;
+
+// Same stops as .scrim in the stylesheet.
+const SCRIM = [
+	{to: 'right', rgb: '11, 13, 16', stops: [[0, 1], [0.35, 0.9], [0.6, 0.45], [0.85, 0]]},
+	{to: 'top', rgb: '11, 13, 16', stops: [[0, 1], [0.45, 0.8], [0.8, 0]]},
+	{at: [0.5, 0.5], rgb: '11, 13, 16', stops: [[0.7, 0], [1, 0.32]]}
+];
 
 // Shared so an item with no credits does not hand the memo a new array each render.
 const EMPTY_LIST = [];
@@ -288,6 +296,7 @@ const SpotlightDetailContent = (props) => {
 		<>
 			<div className={`${css.backdrop} ${isPerson ? css.backdropPerson : ''}`} style={backdropStyle}>
 				{backdropUrl && <img className={css.backdropImage} src={backdropUrl} alt="" />}
+				<div className={css.scrim} style={scrimStyle(SCRIM, backdropStyle['--gradient-scale'])} />
 			</div>
 			<div className={`${css.page} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>
 				<div className={css.hero} style={{width: `${bandWidth}px`}}>

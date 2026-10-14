@@ -31,9 +31,11 @@
 // below and keep this static one. Writing var(--x, fallback) instead does not work, since the
 // build resolves any var() that has a fallback ahead of time and would freeze the opacity
 // setting everywhere.
-.backdrop:after {
+//
+// SpotlightDetailContent.js bakes these layers into an image and sets it inline, so its copy of the
+// stops has to match. The gradients here only paint if that fails.
+.scrim {
 	bottom: 0;
-	content: '';
 	left: 0;
 	position: absolute;
 	right: 0;
