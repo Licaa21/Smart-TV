@@ -492,27 +492,6 @@ const decodableAudioOf = (mediaSource, capabilities, passthroughSettings) => new
 		.map((s) => s.Index)
 );
 
-// How a start on this audio track would go, for a screen that says so before play: whether the app would
-// ask the server to build it, and which track the file opens on instead. It judges with the same helpers
-// a start does, and with the capabilities and audio settings playback would use.
-export const getAudioStartPlan = async (mediaSource, audioStreamIndex, options = {}) => {
-	const storedSettings = (await getFromStorage('settings')) || {};
-	const passthroughSettings = await getPlaybackAudioSettings(options, storedSettings);
-	const capabilities = await getDeviceCapabilities({...options, passthroughSettings});
-	const fileAudio = (mediaSource?.MediaStreams || []).filter((s) => s.Type === 'Audio');
-	const decodable = decodableAudioOf(mediaSource, capabilities, passthroughSettings);
-	const canDecode = (s) => decodable.has(s.Index);
-	const opening = openingAudioStream(fileAudio, canDecode);
-	const wanted = fileAudio.find((s) => s.Index === audioStreamIndex) || null;
-	// A start has a native switch queued for a pick in the opening codec, so only another codec is built.
-	const needsServer = audioStartNeedsServer({wanted, audioStreams: fileAudio, canDecode, allowSameCodec: true});
-	return {
-		needsServer,
-		openingCodec: opening ? String(opening.Codec || '').toLowerCase() : null,
-		wantedCodec: wanted ? String(wanted.Codec || '').toLowerCase() : null
-	};
-};
-
 // Where the platform asks for it, the automatic bitrate also stays under what the
 // link to the server was measured to carry.
 const autoMaxBitrate = async (capabilities, creds, canMeasure) => {
@@ -562,7 +541,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	const enableDirectStream = allowDirectStream && options.enableDirectStream !== false;
 
 	// maxBitrate: user-set value (>0), or auto-detect from device capabilities
-	const maxBitrate = options.maxBitrate > 0 ? options.maxBitrate : await autoMaxBitrate(capabilities, creds, !currentSession);
+	const maxBitrate = options.maxBitrate > 0 ? options.maxBitrate : await autoMaxBitrate(capabilities, creds, !currentSession && !options.dryRun);
 
 	const requestedStartTime = isLiveTV ? 0 : (options.startPositionTicks || 0);
 	const hasExplicitSubtitle = options.subtitleStreamIndex != null;
@@ -636,6 +615,8 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	// Live TV: skip VOD media source selection and codec negotiation
 	/* eslint-disable no-shadow */
 	if (isLiveTV) {
+		// A preview of a channel has nothing to decide, and must not take the session of what is playing.
+		if (options.dryRun) return {dryRun: true, mediaSource: firstSource, playMethod: firstSource.TranscodingUrl ? PlayMethod.Transcode : PlayMethod.DirectPlay, deviceProfile, maxBitrate};
 		const mediaSource = firstSource;
 		const playMethod = mediaSource.TranscodingUrl
 			? PlayMethod.Transcode
@@ -788,12 +769,15 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	// Force Direct Play is remembered with the session, since a reload or a subtitle change does not repeat it
 	const directPlayForced = Boolean(options.forceDirectPlay ?? playing?.directPlayForced);
 	let audioRebuilt = false;
+	// The codec the file opens on, kept for a preview to say why the picked track was built by the server.
+	let openingAudioCodec = null;
 	if (directPlayOpensFirstAudio && !directPlayForced && options.audioStreamIndex != null
 		&& playMethod === PlayMethod.DirectPlay) {
 		const fileAudio = (mediaSource.MediaStreams || []).filter((s) => s.Type === 'Audio');
 		const decodable = decodableAudioOf(mediaSource, capabilities, passthroughSettings);
 		const firstAudio = openingAudioStream(fileAudio, (s) => decodable.has(s.Index));
 		const wantedAudio = fileAudio.find((s) => s.Index === options.audioStreamIndex);
+		openingAudioCodec = firstAudio ? String(firstAudio.Codec || '').toLowerCase() : null;
 		if (firstAudio && audioStartNeedsServer({wanted: wantedAudio, audioStreams: fileAudio, canDecode: (s) => decodable.has(s.Index), allowSameCodec: Boolean(options.switchInPlayer)})) {
 			const rebuilt = await api.getPlaybackInfo(itemId, {
 				DeviceProfile: deviceProfile,
@@ -916,6 +900,22 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		mediaSource = playbackInfo.MediaSources[0];
 		playMethod = PlayMethod.Transcode;
 		console.log('[playback] After forcing transcode - TranscodingUrl:', mediaSource.TranscodingUrl ? 'present' : 'none');
+	}
+
+	// A preview stops where a start would begin to commit to what it found: it has asked the server everything a
+	// start asks and decided everything a start decides, and it leaves the playing session alone.
+	if (options.dryRun) {
+		return {
+			dryRun: true,
+			playMethod,
+			mediaSource,
+			audioStreamIndex: audioStreamIndex ?? mediaSource.DefaultAudioStreamIndex,
+			audioRebuilt,
+			openingAudioCodec,
+			deviceProfile,
+			maxBitrate,
+			audioOnlyRemux: playMethod === PlayMethod.Transcode && isAudioOnlyRemuxTranscode(mediaSource)
+		};
 	}
 
 	// A repair that no one asked for, like putting a wrong audio track right, is not worth a re-encode of
