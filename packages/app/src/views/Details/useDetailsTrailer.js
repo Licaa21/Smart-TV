@@ -14,6 +14,9 @@ import serverLogger from '../../services/serverLogger';
 const TRAILER_EVENTS = ['waiting', 'stalled', 'seeking', 'seeked', 'playing', 'pause', 'error', 'ended'];
 const TRAILER_EVENTS_LOGGED = 40;
 
+// What Seerr said about each TMDB title this session: the YouTube id of its trailer, or '' for none.
+const seerrTrailerCache = new Map();
+
 // Plays a title's trailer. A local one goes to the real player, and a YouTube link plays in
 // an overlay here, since the player has no way to open a stream that isn't on the server.
 const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly, backRef}) => {
@@ -25,6 +28,36 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 	const trailerResumeAtRef = useRef(0);
 	const sponsorSegmentsRef = useRef([]);
 	const sponsorSkipIntervalRef = useRef(null);
+	// The trailer Seerr knows of for a library title that carries none of its own, found ahead of the press so the
+	// button is only there when there is something behind it.
+	const [lookedUpVideoId, setLookedUpVideoId] = useState('');
+
+	useEffect(() => {
+		const tmdbId = item?.ProviderIds?.Tmdb;
+		const wanted = !seerrOnly && tmdbId && (item.Type === 'Movie' || item.Type === 'Series') &&
+			!(item.LocalTrailerCount > 0) && !(item.RemoteTrailers?.length > 0);
+		if (!wanted) {
+			setLookedUpVideoId('');
+			return undefined;
+		}
+		const key = `${item.Type}:${tmdbId}`;
+		if (seerrTrailerCache.has(key)) {
+			setLookedUpVideoId(seerrTrailerCache.get(key));
+			return undefined;
+		}
+		let cancelled = false;
+		setLookedUpVideoId('');
+		(item.Type === 'Movie' ? seerrApi.getMovie(tmdbId) : seerrApi.getTv(tmdbId))
+			.then((details) => {
+				const found = trailersOf(details || {});
+				let videoId = '';
+				for (let i = 0; i < found.length && !videoId; i++) videoId = extractYouTubeIdFromUrl(found[i].Url) || '';
+				seerrTrailerCache.set(key, videoId);
+				if (!cancelled) setLookedUpVideoId(videoId);
+			})
+			.catch((err) => { void err; });
+		return () => { cancelled = true; };
+	}, [item, seerrOnly]);
 
 	const handleTrailer = useCallback(() => {
 		const openTrailer = async () => {
@@ -73,26 +106,12 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 				}
 			}
 
-			// A movie or series of the library that carries no trailer of its own is looked up on Seerr by its TMDB id,
-			// which holds the clips TMDB lists for it. Nothing found, or no Seerr, leaves the button with nothing to play.
-			const tmdbId = item?.ProviderIds?.Tmdb;
-			if (!seerrOnly && tmdbId && (item.Type === 'Movie' || item.Type === 'Series')) {
-				try {
-					const details = await (item.Type === 'Movie' ? seerrApi.getMovie(tmdbId) : seerrApi.getTv(tmdbId));
-					const found = trailersOf(details || {});
-					for (let i = 0; i < found.length; i++) {
-						const videoId = extractYouTubeIdFromUrl(found[i].Url);
-						if (videoId) {
-							setTrailerOverlay(videoId);
-							return;
-						}
-					}
-				} catch (err) { void err; }
-			}
+			// A library title with none of its own plays the one Seerr was found to know of.
+			if (lookedUpVideoId) setTrailerOverlay(lookedUpVideoId);
 		};
 
 		openTrailer();
-	}, [effectiveApi, item, onPlay, seerrOnly]);
+	}, [effectiveApi, item, onPlay, seerrOnly, lookedUpVideoId]);
 
 	const clearSponsorSkip = useCallback(() => {
 		if (sponsorSkipIntervalRef.current) {
@@ -269,7 +288,8 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 		trailerStreamUrl,
 		trailerVideoRef,
 		handleTrailer,
-		handleCloseTrailer
+		handleCloseTrailer,
+		hasLookedUpTrailer: Boolean(lookedUpVideoId)
 	};
 };
 

@@ -33,6 +33,7 @@ const DetailActionButtons = ({
 	settings,
 	seerr,
 	seerrOnly,
+	hasTrailer,
 	isSeries,
 	isSeason,
 	isBoxSet,
@@ -181,7 +182,7 @@ const DetailActionButtons = ({
 				<span className={css.btnLabel}>{$L('Playback Info')}</span>
 			</SpottableDiv>
 		)},
-		{id: 'trailer', when: item.LocalTrailerCount > 0 || item.RemoteTrailers?.length > 0 || (!seerrOnly && (item.Type === 'Movie' || item.Type === 'Series')), render: () => (
+		{id: 'trailer', when: hasTrailer, render: () => (
 			<SpottableDiv className={css.btnWrapper} onClick={onTrailer}>
 				<div className={css.btnAction}>
 					<BtnIcon path={DETAIL_ICON_PATHS.trailer}/>
