@@ -23,8 +23,7 @@ const useSeerrEpisodes = ({details, enabled, language, tmdbApiKey = ''}) => {
 		if (!enabled || !seriesId || !language) return undefined;
 
 		let cancelled = false;
-		// Specials come last. They sort first, and a viewer opens a show on its first season.
-		const order = seasonsRef.current.map((season) => season.IndexNumber).sort((a, b) => (a === 0) - (b === 0) || a - b);
+		const order = seasonsRef.current.map((season) => season.IndexNumber).sort((a, b) => a - b);
 		const queue = [...order];
 		// Seasons come back in any order but are shown in season order, so the one a viewer lands on
 		// is there from the start and does not give way to a lower one arriving late.

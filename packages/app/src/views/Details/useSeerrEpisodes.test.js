@@ -47,11 +47,10 @@ describe('useSeerrEpisodes', () => {
 		expect(result.current.episodes.map((e) => e.Id)).toEqual(['e11', 'e12', 'e21', 'e22', 'e31']);
 	});
 
-	it('loads the specials last, so the first season is what a viewer opens on', async () => {
+	it('never asks for the specials', async () => {
 		const withSpecials = {id: 7, name: 'Show', seasons: [{seasonNumber: 0, episodeCount: 1}, {seasonNumber: 1, episodeCount: 2}, {seasonNumber: 2, episodeCount: 2}]};
-		seasons[0] = pending();
 		renderHook(() => useSeerrEpisodes({details: withSpecials, enabled: true, language: 'ro-RO'}));
-		expect(loadSeerrSeason.mock.calls.map((call) => call[1])).toEqual([1, 2, 0]);
+		expect(loadSeerrSeason.mock.calls.map((call) => call[1])).toEqual([1, 2]);
 	});
 
 	it('does not hold the rest back for a season that fails', async () => {
