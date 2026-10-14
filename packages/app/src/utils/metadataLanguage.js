@@ -1,3 +1,4 @@
+import serverLogger from '../services/serverLogger';
 import {appLocale} from './appLocale';
 
 // The language Seerr titles are asked for, so a title it only knows by an English text reads the way
@@ -32,7 +33,11 @@ export const resolveMetadataLanguage = (api, key = '') => {
 		held.set(key, Promise.resolve()
 			.then(() => withTimeout(api.getServerConfiguration(), LOOKUP_TIMEOUT_MS))
 			// A server left on no language means English, so only a settings page that can't be read falls through.
-			.then((config) => tmdbLanguage(config?.PreferredMetadataLanguage) || 'en-US')
+			.then((config) => {
+				const language = tmdbLanguage(config?.PreferredMetadataLanguage) || 'en-US';
+				serverLogger.playback('Metadata language', {language, from: 'the server settings'});
+				return language;
+			})
 			.catch((err) => {
 				// A refusal is the answer for a viewer who is not an administrator and is kept. Anything else,
 				// a server that could not be reached or that had a bad moment, says nothing, so the next ask
@@ -40,7 +45,12 @@ export const resolveMetadataLanguage = (api, key = '') => {
 				if (err?.status !== 403) held.delete(key);
 				return null;
 			})
-			.then((language) => language || appLocale() || 'en-US'));
+			.then((language) => {
+				if (language) return language;
+				const fallback = appLocale() || 'en-US';
+				serverLogger.playback('Metadata language', {language: fallback, from: 'the app language, the server settings could not be read'});
+				return fallback;
+			}));
 	}
 	return held.get(key);
 };

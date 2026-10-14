@@ -346,6 +346,7 @@ export const formatDirectPlayReason = (detail, settings = {}) => {
 		anamorphicvideonotsupported: () => $L('Anamorphic video is not supported.'),
 		interlacedvideonotsupported: () => $L('Interlaced video is not supported.'),
 		secondaryaudionotsupported: () => $L('Secondary audio stream requires transcoding.'),
+		streamcountexceedslimit: () => $L('The file has more streams than this TV plays in one file.'),
 		directplayerror: () => $L('Direct play is not supported for this media format.')
 	}[key];
 	return {description: plain ? plain() : reason};

@@ -492,6 +492,27 @@ const decodableAudioOf = (mediaSource, capabilities, passthroughSettings) => new
 		.map((s) => s.Index)
 );
 
+// How a start on this audio track would go, for a screen that says so before play: whether the app would
+// ask the server to build it, and which track the file opens on instead. It judges with the same helpers
+// a start does, and with the capabilities and audio settings playback would use.
+export const getAudioStartPlan = async (mediaSource, audioStreamIndex, options = {}) => {
+	const storedSettings = (await getFromStorage('settings')) || {};
+	const passthroughSettings = await getPlaybackAudioSettings(options, storedSettings);
+	const capabilities = await getDeviceCapabilities({...options, passthroughSettings});
+	const fileAudio = (mediaSource?.MediaStreams || []).filter((s) => s.Type === 'Audio');
+	const decodable = decodableAudioOf(mediaSource, capabilities, passthroughSettings);
+	const canDecode = (s) => decodable.has(s.Index);
+	const opening = openingAudioStream(fileAudio, canDecode);
+	const wanted = fileAudio.find((s) => s.Index === audioStreamIndex) || null;
+	// A start has a native switch queued for a pick in the opening codec, so only another codec is built.
+	const needsServer = audioStartNeedsServer({wanted, audioStreams: fileAudio, canDecode, allowSameCodec: true});
+	return {
+		needsServer,
+		openingCodec: opening ? String(opening.Codec || '').toLowerCase() : null,
+		wantedCodec: wanted ? String(wanted.Codec || '').toLowerCase() : null
+	};
+};
+
 // Where the platform asks for it, the automatic bitrate also stays under what the
 // link to the server was measured to carry.
 const autoMaxBitrate = async (capabilities, creds, canMeasure) => {

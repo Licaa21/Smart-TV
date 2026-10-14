@@ -5,10 +5,12 @@
 // as a finished url, since it lives on TMDB.
 
 import seerrApi from '../services/seerrApi';
+import serverLogger from '../services/serverLogger';
 import {isEnglish} from './metadataLanguage';
 
 const TICKS_PER_MINUTE = 600000000;
 const FALLBACK_LANGUAGE = 'en-US';
+let lastLogged = '';
 
 const seriesIdOf = (details) => `seerr-tv-${details.id}`;
 
@@ -81,6 +83,12 @@ export const withEnglishGaps = (episodes, english) => {
 export const loadSeerrSeason = async (details, seasonNumber, language) => {
 	const season = await seerrApi.getTvSeason(details.id, seasonNumber, language);
 	let episodes = seerrEpisodeItems(season, details);
+	// Once a series, to tell a language Seerr never applied from one TMDB has no text in.
+	const logKey = `${details.id}|${language}`;
+	if (episodes.length && lastLogged !== logKey) {
+		lastLogged = logKey;
+		serverLogger.playback('Seerr season language', {asked: language, season: seasonNumber, name: String(episodes[0].Name || '').slice(0, 30), got: String(episodes[0].Overview || '').slice(0, 40)});
+	}
 	// An episode that has not aired has no text in any language yet, so it is no reason to ask again.
 	const now = Date.now();
 	const aired = (episode) => !episode.PremiereDate || new Date(episode.PremiereDate).getTime() <= now;
