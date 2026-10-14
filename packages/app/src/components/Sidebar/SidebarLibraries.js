@@ -3,7 +3,7 @@ import $L from '@enact/i18n/$L';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 
-import {ChevronDownIcon, LibrariesIcon} from '../icons/navIcons';
+import {ChevronDownIcon, LibrariesIcon, RefreshStateIcon} from '../icons/navIcons';
 import useLibraryRefresh from '../../hooks/useLibraryRefresh';
 import {pointerHover} from '../../utils/focusScroll';
 import SidebarItem from './SidebarItem';
@@ -51,8 +51,8 @@ const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}
 				spotlightDisabled={!expanded}
 			>
 				{canRefresh && (
-					<SpottableButton className={css.libraryItem} onClick={refreshAll} data-nav-slot={1}>
-						<span className={`${css.libraryName} ${css.refreshAllName}`}>{note === 'started' ? $L('Refresh started') : note === 'failed' ? $L('Refresh failed') : $L('Refresh all libraries')}</span>
+					<SpottableButton className={css.libraryItem} onClick={refreshAll} data-nav-slot={1} aria-label={$L('Refresh all libraries')}>
+						<RefreshStateIcon className={css.refreshAllIcon} state={note} />
 					</SpottableButton>
 				)}
 				{libraries.map((lib, index) => (

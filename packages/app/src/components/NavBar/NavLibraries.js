@@ -6,7 +6,7 @@ import Spotlight from '@enact/spotlight';
 
 import useLibraryRefresh from '../../hooks/useLibraryRefresh';
 import {pointerHover} from '../../utils/focusScroll';
-import {LibrariesIcon} from '../icons/navIcons';
+import {LibrariesIcon, RefreshStateIcon} from '../icons/navIcons';
 import NavPillButton from './NavPillButton';
 
 import css from './NavBar.module.less';
@@ -141,8 +141,9 @@ const NavLibraries = ({libraries, slot, activeView, onSelectLibrary, leftTargetI
 						onClick={refreshAll}
 						onSpotlightUp={handleLibraryUp}
 						data-nav-slot={1}
+						aria-label={$L('Refresh all libraries')}
 					>
-						<span className={css.navLabel}>{note === 'started' ? $L('Refresh started') : note === 'failed' ? $L('Refresh failed') : $L('Refresh all libraries')}</span>
+						<RefreshStateIcon className={css.refreshAllIcon} state={note} />
 					</SpottableButton>
 				)}
 				{expanded && libraries.map((lib, index) => (

@@ -9,7 +9,6 @@ import {createApiForServer} from '../../services/jellyfinApi';
 import MusicBrowse from '../MusicBrowse';
 import BackdropLayer from '../../components/BackdropLayer';
 import {getImageUrl, getPrimaryImageId, formatDuration} from '../../utils/helpers';
-import useLibraryRefresh from '../../hooks/useLibraryRefresh';
 import useQuickReturnGrid from '../../hooks/useQuickReturnGrid';
 import {useSettings} from '../../context/SettingsContext';
 import {isMdblistEnabled} from '../../services/mdblistApi';
@@ -192,7 +191,6 @@ const GridList = memo(VirtualGridList);
 const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto, onHome, backHandlerRef}) => {
 	const {api, serverUrl, serverType} = useAuth();
 	const {settings, updateSetting} = useSettings();
-	const {canRefresh, note: refreshNote, refreshLibrary} = useLibraryRefresh();
 
 	const effectiveApi = useMemo(() => {
 		if (library?._serverUrl && library?._serverAccessToken) {
@@ -200,10 +198,6 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		}
 		return api;
 	}, [library, api]);
-
-	const handleRefreshLibrary = useCallback(() => {
-		if (library?.Id) refreshLibrary(library.Id, effectiveApi);
-	}, [library, effectiveApi, refreshLibrary]);
 
 	const effectiveServerUrl = useMemo(() => {
 		return library?._serverUrl || serverUrl;
@@ -1374,19 +1368,6 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 						</svg>
 					</SpottableButton>
 
-					{canRefresh && library?.Id && !isFilterMode && (
-						<SpottableButton
-							className={css.toolbarBtn}
-							onClick={handleRefreshLibrary}
-							spotlightId="library-refresh-btn"
-							aria-label={$L('Refresh library')}
-						>
-							<svg className={css.toolbarIcon} viewBox="0 0 24 24">
-								<path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
-							</svg>
-						</SpottableButton>
-					)}
-
 					<SpottableButton
 						className={css.toolbarBtn}
 						onClick={handleToggleSettingsPanel}
@@ -1470,7 +1451,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 				</GridContainer>
 
 				<div className={css.statusBar}>
-					<div className={css.statusText}>{refreshNote === 'started' ? $L('Refresh started') : refreshNote === 'failed' ? $L('Refresh failed') : statusText}</div>
+					<div className={css.statusText}>{statusText}</div>
 					<div className={css.statusCount}>{items.length} | {shownCount}</div>
 				</div>
 			</div>
