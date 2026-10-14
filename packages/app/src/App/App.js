@@ -811,6 +811,19 @@ const AppContent = (props) => {
 		return true;
 	}, [panelHistory, panelIndex, restoreShown]);
 
+	// A channel button on a screen reached from a guest star of an episode dialog goes straight back to that dialog, the
+	// way a pile of Back presses would. False when there is no dialog to go back to, or this is not further on from it.
+	const handleReturnToEpisode = useCallback(() => {
+		const back = episodeReturnRef.current;
+		if (!back || panelHistory.length <= back.depth || panelHistory[back.depth] !== PANELS.DETAILS) return false;
+		detailsItemStackRef.current = [];
+		episodeReturnRef.current = null;
+		setPanelHistory(panelHistory.slice(0, back.depth));
+		restoreShown(back.depth);
+		setPanelIndex(PANELS.DETAILS);
+		return true;
+	}, [panelHistory, restoreShown]);
+
 	useEffect(() => {
 		const handleKeyDown = (e) => {
 			// An arrow press means the user is done pointing. Spotlight flips
@@ -842,6 +855,7 @@ const AppContent = (props) => {
 					return;
 				}
 				if ((playerReturnRef.current && handleReturnToPlayer()) ||
+					(episodeReturnRef.current && handleReturnToEpisode()) ||
 					(!showScreensaver && toggleNavigationFocus(settings.navbarPosition))) {
 					e.preventDefault();
 					e.stopPropagation();
@@ -924,7 +938,7 @@ const AppContent = (props) => {
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [panelIndex, handleBack, handleReturnToPlayer, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition]);
+	}, [panelIndex, handleBack, handleReturnToPlayer, handleReturnToEpisode, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition]);
 
 	const handleLoggedIn = useCallback(() => {
 		setPanelHistory([]);
