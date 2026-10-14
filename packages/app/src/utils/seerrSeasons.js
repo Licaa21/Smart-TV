@@ -42,6 +42,11 @@ export const seerrSeasonItems = (details) => (details?.seasons || [])
 		_externalPosterUrl: season.posterPath ? seerrApi.getImageUrl(season.posterPath, 'w342') : null
 	}));
 
+const namesOf = (people, jobs) => (Array.isArray(people) ? people : [])
+	.filter((person) => person && person.name && (!jobs || jobs.indexOf(String(person.job || '').toLowerCase()) !== -1))
+	.map((person) => person.name)
+	.filter((name, at, all) => all.indexOf(name) === at);
+
 export const seerrEpisodeItems = (season, details) => (season?.episodes || []).map((episode) => {
 	const still = episode.stillPath ? seerrApi.getImageUrl(episode.stillPath, 'w500') : null;
 	return {
@@ -54,6 +59,10 @@ export const seerrEpisodeItems = (season, details) => (season?.episodes || []).m
 		PremiereDate: episode.airDate || null,
 		RunTimeTicks: episode.runtime > 0 ? episode.runtime * TICKS_PER_MINUTE : null,
 		CommunityRating: episode.voteAverage > 0 ? episode.voteAverage : null,
+		_voteCount: episode.voteCount > 0 ? episode.voteCount : 0,
+		_directors: namesOf(episode.crew, ['director']),
+		_writers: namesOf(episode.crew, ['writer', 'screenplay', 'story', 'teleplay']),
+		_guests: namesOf(episode.guestStars).slice(0, 8),
 		SeriesName: details.name || details.title || '',
 		ProviderIds: {Tmdb: String(details.id)},
 		UserData: {},

@@ -39,3 +39,9 @@
 	border-color: var(--theme-focus-border-color, #ffffff);
 	box-shadow: 0 0 14px 1px rgba(255, 255, 255, 0.25), 0 8px 18px rgba(0, 0, 0, 0.35);
 }
+
+// The selected tab is filled with the accent, and a focus ring of the same color would vanish into it, so a dark line
+// inside the ring keeps the two apart.
+.tabActive:focus {
+	box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.45), 0 0 14px 1px rgba(255, 255, 255, 0.25), 0 8px 18px rgba(0, 0, 0, 0.35);
+}

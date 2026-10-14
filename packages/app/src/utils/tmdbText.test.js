@@ -27,8 +27,8 @@ describe('tmdbGet', () => {
 
 describe('seasonFromTmdb', () => {
 	it('gives an episode the shape Seerr gives', () => {
-		const season = seasonFromTmdb({season_number: 1, episodes: [{season_number: 1, episode_number: 2, name: 'Doi', overview: 'Descriere', air_date: '2008-01-27', runtime: 47, still_path: '/s.jpg', vote_average: 8}]});
-		expect(season).toEqual({seasonNumber: 1, episodes: [{seasonNumber: 1, episodeNumber: 2, name: 'Doi', overview: 'Descriere', airDate: '2008-01-27', runtime: 47, stillPath: '/s.jpg', voteAverage: 8}]});
+		const season = seasonFromTmdb({season_number: 1, episodes: [{season_number: 1, episode_number: 2, name: 'Doi', overview: 'Descriere', air_date: '2008-01-27', runtime: 47, still_path: '/s.jpg', vote_average: 8, vote_count: 3, crew: [{name: 'A', job: 'Director'}], guest_stars: [{name: 'B'}]}]});
+		expect(season).toEqual({seasonNumber: 1, episodes: [{seasonNumber: 1, episodeNumber: 2, name: 'Doi', overview: 'Descriere', airDate: '2008-01-27', runtime: 47, stillPath: '/s.jpg', voteAverage: 8, voteCount: 3, crew: [{name: 'A', job: 'Director'}], guestStars: [{name: 'B'}]}]});
 	});
 });
 

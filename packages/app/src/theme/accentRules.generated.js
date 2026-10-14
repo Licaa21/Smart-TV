@@ -213,6 +213,7 @@ export const ACCENT_RULES = {
 		["views/Details/ModernFileInformation.module.less","",".{retry}","color","{accent}"],
 		["views/Details/ModernFileInformation.module.less","",".{reasonHint}","color","{accent}"],
 		["views/Details/SeerrEpisodes.module.less","",".{card}:focus","background","rgba({rgb}, 0.25)"],
+		["views/Details/SeerrEpisodes.module.less","",".{dialogText}:focus","background","rgba({rgb}, 0.15)"],
 		["views/Details/nouveau/cards/NouveauCards.module.less","",".{progressFill}","background","{accent}"],
 		["views/Details/nouveau/cards/NouveauCards.module.less","",".{nextUp}","background","{accent}"],
 		["views/Details/nouveau/footer/NouveauDetailsFooter.module.less","",".{trackActive} .{trackDot}","background","{accent}"],

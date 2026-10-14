@@ -9,8 +9,10 @@ import {KEYS} from '../../utils/keys';
 import css from './Details.module.less';
 
 // Where focus lands on entering a row from above or below: the card the row marks as the current one, such as the
-// episode this screen is for, and otherwise its first
-const entryOf = (row) => row.querySelector('[data-current="true"]') || row.querySelector('.spottable');
+// episode this screen is for, and otherwise its first. A row that has a bar of tabs over its cards asks to be entered
+// on the bar from above, since coming down onto the cards would skip it.
+const entryOf = (row, fromAbove = false) => (fromAbove && row.querySelector('[data-enter-from-above="true"]'))
+	|| row.querySelector('[data-current="true"]') || row.querySelector('.spottable');
 
 export const handleSectionKeyDown = (ev) => {
 	const currentSpottable = ev.target.closest('.spottable');
@@ -65,7 +67,7 @@ export const handleSectionKeyDown = (ev) => {
 
 		if (currentIndex >= 0 && currentIndex < allRows.length - 1) {
 			const nextRow = allRows[currentIndex + 1];
-			const nextSpottable = entryOf(nextRow);
+			const nextSpottable = entryOf(nextRow, true);
 			if (nextSpottable) {
 				ev.preventDefault();
 				ev.stopPropagation();
@@ -103,7 +105,7 @@ export const handleButtonRowKeyDown = (ev) => {
 	const sectionsContainer = document.querySelector(`.${css.sectionsContainer}`);
 	if (sectionsContainer) {
 		const firstRow = sectionsContainer.firstElementChild;
-		const firstSpottable = (firstRow && entryOf(firstRow)) || sectionsContainer.querySelector('.spottable');
+		const firstSpottable = (firstRow && entryOf(firstRow, true)) || sectionsContainer.querySelector('.spottable');
 		if (firstSpottable) {
 			Spotlight.focus(firstSpottable);
 		}

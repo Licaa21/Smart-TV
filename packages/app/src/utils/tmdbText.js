@@ -29,7 +29,10 @@ export const seasonFromTmdb = (season) => ({
 		airDate: episode.air_date || null,
 		runtime: episode.runtime || null,
 		stillPath: episode.still_path || null,
-		voteAverage: episode.vote_average || 0
+		voteAverage: episode.vote_average || 0,
+		voteCount: episode.vote_count || 0,
+		crew: episode.crew,
+		guestStars: episode.guest_stars
 	}))
 });
 

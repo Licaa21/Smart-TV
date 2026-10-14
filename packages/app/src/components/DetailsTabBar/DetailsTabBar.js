@@ -11,7 +11,7 @@ const TabContainer = SpotlightContainerDecorator({restrict: 'self-first'}, 'div'
 
 // A d-pad focusable pill tab bar. The pill highlight and focus states are all in
 // CSS, so navigating left and right only moves focus and reports the active id.
-const DetailsTabBar = ({tabs, activeId, activeSpotlightId, onSelect, onActivate, expanded = true, spotlightId, className}) => {
+const DetailsTabBar = ({tabs, activeId, activeSpotlightId, onSelect, onActivate, expanded = true, spotlightId, className, entryFromAbove = false}) => {
 	const handleClick = useCallback((ev) => {
 		const id = ev.currentTarget.dataset.id;
 		if (id) onActivate?.(id);
@@ -35,6 +35,7 @@ const DetailsTabBar = ({tabs, activeId, activeSpotlightId, onSelect, onActivate,
 					key={tab.id}
 					spotlightId={tab.id === activeId ? activeSpotlightId : undefined}
 					data-id={tab.id}
+					data-enter-from-above={entryFromAbove && tab.id === activeId ? 'true' : undefined}
 					className={`${css.tab} ${tab.id === activeId ? css.tabActive : ''}`}
 					onClick={handleClick}
 					onFocus={handleFocus}

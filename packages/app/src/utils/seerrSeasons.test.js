@@ -46,6 +46,17 @@ describe('seerrEpisodeItems', () => {
 	});
 });
 
+describe('seerrEpisodeItems people', () => {
+	it('lists the director, the writers and the guests, and leaves out what is not there', () => {
+		const [full, bare] = seerrEpisodeItems(season([
+			{name: 'Pilot', voteCount: 12, crew: [{name: 'A', job: 'Director'}, {name: 'B', job: 'Writer'}, {name: 'B', job: 'Screenplay'}, {name: 'C', job: 'Editor'}], guestStars: [{name: 'D'}, {name: 'E'}]},
+			{name: 'Next'}
+		]), details);
+		expect(full).toMatchObject({_voteCount: 12, _directors: ['A'], _writers: ['B'], _guests: ['D', 'E']});
+		expect(bare).toMatchObject({_voteCount: 0, _directors: [], _writers: [], _guests: []});
+	});
+});
+
 describe('withEnglishGaps', () => {
 	it('fills only what is blank', () => {
 		const filled = withEnglishGaps(

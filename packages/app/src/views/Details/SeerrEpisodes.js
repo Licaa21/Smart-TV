@@ -1,4 +1,4 @@
-import {useCallback, useMemo, useState} from 'react';
+import {useCallback, useMemo, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
 import Spotlight from '@enact/spotlight';
 
@@ -9,6 +9,7 @@ import {formatDuration} from '../../utils/helpers';
 import {KEYS} from '../../utils/keys';
 import {hidesMediaDescription} from './detailsMedia';
 import {SpottableDiv} from './detailsSpottables';
+import SeerrEpisodeDialog from './SeerrEpisodeDialog';
 import {effectiveSeason, groupEpisodesBySeason, seasonOptions} from './nouveau/nouveauSeasons';
 import NouveauRail from './nouveau/sections/NouveauRail';
 
@@ -30,8 +31,10 @@ const airDateText = (episode) => {
 // it, so what an episode says reads the same in each.
 const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId = 'seerr-episodes', onNavigateUp, settings, firstSpotlightId}) => {
 	const [picked, setPicked] = useState(null);
-	// The episode opened with OK, which shows its whole description rather than the first lines of it.
-	const [openId, setOpenId] = useState(null);
+	// The episode opened with OK, in full, and the card that opened it, which gets focus back on closing.
+	const [opened, setOpened] = useState(null);
+	const openerRef = useRef(null);
+	const rootRef = useRef(null);
 
 	const groups = useMemo(() => groupEpisodesBySeason(episodes), [episodes]);
 	const numbers = useMemo(() => [...groups.keys()], [groups]);
@@ -43,11 +46,17 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 
 	const handleActivate = useCallback((id) => {
 		setPicked(Number(id));
-		setOpenId(null);
 	}, []);
-	const handleToggle = useCallback((ev) => {
+	const handleOpen = useCallback((ev) => {
 		const id = ev.currentTarget.dataset.episodeId;
-		setOpenId((current) => (current === id ? null : id));
+		openerRef.current = ev.currentTarget;
+		setOpened(shown.find((episode) => episode.Id === id) || null);
+	}, [shown]);
+	const handleClose = useCallback(() => {
+		setOpened(null);
+		window.requestAnimationFrame(() => {
+			if (openerRef.current && openerRef.current.isConnected) Spotlight.focus(openerRef.current);
+		});
 	}, []);
 
 	// The rail keeps up and down for itself and hands them back, so leaving it is decided here: up to
@@ -60,14 +69,17 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 	const handleDown = useCallback(() => Spotlight.move('down'), []);
 
 	// Down from the season bar goes to the episodes. The Classic page moves between its sections on
-	// up and down, and would otherwise take this press and step past the episodes to the next one.
+	// up and down, and would otherwise take this press and step past the episodes to the next one. The
+	// card is found in the page rather than asked of the rail's container, which after a change of
+	// season still remembers a card that is gone and refuses.
 	const handleTabsKeyDown = useCallback((ev) => {
 		if (ev.keyCode !== KEYS.DOWN) return;
-		if (Spotlight.focus(`${spotlightId}-rail`)) {
+		const first = rootRef.current && rootRef.current.querySelector('[data-episode-id]');
+		if (first && Spotlight.focus(first)) {
 			ev.preventDefault();
 			ev.stopPropagation();
 		}
-	}, [spotlightId]);
+	}, []);
 
 	const renderEpisode = useCallback((episode, index) => {
 		const meta = [
@@ -75,18 +87,17 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 			episode.RunTimeTicks ? formatDuration(episode.RunTimeTicks) : '',
 			episode.CommunityRating ? `\u2605 ${Number(episode.CommunityRating).toFixed(1)}` : ''
 		].filter(Boolean).join(' \u00b7 ');
-		const open = openId === episode.Id;
 		// An episode that has not aired has no description yet, which is nothing to point out on every card.
 		const unaired = episode.PremiereDate && new Date(episode.PremiereDate).getTime() > Date.now();
 		return (
 			// The first card is where the row is entered from the sections above and below it.
 			<SpottableDiv
-				className={`${css.card} ${open ? css.cardOpen : ''}`}
+				className={css.card}
 				style={{width: `${CARD_WIDTH}px`}}
 				spotlightId={index === 0 ? firstSpotlightId : undefined}
 				data-current={index === 0 ? 'true' : undefined}
 				data-episode-id={episode.Id}
-				onClick={handleToggle}
+				onClick={handleOpen}
 			>
 				<div className={css.still}>
 					{episode._externalPosterUrl ? <img src={episode._externalPosterUrl} alt="" /> : <div className={css.noStill} />}
@@ -98,13 +109,13 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 				)}
 			</SpottableDiv>
 		);
-	}, [openId, handleToggle, firstSpotlightId, settings]);
+	}, [handleOpen, firstSpotlightId, settings]);
 
 	// The episodes arrive a season at a time, and whoever draws this waits for the first.
 	if (!shown.length) return null;
 
 	return (
-		<div className={css.episodes}>
+		<div className={css.episodes} ref={rootRef}>
 			{hasTabs && (
 				<div onKeyDown={handleTabsKeyDown}>
 					<DetailsTabBar
@@ -115,6 +126,7 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 						spotlightId={`${spotlightId}-seasons`}
 						activeSpotlightId={`${spotlightId}-season`}
 						className={css.seasonBar}
+						entryFromAbove
 					/>
 				</div>
 			)}
@@ -129,6 +141,14 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 				onNavigateDown={handleDown}
 				renderItem={renderEpisode}
 			/>
+			{opened && (
+				<SeerrEpisodeDialog
+					episode={opened}
+					airDate={airDateText(opened)}
+					hideOverview={hidesMediaDescription(opened, settings)}
+					onClose={handleClose}
+				/>
+			)}
 		</div>
 	);
 };

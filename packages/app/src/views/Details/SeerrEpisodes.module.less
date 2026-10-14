@@ -55,12 +55,6 @@
 	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
 }
 
-// Opened with OK, a card shows the whole description, and grows downward while the others stay as they were.
-.cardOpen .overview {
-	max-height: none;
-	display: block;
-}
-
 // Kept to three lines whether or not it fills them, so a row of uneven descriptions lines up.
 .overview {
 	margin-top: 6px;
@@ -72,4 +66,132 @@
 	display: -webkit-box;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 3;
+}
+
+// An episode in full, over the screen. It is drawn on document.body, so none of the page's own rules reach it.
+.dialogBackdrop {
+	position: fixed;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.75);
+}
+
+.dialogPanel {
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	width: 1100px;
+	max-width: 92%;
+	max-height: 88%;
+	padding: 36px 44px 30px;
+	border: 1px solid var(--theme-card-border, rgba(255, 255, 255, 0.14));
+	border-radius: 14px;
+	background: var(--theme-surface, #181818);
+}
+
+.dialogHead {
+	flex-shrink: 0;
+	margin-bottom: 20px;
+}
+
+.dialogLabel {
+	font-size: 20px;
+	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.dialogTitle {
+	margin: 4px 0 0;
+	font-size: 34px;
+	font-weight: 700;
+	color: var(--theme-text-primary, #ffffff);
+}
+
+.dialogBody {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
+.dialogSide {
+	flex-shrink: 0;
+	width: 380px;
+}
+
+.dialogStill {
+	width: 100%;
+	height: 214px;
+	margin-bottom: 14px;
+	border-radius: 10px;
+	overflow: hidden;
+	background: rgba(255, 255, 255, 0.08);
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+}
+
+.fact {
+	display: flex;
+	margin-top: 6px;
+	font-size: 19px;
+	line-height: 26px;
+}
+
+.factName {
+	flex-shrink: 0;
+	width: 110px;
+	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.factValue {
+	flex: 1;
+	min-width: 0;
+	color: var(--theme-text-primary, #ffffff);
+}
+
+// The description scrolls under the d-pad when it is longer than the room, and shows it has focus the way a card does.
+.dialogText {
+	flex: 1;
+	min-width: 0;
+	margin-left: 36px;
+	padding: 12px 16px;
+	box-sizing: border-box;
+	border: 2px solid transparent;
+	border-radius: 12px;
+	overflow: hidden;
+	outline: none;
+	font-size: 23px;
+	line-height: 34px;
+	color: var(--theme-text-primary, #ffffff);
+
+	&:focus {
+		background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.15);
+		border-color: var(--theme-focus-border-color, #ffffff);
+	}
+}
+
+.dialogClose {
+	align-self: flex-end;
+	flex-shrink: 0;
+	margin-top: 22px;
+	padding: 12px 30px;
+	border: 2px solid transparent;
+	border-radius: 100px;
+	background: var(--theme-surface-variant, #374151);
+	font-size: 20px;
+	color: var(--theme-text-primary, #ffffff);
+	outline: none;
+
+	&:focus {
+		background: var(--theme-text-muted, #4b5563);
+		border-color: var(--theme-focus-border-color, #ffffff);
+	}
 }

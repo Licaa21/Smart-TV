@@ -11,6 +11,7 @@ import {getStatusPills, isSeasonRerequestable, seasonMarkerStatus} from '../../u
 import {
 	cancelableRequests, isContinuingSeries, requestOfferFor, seasonNumbersOf, unavailableOrRequestedSeasons
 } from '../../utils/seerrRequestRules';
+import {closeSeerrEpisodeDialog} from '../../utils/seerrEpisodeDialogBack';
 import {closeSeerrTagsDialog} from '../../utils/seerrTagsDialogBack';
 import {fetchSeerrTitle} from '../../utils/seerrTitle';
 
@@ -41,6 +42,7 @@ const useSeerrRequests = ({
 	// because the detail screen already owns that ref for its own overlays and one of the two
 	// would otherwise overwrite the other.
 	const closeTopPopup = useCallback(() => {
+		if (closeSeerrEpisodeDialog()) return true;
 		if (closeSeerrTagsDialog()) return true;
 		if (showManagePopup) { setShowManagePopup(false); return true; }
 		if (showQualityPopup) { setShowQualityPopup(false); return true; }
