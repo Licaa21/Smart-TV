@@ -7,6 +7,8 @@ import {fetchSeasonalRow} from '../../services/externalRowsApi';
 import {resolveItemsByProviderIds} from '../../services/jellyfinApi';
 import {seasonalCountryParam} from '../../utils/seasonalRow';
 import {resolveDeviceCountry} from '../../utils/deviceCountry';
+import {currentMetadataLanguage} from '../../utils/metadataLanguage';
+import {localizeExternalItems} from '../../utils/localizeExternalItems';
 
 // Home rows built from TMDB and IMDb charts, lists the viewer pasted a URL for, and the
 // Radarr and Sonarr calendars. Items arrive as provider ids, so every row is resolved against
@@ -72,15 +74,17 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 
 		(async () => {
 			try {
+				// The rows come in the language the Jellyfin server is set to, as Seerr's do.
+				const language = await currentMetadataLanguage().catch(() => null);
 				const presetData = await Promise.all(enabledPresets.map(async (id) => {
 					const cfg = presetConfigs.find((c) => c.id === id);
 					if (!cfg) return null;
-					const items = await fetchExternalPresetRow(id);
+					const items = await fetchExternalPresetRow(id, {language});
 					return {id, title: cfg.title, items: items || []};
 				}));
 
 				const customData = await Promise.all(customRows.map(async (row) => {
-					const items = await fetchCustomHomeRow(row);
+					const items = await fetchCustomHomeRow(row, {language});
 					return {id: `external-${row.id}`, title: row.name || row.title || $L('Custom'), items: items || [], isCustomRow: true};
 				}));
 
@@ -100,7 +104,12 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 				let seasonalRow = null;
 				if (seasonalEnabled) {
 					const country = seasonalCountryParam(settings.seasonalRowCountry, await resolveDeviceCountry());
-					seasonalRow = buildSeasonalRow(await fetchSeasonalRow({country}), settings.seasonalRowHiddenHolidays || []);
+					const payload = await fetchSeasonalRow({country});
+					// The plugin builds the suggestions in English, so they are put into the language here.
+					const localized = payload && payload.suggestions && payload.suggestions.length
+						? {...payload, suggestions: await localizeExternalItems(payload.suggestions, language).catch(() => payload.suggestions)}
+						: payload;
+					seasonalRow = buildSeasonalRow(localized, settings.seasonalRowHiddenHolidays || []);
 				}
 
 				const allRows = [

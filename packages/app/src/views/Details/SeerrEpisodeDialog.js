@@ -98,10 +98,13 @@ const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onSelectPerson, ini
 			ev.stopPropagation();
 		};
 		window.addEventListener('keydown', handleKeyDown, true);
-		const moveIn = focusableRef.current ? window.setTimeout(() => Spotlight.focus('seerr-episode-dialog'), 50) : 0;
+		// Asked twice, since a screen that opens the part holding the popup moves focus about on its own a moment after
+		// it, and the second ask is the one that is left standing.
+		const focusIn = () => Spotlight.focus('seerr-episode-dialog');
+		const moveIn = focusableRef.current ? [window.setTimeout(focusIn, 50), window.setTimeout(focusIn, 250)] : [];
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown, true);
-			window.clearTimeout(moveIn);
+			moveIn.forEach((timer) => window.clearTimeout(timer));
 			unregisterSeerrEpisodeDialog(onClose);
 		};
 	}, [onClose]);

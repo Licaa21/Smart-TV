@@ -86,7 +86,9 @@
 	bottom: 0;
 	display: flex;
 	flex-direction: column;
-	justify-content: space-between;
+	// The title, the buttons and the cards sit together at the foot of the screen, with the backdrop above them, where
+	// they used to be held apart by a gap that took up the middle of it.
+	justify-content: flex-end;
 	left: 0;
 	padding: 40px;
 	position: absolute;
@@ -241,6 +243,7 @@
 .cardBand {
 	display: flex;
 	flex-direction: row;
+	margin-top: 32px;
 }
 
 .metaRow              { .flex-row-gap(0); }

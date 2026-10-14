@@ -13,6 +13,7 @@ import {buildMediaFacts} from '../../../utils/seerrMediaFacts';
 import {useSeerr} from '../../../context/SeerrContext';
 import ExpandableOverview from '../ExpandableOverview';
 import ModernActionButtons from '../ModernActionButtons';
+import {hasKeptEpisodeDialog} from '../../../utils/episodeDialogReturn';
 import {KEYS} from '../../../utils/keys';
 import {spotlightCardsFor, spotlightCardFor} from './spotlightCards';
 import {studioCardsFor, studioLogoIndex} from '../studioLogos';
@@ -227,6 +228,14 @@ const SpotlightDetailContent = (props) => {
 	const cardWidth = summaryCardWidth(bandWidth, cards.length, cardHeight);
 
 	const handleOpenCard = useCallback((card) => setOpenCardId(card.id), []);
+
+	// Back from a guest star's page, the episodes card is what holds the popup, so it is opened for the episodes to
+	// find the place they kept.
+	useEffect(() => {
+		if (!seerrOnly || openCardId || !hasKeptEpisodeDialog(seriesEpisodes)) return;
+		const episodesCard = cards.find((card) => card.sections?.some((section) => section.kind === 'seerrEpisodes'));
+		if (episodesCard) setOpenCardId(episodesCard.id);
+	}, [seerrOnly, openCardId, seriesEpisodes, cards]);
 
 	const handleCloseModal = useCallback(() => {
 		const id = openCardId;
