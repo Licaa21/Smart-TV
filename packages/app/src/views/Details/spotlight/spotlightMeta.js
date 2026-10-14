@@ -58,5 +58,9 @@ export const spotlightMetaPieces = ({
 		}
 	};
 
-	return orderedItems.flatMap((itemDef) => pieceFor(itemDef.id));
+	const all = orderedItems.flatMap((itemDef) => pieceFor(itemDef.id));
+	// Whether the show is still running and what Seerr says of it close the line, side by side, in that order, wherever the
+	// order puts them, so the two markers are not split up by the facts between.
+	const closing = ['status', 'seerr'].flatMap((kind) => all.filter((piece) => piece.kind === kind));
+	return [...all.filter((piece) => piece.kind !== 'status' && piece.kind !== 'seerr'), ...closing];
 };
