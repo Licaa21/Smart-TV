@@ -13,6 +13,9 @@ import NouveauRail from './sections/NouveauRail';
 import NouveauRailCard from './cards/NouveauRailCard';
 import NouveauPeopleCard from './cards/NouveauPeopleCard';
 import NouveauPosterCard from './cards/NouveauPosterCard';
+import MediaCard from '../../../components/MediaCard';
+import SeerrEpisodes from '../SeerrEpisodes';
+import {getPerfTier} from '../../../utils/perfTier';
 import NouveauLandscapeCard from './cards/NouveauLandscapeCard';
 import DetailsTabBar from '../../../components/DetailsTabBar';
 import NouveauSortDialog from './sections/NouveauSortDialog';
@@ -31,7 +34,7 @@ import {
 } from './nouveauCollectionSort';
 import {chapterDisplayName, collectionSubtitle, extraSubtitle} from './nouveauLabels';
 import {
-	RAIL_GAP, SECTION_INSET, TOP_BAR_CLEARANCE, TV_RAIL_GAP, discoveryCardWidth, discoveryPosterHeight,
+	RAIL_GAP, SECTION_INSET, TOP_BAR_CLEARANCE, TV_RAIL_GAP,
 	collectionCardHeight, collectionCardWidth, episodeCardWidth, episodeImageHeight,
 	mediaRailArtworkHeight, mediaRailCardWidth,
 	peopleAvatarSize, peopleCardWidth
@@ -61,8 +64,10 @@ const SCRIM = [
 
 const HERO_UNDER_TOP_BAR = {paddingTop: rem(TOP_BAR_CLEARANCE)};
 
-// Older Tizen and webOS WebKit have no smooth scrolling, so they jump instead.
-const SMOOTH_SCROLL = typeof document !== 'undefined' && 'scrollBehavior' in document.documentElement.style;
+// Older Tizen and webOS WebKit have no smooth scrolling, so they jump instead. A set at the Medium performance level
+// or below can smooth scroll but redraws the whole page for every frame of it, which is the lag of moving down the
+// page, so it jumps too.
+const CAN_SMOOTH_SCROLL = typeof document !== 'undefined' && 'scrollBehavior' in document.documentElement.style;
 
 // Looking an item up in the list a card came from, which every rail's select handler needs.
 const findIn = (list, key) => list.find((candidate) => String(candidate.Id) === key);
@@ -255,17 +260,10 @@ const NouveauDetailContent = (props) => {
 		hasSeerr: Boolean(seerr?.isActive)
 	}), [item, similar, seerr]);
 
-	// One handler for every poster rail, since a card says for itself which side it came from. A
-	// person page carries filmography and no discovery, and an item page the other way round, so
-	// the two sets never hold the same card.
-	const onPosterCard = useCallback((ev) => {
-		const key = ev.currentTarget.dataset.selectKey;
-		const pools = [discovery.related, discovery.recommendations, ...personRails.map((rail) => rail.items)];
-		const found = pools.reduce((hit, pool) => hit || findIn(pool, key), null);
-		if (!found) return;
-		if (found._seerr) onSelectSeerrCard?.(found);
-		else onSelectItem?.(found);
-	}, [discovery, personRails, onSelectItem, onSelectSeerrCard]);
+	const onTitleCard = useCallback((entry) => {
+		if (entry?._seerr) onSelectSeerrCard?.(entry);
+		else onSelectItem?.(entry);
+	}, [onSelectItem, onSelectSeerrCard]);
 
 	const people = useMemo(() => [...cast, ...crew], [cast, crew]);
 
@@ -305,8 +303,6 @@ const NouveauDetailContent = (props) => {
 	const railArtwork = mediaRailArtworkHeight(railWidth);
 	const personWidth = peopleCardWidth(viewportWidth);
 	const personAvatar = peopleAvatarSize(personWidth);
-	const posterWidth = discoveryCardWidth(viewportWidth);
-	const posterHeight = discoveryPosterHeight(posterWidth);
 	const episodeWidth = episodeCardWidth(viewportWidth);
 	const episodeImage = episodeImageHeight(episodeWidth);
 	const collectionWidth = collectionCardWidth(viewportWidth);
@@ -392,7 +388,7 @@ const NouveauDetailContent = (props) => {
 		}
 		top = Math.max(0, top);
 
-		if (SMOOTH_SCROLL) {
+		if (CAN_SMOOTH_SCROLL && getPerfTier() === 'high') {
 			scroller.scrollTo({top, behavior: 'smooth'});
 		} else {
 			scroller.scrollTop = top;
@@ -554,6 +550,24 @@ const NouveauDetailContent = (props) => {
 		}
 
 		if (id === SECTION_EPISODES) {
+			// A series only Seerr knows has no episode to play, so its seasons and episodes are drawn the way the other
+			// details styles draw them, with a popup of each episode on OK, and the page's focus chain steps through them.
+			if (seerrOnly && isSeries) {
+				return (
+					<SeerrEpisodes
+						seasons={seasons}
+						episodes={seriesEpisodes}
+						navbarPosition={settings.navbarPosition}
+						settings={settings}
+						spotlightId="nouveau-seerr-episodes"
+						railSpotlightId={`nouveau-rail-${id}`}
+						seasonBarId="nouveau-season-selector"
+						onNavigateUp={handleNavigateUp}
+						onNavigateDown={handleNavigateDown}
+						onSelectPerson={seerrNav?.onSelectPersonFromEpisode}
+					/>
+				);
+			}
 			// A season is only committed when it is chosen, since following focus along the
 			// selector would swap the rail out from under every press.
 			return (
@@ -702,18 +716,10 @@ const NouveauDetailContent = (props) => {
 		);
 	}
 
+	// Other titles, similar or recommended or in a person's filmography, are Home's own cards, the ones the other
+	// details styles draw, so they follow the Home card settings and look the same on every details screen.
 	function renderPosterCard (entry) {
-		return (
-			<NouveauPosterCard
-				imageUrl={spotlightItemImageUrl(effectiveServerUrl, entry)}
-				title={entry.Name}
-				subtitle={entry.ProductionYear ? String(entry.ProductionYear) : null}
-				width={posterWidth}
-				height={posterHeight}
-				selectKey={entry.Id}
-				onSelect={onPosterCard}
-			/>
-		);
+		return <MediaCard item={entry} serverUrl={effectiveServerUrl} onSelect={onTitleCard} />;
 	}
 
 	function renderPerson (person) {

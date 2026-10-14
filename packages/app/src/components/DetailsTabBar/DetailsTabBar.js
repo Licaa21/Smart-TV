@@ -1,4 +1,4 @@
-import {useCallback} from 'react';
+import {useCallback, useEffect} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 
@@ -7,11 +7,14 @@ import {keepFocusInView, pointerHover} from '../../utils/focusScroll';
 import css from './DetailsTabBar.module.less';
 
 const Pill = Spottable('div');
+// How much of the bar is kept clear beyond the open tab, so the next one is seen to be there.
+const KEEP_CLEAR = 24;
+
 const TabContainer = SpotlightContainerDecorator({restrict: 'self-first'}, 'div');
 
 // A d-pad focusable pill tab bar. The pill highlight and focus states are all in
 // CSS, so navigating left and right only moves focus and reports the active id.
-const DetailsTabBar = ({tabs, activeId, activeSpotlightId, onSelect, onActivate, expanded = true, spotlightId, className, entryFromAbove = false}) => {
+const DetailsTabBar = ({tabs, activeId, activeSpotlightId, onSelect, onActivate, expanded = true, spotlightId, className, entryFromAbove = false, compact = false}) => {
 	const handleClick = useCallback((ev) => {
 		const id = ev.currentTarget.dataset.id;
 		if (id) onActivate?.(id);
@@ -26,10 +29,24 @@ const DetailsTabBar = ({tabs, activeId, activeSpotlightId, onSelect, onActivate,
 		if (id) onSelect?.(id);
 	}, [expanded, onSelect]);
 
+	// The open tab is kept in view of a bar that scrolls, whoever changed it and wherever focus is. Focus moving along
+	// the bar does this itself, but a season changed from the episodes below, with the channel keys, would otherwise
+	// leave it off screen until focus came back.
+	useEffect(() => {
+		if (!spotlightId) return;
+		const bar = document.querySelector(`[data-spotlight-id="${spotlightId}"]`);
+		const tab = bar && bar.querySelector(`.${css.tabActive}`);
+		if (!bar || !tab) return;
+		const view = bar.getBoundingClientRect();
+		const box = tab.getBoundingClientRect();
+		if (box.left < view.left + KEEP_CLEAR) bar.scrollLeft -= view.left + KEEP_CLEAR - box.left;
+		else if (box.right > view.right - KEEP_CLEAR) bar.scrollLeft += box.right - view.right + KEEP_CLEAR;
+	}, [activeId, spotlightId]);
+
 	if (!tabs || tabs.length === 0) return null;
 
 	return (
-		<TabContainer className={`${css.tabBar} ${className || ''}`} spotlightId={spotlightId} onFocus={keepFocusInView}>
+		<TabContainer className={`${css.tabBar} ${compact ? css.compact : ''} ${className || ''}`} spotlightId={spotlightId} onFocus={keepFocusInView}>
 			{tabs.map((tab) => (
 				<Pill
 					key={tab.id}

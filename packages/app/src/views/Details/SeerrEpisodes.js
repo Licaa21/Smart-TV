@@ -37,7 +37,7 @@ const cardTitle = (episode) => {
 // A Seerr series' episodes, read only: season tabs over a row of cards showing the still, the number
 // and name, when it airs and the description. Every style that has no row of its own for this draws
 // it, so what an episode says reads the same in each.
-const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId = 'seerr-episodes', onNavigateUp, settings, firstSpotlightId, onSelectPerson}) => {
+const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId = 'seerr-episodes', onNavigateUp, onNavigateDown, railSpotlightId, seasonBarId, settings, firstSpotlightId, onSelectPerson}) => {
 	const [picked, setPicked] = useState(null);
 	// The episode opened with OK, in full. Focus stays on its card while it is up.
 	const [opened, setOpened] = useState(null);
@@ -108,10 +108,13 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 	// the season tabs when there are some, and otherwise wherever the page puts focus.
 	const hasTabs = tabs.length > 1;
 	const handleUp = useCallback(() => {
-		if (onNavigateUp) onNavigateUp();
+		if (onNavigateUp) onNavigateUp(railSpotlightId || `${spotlightId}-rail`);
 		else if (!hasTabs || !Spotlight.focus(`${spotlightId}-season`)) Spotlight.move('up');
-	}, [onNavigateUp, hasTabs, spotlightId]);
-	const handleDown = useCallback(() => Spotlight.move('down'), []);
+	}, [onNavigateUp, hasTabs, spotlightId, railSpotlightId]);
+	const handleDown = useCallback(() => {
+		if (onNavigateDown) onNavigateDown(railSpotlightId || `${spotlightId}-rail`);
+		else Spotlight.move('down');
+	}, [onNavigateDown, spotlightId, railSpotlightId]);
 
 	// Down from the season bar goes to the episodes. The Classic page moves between its sections on
 	// up and down, and would otherwise take this press and step past the episodes to the next one. The
@@ -168,10 +171,11 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 						activeId={String(active)}
 						expanded={false}
 						onActivate={handleActivate}
-						spotlightId={`${spotlightId}-seasons`}
+						spotlightId={seasonBarId || `${spotlightId}-seasons`}
 						activeSpotlightId={`${spotlightId}-season`}
 						className={css.seasonBar}
 						entryFromAbove
+						compact
 					/>
 				</div>
 			)}
@@ -180,7 +184,7 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 				key={active}
 				items={shown}
 				gap={CARD_GAP}
-				spotlightId={`${spotlightId}-rail`}
+				spotlightId={railSpotlightId || `${spotlightId}-rail`}
 				navbarPosition={navbarPosition}
 				onNavigateUp={handleUp}
 				onNavigateDown={handleDown}
