@@ -8,7 +8,7 @@ import {resolveItemsByProviderIds} from '../../services/jellyfinApi';
 import {seasonalCountryParam} from '../../utils/seasonalRow';
 import {resolveDeviceCountry} from '../../utils/deviceCountry';
 import {currentMetadataLanguage} from '../../utils/metadataLanguage';
-import {localizeExternalItems} from '../../utils/localizeExternalItems';
+import {localizeExternalItems, localizeSeerrCards} from '../../utils/localizeExternalItems';
 
 // Home rows built from TMDB and IMDb charts, lists the viewer pasted a URL for, and the
 // Radarr and Sonarr calendars. Items arrive as provider ids, so every row is resolved against
@@ -156,10 +156,27 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 					}
 				}
 
+				const built = [...presetRows, ...builtCustomRows, seasonalRow, ...resolvedCalendarRows].filter(Boolean);
 				if (!cancelled) {
-					const built = [...presetRows, ...builtCustomRows, seasonalRow, ...resolvedCalendarRows].filter(Boolean);
 					memoryCache.externalRows = {key, owner, rows: built};
 					setExternalRows(built);
+					// The places held for the rows are let go now that they are there, not after the language is put right.
+					setPending([]);
+				}
+
+				// The rows are up already, and what the library does not hold in them is put into the language after, whatever
+				// the plugin did with the language it was asked for, since one that keeps a copy from before, or does not know the
+				// language, answers in English. The seasonal row has been through this already.
+				if (!cancelled && language) {
+					const localized = await Promise.all(built.map(async (row) => (
+						row.isExternalRow && !row.isSeasonalRow
+							? {...row, items: await localizeSeerrCards(row.items, language).catch(() => row.items)}
+							: row
+					)));
+					if (!cancelled) {
+						memoryCache.externalRows = {key, owner, rows: localized};
+						setExternalRows(localized);
+					}
 				}
 			} catch (err) {
 				console.warn('[Browse] Failed to fetch and resolve external rows:', err);
