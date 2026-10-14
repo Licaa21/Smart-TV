@@ -298,7 +298,7 @@ const SpotlightDetailContent = (props) => {
 				{backdropUrl && <img className={css.backdropImage} src={backdropUrl} alt="" />}
 				<div className={css.scrim} style={scrimStyle(SCRIM, backdropStyle['--gradient-scale'])} />
 			</div>
-			<div className={`${css.page} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>
+			<div className={`${css.page} ${settings.navbarPosition === 'left' ? css.sidebarOffset : css.topbarOffset}`}>
 				<div className={css.hero} style={{width: `${bandWidth}px`}}>
 					{isPerson && posterUrl && <img className={css.personAvatar} src={posterUrl} alt="" />}
 					{tagline && !isPerson && <div className={css.tagline}>{tagline}</div>}

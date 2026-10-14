@@ -1,6 +1,7 @@
 // Back on a scrolled grid returns it to its first item instead of leaving.
-// Hands out the cbScrollTo receiver for the grid and a handler that consumes
-// the press only once the grid has actually been scrolled.
+// Hands out the cbScrollTo receiver for the grid, a handler that consumes
+// the press only once the grid has actually been scrolled, and a way to put
+// the grid on any item.
 
 import {useCallback, useRef} from 'react';
 import {isListScrolledAway} from '../utils/quickReturn';
@@ -19,7 +20,11 @@ const useQuickReturnGrid = (spotlightId) => {
 		return false;
 	}, [spotlightId]);
 
-	return {getScrollTo, quickReturn};
+	const scrollTo = useCallback((options) => {
+		if (scrollToRef.current) scrollToRef.current(options);
+	}, []);
+
+	return {getScrollTo, quickReturn, scrollTo};
 };
 
 export default useQuickReturnGrid;

@@ -34,3 +34,10 @@ export const focusedRowIndex = (active) => {
 	const index = wrapper ? Number(wrapper.getAttribute('data-row-index')) : 0;
 	return index > 0 ? index : 0;
 };
+
+// The row a remembered focus goes back to: the one it was left in, found by its id since rows
+// that load late shift the rest, or the same place in the list when that row isn't there.
+export const rowToRestore = (rows, target) => {
+	const byId = rows.findIndex((row) => row.id === target.rowId && !row.isPlaceholder);
+	return byId >= 0 ? byId : Math.min(target.rowIndex, rows.length - 1);
+};

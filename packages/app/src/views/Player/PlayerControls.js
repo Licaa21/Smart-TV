@@ -149,6 +149,7 @@ const PlayerControls = ({
 	topButtons,
 	bottomButtons,
 	displayTime,
+	seekStepSeconds,
 	duration,
 	progressPercent,
 	bufferedPercent,
@@ -410,7 +411,7 @@ const PlayerControls = ({
 									mediaSourceId={mediaSourceId}
 									positionTicks={displayTime * 10000000}
 									durationTicks={durationMs * 10000}
-									stepSeconds={settings.seekStep}
+									stepSeconds={seekStepSeconds}
 									mode={settings.trickPlayMode}
 									scalePercent={settings.trickPlayPreviewScale}
 									verticalPercent={settings.trickPlayVerticalPosition}
@@ -483,7 +484,7 @@ const PlayerControls = ({
 								onClick={handleSelectSubtitle}
 								onKeyDown={handleSubtitleKeyDown}
 							/>
-							{sortSubtitleStreams(subtitleStreams).map((stream, i) => (
+							{sortSubtitleStreams(subtitleStreams, settings?.preferExternalSubtitles === true).map((stream, i) => (
 								<TrackOptionRow
 									key={stream.index}
 									label={numberedTrackName(i + 1, stream.displayTitle, $L('Subtitle'))}
@@ -725,7 +726,7 @@ const PlayerControls = ({
 
 				return (
 					<div className={css.trackModal} onClick={closeModal}>
-						<div className={`${css.modalContent} ${css.videoInfoModal}`} onClick={stopPropagation}>
+						<ModalContainer className={`${css.modalContent} ${css.videoInfoModal}`} onClick={stopPropagation} data-modal="info" spotlightId="info-modal">
 							<h2 className={css.modalTitle}>{$L('Playback Information')}</h2>
 							<Scroller
 								className={css.videoInfoContent}
@@ -853,7 +854,7 @@ const PlayerControls = ({
 								)}
 							</Scroller>
 							<p className={css.modalFooter}>{$L('Press BACK to close')}</p>
-						</div>
+						</ModalContainer>
 					</div>
 				);
 			})()}

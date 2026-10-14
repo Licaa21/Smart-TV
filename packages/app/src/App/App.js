@@ -8,6 +8,7 @@ import ThemeDecorator from '@enact/sandstone/ThemeDecorator';
 import {Panels, Panel} from '@enact/sandstone/Panels';
 import Spottable from '@enact/spotlight/Spottable';
 import Spotlight from '@enact/spotlight';
+import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import $L from '@enact/i18n/$L';
 
 import ilib from 'ilib';
@@ -129,8 +130,10 @@ const PanelLoader = () => (
 	</div>
 );
 
-// Puts a class on the Browse panel's body so the stylesheet can turn its fade off on the Fire TV
-const browsePanelCss = {body: css.browseBody};
+// Home sits outside the panels so it can stay mounted under the other screens, with the same focus
+// rules its panel gave it.
+const HomeLayer = SpotlightContainerDecorator({enterTo: 'last-focused', continue5WayHold: true}, 'div');
+const hiddenStyle = {display: 'none'};
 
 const PANELS = {
 	LOGIN: 0,
@@ -1592,26 +1595,8 @@ const AppContent = (props) => {
 						<Panel>
 							<Login onLoggedIn={handleLoggedIn} backHandlerRef={backHandlerRef} />
 						</Panel>
-						<Panel css={browsePanelCss}>
-							<Browse
-								onSelectItem={handleSelectItem}
-								onSelectLibrary={handleSelectLibrary}
-								onOpenRecordings={handleOpenRecordings}
-								onPlayRecording={handlePlayRecording}
-								onSelectGenre={handleSelectGenreFromBrowse}
-								onSelectSeerrItem={handleSelectSeerrItem}
-								onSelectSeerrGenre={handleSelectSeerrGenre}
-								onSelectSeerrStudio={handleSelectSeerrStudio}
-								onSelectSeerrNetwork={handleSelectSeerrNetwork}
-								onOpenSeerrShortcut={handleOpenSeerrShortcut}
-								isVisible={panelIndex === PANELS.BROWSE && !showSettingsPanel}
-								backHandlerRef={backHandlerRef}
-								onFocusItemThemeMusic={themeMusic.playThemeMusicDelayed}
-								onBlurItemThemeMusic={themeMusic.cancelDelayed}
-								onLeaveThemeMusic={themeMusic.stopThemeMusic}
-								onHoldThemeMusic={themeMusic.holdThemeMusic}
-							/>
-						</Panel>
+						{/* Home's place in the panel order, it's drawn by the layer after the panels. */}
+						<Panel />
 						<Panel>
 							{panelIndex === PANELS.DETAILS && (
 								<Details
@@ -1837,6 +1822,30 @@ const AppContent = (props) => {
 						</Panel>
 					</Panels>
 				</Suspense>
+				{/* Covered screens hide Home rather than unmount it, so going back is instant and lands on
+				the same card. It's let go at sign in and during playback, which wants the memory. */}
+				{panelIndex !== PANELS.LOGIN && panelIndex !== PANELS.PLAYER && panelIndex !== PANELS.GAME_PLAYER && (
+					<HomeLayer style={panelIndex === PANELS.BROWSE ? null : hiddenStyle}>
+						<Browse
+							onSelectItem={handleSelectItem}
+							onSelectLibrary={handleSelectLibrary}
+							onOpenRecordings={handleOpenRecordings}
+							onPlayRecording={handlePlayRecording}
+							onSelectGenre={handleSelectGenreFromBrowse}
+							onSelectSeerrItem={handleSelectSeerrItem}
+							onSelectSeerrGenre={handleSelectSeerrGenre}
+							onSelectSeerrStudio={handleSelectSeerrStudio}
+							onSelectSeerrNetwork={handleSelectSeerrNetwork}
+							onOpenSeerrShortcut={handleOpenSeerrShortcut}
+							isVisible={panelIndex === PANELS.BROWSE && !showSettingsPanel}
+							backHandlerRef={backHandlerRef}
+							onFocusItemThemeMusic={themeMusic.playThemeMusicDelayed}
+							onBlurItemThemeMusic={themeMusic.cancelDelayed}
+							onLeaveThemeMusic={themeMusic.stopThemeMusic}
+							onHoldThemeMusic={themeMusic.holdThemeMusic}
+						/>
+					</HomeLayer>
+				)}
 			</ItemMenuProvider>
 			<AccountModal
 				open={showAccountModal}

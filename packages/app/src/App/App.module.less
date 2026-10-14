@@ -231,11 +231,3 @@
 		background: rgba(71, 131, 255, 0.95);
 	}
 }
-
-// The Fire TV WebView only shows a video it can put on its own hardware plane, and the
-// Panel body's opacity fade keeps the media bar trailer off one, so the Browse panel
-// does without the fade there
-:global(html.vega) .browseBody {
-	will-change: auto;
-	transition: none;
-}

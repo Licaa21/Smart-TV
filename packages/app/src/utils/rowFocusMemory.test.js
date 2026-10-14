@@ -1,4 +1,4 @@
-import {focusedCardIndex, cardToRestore, focusedRowIndex} from './rowFocusMemory';
+import {focusedCardIndex, cardToRestore, focusedRowIndex, rowToRestore} from './rowFocusMemory';
 
 const buildRow = (count, spotlightId = 'row-0') => {
 	const row = document.createElement('div');
@@ -145,5 +145,18 @@ describe('going back to a row that was rebuilt', () => {
 		const after = buildRow(3, 'row-2');
 
 		expect(cardToRestore('row-2', index)).toBe(after.children[2]);
+	});
+});
+
+describe('rowToRestore', () => {
+	const rows = [{id: 'resume'}, {id: 'seasonal', isPlaceholder: true}, {id: 'latest'}];
+
+	test('finds the row by its id wherever it sits now', () => {
+		expect(rowToRestore(rows, {rowId: 'latest', rowIndex: 5})).toBe(2);
+	});
+
+	test('falls back to the same place in the list for a row that is missing or still a placeholder', () => {
+		expect(rowToRestore(rows, {rowId: 'imdb', rowIndex: 9})).toBe(2);
+		expect(rowToRestore(rows, {rowId: 'seasonal', rowIndex: 1})).toBe(1);
 	});
 });

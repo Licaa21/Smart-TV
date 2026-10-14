@@ -90,6 +90,8 @@ const TileGrid = memo(({className, dataSize, itemSize, renderTile, spotlightId, 
 		cbScrollTo(({index = 0, focus}) => {
 			const state = stateRef.current;
 			const target = Math.max(0, Math.min(index, state.dataSize - 1));
+			// Set ahead of the render, since taking focus reports the index right away.
+			state.focusIndex = target;
 			setFocusIndex(target);
 			setFirstRow(scrollRowFor(Math.floor(target / state.layout.columns), state.firstRow, state.layout.fullRows));
 			if (focus) Spotlight.focus(spotlightId);

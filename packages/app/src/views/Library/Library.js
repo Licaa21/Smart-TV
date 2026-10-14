@@ -83,6 +83,10 @@ const GRID_INSET = 174;
 // The least room a row leaves between two cards.
 const MIN_ROW_GAP = 6;
 
+// Opening an item takes the library off screen and it's built again on the way back, so the item
+// that was opened is noted here to come back to.
+let returnTo = null;
+
 const PLAYED_FILTERS = [
 	{key: 'all', label: $L('All')},
 	{key: 'watched', label: $L('Watched')},
@@ -661,7 +665,8 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		const itemIndex = ev.currentTarget?.dataset?.index;
 		if (itemIndex === undefined) return;
 
-		const item = itemsRef.current[parseInt(itemIndex, 10)];
+		const index = parseInt(itemIndex, 10);
+		const item = itemsRef.current[index];
 		if (item) {
 			if (isFolderView && item.IsFolder && !FOLDER_DETAIL_TYPES.includes(item.Type)) {
 				setFolderStack(prev => [...prev, {id: item.Id, name: item.Name, collectionType: item.CollectionType}]);
@@ -670,12 +675,13 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 			if (item.Type === 'Photo' && onViewPhoto) {
 				onViewPhoto(item, itemsRef.current);
 			} else {
+				returnTo = {libraryId, itemId: item.Id, index};
 				onSelectItem?.(item);
 			}
 		}
-	}, [isFolderView, onSelectItem, onViewPhoto]);
+	}, [isFolderView, onSelectItem, onViewPhoto, libraryId]);
 
-	const {getScrollTo: getGridScrollTo, quickReturn} = useQuickReturnGrid('library-grid');
+	const {getScrollTo: getGridScrollTo, quickReturn, scrollTo: scrollGridTo} = useQuickReturnGrid('library-grid');
 
 	const handleScrollStop = useCallback(() => {
 		if (apiFetchIndexRef.current < totalCount && !isLoading && !loadingMoreRef.current) {
@@ -751,15 +757,26 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	// The grid takes focus once a list has landed, but not while a panel is up, since that's
 	// the viewer still picking. A pick that closes the panel runs this before the reload has
 	// cleared the old list, so it also waits for the new first page.
+	//
+	// Coming back from an item lands on it, pulling in pages until it turns up, or giving up a page
+	// past where it was.
 	useEffect(() => {
 		if (showSortPanel || showSettingsPanel || apiFetchIndexRef.current === 0) return undefined;
 		if (items.length === 0 || isLoading || initialFocusDoneRef.current) return undefined;
+		const back = returnTo && returnTo.libraryId === libraryId && !groupedActive ? returnTo : null;
+		const index = back ? items.findIndex((item) => item.Id === back.itemId) : -1;
+		if (back && index < 0 && apiFetchIndexRef.current < totalCount && items.length <= back.index + 150) {
+			loadItems(apiFetchIndexRef.current, true);
+			return undefined;
+		}
 		const id = setTimeout(() => {
-			Spotlight.focus(groupedActive ? 'library-group-row-0' : 'library-grid');
+			returnTo = null;
+			if (index >= 0) scrollGridTo({index, focus: true});
+			else Spotlight.focus(groupedActive ? 'library-group-row-0' : 'library-grid');
 			initialFocusDoneRef.current = true;
 		}, 100);
 		return () => clearTimeout(id);
-	}, [items.length, isLoading, groupedActive, showSortPanel, showSettingsPanel]);
+	}, [items, isLoading, groupedActive, showSortPanel, showSettingsPanel, libraryId, totalCount, loadItems, scrollGridTo]);
 
 	// Choosing the sort already in use turns it around rather than doing nothing.
 	const handleSortSelect = useCallback((ev) => {

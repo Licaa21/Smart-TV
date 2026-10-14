@@ -1,4 +1,4 @@
-import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
+import {useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo} from 'react';
 import {isKidsMode, kidsModeRows, mergesContinueWatchingNextUp} from '../../utils/kidsMode';
 import {withoutBlocked} from '../../utils/parentalFilter';
 import useParentalFilter from '../../hooks/useParentalFilter';
@@ -15,7 +15,7 @@ import SeerrTileRow from '../../components/SeerrTileRow';
 import LibraryButtonRow from '../../components/LibraryButtonRow';
 import {SkeletonShimmer, skeletonTitleWidths} from '../../components/Skeleton';
 import {getImageUrl, getBackdropId} from '../../utils/helpers';
-import {focusedCardIndex, cardToRestore, focusedRowIndex} from '../../utils/rowFocusMemory';
+import {focusedCardIndex, cardToRestore, focusedRowIndex, rowToRestore} from '../../utils/rowFocusMemory';
 import {radiusToCss, shadowToCss, toCssColor} from '../../theme/themeSpec';
 import DetailSection from './DetailSection';
 import FeaturedBanner from './FeaturedBanner';
@@ -109,6 +109,9 @@ const Browse = ({
 	const initialFocusSetRef = useRef(false);
 	const scrollTimeoutRef = useRef(null);
 	const contentRowsRef = useRef(null);
+	const scrollsRef = useRef(new Map());
+	const isVisibleRef = useRef(isVisible);
+	isVisibleRef.current = isVisible;
 
 	const showFeaturedBar = (settings.featuredBarStyle !== 'off');
 
@@ -227,7 +230,8 @@ const Browse = ({
 	const filteredRows = useUserDataRows(builtRows);
 	const hasFocusableRow = filteredRows.some((row) => !row.isPlaceholder);
 
-	const focusRow = useCallback((rowIndex, cardIndex) => {
+	const focusRow = useCallback((rowIndex, cardIndex, cardId) => {
+		if (cardId && Spotlight.focus(cardId)) return true;
 		const card = cardToRestore(`row-${rowIndex}`, cardIndex);
 		if (card && Spotlight.focus(card)) {
 			return true;
@@ -269,13 +273,13 @@ const Browse = ({
 		if (Math.abs(container.scrollTop - top) > 1) container.scrollTop = top;
 	}, [settings.navbarPosition, showTopInfoArea]);
 
-	const scrollToRow = useCallback((rowIndex, thenFocus, cardIndex) => {
+	const scrollToRow = useCallback((rowIndex, thenFocus, cardIndex, cardId) => {
 		if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
 
 		const targetRow = rowRefsMap.current.get(rowIndex);
 		const container = contentRowsRef.current;
 		if (!targetRow || !container) {
-			if (thenFocus) focusRow(rowIndex, cardIndex);
+			if (thenFocus) focusRow(rowIndex, cardIndex, cardId);
 			return;
 		}
 
@@ -292,7 +296,7 @@ const Browse = ({
 			let attempts = 0;
 			const tryFocus = () => {
 				attempts += 1;
-				if (focusRow(rowIndex, cardIndex)) {
+				if (focusRow(rowIndex, cardIndex, cardId)) {
 					return;
 				}
 				if (attempts < 6) {
@@ -329,6 +333,29 @@ const Browse = ({
 
 	filteredRowsRef.current = filteredRows;
 
+	// The row focus goes back to, stepping off a placeholder to the nearest real row above it.
+	const returnRow = useCallback((state) => {
+		const nearest = rowToRestore(filteredRowsRef.current, state);
+		const above = focusableRowFrom(nearest, -1);
+		return above >= 0 ? above : focusableRowFrom(nearest, 1);
+	}, [focusableRowFrom]);
+
+	// Hiding Home drops how far each row was scrolled, so that's noted as it changes and put back
+	// when Home shows again.
+	useEffect(() => {
+		const rows = contentRowsRef.current;
+		const scrolls = scrollsRef.current;
+		if (!rows) return undefined;
+		const note = (event) => {
+			if (isVisibleRef.current) scrolls.set(event.target, event.target.scrollLeft);
+		};
+		rows.addEventListener('scroll', note, true);
+		return () => {
+			rows.removeEventListener('scroll', note, true);
+			scrolls.clear();
+		};
+	}, [isLoading]);
+
 	const handleNavigateDown = useCallback((fromRowIndex) => {
 		const targetIndex = focusableRowFrom(fromRowIndex + 1, 1);
 		if (targetIndex < 0) return;
@@ -341,38 +368,46 @@ const Browse = ({
 		}
 	}, [showFeaturedBar, setBrowseMode]);
 
-	useEffect(() => {
+	// Run before paint, so a card that's come back to already has its focus and its row's scroll
+	// when Home shows again.
+	useLayoutEffect(() => {
 		if (!isVisible) {
 			wasVisibleRef.current = false;
 			return;
 		}
 		if (isLoading || !hasFocusableRow) return;
-		// The panel is built again on the way back in, so the ref that marks a first run
-		// starts over with it. A place to return to is what tells the two apart.
+		// Home is built again after sign in and playback, so the ref that marks a first run starts
+		// over with it. A place to return to is what tells the two apart.
 		if (wasVisibleRef.current && lastFocusState === null) return;
 		wasVisibleRef.current = true;
+		scrollsRef.current.forEach((left, node) => {
+			node.scrollLeft = left;
+		});
 
 		fetchFreshFeaturedItems();
 		refreshVolatileData(true);
 
+		// The first row is somewhere the user was too, so it comes back like any other rather than
+		// handing the screen to the banner.
+		if (lastFocusState) {
+			const {cardIndex, cardId} = lastFocusState;
+			const row = returnRow(lastFocusState);
+			lastFocusState = null;
+			// Marked as placed, or the first focus would still take the media bar once its items land.
+			initialFocusSetRef.current = true;
+			setBrowseMode('rows');
+			scrollToRow(row, !focusRow(row, cardIndex, cardId), cardIndex, cardId);
+			return;
+		}
 		setTimeout(() => {
-			// The first row is somewhere the user was too, so it comes back like any other
-			// rather than handing the screen to the banner.
-			if (lastFocusState && lastFocusState.rowIndex >= 0) {
-				const {rowIndex, cardIndex} = lastFocusState;
-				const nearest = Math.min(rowIndex, filteredRows.length - 1);
-				const above = focusableRowFrom(nearest, -1);
-				setBrowseMode('rows');
-				scrollToRow(above >= 0 ? above : focusableRowFrom(nearest, 1), true, cardIndex);
-			} else if (showFeaturedBar !== false && featuredItems.length > 0) {
+			if (showFeaturedBar !== false && featuredItems.length > 0) {
 				setBrowseMode('featured');
 				setTimeout(() => Spotlight.focus('featured-banner'), 50);
 			} else {
 				scrollToRow(focusableRowFrom(0, 1), true);
 			}
-			lastFocusState = null;
 		}, FOCUS_DELAY_MS);
-	}, [isVisible, isLoading, filteredRows.length, hasFocusableRow, fetchFreshFeaturedItems, refreshVolatileData, showFeaturedBar, featuredItems.length, scrollToRow, setBrowseMode, focusableRowFrom]);
+	}, [isVisible, isLoading, filteredRows.length, hasFocusableRow, fetchFreshFeaturedItems, refreshVolatileData, showFeaturedBar, featuredItems.length, scrollToRow, setBrowseMode, focusableRowFrom, returnRow, focusRow]);
 
 	useEffect(() => {
 		if (!isVisible) return;
@@ -424,9 +459,12 @@ const Browse = ({
 	const rememberFocus = useCallback(() => {
 		const rowIndex = lastFocusedRowRef.current;
 		if (rowIndex === null) return;
+		const active = document.activeElement;
 		lastFocusState = {
 			rowIndex,
-			cardIndex: focusedCardIndex(`row-${rowIndex}`, document.activeElement)
+			rowId: filteredRowsRef.current[rowIndex]?.id,
+			cardIndex: focusedCardIndex(`row-${rowIndex}`, active),
+			cardId: active?.getAttribute('data-spotlight-id') || null
 		};
 	}, []);
 

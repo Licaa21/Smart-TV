@@ -33,6 +33,7 @@ import {api as jellyfinApi, createApiForServer, getServerUrl} from '../../servic
 import PlayerControls, {usePlayerButtons} from './PlayerControls';
 import {canBrowseEpisodes} from '../../utils/episodeBrowser';
 import useLiveProgram from './useLiveProgram';
+import useHeldSeekStep from './useHeldSeekStep';
 import {hasTrickplayPreview} from '../../components/TrickplayPreview';
 import {isTrickplayOn} from '../../utils/trickplayLayout';
 import useChannelCarousel from './useChannelCarousel';
@@ -2439,6 +2440,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 	}, [settings.trickPlayPauseWhileScrubbing, settings.trickPlayMode, isInGroup, item.Id, mediaSourceId]);
 
+	const {stepBy: heldSeekStep, stepSeconds: seekStepSeconds} = useHeldSeekStep(settings.seekStep);
+
 	// One scrub step on from the pending target, or from where playback is when a scrub starts.
 	const scrubBy = useCallback((deltaSeconds) => {
 		if (!avplayReadyRef.current) return;
@@ -2456,14 +2459,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const handleProgressKeyDown = useCallback((e) => {
 		if (!avplayReadyRef.current) return;
 		showControls();
-		const step = settings.seekStep;
 
 		if (e.key === 'ArrowLeft' || e.keyCode === 37) {
 			e.preventDefault();
-			scrubBy(-step);
+			scrubBy(heldSeekStep(-1));
 		} else if (e.key === 'ArrowRight' || e.keyCode === 39) {
 			e.preventDefault();
-			scrubBy(step);
+			scrubBy(heldSeekStep(1));
 		} else if (e.key === 'Enter' || e.keyCode === 13) {
 			e.preventDefault();
 			if (resumeHeldScrub()) return;
@@ -2485,7 +2487,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				window.requestAnimationFrame(() => Spotlight.focus('play-pause-btn'));
 			}
 		}
-	}, [settings.seekStep, showControls, scrubBy, executeDeferredSeek, resumeHeldScrub, handlePlayPause, isAudioMode]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [heldSeekStep, showControls, scrubBy, executeDeferredSeek, resumeHeldScrub, handlePlayPause, isAudioMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const handleToggleFavorite = useCallback(async () => {
 		if (!item?.Id) return;
@@ -2995,7 +2997,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					if (isLiveTV) { showControls(); return; }
 					showControls();
 					setFocusRow('progress');
-					scrubBy(key === 'ArrowLeft' || e.keyCode === 37 ? -settings.seekStep : settings.seekStep);
+					scrubBy(heldSeekStep(key === 'ArrowLeft' || e.keyCode === 37 ? -1 : 1));
 					return;
 				}
 				e.preventDefault();
@@ -3223,6 +3225,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				topButtons={topButtons}
 				bottomButtons={bottomButtons}
 				displayTime={displayTime}
+				seekStepSeconds={seekStepSeconds}
 				duration={duration}
 				progressPercent={progressPercent}
 				bufferedPercent={bufferedPercent}
