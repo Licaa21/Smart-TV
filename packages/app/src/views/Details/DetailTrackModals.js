@@ -32,7 +32,8 @@ const DetailTrackModals = ({
 	remoteSubtitleError,
 	remoteSubtitleResults,
 	onSelectRemoteSubtitle,
-	onOpenSetting
+	onOpenSetting,
+	focusNoteKey
 }) => {
 	const stopPropagation = useCallback((e) => e.stopPropagation(), []);
 
@@ -63,6 +64,7 @@ const DetailTrackModals = ({
 					subtitleStreamIndex={selectedSubtitleIndex >= 0 ? subtitleStreams[selectedSubtitleIndex]?.Index : -1}
 					onClose={onCloseModal}
 					onOpenSetting={onOpenSetting}
+					focusNoteKey={focusNoteKey}
 				/>
 			)}
 			{activeModal === 'advancedPlayback' && (

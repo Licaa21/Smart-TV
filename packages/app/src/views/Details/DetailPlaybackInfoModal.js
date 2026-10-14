@@ -1,5 +1,6 @@
-import {useCallback, useMemo} from 'react';
+import {useCallback, useEffect, useMemo} from 'react';
 import $L from '@enact/i18n/$L';
+import Spotlight from '@enact/spotlight';
 
 import {useSettings} from '../../context/SettingsContext';
 import {isTizen} from '../../platform';
@@ -36,7 +37,7 @@ const CardHead = ({path, title}) => (
 // The screen of Settings that holds the settings the notes are about.
 const NOTE_SETTINGS_SCREEN = {categoryId: 'playback', subcategoryId: 'qualityDecoding'};
 
-const DetailPlaybackInfoModal = ({api, item, mediaSource, audioStreamIndex, subtitleStreamIndex, onClose, onOpenSetting}) => {
+const DetailPlaybackInfoModal = ({api, item, mediaSource, audioStreamIndex, subtitleStreamIndex, onClose, onOpenSetting, focusNoteKey}) => {
 	const {settings} = useSettings();
 	const {status, result, retry} = useDetailPlaybackInfo({
 		api,
@@ -56,13 +57,23 @@ const DetailPlaybackInfoModal = ({api, item, mediaSource, audioStreamIndex, subt
 		const key = e.currentTarget.dataset.settingKey;
 		if (!key || !onOpenSetting) return;
 		onClose();
-		onOpenSetting({...NOTE_SETTINGS_SCREEN, focus: `setting-${key}`});
+		onOpenSetting({...NOTE_SETTINGS_SCREEN, settingKey: key, focus: `setting-${key}`});
 	}, [onClose, onOpenSetting]);
 
 	const info = useMemo(
 		() => (result ? buildPlaybackInfo(result, {audioStreamIndex: result.audioStreamIndex ?? audioStreamIndex, subtitleStreamIndex, settings, tizen: isTizen()}) : null),
 		[result, audioStreamIndex, subtitleStreamIndex, settings]
 	);
+
+	// Opened again on the way back from Settings, it puts focus on the note it was left from, once the notes are there.
+	useEffect(() => {
+		if (!focusNoteKey || !info) return undefined;
+		const timer = setTimeout(() => {
+			const note = document.querySelector(`[data-modal="playbackInfo"] [data-setting-key="${focusNoteKey}"]`);
+			if (note) Spotlight.focus(note);
+		}, 60);
+		return () => clearTimeout(timer);
+	}, [focusNoteKey, info]);
 
 	const section = (id) => info?.sections.find((candidate) => candidate.id === id);
 	const file = section('file');
