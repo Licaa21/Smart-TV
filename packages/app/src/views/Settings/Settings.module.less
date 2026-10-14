@@ -855,17 +855,15 @@
 		color: #00a4dc;
 	}
 
-	// The hint inside an empty field, readable on the dark field and on the white one a focused field turns into.
+	// The hint inside an empty field: light on the dark field, and a solid blue on the white one a focused field
+	// turns into, where a pale one disappeared.
 	input::placeholder {
-		color: rgba(255, 255, 255, 0.4);
+		color: rgba(255, 255, 255, 0.55);
 	}
 
 	&:focus input::placeholder, &[data-focused] input::placeholder {
-		color: rgba(0, 0, 0, 0.45);
-	}
-
-	input::placeholder {
-		color: rgba(255, 255, 255, 0.55);
+		color: #0b7aa8;
+		opacity: 1;
 	}
 }
 

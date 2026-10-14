@@ -79,37 +79,98 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.75);
+	background: rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.78);
 }
 
 .dialogPanel {
+	position: relative;
+	box-sizing: border-box;
+	width: 1180px;
+	max-width: 92%;
+	max-height: 88%;
+	display: flex;
+	overflow: hidden;
+	border: 2px solid rgba(var(--theme-accent-rgb, 0, 164, 220), 0.55);
+	border-radius: 28px;
+	background: var(--theme-surface, #181818);
+	box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7), 0 0 60px rgba(var(--theme-accent-rgb, 0, 164, 220), 0.22);
+}
+
+// The still, large and soft, filling the panel under a dark wash, so the colors of the episode run through it.
+.dialogArt {
+	position: absolute;
+	top: -40px;
+	right: -40px;
+	bottom: -40px;
+	left: -40px;
+	background-size: cover;
+	background-position: center;
+	opacity: 0.55;
+	-webkit-filter: blur(28px);
+	filter: blur(28px);
+
+	:global(.perf-low) &,
+	:global(.perf-mid) & {
+		-webkit-filter: none;
+		filter: none;
+		opacity: 0.3;
+	}
+}
+
+.dialogShade {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	background: linear-gradient(135deg, rgba(var(--theme-surface-rgb, 24, 24, 24), 0.7), rgba(var(--theme-surface-rgb, 24, 24, 24), 0.92));
+}
+
+.dialogContent {
+	position: relative;
+	flex: 1;
+	min-width: 0;
 	box-sizing: border-box;
 	display: flex;
 	flex-direction: column;
-	width: 1100px;
-	max-width: 92%;
-	max-height: 88%;
-	padding: 36px 44px 30px;
-	border: 1px solid var(--theme-card-border, rgba(255, 255, 255, 0.14));
-	border-radius: 14px;
-	background: var(--theme-surface, #181818);
+	padding: 40px 48px 28px;
 }
 
 .dialogHead {
+	display: flex;
+	align-items: center;
 	flex-shrink: 0;
-	margin-bottom: 20px;
 }
 
-.dialogLabel {
+// S1 E2, set as a tag in the accent.
+.dialogCode {
+	padding: 6px 16px;
+	border-radius: 100px;
+	background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.9);
 	font-size: 20px;
-	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
+	font-weight: 700;
+	letter-spacing: 1px;
+	color: #fff;
+}
+
+.dialogSeries {
+	margin-left: 16px;
+	font-size: 22px;
+	font-weight: 600;
+	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.75));
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .dialogTitle {
-	margin: 4px 0 0;
-	font-size: 34px;
-	font-weight: 700;
+	flex-shrink: 0;
+	margin: 14px 0 22px;
+	font-size: 44px;
+	line-height: 52px;
+	font-weight: 800;
 	color: var(--theme-text-primary, #ffffff);
+	text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
 }
 
 .dialogBody {
@@ -118,62 +179,129 @@
 	min-height: 0;
 }
 
-.dialogSide {
-	flex-shrink: 0;
-	width: 380px;
-}
-
 .dialogStill {
-	width: 100%;
-	height: 214px;
-	margin-bottom: 14px;
-	border-radius: 10px;
+	flex-shrink: 0;
+	align-self: flex-start;
+	width: 400px;
+	height: 225px;
+	border: 2px solid rgba(255, 255, 255, 0.18);
+	border-radius: 18px;
 	overflow: hidden;
 	background: rgba(255, 255, 255, 0.08);
+	box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
 
 	img {
+		display: block;
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 	}
 }
 
-.fact {
-	display: flex;
-	margin-top: 6px;
-	font-size: 19px;
-	line-height: 26px;
-}
-
-.factName {
-	flex-shrink: 0;
-	width: 110px;
-	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
-}
-
-.factValue {
+.dialogInfo {
 	flex: 1;
 	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	margin-left: 40px;
+}
+
+.dialogChips {
+	display: flex;
+	flex-wrap: wrap;
+	flex-shrink: 0;
+	margin: 0 0 6px -12px;
+}
+
+// A fact as a pill with its own picture: when it aired, how long it runs, how it was rated.
+.dialogChip {
+	display: inline-flex;
+	align-items: center;
+	margin: 0 0 10px 12px;
+	padding: 8px 18px 8px 14px;
+	border: 2px solid rgba(255, 255, 255, 0.22);
+	border-radius: 100px;
+	background: rgba(255, 255, 255, 0.1);
+	font-size: 21px;
+	font-weight: 600;
 	color: var(--theme-text-primary, #ffffff);
+}
+
+.dialogChipAccent {
+	border-color: rgba(255, 193, 7, 0.65);
+	background: rgba(255, 193, 7, 0.16);
+	color: #ffd54f;
+}
+
+.dialogIcon {
+	flex-shrink: 0;
+	width: 24px;
+	height: 24px;
+	margin-right: 10px;
 }
 
 // The description is read with up and down while the dialog is open, and nothing here takes focus.
 .dialogText {
 	flex: 1;
-	min-width: 0;
-	margin-left: 36px;
-	padding: 4px 8px;
-	box-sizing: border-box;
+	min-height: 0;
 	overflow: hidden;
-	font-size: 23px;
-	line-height: 34px;
+	font-size: 24px;
+	line-height: 36px;
 	color: var(--theme-text-primary, #ffffff);
 }
 
-.dialogHint {
-	align-self: flex-end;
+.dialogCredits {
 	flex-shrink: 0;
-	margin-top: 22px;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.credit {
+	display: flex;
+	margin-top: 4px;
+	font-size: 19px;
+	line-height: 26px;
+}
+
+.creditName {
+	flex-shrink: 0;
+	width: 130px;
+	font-weight: 700;
+	color: rgba(var(--theme-accent-rgb, 0, 164, 220), 1);
+}
+
+.creditValue {
+	flex: 1;
+	min-width: 0;
+	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.8));
+}
+
+.dialogHint {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	align-self: flex-end;
+	margin-top: 20px;
 	font-size: 18px;
 	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+// The back key, drawn as a key.
+.dialogKey {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 38px;
+	height: 30px;
+	margin-right: 12px;
+	border: 2px solid rgba(255, 255, 255, 0.4);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.1);
+
+	.dialogIcon {
+		width: 20px;
+		height: 20px;
+		margin-right: 0;
+	}
 }
