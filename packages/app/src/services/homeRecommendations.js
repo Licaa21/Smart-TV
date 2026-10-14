@@ -4,6 +4,7 @@ import {getActiveParentalFilter} from './parentalControls';
 import {byLastPlayedDesc} from '../utils/libraryScopeRules';
 import seerrApi from './seerrApi';
 import {normalizeMediaItem} from '../utils/seerrHomeRows';
+import {currentMetadataLanguage} from '../utils/metadataLanguage';
 
 // How many a row shows, and how many are asked for to fill it. The server scored
 // sources are asked for more because the watched ones get dropped here, but not
@@ -472,6 +473,8 @@ export async function loadSinceYouWatchedRows(api, settings, enabledIndexes, onl
 
 	const seeds = await loadSeeds(api, sourceItem, sourceType);
 	if (seeds.length === 0) return [];
+	// Online titles and posters come in the language the Jellyfin server is set to, as Seerr's do.
+	const language = online ? await currentMetadataLanguage().catch(() => null) : null;
 
 	const rows = await Promise.all(
 		enabledIndexes.map(async (idx) => {
@@ -483,7 +486,7 @@ export async function loadSinceYouWatchedRows(api, settings, enabledIndexes, onl
 				: null);
 
 			if (online) {
-				const onlineItems = await getOnlineRecommendations(settings, seed).catch(() => []);
+				const onlineItems = await getOnlineRecommendations(settings, seed, language).catch(() => []);
 				if (onlineItems.length) return row(onlineItems, true);
 			}
 
@@ -521,10 +524,10 @@ export async function loadSinceYouWatchedRows(api, settings, enabledIndexes, onl
 
 // Online recommendations come from TMDB using the plugin synced key, falling back
 // to the Seerr proxy. Results are normalized to the external card shape.
-async function fetchTmdbRecommendations(tmdbApiKey, tmdbId, mediaType) {
+async function fetchTmdbRecommendations(tmdbApiKey, tmdbId, mediaType, language) {
 	if (!tmdbApiKey) return [];
 	try {
-		let url = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/recommendations?language=en-US&page=1`;
+		let url = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/recommendations?language=${encodeURIComponent(language || 'en-US')}&page=1`;
 		const options = {};
 		if (tmdbApiKey.startsWith('eyJ')) {
 			options.headers = {Authorization: `Bearer ${tmdbApiKey}`};
@@ -540,24 +543,24 @@ async function fetchTmdbRecommendations(tmdbApiKey, tmdbId, mediaType) {
 	}
 }
 
-async function fetchSeerrRecommendations(tmdbId, mediaType) {
+async function fetchSeerrRecommendations(tmdbId, mediaType, language) {
 	try {
 		const res = mediaType === 'tv'
-			? await seerrApi.getTvRecommendations(tmdbId)
-			: await seerrApi.getMovieRecommendations(tmdbId);
+			? await seerrApi.getTvRecommendations(tmdbId, 1, language)
+			: await seerrApi.getMovieRecommendations(tmdbId, 1, language);
 		return Array.isArray(res && res.results) ? res.results : [];
 	} catch (_error) {
 		return [];
 	}
 }
 
-export async function getOnlineRecommendations(settings, seed) {
+export async function getOnlineRecommendations(settings, seed, language) {
 	const tmdbId = seed.ProviderIds && seed.ProviderIds.Tmdb;
 	if (!tmdbId) return [];
 	const mediaType = seed.Type === 'Series' ? 'tv' : 'movie';
 
-	let results = await fetchTmdbRecommendations(settings.tmdbApiKey, String(tmdbId), mediaType);
-	if (!results.length) results = await fetchSeerrRecommendations(String(tmdbId), mediaType);
+	let results = await fetchTmdbRecommendations(settings.tmdbApiKey, String(tmdbId), mediaType, language);
+	if (!results.length) results = await fetchSeerrRecommendations(String(tmdbId), mediaType, language);
 
 	return results.filter((item) => item && item.id).slice(0, 15).map(normalizeMediaItem);
 }

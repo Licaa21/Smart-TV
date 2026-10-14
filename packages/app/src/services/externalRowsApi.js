@@ -11,7 +11,7 @@ import {mediaServerQueue} from '../utils/requestQueue';
 const cache = {};
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
-const cacheKeyFor = (source, type, params) => `${source}:${type}:${JSON.stringify(params || {})}`;
+const cacheKeyFor = (source, type, params, language) => `${source}:${type}:${JSON.stringify(params || {})}:${language || ''}`;
 
 const normalizeItem = (raw) => {
 	const providerIds = raw.providerIds || raw.ProviderIds || {};
@@ -41,7 +41,10 @@ const normalizeItem = (raw) => {
 export const fetchCustomRow = async ({source, type, params = {}}, options = {}) => {
 	if (!source || !type) return [];
 
-	const key = cacheKeyFor(source, type, params);
+	// The plugin asks TMDB and MDBList in this language, so titles and posters come in it. It keeps one copy per
+	// language, so one viewer's pick does not change another's.
+	const {language} = options;
+	const key = cacheKeyFor(source, type, params, language);
 	if (!options.forceRefresh) {
 		const cached = cache[key];
 		if (cached && (Date.now() - cached.fetchedAt) < CACHE_TTL_MS) {
@@ -59,6 +62,7 @@ export const fetchCustomRow = async ({source, type, params = {}}, options = {}) 
 			+ `?source=${encodeURIComponent(source)}`
 			+ `&type=${encodeURIComponent(type)}`
 			+ `&params=${encodeURIComponent(JSON.stringify(params))}`
+			+ (language ? `&language=${encodeURIComponent(language)}` : '')
 			+ (options.forceRefresh ? '&refresh=true' : '');
 
 		const fetchOptions = {headers: {'Authorization': getAuthHeader()}};

@@ -918,12 +918,12 @@ export const getLanguages = async () => {
 	return request('/languages');
 };
 
-export const getMovieRecommendations = async (movieId, page = 1) => {
-	return request(`/movie/${movieId}/recommendations?page=${page}`);
+export const getMovieRecommendations = async (movieId, page = 1, language) => {
+	return request(`/movie/${movieId}/recommendations?page=${page}${language ? `&language=${encodeURIComponent(language)}` : ''}`);
 };
 
-export const getTvRecommendations = async (tvId, page = 1) => {
-	return request(`/tv/${tvId}/recommendations?page=${page}`);
+export const getTvRecommendations = async (tvId, page = 1, language) => {
+	return request(`/tv/${tvId}/recommendations?page=${page}${language ? `&language=${encodeURIComponent(language)}` : ''}`);
 };
 
 export const getMovieSimilar = async (movieId, page = 1) => {

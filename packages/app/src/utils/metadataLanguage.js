@@ -1,4 +1,5 @@
 import serverLogger from '../services/serverLogger';
+import {api as jellyfinApi, getServerUrl, getUserId} from '../services/jellyfinApi';
 import {appLocale} from './appLocale';
 
 // The language Seerr titles are asked for, so a title it only knows by an English text reads the way
@@ -54,6 +55,9 @@ export const resolveMetadataLanguage = (api, key = '') => {
 	}
 	return held.get(key);
 };
+
+// The same for whoever is signed in now, for the rows of Home and the like that have no api of their own to hand.
+export const currentMetadataLanguage = () => resolveMetadataLanguage(jellyfinApi, `${getServerUrl() || ''}|${getUserId() || ''}`);
 
 // For tests.
 export const forgetMetadataLanguage = () => held.clear();

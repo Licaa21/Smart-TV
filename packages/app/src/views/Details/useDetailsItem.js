@@ -17,6 +17,7 @@ import {isBlocked as isContentBlocked, isBlockedNow, observeItem} from '../../se
 import {getActiveParentalFilter, withoutBlockedItems} from '../../services/parentalControls';
 import * as userDataSync from '../../services/userDataSync';
 import {useUserDataVersion} from '../../hooks/useUserDataSync';
+import {currentMetadataLanguage} from '../../utils/metadataLanguage';
 
 // Everything the screen shows about one item. The item itself is fetched first and rendered
 // on its own, then the rows that hang off it fill in behind, because waiting for all of them
@@ -375,7 +376,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					if (source === 'server') return {data: await stock(), source: 'jellyfin'};
 
 					if (source === 'online') {
-						const onlineCards = await getOnlineRecommendations(currentSettings, data).catch(() => []);
+						const onlineLanguage = await currentMetadataLanguage().catch(() => null);
+						const onlineCards = await getOnlineRecommendations(currentSettings, data, onlineLanguage).catch(() => []);
 						if (onlineCards.length) return {data: {Items: onlineCards}, source: 'tmdb'};
 					}
 
