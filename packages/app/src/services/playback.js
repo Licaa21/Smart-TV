@@ -1497,6 +1497,8 @@ const shareStopWithShell = (positionTicks) => {
 
 export const reportStart = async (positionTicks = 0) => {
 	if (!currentSession) return;
+	// Once playback starts again, a stop at the same position is a new one.
+	delete currentSession.lastStopBeaconKey;
 
 	try {
 		// Use session's server credentials for cross-server support
@@ -1582,14 +1584,24 @@ const sendStopRequest = ({endpoint, json}) => {
 	}
 };
 
+// Every stop the server gets fires its PlaybackStopped listeners, so a scrobbler
+// like Trakt rejects a repeat of a stop it already has.
+const stopKey = (session, positionTicks) => `${session.playSessionId}:${positionTicks || 0}`;
+
 export const reportStopBeacon = (positionTicks) => {
 	const request = stopRequest(positionTicks);
 	if (!request) return false;
+	const key = stopKey(currentSession, positionTicks);
+	// The server already has this exact stop, so it counts as sent.
+	if (key === currentSession.lastStopBeaconKey) return true;
 	const sent = sendStopRequest(request);
-	// The stop that went out named the live stream, so the server has let it go.
-	// A later stop must not close it again, since the server counts viewers and a
-	// second close on a stream shared with another set takes theirs as well.
-	if (sent) currentSession.liveStreamClosed = true;
+	if (sent) {
+		currentSession.lastStopBeaconKey = key;
+		// The stop that went out named the live stream, so the server has let it go.
+		// A later stop must not close it again, since the server counts viewers and a
+		// second close on a stream shared with another set takes theirs as well.
+		currentSession.liveStreamClosed = true;
+	}
 	return sent;
 };
 
@@ -1633,6 +1645,15 @@ export const consumeBackgroundStopFired = () => {
 	return fired;
 };
 
+// Lets go of the session without telling the server, for when its stop already
+// went out, so nothing reports on it again.
+export const discardCurrentSession = () => {
+	currentSession = null;
+	shareStopWithShell(null);
+	stopProgressReporting();
+	stopHealthMonitoring();
+};
+
 export const reportStop = async (positionTicks) => {
 	// a normal stop supersedes an earlier background stop
 	backgroundStopFired = false;
@@ -1641,21 +1662,20 @@ export const reportStop = async (positionTicks) => {
 	// this stop is in flight keeps it, and nothing reports on this one in the meantime.
 	const session = currentSession;
 	if (!session) return;
-	currentSession = null;
-	shareStopWithShell(null);
+	discardCurrentSession();
 
-	stopProgressReporting();
-	stopHealthMonitoring();
-
-	try {
-		await apiForSession(session).reportPlaybackStopped({
-			ItemId: session.itemId,
-			PlaySessionId: session.playSessionId,
-			MediaSourceId: session.mediaSourceId,
-			PositionTicks: positionTicks
-		});
-	} catch (e) {
-		console.warn('[playback] Failed to report stop:', e.message);
+	// A beacon already sent this exact stop.
+	if (stopKey(session, positionTicks) !== session.lastStopBeaconKey) {
+		try {
+			await apiForSession(session).reportPlaybackStopped({
+				ItemId: session.itemId,
+				PlaySessionId: session.playSessionId,
+				MediaSourceId: session.mediaSourceId,
+				PositionTicks: positionTicks
+			});
+		} catch (e) {
+			console.warn('[playback] Failed to report stop:', e.message);
+		}
 	}
 
 	await closeLiveStreamOnce(session);
@@ -1825,6 +1845,7 @@ export default {
 	reportProgress,
 	reportStopBeacon,
 	reportStop,
+	discardCurrentSession,
 	startProgressReporting,
 	stopProgressReporting,
 	getHealthMonitor,
