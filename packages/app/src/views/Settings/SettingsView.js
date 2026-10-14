@@ -93,7 +93,7 @@ const SettingsView = ({spotlightId, title, root, header, clean, action, children
 		<ViewContainer className={className} spotlightId={spotlightId} data-settings-page>
 			{shownTitle && (
 				<div className={scrolled ? `${css.appBar} ${css.appBarScrolled}` : css.appBar}>
-					<div className={root ? `${css.appBarTitle} ${css.appBarTitleRoot}` : css.appBarTitle}>{shownTitle}</div>
+					<div className={css.appBarTitle}>{shownTitle}</div>
 					{action}
 				</div>
 			)}
