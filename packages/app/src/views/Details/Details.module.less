@@ -46,6 +46,8 @@
 	object-position: center top;
 }
 
+// DetailBackdrop.js bakes this gradient, and the Neon Pulse one further down, into an image and sets
+// it inline, so its copy of the stops has to match. The gradients here only paint if that fails.
 .backdropGradient {
 	position: fixed;
 	top: 0;

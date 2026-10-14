@@ -1,10 +1,21 @@
 import {useEffect, useRef, memo} from 'react';
+import {getPerfTier} from '../../utils/perfTier';
+import {serverBlurredUrl} from '../../utils/serverBlur';
 
 import css from './BackdropLayer.module.less';
 
 const BACKDROP_DEBOUNCE_MS = 500;
 
-const BackdropLayer = memo(({targetUrl, blurAmount, overlayOpacity, scrimWhenEmpty = true}) => {
+const TIER_BLUR_CAPS = {low: 0, mid: 8, high: 20};
+
+const clampBlur = (amount) => {
+	const cap = TIER_BLUR_CAPS[getPerfTier()];
+	return Math.min(amount || 0, cap);
+};
+
+const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, scrimWhenEmpty = true}) => {
+	const blurredUrl = serverBlurredUrl(requestedUrl, blurAmount);
+	const targetUrl = blurredUrl || requestedUrl;
 	const layerARef = useRef(null);
 	const layerBRef = useRef(null);
 	const activeLayerRef = useRef('a');
@@ -65,9 +76,11 @@ const BackdropLayer = memo(({targetUrl, blurAmount, overlayOpacity, scrimWhenEmp
 		}, BACKDROP_DEBOUNCE_MS);
 	}, [targetUrl]);
 
-	const effectiveBlur = blurAmount || 0;
-	const layerStyle = effectiveBlur > 0
-		? {WebkitFilter: `blur(${effectiveBlur}px)`, filter: `blur(${effectiveBlur}px)`}
+	const effectiveBlur = blurredUrl ? 0 : clampBlur(blurAmount);
+	const filter = effectiveBlur > 0 ? `blur(${effectiveBlur}px)` : 'none';
+	// A server blur darkens the edges like a CSS one, so both keep the oversize that hides them.
+	const layerStyle = blurredUrl || effectiveBlur > 0
+		? {WebkitFilter: filter, filter}
 		: {WebkitFilter: 'none', filter: 'none', top: 0, left: 0, width: '100%', height: '100%'};
 
 	// How much picture shows through is the screen's own call, since a page laying

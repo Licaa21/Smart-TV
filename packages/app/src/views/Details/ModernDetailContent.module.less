@@ -27,8 +27,9 @@
 	object-position: center right;
 }
 
-.backdrop::after {
-	content: '';
+// ModernDetailContent.js bakes these layers, and the person ones below, into an image and sets it
+// inline, so its copy of the stops has to match. The gradients here only paint if that fails.
+.scrim {
 	position: absolute;
 	top: 0;
 	right: 0;
@@ -78,8 +79,8 @@
 	background-color: rgba(0, 0, 0, var(--opacity-alpha));
 }
 
-.backdropPerson::after {
-	// Static pass first, see .backdrop::after above.
+.backdropPerson .scrim {
+	// Static pass first, see .scrim above.
 	background-image: linear-gradient(to top,
 		rgba(11, 13, 16, 1) 0%,
 		rgba(11, 13, 16, 0.6) 50%,
