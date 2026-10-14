@@ -69,3 +69,13 @@ describe('buildForkNotes', () => {
 		expect(buildForkNotes({tizen: true, method: 'transcode', source: fileOf([stream('Video', {Codec: 'hevc', Level: 156, Width: 1920})]), reasonKeys: ['videolevelnotsupported'], settings: {}})).toEqual([]);
 	});
 });
+
+describe('what a note points at', () => {
+	it('names the setting it is about, so the popup can open it', () => {
+		const many = {MediaStreams: Array.from({length: 40}, (_, i) => ({Type: 'Subtitle', Index: i}))};
+		const [note] = buildForkNotes({tizen: true, method: 'transcode', source: many, reasonKeys: ['streamcountexceedslimit'], settings: {}});
+		expect(note.settingKey).toBe('allowManyStreams');
+		const [av1] = buildForkNotes({tizen: true, method: 'transcode', source: {MediaStreams: [{Type: 'Video', Codec: 'av1'}]}, reasonKeys: [], settings: {}});
+		expect(av1.settingKey).toBe('forceCompatibleAv1Transcode');
+	});
+});

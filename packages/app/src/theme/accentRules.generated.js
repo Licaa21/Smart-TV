@@ -201,6 +201,7 @@ export const ACCENT_RULES = {
 		["views/Details/Details.module.less","",".{trackItem}:focus","box-shadow","inset 0 0 0 2px rgba({rgb}, 0.6)"],
 		["views/Details/Details.module.less","",".{trackPlayed} svg","fill","{accent}"],
 		["views/Details/Details.module.less","",".{playlistItem}:focus","box-shadow","inset 0 0 0 2px rgba({rgb}, 0.6)"],
+		["views/Details/Details.module.less","",".{infoNoteLink}:focus","background","rgba({rgb}, 0.22)"],
 		["views/Details/Details.module.less","",".{infoCardIcon}","color","{accent}"],
 		["views/Details/ExpandableOverview.module.less","",".{readMoreBtn}","color","{accent}"],
 		["views/Details/ModernDetailContent.module.less","",".{statusUpcoming}","background","{accent}"],

@@ -6,6 +6,7 @@ import {isTizen} from '../../platform';
 import {iconViewBox} from '../../components/icons/iconViewBox';
 import {ModalContainer} from '../../utils/spotlightContainers';
 import TrackOptionRow, {TrackDivider} from '../../components/TrackOptionRow';
+import {SpottableDiv} from './detailsSpottables';
 import {DETAIL_ICON_PATHS} from './detailIcons';
 import useDetailPlaybackInfo from './useDetailPlaybackInfo';
 import {buildPlaybackInfo} from './playbackInfoRows';
@@ -32,7 +33,10 @@ const CardHead = ({path, title}) => (
 // How the server would play the selected file with the selected tracks, behind the Playback Info
 // button. It is only mounted while open, so the server is asked once per press and never for a
 // screen where the button isn't used.
-const DetailPlaybackInfoModal = ({api, item, mediaSource, audioStreamIndex, subtitleStreamIndex, onClose}) => {
+// The screen of Settings that holds the settings the notes are about.
+const NOTE_SETTINGS_SCREEN = {categoryId: 'playback', subcategoryId: 'qualityDecoding'};
+
+const DetailPlaybackInfoModal = ({api, item, mediaSource, audioStreamIndex, subtitleStreamIndex, onClose, onOpenSetting}) => {
 	const {settings} = useSettings();
 	const {status, result, retry} = useDetailPlaybackInfo({
 		api,
@@ -46,6 +50,14 @@ const DetailPlaybackInfoModal = ({api, item, mediaSource, audioStreamIndex, subt
 	});
 
 	const stopPropagation = useCallback((e) => e.stopPropagation(), []);
+
+	// OK on a note closes the popup and opens that setting in Settings, with focus on it.
+	const handleOpenNote = useCallback((e) => {
+		const key = e.currentTarget.dataset.settingKey;
+		if (!key || !onOpenSetting) return;
+		onClose();
+		onOpenSetting({...NOTE_SETTINGS_SCREEN, focus: `setting-${key}`});
+	}, [onClose, onOpenSetting]);
 
 	const info = useMemo(
 		() => (result ? buildPlaybackInfo(result, {audioStreamIndex: result.audioStreamIndex ?? audioStreamIndex, subtitleStreamIndex, settings, tizen: isTizen()}) : null),
@@ -100,12 +112,22 @@ const DetailPlaybackInfoModal = ({api, item, mediaSource, audioStreamIndex, subt
 										<div className={css.infoCard}>
 											<CardHead path={DETAIL_ICON_PATHS.admin} title={$L('Settings that apply')} />
 											<div className={sideBySide ? css.infoStack : css.infoReasons}>
-												{info.notes.map((note) => (
-													<div key={note.id} className={`${css.infoReason} ${css[`infoNote_${note.tone}`]}`}>
-														<div className={css.infoNoteTitle}>{note.title}</div>
-														<div className={css.infoHint}>{note.text}</div>
-													</div>
-												))}
+												{info.notes.map((note) => {
+													const body = (
+														<>
+															<div className={css.infoNoteTitle}>{note.title}</div>
+															<div className={css.infoHint}>{note.text}</div>
+														</>
+													);
+													const tone = css[`infoNote_${note.tone}`];
+													return note.settingKey && onOpenSetting ? (
+														<SpottableDiv key={note.id} className={`${css.infoReason} ${tone} ${css.infoNoteLink}`} data-setting-key={note.settingKey} onClick={handleOpenNote}>
+															{body}
+														</SpottableDiv>
+													) : (
+														<div key={note.id} className={`${css.infoReason} ${tone}`}>{body}</div>
+													);
+												})}
 											</div>
 										</div>
 									)}
@@ -127,7 +149,7 @@ const DetailPlaybackInfoModal = ({api, item, mediaSource, audioStreamIndex, subt
 				<div className={css.trackList}>
 					<TrackDivider />
 					{(status === 'failed' || status === 'empty') && <TrackOptionRow label={$L('Retry')} onClick={retry} />}
-					<TrackOptionRow label={$L('Close')} dimmed onClick={onClose} />
+					<TrackOptionRow label={$L('Close')} dimmed onClick={onClose} data-selected="true" />
 				</div>
 			</ModalContainer>
 		</div>

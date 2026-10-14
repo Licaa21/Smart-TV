@@ -31,7 +31,8 @@ const DetailTrackModals = ({
 	isDownloadingRemoteSubtitle,
 	remoteSubtitleError,
 	remoteSubtitleResults,
-	onSelectRemoteSubtitle
+	onSelectRemoteSubtitle,
+	onOpenSetting
 }) => {
 	const stopPropagation = useCallback((e) => e.stopPropagation(), []);
 
@@ -61,6 +62,7 @@ const DetailTrackModals = ({
 					audioStreamIndex={audioStreams[selectedAudioIndex]?.Index}
 					subtitleStreamIndex={selectedSubtitleIndex >= 0 ? subtitleStreams[selectedSubtitleIndex]?.Index : -1}
 					onClose={onCloseModal}
+					onOpenSetting={onOpenSetting}
 				/>
 			)}
 			{activeModal === 'advancedPlayback' && (

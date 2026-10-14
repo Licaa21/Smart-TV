@@ -66,7 +66,7 @@ import css from './Details.module.less';
 // draws the screen.
 const DETAIL_CONTENT = {v3: SpotlightDetailContent, v4: NouveauDetailContent, v5: MinimalistDetailContent};
 
-const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectItem: onSelectItemProp, onSelectPerson, onSelectStudio, onItemDeleted, autoPlay, onAutoPlayed, seerrNav, backHandlerRef}) => {
+const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectItem: onSelectItemProp, onSelectPerson, onSelectStudio, onItemDeleted, autoPlay, onAutoPlayed, seerrNav, backHandlerRef, onOpenSetting}) => {
 	const {api, serverUrl, user} = useAuth();
 	// Kids Mode has its say before anything on this screen reads a setting, and every piece below
 	// takes what it is handed rather than reaching for the context itself. Held steady across
@@ -1014,6 +1014,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				api={effectiveApi}
 				activeModal={activeModal}
 				onCloseModal={closeModal}
+				onOpenSetting={onOpenSetting}
 				item={item}
 				audioStreams={audioStreams}
 				subtitleStreams={subtitleStreams}

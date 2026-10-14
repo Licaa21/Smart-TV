@@ -1200,6 +1200,12 @@ const AppContent = (props) => {
 		setShowSettingsPanel(true);
 	}, []);
 
+	// Settings opened on one setting, with focus on it, from a screen that points at it.
+	const handleOpenSettingAt = useCallback((target) => {
+		setSettingsInitialView(target);
+		setShowSettingsPanel(true);
+	}, []);
+
 	const handleOpenFriends = useCallback(() => {
 		setSettingsInitialView('friends');
 		setShowSettingsPanel(true);
@@ -1799,6 +1805,7 @@ const AppContent = (props) => {
 									onAutoPlayed={handleAutoPlayed}
 									seerrNav={seerrNav}
 									backHandlerRef={backHandlerRef}
+									onOpenSetting={handleOpenSettingAt}
 							/>
 							)}
 						</Panel>
