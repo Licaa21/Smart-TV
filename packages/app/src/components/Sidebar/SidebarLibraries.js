@@ -1,4 +1,4 @@
-import {useCallback, useRef} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
@@ -24,6 +24,18 @@ const SpottableButton = Spottable('button');
 const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}) => {
 	const {canRefresh, note, refreshAll} = useLibraryRefresh();
 	const rowRef = useRef(null);
+	// The scan button can only be reached by pressing Right from the row, so Up and Down never land on it.
+	const [reachable, setReachable] = useState(false);
+
+	const reachableRef = useRef(false);
+
+	useEffect(() => {
+		reachableRef.current = reachable;
+		const button = reachable && rowRef.current && rowRef.current.querySelector('[data-refresh-all]');
+		if (button) Spotlight.focus(button);
+	}, [reachable]);
+
+	const handleRefreshBlur = useCallback(() => setReachable(false), []);
 
 	// Right from the row goes to the scan button beside it, where the sidebar would otherwise take Right as the way out
 	// to the content, and Left from the button comes back. Right from the button is the way out.
@@ -35,7 +47,9 @@ const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}
 		if (e.keyCode === KEYS.RIGHT && !onButton) {
 			e.preventDefault();
 			e.stopPropagation();
-			Spotlight.focus(button);
+			// Already reachable when the button was just left by the pointer and is still open
+			if (reachableRef.current) Spotlight.focus(button);
+			else setReachable(true);
 		} else if (e.keyCode === KEYS.LEFT && onButton) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -67,7 +81,7 @@ const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}
 				<ChevronDownIcon className={css.chevron} />
 			</SidebarItem>
 			{canRefresh && (
-				<SpottableButton className={css.refreshAllBtn} onClick={refreshAll} data-refresh-all="true" aria-label={$L('Refresh all libraries')}>
+				<SpottableButton className={css.refreshAllBtn} onClick={refreshAll} spotlightDisabled={!reachable} onBlur={handleRefreshBlur} data-refresh-all="true" aria-label={$L('Refresh all libraries')}>
 					<RefreshStateIcon key={note} className={`${css.refreshAllIcon} ${note === 'busy' ? css.refreshSpin : note === 'started' || note === 'failed' ? css.refreshPop : ''}`} state={note} />
 				</SpottableButton>
 			)}
