@@ -1,11 +1,13 @@
-import {useCallback} from 'react';
+import {useCallback, useRef} from 'react';
 import $L from '@enact/i18n/$L';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
+import Spotlight from '@enact/spotlight';
 
 import {ChevronDownIcon, LibrariesIcon, RefreshStateIcon} from '../icons/navIcons';
 import useLibraryRefresh from '../../hooks/useLibraryRefresh';
 import {pointerHover} from '../../utils/focusScroll';
+import {KEYS} from '../../utils/keys';
 import SidebarItem from './SidebarItem';
 
 import css from './Sidebar.module.less';
@@ -21,6 +23,25 @@ const SpottableButton = Spottable('button');
 // it's actually open.
 const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}) => {
 	const {canRefresh, note, refreshAll} = useLibraryRefresh();
+	const rowRef = useRef(null);
+
+	// Right from the row goes to the scan button beside it, where the sidebar would otherwise take Right as the way out
+	// to the content, and Left from the button comes back. Right from the button is the way out.
+	const handleRowKeyDown = useCallback((e) => {
+		if (!rowRef.current) return;
+		const button = rowRef.current.querySelector('[data-refresh-all]');
+		if (!button) return;
+		const onButton = Boolean(e.target.closest('[data-refresh-all]'));
+		if (e.keyCode === KEYS.RIGHT && !onButton) {
+			e.preventDefault();
+			e.stopPropagation();
+			Spotlight.focus(button);
+		} else if (e.keyCode === KEYS.LEFT && onButton) {
+			e.preventDefault();
+			e.stopPropagation();
+			Spotlight.focus(rowRef.current.querySelector('button:not([data-refresh-all])'));
+		}
+	}, []);
 	const handleLibraryClick = useCallback((e) => {
 		const libId = e.currentTarget.dataset.libraryId;
 		const lib = libraries.find(l => l.Id === libId);
@@ -35,7 +56,7 @@ const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}
 	return (
 		<div>
 			{/* The scan button rides on the Libraries row itself, on its right, and Right from the row focuses it. */}
-			<div className={css.librariesRow}>
+			<div className={css.librariesRow} ref={rowRef} onKeyDown={handleRowKeyDown}>
 			<SidebarItem
 				Icon={LibrariesIcon}
 				slot={slot}
@@ -46,7 +67,7 @@ const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}
 				<ChevronDownIcon className={css.chevron} />
 			</SidebarItem>
 			{canRefresh && (
-				<SpottableButton className={css.refreshAllBtn} onClick={refreshAll} aria-label={$L('Refresh all libraries')}>
+				<SpottableButton className={css.refreshAllBtn} onClick={refreshAll} data-refresh-all="true" aria-label={$L('Refresh all libraries')}>
 					<RefreshStateIcon key={note} className={`${css.refreshAllIcon} ${note === 'busy' ? css.refreshSpin : note === 'started' || note === 'failed' ? css.refreshPop : ''}`} state={note} />
 				</SpottableButton>
 			)}
