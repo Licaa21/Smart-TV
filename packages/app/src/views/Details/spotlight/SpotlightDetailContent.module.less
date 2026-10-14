@@ -250,3 +250,10 @@
 .techRow              { .flex-row-gap(8px); }
 .hero                 { .flex-col-gap(10px); }
 .cardBand             { .flex-row-gap(16px); }
+
+// What Seerr says of the title is drawn at the size of the Continuing and Ended markers beside it. The pill has a border the markers do not, so its padding is one less.
+.metaBadge > span {
+	border-radius: 4px;
+	font-size: 17px;
+	padding: 1px 7px;
+}

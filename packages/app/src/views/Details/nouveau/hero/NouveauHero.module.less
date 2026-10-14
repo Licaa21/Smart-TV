@@ -196,3 +196,16 @@
 .badges          { .flex-row-gap(9px); }
 .meta            { .flex-wrap-gap(7px; 6px); }
 .tech            { .flex-wrap-gap(7px; 7px); }
+
+// What Seerr says of the title is drawn at the size of the Continuing and Ended markers beside it, not at its own larger one,
+// which stood taller than they did and was cut at the top by the row.
+.seerrPills > span {
+	align-items: center;
+	border-radius: 6px;
+	box-sizing: border-box;
+	display: inline-flex;
+	font-size: 13px;
+	height: 38px;
+	line-height: 1;
+	padding: 4px 11px;
+}

@@ -175,7 +175,7 @@ const ClassicDetailScreen = ({
 			case 'seerrAvailability':
 				return seerr?.statusPills?.length > 0 ? (
 					<span key="seerrAvailability" className={css.infoItem}>
-						<SeerrStatusBadge seerr={seerr} />
+						<SeerrStatusBadge seerr={seerr} className={css.seerrPills} />
 					</span>
 				) : null;
 			default:
