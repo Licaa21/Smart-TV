@@ -46,6 +46,19 @@ describe('seerrEpisodeItems', () => {
 	});
 });
 
+describe('seerrEpisodeItems rating', () => {
+	it('shows a score only when votes stand behind it', () => {
+		const rated = seerrEpisodeItems(season([
+			{name: 'a', voteAverage: 1, voteCount: 0},
+			{name: 'b', voteAverage: 8.4, voteCount: 120},
+			{name: 'c', voteAverage: 1, voteCount: 1},
+			{name: 'd', voteAverage: 1},
+			{name: 'e', voteAverage: 7.2}
+		]), details).map((episode) => episode.CommunityRating);
+		expect(rated).toEqual([null, 8.4, null, null, 7.2]);
+	});
+});
+
 describe('seerrEpisodeItems people', () => {
 	it('lists the director, the writers and the guests, and leaves out what is not there', () => {
 		const [full, bare] = seerrEpisodeItems(season([

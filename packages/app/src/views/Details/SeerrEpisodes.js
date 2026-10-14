@@ -37,9 +37,8 @@ const cardTitle = (episode) => {
 // it, so what an episode says reads the same in each.
 const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId = 'seerr-episodes', onNavigateUp, settings, firstSpotlightId}) => {
 	const [picked, setPicked] = useState(null);
-	// The episode opened with OK, in full, and the card that opened it, which gets focus back on closing.
+	// The episode opened with OK, in full. Focus stays on its card while it is up.
 	const [opened, setOpened] = useState(null);
-	const openerRef = useRef(null);
 	const rootRef = useRef(null);
 
 	const groups = useMemo(() => groupEpisodesBySeason(episodes), [episodes]);
@@ -55,15 +54,9 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 	}, []);
 	const handleOpen = useCallback((ev) => {
 		const id = ev.currentTarget.dataset.episodeId;
-		openerRef.current = ev.currentTarget;
 		setOpened(shown.find((episode) => episode.Id === id) || null);
 	}, [shown]);
-	const handleClose = useCallback(() => {
-		setOpened(null);
-		window.requestAnimationFrame(() => {
-			if (openerRef.current && openerRef.current.isConnected) Spotlight.focus(openerRef.current);
-		});
-	}, []);
+	const handleClose = useCallback(() => setOpened(null), []);
 
 	// The rail keeps up and down for itself and hands them back, so leaving it is decided here: up to
 	// the season tabs when there are some, and otherwise wherever the page puts focus.

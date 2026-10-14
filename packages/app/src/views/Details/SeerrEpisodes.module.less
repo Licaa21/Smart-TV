@@ -157,41 +157,23 @@
 	color: var(--theme-text-primary, #ffffff);
 }
 
-// The description scrolls under the d-pad when it is longer than the room, and shows it has focus the way a card does.
+// The description is read with up and down while the dialog is open, and nothing here takes focus.
 .dialogText {
 	flex: 1;
 	min-width: 0;
 	margin-left: 36px;
-	padding: 12px 16px;
+	padding: 4px 8px;
 	box-sizing: border-box;
-	border: 2px solid transparent;
-	border-radius: 12px;
 	overflow: hidden;
-	outline: none;
 	font-size: 23px;
 	line-height: 34px;
 	color: var(--theme-text-primary, #ffffff);
-
-	&:focus {
-		background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.15);
-		border-color: var(--theme-focus-border-color, #ffffff);
-	}
 }
 
-.dialogClose {
+.dialogHint {
 	align-self: flex-end;
 	flex-shrink: 0;
 	margin-top: 22px;
-	padding: 12px 30px;
-	border: 2px solid transparent;
-	border-radius: 100px;
-	background: var(--theme-surface-variant, #374151);
-	font-size: 20px;
-	color: var(--theme-text-primary, #ffffff);
-	outline: none;
-
-	&:focus {
-		background: var(--theme-text-muted, #4b5563);
-		border-color: var(--theme-focus-border-color, #ffffff);
-	}
+	font-size: 18px;
+	color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
 }

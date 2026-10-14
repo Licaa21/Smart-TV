@@ -42,6 +42,13 @@ export const seerrSeasonItems = (details) => (details?.seasons || [])
 		_externalPosterUrl: season.posterPath ? seerrApi.getImageUrl(season.posterPath, 'w342') : null
 	}));
 
+// An episode nobody has rated still comes with a score, a flat 1.0 on a row of cards, so a score only counts
+// with a few votes behind it. An answer that gives no vote count is trusted above that flat score.
+const MIN_VOTES = 3;
+const hasRealRating = (episode) => (Number.isFinite(episode.voteCount)
+	? episode.voteCount >= MIN_VOTES && episode.voteAverage > 0
+	: episode.voteAverage > 1);
+
 const namesOf = (people, jobs) => (Array.isArray(people) ? people : [])
 	.filter((person) => person && person.name && (!jobs || jobs.indexOf(String(person.job || '').toLowerCase()) !== -1))
 	.map((person) => person.name)
@@ -58,7 +65,7 @@ export const seerrEpisodeItems = (season, details) => (season?.episodes || []).m
 		ParentIndexNumber: episode.seasonNumber != null ? episode.seasonNumber : season.seasonNumber,
 		PremiereDate: episode.airDate || null,
 		RunTimeTicks: episode.runtime > 0 ? episode.runtime * TICKS_PER_MINUTE : null,
-		CommunityRating: episode.voteAverage > 0 ? episode.voteAverage : null,
+		CommunityRating: hasRealRating(episode) ? episode.voteAverage : null,
 		_voteCount: episode.voteCount > 0 ? episode.voteCount : 0,
 		_directors: namesOf(episode.crew, ['director']),
 		_writers: namesOf(episode.crew, ['writer', 'screenplay', 'story', 'teleplay']),
