@@ -17,21 +17,21 @@ const details = {id: 1396, name: 'Breaking Bad', seasons: [
 const season = (episodes) => ({seasonNumber: 1, episodes: episodes.map((e, i) => ({seasonNumber: 1, episodeNumber: i + 1, ...e}))});
 
 describe('seerrSeasonItems', () => {
-	it('makes a season item of each season, and leaves out an empty specials one', () => {
+	it('makes a season item of each season, and leaves out the specials', () => {
 		const items = seerrSeasonItems(details);
 		expect(items.map((s) => s.IndexNumber)).toEqual([1, 2]);
 		expect(items[0]).toMatchObject({Type: 'Season', Name: 'Sezonul 1', SeriesName: 'Breaking Bad', _externalPosterUrl: 'tmdb/w342/s1.jpg'});
 		expect(isSeerrPseudo(items[0])).toBe(true);
 	});
 
-	it('keeps specials when they have episodes, and leaves out a season that has none yet', () => {
-		const withSpecials = {...details, seasons: [{seasonNumber: 0, episodeCount: 3, name: 'Specials'}, {seasonNumber: 3, episodeCount: 0, name: 'Sezonul 3'}]};
-		expect(seerrSeasonItems(withSpecials).map((s) => s.IndexNumber)).toEqual([0]);
+	it('leaves out season 0 even when it has episodes, and a season that has none yet', () => {
+		const withSpecials = {...details, seasons: [{seasonNumber: 0, episodeCount: 3, name: 'Specials'}, {seasonNumber: 1, episodeCount: 5, name: 'Sezonul 1'}, {seasonNumber: 3, episodeCount: 0, name: 'Sezonul 3'}]};
+		expect(seerrSeasonItems(withSpecials).map((s) => s.IndexNumber)).toEqual([1]);
 	});
 
 	it('leaves a season TMDB only names in English unnamed, so the app labels it in its own language', () => {
-		const untranslated = {...details, seasons: [{seasonNumber: 1, episodeCount: 2, name: 'Season 1'}, {seasonNumber: 2, episodeCount: 2, name: 'Sezonul 2'}, {seasonNumber: 0, episodeCount: 2, name: 'Specials'}]};
-		expect(seerrSeasonItems(untranslated).map((s) => s.Name)).toEqual(['', 'Sezonul 2', '']);
+		const untranslated = {...details, seasons: [{seasonNumber: 1, episodeCount: 2, name: 'Season 1'}, {seasonNumber: 2, episodeCount: 2, name: 'Sezonul 2'}]};
+		expect(seerrSeasonItems(untranslated).map((s) => s.Name)).toEqual(['', 'Sezonul 2']);
 	});
 });
 

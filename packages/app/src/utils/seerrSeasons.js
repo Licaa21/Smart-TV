@@ -23,10 +23,10 @@ export const isSeerrPseudo = (item) => Boolean(item?._seerrPseudo);
 // takes the app's own label instead, which is in the viewer's language.
 const GENERIC_NAME = /^(season|specials)\s*\d*$/i;
 
-// A season with no episodes yet, an announced one, has nothing to show, and neither does an empty
-// specials.
+// A season with no episodes yet, an announced one, has nothing to show. Season 0, the specials, is left out
+// whatever it holds, since those are extras and not part of the run.
 export const seerrSeasonItems = (details) => (details?.seasons || [])
-	.filter((season) => season && Number.isInteger(season.seasonNumber) && season.episodeCount > 0)
+	.filter((season) => season && Number.isInteger(season.seasonNumber) && season.seasonNumber > 0 && season.episodeCount > 0)
 	.map((season) => ({
 		Id: `${seriesIdOf(details)}-s${season.seasonNumber}`,
 		Type: 'Season',
