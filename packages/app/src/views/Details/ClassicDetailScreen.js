@@ -271,7 +271,7 @@ const ClassicDetailScreen = ({
 			{isSeries && seerrOnly && seriesEpisodes.length > 0 && (
 				<RowContainer className={css.section}>
 					<div className={css.sectionHeader}>
-						<h3 className={css.sectionTitle}>{$L('Episodes')}</h3>
+						<h3 className={css.sectionTitle}>{$L('Seasons and Episodes')}</h3>
 					</div>
 					<SeerrEpisodes seasons={seasons} episodes={seriesEpisodes} navbarPosition={settings.navbarPosition} settings={settings} />
 				</RowContainer>

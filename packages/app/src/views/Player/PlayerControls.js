@@ -26,11 +26,10 @@ import {formatClockTime} from '../../utils/clock';
 import {episodeLine} from '../../utils/liveTvGuide';
 import {chapterMarkerPositions} from '../../utils/chapterMarkers';
 import {keepFocusInView} from '../../utils/focusScroll';
-import {neighbourButton} from '../../utils/controlRowFocus';
+import {focusButton, neighbourButton} from '../../utils/controlRowFocus';
 import {getPerfTier} from '../../utils/perfTier';
 import {isTizen} from '../../platform';
 import {KEYS} from '../../utils/keys';
-import Spotlight from '@enact/spotlight';
 import {SLEEP_TIMER_MINUTES} from './useSleepTimer';
 import {arrange, OSD_BUTTONS, OSD_ORDER_KEY, OSD_HIDDEN_KEY} from '../../utils/buttonLayout';
 import {formatPlaybackTimeSlot, formatPlaybackTrailingTime} from '../../utils/playbackTimeLabels';
@@ -284,7 +283,7 @@ const PlayerControls = ({
 		if ((ev.keyCode !== KEYS.LEFT && ev.keyCode !== KEYS.RIGHT) || getPerfTier() === 'high' || !isTizen()) return;
 		const next = neighbourButton(ev.currentTarget, ev.target.closest('.spottable'), ev.keyCode === KEYS.LEFT ? -1 : 1);
 		// Only a press that moved focus is taken, so one Spotlight would have placed another way still is.
-		if (!next || !Spotlight.focus(next)) return;
+		if (!next || !focusButton(next)) return;
 		ev.preventDefault();
 		ev.stopPropagation();
 	}, []);

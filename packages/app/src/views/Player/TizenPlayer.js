@@ -52,6 +52,7 @@ import useAudioTransport from './audio/useAudioTransport';
 import useLyrics from './audio/useLyrics';
 import {handleAudioFocusKey, exitAudioPanel, nextAudioFocusRow, AUDIO_FOCUS_IDS} from './audio/audioFocus';
 import useSegmentPopups from './useSegmentPopups';
+import {focusTiming} from '../../utils/controlRowFocus';
 import {NextEpisodeContainer, CONTROLS_HIDE_DELAY, withTimeout, SEGMENT_FETCH_TIMEOUT, SKIP_LANDING_CHECK_MS, SKIP_LANDING_TOLERANCE_TICKS, SKIP_LANDING_SNAP_TICKS, SLOW_KEY_MS, SLOW_KEYS_LOGGED} from './PlayerConstants';
 import NextUpOverlay from './NextUpOverlay';
 import SkipSegmentOverlay from './SkipSegmentOverlay';
@@ -3705,8 +3706,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			const timed = controlsUpRef.current && e.keyCode >= 37 && e.keyCode <= 40 && slowKeysLoggedRef.current < SLOW_KEYS_LOGGED;
 			const started = timed ? performance.now() : 0;
 			const draws = drawCountRef.current;
+			focusTiming.ms = 0;
 			keyDownRef.current?.(e);
 			if (!timed) return;
+			const handlerMs = Math.round(performance.now() - started);
 			// What ran before the browser got to draw: this handler, the buttons' own and Spotlight's.
 			let scriptMs = 0;
 			setTimeout(() => { scriptMs = Math.round(performance.now() - started); }, 0);
@@ -3714,7 +3717,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const took = Math.round(performance.now() - started);
 				if (took < SLOW_KEY_MS) return;
 				slowKeysLoggedRef.current += 1;
-				serverLogger.playback('Control key was slow', {key: e.keyCode, ms: took, scriptMs, redraws: drawCountRef.current - draws});
+				serverLogger.playback('Control key was slow', {key: e.keyCode, ms: took, scriptMs, handlerMs, focusMs: focusTiming.ms, redraws: drawCountRef.current - draws});
 			}));
 		};
 		window.addEventListener('keydown', onKeyDown, true);

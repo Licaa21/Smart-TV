@@ -4,7 +4,6 @@ import Spotlight from '@enact/spotlight';
 
 import DetailsTabBar from '../../components/DetailsTabBar';
 import {appLocale} from '../../utils/appLocale';
-import {episodeCardTitle} from '../../utils/episodeCardTitle';
 import {formatDuration} from '../../utils/helpers';
 import {KEYS} from '../../utils/keys';
 import {hidesMediaDescription} from './detailsMedia';
@@ -24,6 +23,13 @@ const airDateText = (episode) => {
 	const date = new Date(episode.PremiereDate);
 	if (Number.isNaN(date.getTime())) return '';
 	return date.toLocaleDateString(appLocale(), {year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC'});
+};
+
+// The card's heading, with the season in it since the cards of a season all start again at one: S2 E3: Name.
+const cardTitle = (episode) => {
+	const number = episode.IndexNumber == null ? '' : `${episode.ParentIndexNumber == null ? '' : `S${episode.ParentIndexNumber} `}E${episode.IndexNumber}`;
+	if (!number) return episode.Name || '';
+	return episode.Name ? `${number}: ${episode.Name}` : number;
 };
 
 // A Seerr series' episodes, read only: season tabs over a row of cards showing the still, the number
@@ -102,7 +108,7 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 				<div className={css.still}>
 					{episode._externalPosterUrl ? <img src={episode._externalPosterUrl} alt="" /> : <div className={css.noStill} />}
 				</div>
-				<div className={css.title}>{episodeCardTitle(episode.Name, episode.IndexNumber)}</div>
+				<div className={css.title}>{cardTitle(episode)}</div>
 				{meta && <div className={css.meta}>{meta}</div>}
 				{!hidesMediaDescription(episode, settings) && (episode.Overview || !unaired) && (
 					<div className={css.overview}>{episode.Overview || $L('No description available.')}</div>

@@ -4,7 +4,6 @@ import $L from '@enact/i18n/$L';
 import Spotlight from '@enact/spotlight';
 
 import {formatDuration} from '../../utils/helpers';
-import {episodeCardTitle} from '../../utils/episodeCardTitle';
 import {KEYS} from '../../utils/keys';
 import {registerSeerrEpisodeDialog, unregisterSeerrEpisodeDialog} from '../../utils/seerrEpisodeDialogBack';
 import {ModalContainer} from '../../utils/spotlightContainers';
@@ -64,7 +63,7 @@ const SeerrEpisodeDialog = ({episode, airDate, hideOverview, onClose}) => {
 			<ModalContainer className={css.dialogPanel} spotlightId="seerr-episode-dialog" onClick={stopClick}>
 				<div className={css.dialogHead}>
 					<div className={css.dialogLabel}>{[episode.SeriesName, label].filter(Boolean).join(' · ')}</div>
-					<h2 className={css.dialogTitle}>{episodeCardTitle(episode.Name, episode.IndexNumber)}</h2>
+					<h2 className={css.dialogTitle}>{episode.Name || `${$L('Episode')} ${episode.IndexNumber}`}</h2>
 				</div>
 				<div className={css.dialogBody}>
 					<div className={css.dialogSide}>
