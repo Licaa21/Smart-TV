@@ -80,6 +80,8 @@ export const normalizeMediaItem = (item) => {
 	return {
 		Id: `seerr-${mediaType}-${item.id}`,
 		Name: item.title || item.name,
+		// The title it was made under, which a search typed in that language matches though the name shown is a translation.
+		_altNames: [item.originalTitle, item.originalName, item.original_title, item.original_name].filter((name, at, all) => name && name !== (item.title || item.name) && all.indexOf(name) === at),
 		Type: mediaType === 'movie' ? 'Movie' : 'Series',
 		ProductionYear: yearOf(item),
 		Overview: item.overview || '',

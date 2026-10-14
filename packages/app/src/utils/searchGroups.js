@@ -63,7 +63,8 @@ export const isCircleType = (type) => type === 'Person';
 
 // Closer to what was typed ranks first: the exact title, then one that starts with it, then one
 // that contains it, then the rest. The order the results arrive in settles every tie, which for
-// Seerr is its own best first order.
+// Seerr is its own best first order. A title is judged by its best name, the shown one or the one it
+// was made under, so a translated title is found by what it is called elsewhere.
 const titleMatchRank = (title, typed) => {
 	const name = foldForSearch(title || '');
 	if (!typed) return 3;
@@ -75,7 +76,7 @@ const titleMatchRank = (title, typed) => {
 export const rankMostRelevant = (items, query, count) => {
 	const typed = foldForSearch((query || '').trim());
 	return (items || [])
-		.map((item, order) => ({item, order, rank: titleMatchRank(item.Name, typed)}))
+		.map((item, order) => ({item, order, rank: Math.min(titleMatchRank(item.Name, typed), ...(item._altNames || []).map((name) => titleMatchRank(name, typed)))}))
 		.sort((a, b) => (a.rank - b.rank) || (a.order - b.order))
 		.slice(0, count)
 		.map(({item}) => item);

@@ -12,6 +12,11 @@ describe('rankMostRelevant', () => {
 			.toEqual(['Outer', 'Outer Banks', 'Not Outer', 'The Outer Limits']);
 	});
 
+	it('finds a translated title by the name it was made under', () => {
+		const items = [{Name: 'The Wire Tapped'}, {Name: 'Cartelul Crimelor', _altNames: ['The Wire']}, {Name: 'Altceva'}];
+		expect(rankMostRelevant(items, 'The Wire', 3).map((item) => item.Name)).toEqual(['Cartelul Crimelor', 'The Wire Tapped', 'Altceva']);
+	});
+
 	it('keeps the arrival order among equally close matches, which is Seerr\'s own ranking', () => {
 		const items = [title('Zeta Outer'), title('Alpha Outer'), title('Beta Outer')];
 		expect(rankMostRelevant(items, 'outer', 3).map((item) => item.Name)).toEqual(['Zeta Outer', 'Alpha Outer', 'Beta Outer']);
