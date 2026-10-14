@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
 import Scroller from '@enact/sandstone/Scroller';
 import * as playback from '../../services/playback';
@@ -136,6 +136,26 @@ const logoHeightPxFor = (aspectRatio, viewportWidth, viewportHeight) => {
 	return widthAtNormalHeight > maxWidth ? maxWidth / aspectRatio : normalHeight;
 };
 
+// One button of the rows under the progress bar, with its tooltip. The player redraws for the clock, and
+// without this every one of these twenty buttons was drawn again each time, which a slow set felt in the
+// key presses moving along the row. It only draws again when its own button, its row or the look changes.
+const ControlButton = memo(({btn, css, isLiveTV, rowDisabled, defaultSpotlightId, onClick}) => (
+	<div className={css.controlBtnWrapper}>
+		<SpottableButton
+			className={`${css.controlBtn} ${isLiveTV ? css.liveBtn : ''} ${btn.disabled ? css.controlBtnDisabled : ''} ${btn.active ? css.controlBtnActive : ''}`}
+			data-action={btn.action}
+			onClick={btn.disabled ? undefined : onClick}
+			aria-label={btn.label}
+			aria-disabled={btn.disabled}
+			spotlightDisabled={rowDisabled}
+			spotlightId={defaultSpotlightId}
+		>
+			{btn.icon}
+		</SpottableButton>
+		<div className={css.focusTooltip}>{btn.label}</div>
+	</div>
+));
+
 const PlayerControls = ({
 	css,
 	controlsVisible,
@@ -248,21 +268,21 @@ const PlayerControls = ({
 
 	// Every button carries its own tooltip and the stylesheet reveals the focused one,
 	// so moving along the row doesn't re-render anything.
+	// The handler is rebuilt as the player's state changes, so the buttons are given one that never is.
+	const clickRef = useRef(handleControlButtonClick);
+	clickRef.current = handleControlButtonClick;
+	const stableClick = useCallback((e) => clickRef.current?.(e), []);
+
 	const renderControlButton = (btn, row, defaultSpotlightId) => (
-		<div key={btn.id} className={css.controlBtnWrapper}>
-			<SpottableButton
-				className={`${css.controlBtn} ${isLiveTV ? css.liveBtn : ''} ${btn.disabled ? css.controlBtnDisabled : ''} ${btn.active ? css.controlBtnActive : ''}`}
-				data-action={btn.action}
-				onClick={btn.disabled ? undefined : handleControlButtonClick}
-				aria-label={btn.label}
-				aria-disabled={btn.disabled}
-				spotlightDisabled={focusRow !== row}
-				spotlightId={defaultSpotlightId}
-			>
-				{btn.icon}
-			</SpottableButton>
-			<div className={css.focusTooltip}>{btn.label}</div>
-		</div>
+		<ControlButton
+			key={btn.id}
+			btn={btn}
+			css={css}
+			isLiveTV={isLiveTV}
+			rowDisabled={focusRow !== row}
+			defaultSpotlightId={defaultSpotlightId}
+			onClick={stableClick}
+		/>
 	);
 
 	const handleCastClick = useCallback((e) => {

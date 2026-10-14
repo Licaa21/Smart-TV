@@ -1,43 +1,44 @@
 import seerrApi from '../services/seerrApi';
 import {fetchSeerrTitle} from './seerrTitle';
+import {tmdbGet} from './tmdbText';
 
 jest.mock('../services/seerrApi', () => ({
 	__esModule: true,
 	default: {getMovie: jest.fn(), getTv: jest.fn()}
 }));
+jest.mock('./tmdbText', () => ({...jest.requireActual('./tmdbText'), tmdbGet: jest.fn()}));
 
 describe('fetchSeerrTitle', () => {
 	beforeEach(() => {
 		seerrApi.getMovie.mockReset();
 		seerrApi.getTv.mockReset();
+		tmdbGet.mockReset();
 	});
 
-	it('asks for the right kind of title in the language', async () => {
-		seerrApi.getTv.mockResolvedValue({id: 1, overview: 'Descriere.'});
-		await fetchSeerrTitle('tv', 1, 'ro-RO');
-		expect(seerrApi.getTv).toHaveBeenCalledWith(1, 'ro-RO');
-		expect(seerrApi.getMovie).not.toHaveBeenCalled();
+	it('is Seerr\'s own answer, with no language asked, when there is no TMDB key', async () => {
+		seerrApi.getTv.mockResolvedValue({id: 1, overview: 'A teacher.'});
+		await expect(fetchSeerrTitle('tv', 1, 'ro')).resolves.toEqual({id: 1, overview: 'A teacher.'});
+		expect(seerrApi.getTv).toHaveBeenCalledWith(1);
+		expect(tmdbGet).not.toHaveBeenCalled();
 	});
 
-	it('fills a missing description and tagline from English, once', async () => {
-		seerrApi.getMovie
-			.mockResolvedValueOnce({id: 2, overview: '', tagline: ''})
-			.mockResolvedValueOnce({id: 2, overview: 'In English.', tagline: 'A line.'});
-		const title = await fetchSeerrTitle('movie', 2, 'ro-RO');
-		expect(seerrApi.getMovie).toHaveBeenCalledTimes(2);
-		expect(seerrApi.getMovie).toHaveBeenLastCalledWith(2, 'en-US');
-		expect(title).toMatchObject({overview: 'In English.', tagline: 'A line.'});
+	it('takes the words from TMDB in the language, and leaves the rest of Seerr\'s answer', async () => {
+		seerrApi.getMovie.mockResolvedValue({id: 2, title: 'Film', overview: 'English.', mediaInfo: {status: 5}});
+		tmdbGet.mockResolvedValue({title: 'Filmul', overview: 'Romanesc.', tagline: ''});
+		const title = await fetchSeerrTitle('movie', 2, 'ro', {tmdbApiKey: 'key'});
+		expect(tmdbGet).toHaveBeenCalledWith('/movie/2', 'ro', 'key');
+		expect(title).toMatchObject({title: 'Filmul', overview: 'Romanesc.', mediaInfo: {status: 5}});
 	});
 
-	it('does not ask English when the description is there, or when English was asked for, or with no language', async () => {
-		seerrApi.getMovie.mockResolvedValue({id: 3, overview: ''});
-		await fetchSeerrTitle('movie', 3, 'en-US');
-		await fetchSeerrTitle('movie', 3, null);
-		expect(seerrApi.getMovie).toHaveBeenCalledTimes(2);
+	it('keeps Seerr\'s text where TMDB has none in that language', async () => {
+		seerrApi.getTv.mockResolvedValue({id: 3, overview: 'English.', tagline: 'Line.'});
+		tmdbGet.mockResolvedValue({overview: '', tagline: ''});
+		await expect(fetchSeerrTitle('tv', 3, 'ro', {tmdbApiKey: 'key'})).resolves.toMatchObject({overview: 'English.', tagline: 'Line.'});
 	});
 
-	it('keeps what it has when English cannot be reached', async () => {
-		seerrApi.getMovie.mockResolvedValueOnce({id: 4, overview: ''}).mockRejectedValueOnce(new Error('down'));
-		await expect(fetchSeerrTitle('movie', 4, 'ro-RO')).resolves.toMatchObject({id: 4});
+	it('is Seerr\'s answer when TMDB cannot be reached', async () => {
+		seerrApi.getTv.mockResolvedValue({id: 4, overview: 'English.'});
+		tmdbGet.mockRejectedValue(new Error('down'));
+		await expect(fetchSeerrTitle('tv', 4, 'ro', {tmdbApiKey: 'key'})).resolves.toEqual({id: 4, overview: 'English.'});
 	});
 });

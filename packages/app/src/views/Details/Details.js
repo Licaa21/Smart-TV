@@ -167,7 +167,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	const seerr = useSeerrOverlay({item: seerrOnly ? initialItem : data.item, seerrOnly, showsSection});
 
 	// A title the library lacks has its seasons and episodes from Seerr, in the metadata language.
-	const seerrEpisodes = useSeerrEpisodes({details: seerr.details, enabled: seerrOnly && seerr.mediaType === 'tv', language: seerr.language});
+	const seerrEpisodes = useSeerrEpisodes({details: seerr.details, enabled: seerrOnly && seerr.mediaType === 'tv', language: seerr.language, tmdbApiKey: seerr.tmdbApiKey});
 	const seasons = seerrOnly ? seerrEpisodes.seasons : librarySeasons;
 	const seriesEpisodes = seerrOnly ? seerrEpisodes.episodes : librarySeriesEpisodes;
 
