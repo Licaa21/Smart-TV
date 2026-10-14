@@ -1935,6 +1935,7 @@
 // rather than scrolled, since a remote has nothing in it to focus; add a spottable scroller if real
 // files ever overflow.
 .infoPanel {
+	padding: 20px 0 6px;
 	max-width: 1300px;
 	max-height: 100%;
 	display: flex;
@@ -1942,20 +1943,30 @@
 	overflow: hidden;
 }
 
+.infoPanel .trackModalTitle {
+	margin-bottom: 12px;
+	padding-bottom: 12px;
+}
+
+// The shared track list leaves room under its last row that this popup has no use for.
+.infoPanel .trackList {
+	margin: 4px 0 0;
+}
+
 .infoBody {
-	display: flex;
 	flex: 1 1 auto;
 	min-height: 0;
 	overflow: hidden;
 	padding: 0 36px 12px;
 }
 
-.infoColumn {
-	flex: 1;
-	min-width: 0;
+// Cards sit side by side and share the width, so no part of the popup is left bare while another is full.
+.infoCols {
+	display: flex;
+	margin-top: 10px;
 
-	& + & {
-		margin-left: 48px;
+	> * + * {
+		margin-left: 12px;
 	}
 }
 
@@ -1964,7 +1975,7 @@
 .infoVerdict {
 	display: flex;
 	align-items: center;
-	padding: 18px 22px;
+	padding: 12px 22px;
 	border-radius: 14px;
 	border: 1px solid currentColor;
 	color: #4caf50;
@@ -1996,6 +2007,18 @@
 	box-shadow: 0 0 14px currentColor;
 }
 
+.infoVerdictText {
+	flex: 0 0 auto;
+	max-width: 48%;
+}
+
+// The facts about the file ride on the right of the verdict, so that side is not left bare.
+.infoVerdict .infoChips {
+	flex: 1;
+	justify-content: flex-end;
+	margin-left: 20px;
+}
+
 .infoMethod {
 	font-size: 28px;
 	font-weight: 700;
@@ -2009,13 +2032,77 @@
 }
 
 .infoCard {
-	padding: 10px 18px 12px;
-	border-radius: 12px;
+	flex: 1;
+	min-width: 0;
+	padding: 12px 18px 14px;
+	border-radius: 14px;
 	background: rgba(255, 255, 255, 0.05);
+}
 
-	& + & {
-		margin-top: 10px;
-	}
+.infoReasons {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0 -12px;
+}
+
+.infoStack > * + * {
+	margin-top: 8px;
+}
+
+.infoReason {
+	flex: 1 1 44%;
+	min-width: 0;
+	padding: 0 12px;
+}
+
+// A setting of this app that has to do with how the file plays. A tip is a setting that could change it, and
+// an info is one that already has.
+.infoNoteTitle {
+	font-size: 22px;
+	font-weight: 700;
+	color: var(--theme-text-primary, #ffffff);
+}
+
+.infoNote_tip {
+	border-left: 4px solid #f0a73a;
+	margin-top: 6px;
+	padding-left: 14px;
+}
+
+.infoNote_info {
+	border-left: 4px solid #4caf50;
+	margin-top: 6px;
+	padding-left: 14px;
+}
+
+.infoCardHead {
+	display: flex;
+	align-items: center;
+	margin-bottom: 6px;
+}
+
+.infoCardIcon {
+	flex: 0 0 auto;
+	width: 26px;
+	height: 26px;
+	margin-right: 10px;
+	color: var(--theme-accent, #00a4dc);
+}
+
+// What the file is, as pills, since each is a short fact rather than a sentence.
+.infoChips {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0 -5px;
+}
+
+.infoChip {
+	margin: 3px 5px;
+	padding: 3px 12px;
+	border-radius: 999px;
+	font-size: 18px;
+	color: var(--theme-text-primary, #ffffff);
+	background: rgba(255, 255, 255, 0.1);
 }
 
 .infoGroupTitle {
@@ -2023,12 +2110,7 @@
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 1px;
-	margin-top: 18px;
-	color: rgba(255, 255, 255, 0.5);
-}
-
-.infoCard .infoGroupTitle {
-	margin-top: 0;
+	color: rgba(255, 255, 255, 0.55);
 }
 
 .infoLine {
@@ -2038,7 +2120,7 @@
 }
 
 .infoHint {
-	font-size: 18px;
+	font-size: 19px;
 	margin-top: 2px;
 	color: rgba(255, 255, 255, 0.6);
 }

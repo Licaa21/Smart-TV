@@ -2,6 +2,7 @@ import $L from '@enact/i18n/$L';
 
 import {formatDirectPlayReason, resolveDirectPlayFailureDetails} from '../../utils/directPlayReasons';
 import {videoLines} from './nouveau/nouveauFooterFields';
+import {buildForkNotes} from './playbackInfoNotes';
 
 // What the Playback Info popup says, worked out from the server's answer for the selected tracks
 // (see detailPlaybackInfo). Nothing here asks the server anything.
@@ -58,7 +59,7 @@ const audioText = (stream) => {
 
 // `audioStreamIndex` and `subtitleStreamIndex` are the tracks' own indexes, the ones the server was
 // asked with, and a subtitle left undefined means none.
-export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex, settings} = {}) => {
+export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex, settings, audioStart = null, tizen = false} = {}) => {
 	const {source, deviceProfile, maxStreamingBitrate} = result;
 	const method = playMethod(result);
 	const streams = Array.isArray(source.MediaStreams) ? source.MediaStreams : [];
@@ -82,6 +83,9 @@ export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex
 		deviceProfile
 	});
 	const reasons = details.map((detail) => detail.reason);
+	// The server calls a pick it can play as it is a direct play, but the player opens a file on one track
+	// and the app has the server build any other codec, so it is not one.
+	const built = method === 'direct' && Boolean(audioStart?.needsServer);
 
 	const fileLines = [
 		source.Container ? $L('Container: {container}').replace('{container}', String(source.Container).toUpperCase()) : null,
@@ -95,17 +99,19 @@ export const buildPlaybackInfo = (result, {audioStreamIndex, subtitleStreamIndex
 	}
 
 	const sections = [
-		{title: $L('File Information'), lines: fileLines},
-		{title: $L('Video'), lines: [videoLines(video).join(' · ')]},
-		{title: $L('Audio'), lines: [audioText(audio)]},
-		{title: $L('Subtitle'), lines: [subtitleText(subtitle, method, reasons)]}
+		{id: 'file', title: $L('File Information'), lines: fileLines},
+		{id: 'video', title: $L('Video'), lines: [videoLines(video).join(' · ')]},
+		{id: 'audio', title: $L('Audio'), lines: [audioText(audio)]},
+		{id: 'subtitle', title: $L('Subtitle'), lines: [subtitleText(subtitle, method, reasons)]}
 	].map((section) => ({...section, lines: section.lines.filter(Boolean)})).filter((section) => section.lines.length);
 
 	return {
-		method,
-		title: {direct: $L('Direct Play'), stream: $L('Direct Stream'), transcode: $L('Transcoding')}[method],
-		summary: changesText(method, reasons),
+		// Amber, since the picture is copied and only the sound is rebuilt.
+		method: built ? 'stream' : method,
+		title: built ? $L('Audio built on the server') : {direct: $L('Direct Play'), stream: $L('Direct Stream'), transcode: $L('Transcoding')}[method],
+		summary: built ? $L('The server is asked to build the audio track you picked, with the picture copied.') : changesText(method, reasons),
 		reasons: details.map((detail) => formatDirectPlayReason(detail, settings)),
+		notes: buildForkNotes({tizen, method, source, reasonKeys: reasons.map((reason) => String(reason).toLowerCase()), settings, audioStart: built ? audioStart : null}),
 		sections
 	};
 };

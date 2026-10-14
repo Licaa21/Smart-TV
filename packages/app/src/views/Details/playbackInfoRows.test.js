@@ -36,6 +36,25 @@ describe('playMethod', () => {
 });
 
 describe('buildPlaybackInfo', () => {
+	it('does not call a direct play one when the app has the server build the picked audio', () => {
+		const audioStart = {needsServer: true, openingCodec: 'eac3', wantedCodec: 'ac3'};
+		const info = buildPlaybackInfo(answer({supportsDirectPlay: true}), {audioStreamIndex: 2, audioStart, tizen: true});
+		expect(info.method).toBe('stream');
+		expect(info.title).toBe('Audio built on the server');
+		expect(info.notes.map((note) => note.id)).toEqual(['audio']);
+		// A server that is transcoding anyway has already said everything.
+		const transcoding = buildPlaybackInfo(answer({transcodeReasons: ['AudioCodecNotSupported']}), {audioStreamIndex: 2, audioStart});
+		expect(transcoding.title).toBe('Transcoding');
+		expect(transcoding.notes).toEqual([]);
+	});
+
+	it('puts the fork note for the stream count beside the reason', () => {
+		const many = {...source, MediaStreams: [...source.MediaStreams, ...Array.from({length: 40}, (_, i) => ({Type: 'Subtitle', Index: 10 + i, Codec: 'subrip'}))]};
+		const info = buildPlaybackInfo(answer({transcodeReasons: ['StreamCountExceedsLimit'], source: many}), {audioStreamIndex: 2, settings: {}, tizen: true});
+		expect(info.reasons[0].description).toBe('The file has more streams than this TV plays in one file.');
+		expect(info.notes.map((note) => note.id)).toEqual(['streams']);
+	});
+
 	it('adds the bitrate over the limit to the reasons and to what changes', () => {
 		const info = buildPlaybackInfo(answer({transcodeReasons: ['AudioCodecNotSupported'], source: overLimit}), {audioStreamIndex: 1});
 		expect(info.reasons).toHaveLength(2);

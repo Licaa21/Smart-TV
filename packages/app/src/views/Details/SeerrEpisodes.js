@@ -5,6 +5,7 @@ import DetailsTabBar from '../../components/DetailsTabBar';
 import {appLocale} from '../../utils/appLocale';
 import {episodeCardTitle} from '../../utils/episodeCardTitle';
 import {formatDuration} from '../../utils/helpers';
+import {KEYS} from '../../utils/keys';
 import {hidesMediaDescription} from './detailsMedia';
 import {SpottableDiv} from './detailsSpottables';
 import {effectiveSeason, groupEpisodesBySeason, seasonOptions} from './nouveau/nouveauSeasons';
@@ -48,6 +49,16 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 	}, [onNavigateUp, hasTabs, spotlightId]);
 	const handleDown = useCallback(() => Spotlight.move('down'), []);
 
+	// Down from the season bar goes to the episodes. The Classic page moves between its sections on
+	// up and down, and would otherwise take this press and step past the episodes to the next one.
+	const handleTabsKeyDown = useCallback((ev) => {
+		if (ev.keyCode !== KEYS.DOWN) return;
+		if (Spotlight.focus(`${spotlightId}-rail`)) {
+			ev.preventDefault();
+			ev.stopPropagation();
+		}
+	}, [spotlightId]);
+
 	const renderEpisode = useCallback((episode, index) => {
 		const meta = [airDateText(episode), episode.RunTimeTicks ? formatDuration(episode.RunTimeTicks) : ''].filter(Boolean).join(' · ');
 		return (
@@ -68,15 +79,17 @@ const SeerrEpisodes = ({seasons = [], episodes = [], navbarPosition, spotlightId
 	return (
 		<div className={css.episodes}>
 			{hasTabs && (
-				<DetailsTabBar
-					tabs={tabs}
-					activeId={String(active)}
-					expanded={false}
-					onActivate={handleActivate}
-					spotlightId={`${spotlightId}-seasons`}
-					activeSpotlightId={`${spotlightId}-season`}
-					className={css.seasonBar}
-				/>
+				<div onKeyDown={handleTabsKeyDown}>
+					<DetailsTabBar
+						tabs={tabs}
+						activeId={String(active)}
+						expanded={false}
+						onActivate={handleActivate}
+						spotlightId={`${spotlightId}-seasons`}
+						activeSpotlightId={`${spotlightId}-season`}
+						className={css.seasonBar}
+					/>
+				</div>
 			)}
 			{/* Keyed by season, so a new season opens at its first episode rather than where the last was scrolled to. */}
 			<NouveauRail

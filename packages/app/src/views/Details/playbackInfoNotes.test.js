@@ -1,0 +1,82 @@
+import {buildForkNotes} from './playbackInfoNotes';
+
+jest.mock('@enact/i18n/$L', () => (text) => text);
+
+const stream = (type, extra) => ({Type: type, ...extra});
+const fileOf = (streams) => ({MediaStreams: streams});
+const ids = (notes) => notes.map((note) => note.id);
+
+describe('buildForkNotes', () => {
+	it('says nothing off a Samsung, where these settings are not offered', () => {
+		expect(buildForkNotes({method: 'direct', source: {MediaStreams: []}, audioStart: {needsServer: true, openingCodec: 'eac3', wantedCodec: 'ac3'}})).toEqual([]);
+	});
+
+	it('says the server builds a pick in another codec than the file opens on, with both codecs', () => {
+		const notes = buildForkNotes({tizen: true, method: 'direct', source: fileOf([]), audioStart: {needsServer: true, openingCodec: 'eac3', wantedCodec: 'ac3'}});
+		expect(ids(notes)).toEqual(['audio']);
+		expect(notes[0].text).toBe('Opens on EAC3 audio, and the player cannot switch to AC3 dependably, so the server is asked to build your AC3 track with the picture copied. If that needs a re-encode, the file plays as it is instead.');
+	});
+
+	it('says nothing about audio when the player switches the pick itself', () => {
+		expect(buildForkNotes({tizen: true, method: 'direct', source: fileOf([]), audioStart: {needsServer: false}})).toEqual([]);
+	});
+
+	describe('many streams', () => {
+		const many = fileOf(Array.from({length: 40}, (_, i) => stream('Subtitle', {Index: i})));
+
+		it('names the setting that would let the file play as it is, and that it is the only thing stopping it', () => {
+			const [note] = buildForkNotes({tizen: true, method: 'transcode', source: many, reasonKeys: ['streamcountexceedslimit'], settings: {}});
+			expect(note).toMatchObject({id: 'streams', tone: 'tip', title: 'Allow Files With Many Streams'});
+			expect(note.text).toContain('40 streams');
+			expect(note.text).toContain('Nothing else stops it.');
+		});
+
+		it('leaves out "nothing else" when another reason is there too', () => {
+			const [note] = buildForkNotes({tizen: true, method: 'transcode', source: many, reasonKeys: ['streamcountexceedslimit', 'audiocodecnotsupported'], settings: {}});
+			expect(note.text).not.toContain('Nothing else');
+		});
+
+		it('says the setting is why a file over the limit plays as it is', () => {
+			const [note] = buildForkNotes({tizen: true, method: 'direct', source: many, settings: {allowManyStreams: true}});
+			expect(note).toMatchObject({id: 'streams', tone: 'info'});
+		});
+
+		it('is quiet about a small file', () => {
+			expect(buildForkNotes({tizen: true, method: 'direct', source: fileOf([stream('Video')]), settings: {allowManyStreams: true}})).toEqual([]);
+		});
+	});
+
+	describe('AV1', () => {
+		const av1 = fileOf([stream('Video', {Codec: 'av1'})]);
+
+		it('offers the setting when the picture would have to be copied into a server stream', () => {
+			expect(buildForkNotes({tizen: true, method: 'transcode', source: av1, settings: {}})[0]).toMatchObject({id: 'av1', tone: 'tip'});
+		});
+
+		it('says the setting is re-encoding it when it is on', () => {
+			const [note] = buildForkNotes({tizen: true, method: 'transcode', source: av1, settings: {forceCompatibleAv1Transcode: true}});
+			expect(note.tone).toBe('info');
+			expect(note.text).toContain('AV1 with AC3 audio plays as it is from MKV');
+		});
+
+		it('has nothing to say about an AV1 file that plays as it is', () => {
+			expect(buildForkNotes({tizen: true, method: 'direct', source: av1, settings: {}})).toEqual([]);
+		});
+	});
+
+	it('explains the Dolby Vision enhancement layer both ways round', () => {
+		const dovi = fileOf([stream('Video', {Codec: 'hevc', VideoRangeType: 'DOVIWithEL'})]);
+		expect(buildForkNotes({tizen: true, method: 'transcode', source: dovi, reasonKeys: ['videorangetypenotsupported'], settings: {}})[0]).toMatchObject({id: 'dolby', tone: 'tip'});
+		expect(buildForkNotes({tizen: true, method: 'direct', source: dovi, settings: {dolbyVisionAsHdr10: true}})[0]).toMatchObject({id: 'dolby', tone: 'info'});
+		expect(buildForkNotes({tizen: true, method: 'transcode', source: dovi, reasonKeys: ['audiocodecnotsupported'], settings: {}})).toEqual([]);
+	});
+
+	it('explains HEVC level 5.2 on a 4K file, with the level as people write it', () => {
+		const hevc = fileOf([stream('Video', {Codec: 'hevc', Level: 156, Width: 3840})]);
+		const [tip] = buildForkNotes({tizen: true, method: 'transcode', source: hevc, reasonKeys: ['videolevelnotsupported'], settings: {}});
+		expect(tip).toMatchObject({id: 'hevc', tone: 'tip'});
+		expect(tip.text).toContain('Level 5.2');
+		expect(buildForkNotes({tizen: true, method: 'direct', source: hevc, settings: {allowHevcLevel52: true}})[0].tone).toBe('info');
+		expect(buildForkNotes({tizen: true, method: 'transcode', source: fileOf([stream('Video', {Codec: 'hevc', Level: 156, Width: 1920})]), reasonKeys: ['videolevelnotsupported'], settings: {}})).toEqual([]);
+	});
+});
