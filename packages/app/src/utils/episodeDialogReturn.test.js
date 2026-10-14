@@ -1,4 +1,4 @@
-import {dropEpisodeDialog, keepEpisodeDialog, takeEpisodeDialog} from './episodeDialogReturn';
+import {dropEpisodeDialog, hasKeptEpisodeDialog, keepEpisodeDialog, takeEpisodeDialog} from './episodeDialogReturn';
 
 describe('episodeDialogReturn', () => {
 	afterEach(() => {
@@ -17,6 +17,15 @@ describe('episodeDialogReturn', () => {
 		keepEpisodeDialog({episodeId: 'b', season: 2, personId: '7'});
 		expect(takeEpisodeDialog([{Id: 'a'}])).toBeNull();
 		expect(takeEpisodeDialog([{Id: 'b'}])).not.toBeNull();
+	});
+
+	it('says whether a place is kept without taking it', () => {
+		keepEpisodeDialog({episodeId: 'b'});
+		expect(hasKeptEpisodeDialog([{Id: 'a'}])).toBe(false);
+		expect(hasKeptEpisodeDialog([{Id: 'b'}])).toBe(true);
+		expect(hasKeptEpisodeDialog([{Id: 'b'}])).toBe(true);
+		expect(takeEpisodeDialog([{Id: 'b'}])).not.toBeNull();
+		expect(hasKeptEpisodeDialog([{Id: 'b'}])).toBe(false);
 	});
 
 	it('lets a place go after a while', () => {

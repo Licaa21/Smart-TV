@@ -24,6 +24,12 @@ export const takeEpisodeDialog = (episodes) => {
 	return back;
 };
 
+// Whether a place is kept for one of these episodes, without taking it. A screen that has to open on the part that holds
+// the episodes asks this first.
+export const hasKeptEpisodeDialog = (episodes) => Boolean(
+	kept && Date.now() - kept.at <= KEPT_MS && (episodes || []).some((candidate) => candidate.Id === kept.episodeId)
+);
+
 export const dropEpisodeDialog = () => {
 	kept = null;
 };
