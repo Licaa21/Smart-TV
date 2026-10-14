@@ -13,7 +13,8 @@ export const isListScrolledAway = (spotlightId) => {
 	if (typeof document === 'undefined') return false;
 	const root = document.querySelector(`[data-spotlight-id="${spotlightId}"]`);
 	if (!root) return false;
-	if (isScrolledAway(root)) return true;
+	// A grid that slides its rows with a transform says so itself, since nothing in it scrolls.
+	if (isScrolledAway(root) || root.getAttribute('data-scrolled') === 'true') return true;
 	const nodes = root.querySelectorAll('div');
 	for (let i = 0; i < nodes.length; i++) {
 		if (isScrolledAway(nodes[i])) return true;
