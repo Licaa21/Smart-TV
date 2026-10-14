@@ -24,6 +24,9 @@ const LibrariesContainer = SpotlightContainerDecorator({
 
 const SpottableButton = Spottable('button');
 
+// The arrow turns while the server is asked, and the tick or the warning pops in once it has answered.
+const refreshMotionClass = (note, styles) => (note === 'busy' ? styles.refreshSpin : note === 'started' || note === 'failed' ? styles.refreshPop : '');
+
 const BLUR_GRACE = 100;
 const FOCUS_DELAY = 50;
 
@@ -134,18 +137,18 @@ const NavLibraries = ({libraries, slot, activeView, onSelectLibrary, leftTargetI
 				className={css.librariesBtn}
 				onSpotlightLeft={handleSpotlightLeft}
 			/>
+			{/* Beside the pill, so Right from it lands here, and the list of libraries carries on after it. */}
+			{canRefresh && (
+				<SpottableButton
+					className={`${css.navBtn} ${css.libraryBtn} ${css.refreshAllBtn}`}
+					onClick={refreshAll}
+					data-nav-slot={1}
+					aria-label={$L('Refresh all libraries')}
+				>
+					<RefreshStateIcon key={note} className={`${css.refreshAllIcon} ${refreshMotionClass(note, css)}`} state={note} />
+				</SpottableButton>
+			)}
 			<div className={css.librariesList} ref={listRef}>
-				{expanded && canRefresh && (
-					<SpottableButton
-						className={`${css.navBtn} ${css.libraryBtn} ${css.refreshAllBtn}`}
-						onClick={refreshAll}
-						onSpotlightUp={handleLibraryUp}
-						data-nav-slot={1}
-						aria-label={$L('Refresh all libraries')}
-					>
-						<RefreshStateIcon className={css.refreshAllIcon} state={note} />
-					</SpottableButton>
-				)}
 				{expanded && libraries.map((lib, index) => (
 					<SpottableButton
 						key={lib.Id}

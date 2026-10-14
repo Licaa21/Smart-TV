@@ -52,7 +52,7 @@ const SidebarLibraries = ({libraries, slot, expanded, onToggle, onSelectLibrary}
 			>
 				{canRefresh && (
 					<SpottableButton className={css.libraryItem} onClick={refreshAll} data-nav-slot={1} aria-label={$L('Refresh all libraries')}>
-						<RefreshStateIcon className={css.refreshAllIcon} state={note} />
+						<RefreshStateIcon key={note} className={`${css.refreshAllIcon} ${note === 'busy' ? css.refreshSpin : note === 'started' || note === 'failed' ? css.refreshPop : ''}`} state={note} />
 					</SpottableButton>
 				)}
 				{libraries.map((lib, index) => (

@@ -257,6 +257,29 @@
 	fill: currentColor;
 }
 
+.refreshAllBtn {
+	padding: 12px 14px;
+}
+
+.refreshSpin {
+	animation: refreshSpin 0.8s linear infinite;
+}
+
+.refreshPop {
+	animation: refreshPop 0.4s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+@keyframes refreshSpin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+// A tick or a warning grows from nothing and settles, so it reads as an answer rather than a swap.
+@keyframes refreshPop {
+	0% { transform: scale(0.2) rotate(-90deg); opacity: 0; }
+	100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
 .libraryBtn {
 	padding: 12px 20px;
 	min-height: 58px;
