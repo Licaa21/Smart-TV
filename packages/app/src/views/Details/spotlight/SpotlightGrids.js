@@ -11,6 +11,7 @@ import {SpottableDiv, RowContainer} from '../detailsSpottables';
 import SeerrEpisodes from '../SeerrEpisodes';
 import {DETAIL_ICON_PATHS} from '../detailIcons';
 import {iconViewBox} from '../../../components/icons/iconViewBox';
+import ModernFileInformation from '../ModernFileInformation';
 
 import css from './SpotlightGrids.module.less';
 
@@ -197,6 +198,19 @@ const SpotlightSection = ({section, serverUrl, actions, seerr, firstSpotlightId}
 				<div className={css.factsRow}>
 					<SeerrCollectionBanner collection={seerr?.collection} onOpen={seerr?.nav?.onSelectItem} />
 				</div>
+			);
+		case 'fileInfo':
+			return (
+				<ModernFileInformation
+					item={section.item}
+					mediaSource={section.mediaSource}
+					effectiveApi={actions.effectiveApi}
+					selectedAudioIndex={actions.selectedAudioIndex}
+					selectedSubtitleIndex={actions.selectedSubtitleIndex}
+					settings={actions.settings}
+					firstSpotlightId={firstSpotlightId}
+					showTitle={false}
+				/>
 			);
 		default:
 			return null;
