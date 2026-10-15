@@ -1625,6 +1625,8 @@
     "This playlist is empty": "Această listă de redare este goală",
     "Unplayed": "Neredate",
     "On Now": "Acum la TV",
+    "PGS Background Color": "Culoarea fundalului PGS",
+    "PGS Background Opacity": "Opacitatea fundalului PGS",
     "This subtitle is styled by its own file, so its look cannot be changed here.": "Această subtitrare are stilul în propriul fișier, așa că aspectul ei nu poate fi schimbat de aici.",
     "Picture Subtitles (PGS)": "Subtitrări imagine (PGS)",
     "PGS Brightness": "Luminozitatea PGS",

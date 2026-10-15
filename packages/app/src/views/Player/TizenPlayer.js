@@ -25,10 +25,10 @@ import {driftMs, needsSeek, correctionOptions, DRIFT_CHECK_MS, GROUP_SEEK_SETTLE
 import {createReadyGate} from '../../utils/syncReady';
 import {createSkipGovernor, chooseCorrection} from '../../utils/syncCorrection';
 import {getImageUrl, getLogoUrl} from '../../utils/helpers';
-import {initPgsCanvasRenderer, disposePgsRenderer, clearPgsCanvas} from '../../utils/pgsRenderer';
+import {initPgsCanvasRenderer, disposePgsRenderer, clearPgsCanvas, pgsDrawnArea} from '../../utils/pgsRenderer';
 import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTime} from '../../utils/assRenderer';
 import {describeHlsManifest} from '../../utils/hlsManifestProbe';
-import {canvasLiftFor, canvasRestingPercent, getSubtitleCanvasStyle, getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
+import {canvasLiftFor, canvasRestingPercent, getPgsBackgroundStyle, getPgsPictureStyle, getSubtitleCanvasStyle, getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
 import {audioStartNeedsServer, openingAudioStream} from '../../utils/audioStartPlan';
@@ -325,10 +325,24 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// Ref for the Player container DOM element - used to walk up ancestors for transparency
 	const playerContainerRef = useRef(null);
 	const pgsRendererRef = useRef(null);
+	const pgsCanvasRef = useRef(null);
 	// What the canvas is drawing: picture subtitles (pgs), which take the PGS settings, an ASS track, or nothing
 	const [canvasSubtitle, setCanvasSubtitle] = useState(null);
 	const pgsActive = canvasSubtitle === 'pgs';
-	const pgsCanvasRef = useRef(null);
+	// Where the picture subtitle on screen was drawn, for the box behind it. Read in the frame after the renderer draws, and
+	// only kept while there is a box to draw.
+	const [pgsArea, setPgsArea] = useState(null);
+	const pgsBackgroundOn = pgsActive && settings.pgsSubtitleBackground > 0;
+	const trackPgsArea = useCallback(() => {
+		const next = pgsDrawnArea(pgsRendererRef.current, pgsCanvasRef.current);
+		setPgsArea((prev) => {
+			const same = prev === next || (prev && next && prev.left === next.left && prev.top === next.top && prev.width === next.width && prev.height === next.height);
+			return same ? prev : next;
+		});
+	}, []);
+	useEffect(() => {
+		if (!pgsBackgroundOn) setPgsArea(null);
+	}, [pgsBackgroundOn]);
 	const assRendererRef = useRef(null);
 	const rootFontSizePxRef = useRef(null);
 	const prevInlineRootFontSizeRef = useRef('');
@@ -585,6 +599,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			setCurrentSubtitleText(null);
 			const pgsTime = time - (subtitleOffset || 0);
 			pgsRendererRef.current.renderAtTimestamp(Math.max(0, pgsTime));
+			// The renderer draws in the next frame, and this is queued after it, so the box is read once the picture is there
+			if (settings.pgsSubtitleBackground > 0) window.requestAnimationFrame(trackPgsArea);
 		} else if (assRendererRef.current) {
 			setCurrentSubtitleText(null);
 			const assTime = time - (subtitleOffset || 0);
@@ -3887,9 +3903,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			)}
 
 			{!isAudioMode && (
-				<canvas
-					ref={pgsCanvasRef}
-					className={css.pgsCanvasOverlay}
+				<div
 					style={{
 						position: 'fixed',
 						top: 0,
@@ -3900,7 +3914,23 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						pointerEvents: 'none',
 						...getSubtitleCanvasStyle(settings, canvasLiftFor(canvasLift, pauseDescriptionShown), pgsActive)
 					}}
-				/>
+				>
+					{pgsBackgroundOn && getPgsBackgroundStyle(settings, pgsArea) && (
+						<div style={getPgsBackgroundStyle(settings, pgsArea)} />
+					)}
+					<canvas
+						ref={pgsCanvasRef}
+						className={css.pgsCanvasOverlay}
+						style={{
+							position: 'absolute',
+							top: 0,
+							left: 0,
+							width: '100%',
+							height: '100%',
+							...(pgsActive ? getPgsPictureStyle(settings) : null)
+						}}
+					/>
+				</div>
 			)}
 
 

@@ -132,17 +132,43 @@ export const getSubtitleCanvasStyle = (settings, lift = 0, isPgs = false, screen
 		transition: 'transform 0.35s ease',
 		WebkitTransition: '-webkit-transform 0.35s ease'
 	};
-	if (isPgs) {
-		const opacity = Number.isFinite(settings.pgsSubtitleOpacity) ? settings.pgsSubtitleOpacity : 100;
-		const brightness = Number.isFinite(settings.pgsSubtitleBrightness) ? settings.pgsSubtitleBrightness : 100;
-		if (opacity < 100) style.opacity = opacity / 100;
-		// Only when dimmed, since a filter over a whole screen of canvas is not free on the older sets
-		if (brightness < 100) {
-			style.filter = `brightness(${brightness}%)`;
-			style.WebkitFilter = style.filter;
-		}
+	return style;
+};
+
+// What fades and dims the picture itself, apart from the box behind it, which has an opacity of its own
+export const getPgsPictureStyle = (settings) => {
+	const style = {};
+	const opacity = Number.isFinite(settings.pgsSubtitleOpacity) ? settings.pgsSubtitleOpacity : 100;
+	const brightness = Number.isFinite(settings.pgsSubtitleBrightness) ? settings.pgsSubtitleBrightness : 100;
+	if (opacity < 100) style.opacity = opacity / 100;
+	// Only when dimmed, since a filter over a whole screen of canvas is not free on the older sets
+	if (brightness < 100) {
+		style.filter = `brightness(${brightness}%)`;
+		style.WebkitFilter = style.filter;
 	}
 	return style;
+};
+
+// The box drawn behind a picture subtitle. `area` is where the picture was drawn, as fractions of the screen, with a
+// margin kept around it so the box is not tight against the letters. Nothing while its opacity is 0 or nothing is on screen.
+const PGS_BOX_PAD_X = 1;
+const PGS_BOX_PAD_Y = 1.4;
+export const getPgsBackgroundStyle = (settings, area) => {
+	const opacity = settings.pgsSubtitleBackground;
+	if (!area || !(opacity > 0)) return null;
+	const left = Math.max(0, area.left * 100 - PGS_BOX_PAD_X);
+	const top = Math.max(0, area.top * 100 - PGS_BOX_PAD_Y);
+	const right = Math.min(100, (area.left + area.width) * 100 + PGS_BOX_PAD_X);
+	const bottom = Math.min(100, (area.top + area.height) * 100 + PGS_BOX_PAD_Y);
+	return {
+		position: 'absolute',
+		left: `${left}%`,
+		top: `${top}%`,
+		width: `${right - left}%`,
+		height: `${bottom - top}%`,
+		background: toCssColor(settings.pgsSubtitleBackgroundColor || '#000000', opacity),
+		borderRadius: '8px'
+	};
 };
 
 export const getSubtitleTextStyle = (settings) => {

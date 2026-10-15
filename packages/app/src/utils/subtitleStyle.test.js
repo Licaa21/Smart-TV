@@ -8,6 +8,8 @@ import {
 	getSubtitleShadowColorOptions,
 	getSubtitleBackgroundColorOptions,
 	getSubtitleCanvasStyle,
+	getPgsBackgroundStyle,
+	getPgsPictureStyle,
 	canvasRestingPercent,
 	canvasLiftFor,
 	CANVAS_DESCRIPTION_GAP,
@@ -137,9 +139,7 @@ describe('the canvas PGS and ASS subtitles are drawn on', () => {
 		expect(getSubtitleCanvasStyle({}, 120, false).transform).toBe('translateY(-120px)');
 		expect(getSubtitleCanvasStyle({}, 0, true).transform).toBe('translateY(0px)');
 		// An ASS track takes nothing else, whatever the picture settings say
-		const ass = getSubtitleCanvasStyle({pgsSubtitleSize: 'large', pgsSubtitleOpacity: 50, pgsSubtitleBrightness: 40}, 0, false);
-		expect(ass.opacity).toBeUndefined();
-		expect(ass.filter).toBeUndefined();
+		const ass = getSubtitleCanvasStyle({pgsSubtitleSize: 'large'}, 0, false);
 		expect(ass.transform).toBe('translateY(0px)');
 	});
 
@@ -151,15 +151,15 @@ describe('the canvas PGS and ASS subtitles are drawn on', () => {
 		// 100 for the controls and 20% of a 1000 pixel screen for the position
 		expect(style.transform).toBe('translateY(-300px) scale(1.2)');
 		expect(style.transformOrigin).toBe('50% 100%');
-		expect(style.opacity).toBe(0.6);
-		expect(style.filter).toBe('brightness(70%)');
+		const picture = getPgsPictureStyle({pgsSubtitleOpacity: 60, pgsSubtitleBrightness: 70});
+		expect(picture.opacity).toBe(0.6);
+		expect(picture.filter).toBe('brightness(70%)');
 	});
 
 	it('draws a picture subtitle as it is when nothing is changed, with no filter over the screen', () => {
-		const style = getSubtitleCanvasStyle({pgsSubtitleSize: 'medium', pgsSubtitlePosition: 'bottom', pgsSubtitleOpacity: 100, pgsSubtitleBrightness: 100}, 0, true);
+		const style = getSubtitleCanvasStyle({pgsSubtitleSize: 'medium', pgsSubtitlePosition: 'bottom'}, 0, true);
 		expect(style.transform).toBe('translateY(0px)');
-		expect(style.opacity).toBeUndefined();
-		expect(style.filter).toBeUndefined();
+		expect(getPgsPictureStyle({pgsSubtitleOpacity: 100, pgsSubtitleBrightness: 100})).toEqual({});
 	});
 
 	it('goes a little further up for the description than the lift, and not at all further for the controls', () => {
@@ -167,6 +167,21 @@ describe('the canvas PGS and ASS subtitles are drawn on', () => {
 		expect(canvasLiftFor(100, false)).toBe(100);
 		// Nothing in the way, nothing to clear
 		expect(canvasLiftFor(0, true)).toBe(0);
+	});
+
+	it('draws a box behind a picture subtitle only when it has some opacity and the picture is on screen', () => {
+		const area = {left: 0.25, top: 0.8, width: 0.5, height: 0.1};
+		expect(getPgsBackgroundStyle({pgsSubtitleBackground: 0, pgsSubtitleBackgroundColor: '#000000'}, area)).toBeNull();
+		expect(getPgsBackgroundStyle({pgsSubtitleBackground: 60, pgsSubtitleBackgroundColor: '#000000'}, null)).toBeNull();
+		const box = getPgsBackgroundStyle({pgsSubtitleBackground: 50, pgsSubtitleBackgroundColor: '#ff0000'}, area);
+		expect(box.background).toBe('rgba(255, 0, 0, 0.5)');
+		// the picture's own area with a margin around it, kept inside the screen
+		expect(box.left).toBe('24%');
+		expect(box.top).toBe('78.6%');
+		expect(box.width).toBe('52%');
+		const edge = getPgsBackgroundStyle({pgsSubtitleBackground: 100, pgsSubtitleBackgroundColor: '#000000'}, {left: 0, top: 0.95, width: 1, height: 0.05});
+		expect(edge.left).toBe('0%');
+		expect(parseFloat(edge.top) + parseFloat(edge.height)).toBeCloseTo(100);
 	});
 
 	it('measures the lift for a picture subtitle from where its position puts it', () => {
