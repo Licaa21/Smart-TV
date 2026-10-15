@@ -21,7 +21,10 @@ import {
 	SERVER_TO_TV_ROW,
 	TV_TO_SERVER_ROW,
 	hasSeenServerLayout,
+	homeRowImageTypesFromServer,
+	homeRowImageTypesToServer,
 	homeRowsFromProfile,
+	rowImageTypeFromServer,
 	serverPluginSections,
 	homeRowsToRowOrder,
 	homeRowsToSections,
@@ -231,6 +234,10 @@ const VALUE_CONVERSIONS = {
 	mdblistRatingSources: {
 		toServer: ratingSourcesToServer,
 		fromServer: normalizeRatingSources
+	},
+	homeRowImageTypes: {
+		toServer: homeRowImageTypesToServer,
+		fromServer: homeRowImageTypesFromServer
 	}
 	// homeRows is missing on purpose. The home layout is two server fields that have to
 	// move together, so it gets resolved whole rather than a key at a time.
@@ -254,7 +261,7 @@ export const SYNCABLE_KEYS = [
 	'showRatingLabels',
 	'showRatingBadges',
 	'themeMusicEnabled', 'themeMusicVolume', 'themeMusicOnHomeRows',
-	'homeRowsImageType', 'showClock', 'clockDisplay',
+	'homeRowsImageType', 'homeRowImageTypes', 'showClock', 'clockDisplay',
 	'homeRowOverlay', 'folderViewMode',
 	'excludedGenres',
 	'autoAdvance', 'autoAdvanceInterval',
@@ -333,6 +340,9 @@ export const profileToLocal = (serverProfile) => {
 			local[localKey] = converted;
 		}
 	}
+	// Continue Watching syncs on its own server key, while this app keeps it with the other rows.
+	const continueWatching = rowImageTypeFromServer(serverProfile.homeImageTypeContinueWatching);
+	if (continueWatching) local.homeRowImageTypes = {...local.homeRowImageTypes, resume: continueWatching};
 	// The TMDB key is read only. We pull it so online rows can call TMDB, but it
 	// stays out of SYNCABLE_KEYS so the client never pushes it back.
 	if (serverProfile.tmdbApiKey !== undefined && serverProfile.tmdbApiKey !== null) {
@@ -360,6 +370,10 @@ export const localToProfile = (localSettings, keys) => {
 		// stored one alone rather than overwriting it with a guess.
 		if (converted === undefined) continue;
 		profile[serverKey] = converted;
+	}
+	// Sent even when it's unset, so a cleared Continue Watching doesn't come back from the server.
+	if (profile.homeRowImageTypes !== undefined) {
+		profile.homeImageTypeContinueWatching = localSettings.homeRowImageTypes.resume || '';
 	}
 	// Send both views or neither. homeRowOrder on its own makes the server throw away the
 	// stored homeSections, whereas sending neither leaves the stored layout alone. That is
@@ -398,6 +412,15 @@ export const resolveFromEnvelope = (envelope, adminDefaults, profile) => {
 		const layer = firstWith(key);
 		if (layer) resolved[key] = layer[key];
 	}
+	// The per row map is two server keys, and each takes its own first layer the way the
+	// server resolves them.
+	const firstStored = (key) => sources.find((source) => source?.[key] != null)?.[key];
+	const rowImageTypes = profileToLocal({
+		homeRowImageTypes: firstStored('homeRowImageTypes'),
+		homeImageTypeContinueWatching: firstStored('homeImageTypeContinueWatching')
+	}).homeRowImageTypes;
+	if (rowImageTypes) resolved.homeRowImageTypes = rowImageTypes;
+	else delete resolved.homeRowImageTypes;
 	const tmdbLayer = firstWith('tmdbApiKey');
 	if (tmdbLayer) resolved.tmdbApiKey = tmdbLayer.tmdbApiKey;
 
@@ -1023,7 +1046,10 @@ export function SettingsProvider({children}) {
 			setSettings(prev => {
 				const nextValues = {};
 				for (const key of SYNCABLE_KEYS) {
-					const incoming = resolved[key];
+					// A row the server leaves out keeps what this device has.
+					const incoming = key === 'homeRowImageTypes' && resolved[key]
+						? {...prev[key], ...resolved[key]}
+						: resolved[key];
 					// Hold on to the previous reference when the value hasn't really changed.
 					// An equal but freshly built array still counts as a new identity, which
 					// would send Browse off to reload every row on every sync.

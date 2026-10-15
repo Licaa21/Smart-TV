@@ -244,7 +244,7 @@ const useBrowseData = ({
 				(row) => row.enabled && (row.id.startsWith('sinceyouwatched') || row.id === 'rewatch')
 			);
 			const hasEnabledMediaSectionRow = homeRowsConfig.some(
-				(row) => row.enabled && ['audioartists', 'audioalbums', 'audioplaylists', 'resumeaudio', 'activerecordings'].includes(row.id)
+				(row) => row.enabled && ['audioartists', 'audioalbums', 'audioplaylists', 'resumeaudio', 'activerecordings', 'onnow'].includes(row.id)
 			);
 			const hasDynamicRowConfig =
 				settings.displayFavoritesRows ||

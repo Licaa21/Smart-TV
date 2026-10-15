@@ -15,6 +15,7 @@ import SeerrTileRow from '../../components/SeerrTileRow';
 import LibraryButtonRow from '../../components/LibraryButtonRow';
 import {SkeletonShimmer, skeletonTitleWidths} from '../../components/Skeleton';
 import {getImageUrl, getBackdropId} from '../../utils/helpers';
+import {channelForProgram, isLiveTvProgram} from '../../utils/liveTvLibrary';
 import {focusedCardIndex, cardToRestore, focusedRowIndex, rowToRestore} from '../../utils/rowFocusMemory';
 import {radiusToCss, shadowToCss, toCssColor} from '../../theme/themeSpec';
 import DetailSection from './DetailSection';
@@ -479,6 +480,8 @@ const Browse = ({
 			onSelectLibrary?.(item);
 		} else if (item.Type === 'Recording') {
 			onPlayRecording?.(item);
+		} else if (isLiveTvProgram(item)) {
+			onSelectItem?.(channelForProgram(item));
 		} else {
 			onSelectItem?.(item);
 		}

@@ -1,4 +1,4 @@
-import {getAuthHeader, getServerUrl} from './jellyfinApi';
+import {getAuthHeader, getServerUrl, getUserId} from './jellyfinApi';
 import {fetchWithTimeout} from '../utils/fetchTimeout';
 import {mediaServerQueue} from '../utils/requestQueue';
 
@@ -11,7 +11,11 @@ import {mediaServerQueue} from '../utils/requestQueue';
 const cache = {};
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
-const cacheKeyFor = (source, type, params) => `${source}:${type}:${JSON.stringify(params || {})}`;
+// The server holds every row to the viewer's parental limit, so a cached row belongs to the
+// account that fetched it, on the server it came from. The next account on this TV gets its
+// own row, not the last one's.
+const cacheScope = () => `${getServerUrl() || ''}|${getUserId() || ''}`;
+const cacheKeyFor = (source, type, params, language) => `${cacheScope()}|${source}:${type}:${JSON.stringify(params || {})}:${(language || '').toLowerCase()}`;
 
 const normalizeItem = (raw) => {
 	const providerIds = raw.providerIds || raw.ProviderIds || {};
@@ -36,12 +40,20 @@ const normalizeItem = (raw) => {
 	};
 };
 
+// Exported so tests can clear the cache between cases.
+export const __resetExternalRowCache = () => {
+	for (const key of Object.keys(cache)) {
+		delete cache[key];
+	}
+};
+
 // Fetches one external list. params is the plugin params object such as
 // {id} or {username, listname}, sent url-encoded as JSON.
 export const fetchCustomRow = async ({source, type, params = {}}, options = {}) => {
 	if (!source || !type) return [];
 
-	const key = cacheKeyFor(source, type, params);
+	const language = options.language || '';
+	const key = cacheKeyFor(source, type, params, language);
 	if (!options.forceRefresh) {
 		const cached = cache[key];
 		if (cached && (Date.now() - cached.fetchedAt) < CACHE_TTL_MS) {
@@ -59,6 +71,7 @@ export const fetchCustomRow = async ({source, type, params = {}}, options = {}) 
 			+ `?source=${encodeURIComponent(source)}`
 			+ `&type=${encodeURIComponent(type)}`
 			+ `&params=${encodeURIComponent(JSON.stringify(params))}`
+			+ (language ? `&language=${encodeURIComponent(language)}` : '')
 			+ (options.forceRefresh ? '&refresh=true' : '');
 
 		const fetchOptions = {headers: {'Authorization': getAuthHeader()}};
@@ -86,7 +99,7 @@ export const fetchCustomRow = async ({source, type, params = {}}, options = {}) 
 // The seasonal row Moonbase built for this user. Owned movies arrive as library items and
 // suggestions in the custom row shape. A holiday of null means there is no row today.
 export const fetchSeasonalRow = async ({country} = {}) => {
-	const key = `seasonal:${country || ''}`;
+	const key = `${cacheScope()}|seasonal:${country || ''}`;
 	const cached = cache[key];
 	if (cached && (Date.now() - cached.fetchedAt) < CACHE_TTL_MS) {
 		return cached.payload;
@@ -94,11 +107,14 @@ export const fetchSeasonalRow = async ({country} = {}) => {
 
 	const baseUrl = getServerUrl();
 	if (!baseUrl) return null;
+	// Read alongside the key, so a request still queued when the account changes answers for
+	// the account the key belongs to.
+	const headers = {'Authorization': getAuthHeader()};
 
 	try {
 		const url = `${baseUrl}/Moonfin/Seasonal/Row` + (country ? `?country=${encodeURIComponent(country)}` : '');
 		const response = await mediaServerQueue.run(
-			() => fetchWithTimeout(url, {headers: {'Authorization': getAuthHeader()}}, 10000)
+			() => fetchWithTimeout(url, {headers}, 10000)
 		);
 		if (!response.ok) return cache[key]?.payload || null;
 

@@ -82,7 +82,8 @@ export const DEFAULT_HOME_ROWS = [
 	{id: 'seerr_watchlist', name: 'Your Watchlist', enabled: false, order: 61},
 	{id: 'librarybuttons', name: 'Library Buttons', enabled: false, order: 62},
 	{id: 'studios', name: 'Studios', enabled: false, order: 63},
-	{id: 'seasonal', name: 'Seasonal Row', enabled: false, order: 64}
+	{id: 'seasonal', name: 'Seasonal Row', enabled: false, order: 64},
+	{id: 'onnow', name: 'On Now', enabled: false, order: 65}
 ];
 
 export const TV_TO_SERVER_ROW = {
@@ -125,6 +126,36 @@ export const SERVER_TO_TV_ROW = {
 	'imdb_most_popular_tv_shows': 'imdb-popular-tv',
 	'imdb_lowest_rated_movies': 'imdb-lowest-rated',
 	'imdb_top_english_movies': 'imdb-top-english'
+};
+
+const ROW_IMAGE_TYPES = ['poster', 'backdrop', 'logo', 'thumb', 'banner'];
+
+export const rowImageTypeFromServer = (value) => {
+	const type = typeof value === 'string' ? value.trim().toLowerCase() : '';
+	return ROW_IMAGE_TYPES.includes(type) ? type : undefined;
+};
+
+// The per row image types travel as row:type pairs under the server's row names, for
+// example "genres:thumb,nextup:poster", since the plugin saves its admin defaults as XML,
+// which can't hold a map. Continue Watching has its own key. An empty list is still sent,
+// because the server keeps the old list when the value is missing and a cleared row would
+// come back.
+export const homeRowImageTypesToServer = (overrides) => Object.entries(overrides || {})
+	.filter(([id]) => id !== 'resume')
+	.map(([id, type]) => `${TV_TO_SERVER_ROW[id] || id}:${type}`)
+	.join(',');
+
+export const homeRowImageTypesFromServer = (value) => {
+	if (typeof value !== 'string') return undefined;
+	const overrides = {};
+	for (const part of value.split(',')) {
+		const pair = part.split(':');
+		if (pair.length !== 2) continue;
+		const row = pair[0].trim().toLowerCase();
+		const type = rowImageTypeFromServer(pair[1]);
+		if (row && row !== 'resume' && type) overrides[SERVER_TO_TV_ROW[row] || row] = type;
+	}
+	return overrides;
 };
 
 // A row the saved layout lacks is appended switched off, except where `enabledById` says

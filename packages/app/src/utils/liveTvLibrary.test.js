@@ -1,4 +1,4 @@
-import {isLiveTvChannel, isLiveTvLibrary, librariesForNav} from './liveTvLibrary';
+import {channelForProgram, isLiveTvChannel, isLiveTvLibrary, isLiveTvProgram, librariesForNav} from './liveTvLibrary';
 
 const movies = {Id: 'm', CollectionType: 'movies'};
 const liveTv = {Id: 'l', CollectionType: 'livetv'};
@@ -64,5 +64,37 @@ describe('isLiveTvChannel', () => {
 		expect(isLiveTvChannel({Type: 'Program'})).toBe(false);
 		expect(isLiveTvChannel({Type: 'Movie'})).toBe(false);
 		expect(isLiveTvChannel(null)).toBe(false);
+	});
+});
+
+describe('channelForProgram', () => {
+	const program = {
+		Id: 'p1',
+		Type: 'Program',
+		Name: 'Evening News',
+		ChannelId: 'c7',
+		ChannelName: 'News 7',
+		ChannelNumber: '7',
+		ChannelPrimaryImageTag: 'tag',
+		_serverUrl: 'http://two',
+		_serverAccessToken: 'token'
+	};
+
+	test('a program airing on a channel tunes that channel on its own server', () => {
+		expect(isLiveTvProgram(program)).toBe(true);
+		expect(channelForProgram(program)).toEqual({
+			Id: 'c7',
+			Name: 'News 7',
+			Type: 'TvChannel',
+			ChannelNumber: '7',
+			ImageTags: {Primary: 'tag'},
+			_serverUrl: 'http://two',
+			_serverAccessToken: 'token'
+		});
+	});
+
+	test('a program with no channel to tune stays a program', () => {
+		expect(isLiveTvProgram({Id: 'p2', Type: 'Program'})).toBe(false);
+		expect(isLiveTvProgram({Id: 'm', Type: 'Movie', ChannelId: 'c7'})).toBe(false);
 	});
 });

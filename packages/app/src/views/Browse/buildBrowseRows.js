@@ -27,7 +27,8 @@ const ROW_TITLES = {
 	audioplaylists: () => $L('Music Playlists'),
 	resumeaudio: () => $L('Continue Listening'),
 	activerecordings: () => $L('Recordings'),
-	livetv: () => $L('Live TV')
+	livetv: () => $L('Live TV'),
+	onnow: () => $L('On Now')
 };
 
 const libraryTitle = (library) => (library._serverName

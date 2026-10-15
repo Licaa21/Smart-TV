@@ -186,9 +186,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	subtitleOffsetRef.current = subtitleOffset;
 	const [controlsVisible, setControlsVisible] = useState(false);
 	const [activeModal, setActiveModal] = useState(null);
-	// Read by the time update, which runs from an interval or a media event and so sees no fresh state.
-	const episodesOpenRef = useRef(false);
-	episodesOpenRef.current = activeModal === 'episodes';
+	// Read by the time update, whose handler only catches up with state after a render.
+	const activeModalRef = useRef(null);
+	activeModalRef.current = activeModal;
 	// Seeded from the advanced playback menu, which picks a cap before playback starts.
 	const [selectedQuality, setSelectedQuality] = useState(initialQuality || null);
 	const [remoteSubtitleResults, setRemoteSubtitleResults] = useState([]);
@@ -1848,9 +1848,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (videoRef.current) {
 			const rawTime = videoRef.current.currentTime;
 			const time = rawTime;
-			// Nothing on screen reads the time while the episode panel is up, and each update redraws the
-			// whole player, which is what makes that panel drag. The first tick after it closes catches up.
-			if (!episodesOpenRef.current) setCurrentTime(time);
+			// Each update redraws the whole player, which is what makes an open picker or the episode
+			// panel drag on the weaker sets. A modal hides the OSD and the OSD only shows whole seconds,
+			// so the time only moves when it would show, and the first tick after a modal closes catches
+			// up. Lyrics and the offset overlay follow it closely, so they still get every tick.
+			const modal = activeModalRef.current;
+			if (isAudioMode || modal === 'subtitleOffset') {
+				setCurrentTime(time);
+			} else if (!modal) {
+				setCurrentTime((shown) => (Math.floor(shown) === Math.floor(time) ? shown : time));
+			}
 			const ticks = Math.floor(time * 10000000);
 			if (ticks !== positionRef.current) {
 				stalledRef.current = false;
@@ -1894,7 +1901,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			checkSegments(ticks);
 		}
-	}, [checkSegments, subtitleTrackEvents, subtitleOffset, settleGroupSeek]);
+	}, [checkSegments, subtitleTrackEvents, subtitleOffset, settleGroupSeek, isAudioMode]);
 
 	const handleWaiting = useCallback(() => {
 		setIsBuffering(true);
@@ -1938,6 +1945,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 
 		await playback.reportStop(positionRef.current);
+		// the next up countdown can load the next one during the stop, leave its player alone
+		if (prevItemIdRef.current !== item.Id) return;
 
 		if (repeatMode === 'one') {
 			restartCurrent();
