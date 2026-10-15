@@ -17,6 +17,9 @@ import css from './Player.module.less';
 
 const SpottableButton = Spottable('button');
 
+// Room is left for the title above and the hint below, so a long list scrolls and does not run under them
+const LIST_STYLE = {flex: '1 1 auto', minHeight: 0, maxHeight: '52vh'};
+
 const SettingsContainer = SpotlightContainerDecorator({
 	enterTo: 'default-element',
 	defaultElement: '[data-spot-default="true"]',
@@ -166,14 +169,16 @@ const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false, subtitleKind 
 			>
 				<h2 className={css.modalTitle}>{subtitleKind === 'pgs' ? $L('Picture Subtitles (PGS)') : $L('Subtitle Appearance')}</h2>
 				{subtitleKind === 'ass' && (
-					<p className={css.settingNote}>{$L('This subtitle is styled by its own file, so its look cannot be changed here.')}</p>
+					<SpottableButton className={css.settingNote} onClick={onClose} spotlightId="sub-settings-close">
+						{$L('This subtitle is styled by its own file, so its look cannot be changed here.')}
+					</SpottableButton>
 				)}
 				{subtitleKind === 'pgs' && (
 					<Scroller
 						direction="vertical"
 						horizontalScrollbar="hidden"
 						verticalScrollbar="hidden"
-						style={{flex: 1, maxHeight: '60vh'}}
+						style={LIST_STYLE}
 					>
 						<SpottableButton
 							className={css.settingItem}
@@ -266,7 +271,7 @@ const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false, subtitleKind 
 					direction="vertical"
 					horizontalScrollbar="hidden"
 					verticalScrollbar="hidden"
-					style={{flex: 1, maxHeight: '60vh'}}
+					style={LIST_STYLE}
 				>
 					{/* Size */}
 					<SpottableButton
@@ -431,9 +436,7 @@ const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false, subtitleKind 
 				</Scroller>
 				)}
 
-				<SpottableButton className={css.closeBtn} onClick={onClose} spotlightId="sub-settings-close">
-					{$L('Press BACK to close')}
-				</SpottableButton>
+				<div className={css.closeHint}>{$L('Press BACK to close')}</div>
 			</SettingsContainer>
 		</div>
 	);
