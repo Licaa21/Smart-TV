@@ -26,6 +26,7 @@ import {
 } from './themeSpec';
 import {resolveOverlayColor} from './overlayColors';
 import {ACCENT_RULES, MODULES as ACCENT_MODULES} from './accentRules.generated';
+import {ACCENT_INHERITS} from './accentSurfaces';
 
 import appCss from '../App/App.module.less';
 import sidebarCss from '../components/Sidebar/Sidebar.module.less';
@@ -183,6 +184,10 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	const picked = {};
 	Object.keys(options.accents || {}).forEach((id) => {
 		if (isValidHexColor(options.accents[id])) picked[id] = seen(options.accents[id]);
+	});
+	// A surface inside another wears that one's pick until it is given its own
+	Object.keys(ACCENT_INHERITS).forEach((id) => {
+		if (!picked[id] && picked[ACCENT_INHERITS[id]]) picked[id] = picked[ACCENT_INHERITS[id]];
 	});
 	const makeAccent = (id) => {
 		const value = picked[id] || c.accent;
@@ -475,6 +480,8 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${achievementsCss.points}, .${achievementsCss.progressText}`, `color: ${os(0.7)};`);
 	rule(`.${achievementsCss.boardValue}, .${achievementsCss.rankGutter}`, `color: ${onSurface};`);
 	rule(`.${achievementsCss.reward}`, `color: ${achievementsAccent.css};`);
+	// The ring on a focused badge of the showcase and on Retry: the surface's accent when it has one, the focus color otherwise
+	rule(`.${achievementsCss.showcaseItem}:focus, .${achievementsCss.retryButton}:focus`, `border-color: ${picked.achievements ? achievementsAccent.css : focusColor};`);
 	rule(`.${settingsCss.listItem}:focus .${achievementsCss.points}, .${settingsCss.listItem}:focus .${achievementsCss.progressText}`, `color: ${settingsFocus.soft};`);
 	rule(`.${settingsCss.listItem}:focus .${achievementsCss.boardValue}, .${settingsCss.listItem}:focus .${achievementsCss.rankGutter}, .${settingsCss.listItem}:focus .${achievementsCss.reward}`, `color: ${settingsFocus.strong};`);
 	rule(`.${settingsCss.actionButton}`, `background: ${buttonNormal}; color: ${onButtonNormal}; border-color: ${tileBorderColor};`);

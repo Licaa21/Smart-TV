@@ -1,6 +1,15 @@
-import {ACCENT_KEYS, ACCENT_SURFACES, accentSignature, defaultAccentSwatch, pickedAccent, pickedAccents, themeAccentHex} from './accentSurfaces';
+import {ACCENT_KEYS, ACCENT_SURFACES, accentSignature, defaultAccentSwatch, pickedAccent, pickedAccents, themeAccentHex, effectiveAccent} from './accentSurfaces';
 import {defaultSettings} from '../context/defaultSettings';
 import {ACCENT_RULES} from './accentRules.generated';
+
+describe('effectiveAccent', () => {
+	it('gives Achievements the Settings pick until it has its own', () => {
+		expect(effectiveAccent({accentSettings: '#ff8800'}, 'achievements')).toBe('#ff8800');
+		expect(effectiveAccent({accentSettings: '#ff8800', accentAchievements: '#00ff00'}, 'achievements')).toBe('#00ff00');
+		expect(effectiveAccent({accentSettings: '#ff8800'}, 'details')).toBe('');
+		expect(effectiveAccent({}, 'achievements')).toBe('');
+	});
+});
 
 describe('themeAccentHex', () => {
 	it('drops the alpha of a theme color, which comes first', () => {

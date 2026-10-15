@@ -27,6 +27,10 @@ export const SHIPPED_ACCENT = '#00a4dc';
 
 export const ACCENT_KEYS = ACCENT_SURFACES.map((surface) => surface.key);
 
+// A surface that lives inside another wears that one's accent while it has none of its own. Achievements and Friends are
+// screens of Settings, so a pick for Settings reaches them too until they are given their own.
+export const ACCENT_INHERITS = {achievements: 'settings'};
+
 // What Apply to All Surfaces writes: every surface's accent, and the outline around whatever is
 // selected, which is a color of its own that the picker treats like the rest.
 export const ACCENT_ALL_KEYS = [...ACCENT_KEYS, 'focusBorderColor'];
@@ -38,6 +42,11 @@ export const pickedAccent = (settings, surfaceId) => {
 	const value = settings?.[KEY_OF[surfaceId]];
 	return isValidHexColor(value) ? value : '';
 };
+
+// The accent a surface wears: its own pick, or the one of the surface it lives in, or ''.
+export const effectiveAccent = (settings, surfaceId) => (
+	pickedAccent(settings, surfaceId) || (ACCENT_INHERITS[surfaceId] ? pickedAccent(settings, ACCENT_INHERITS[surfaceId]) : '')
+);
 
 // Every pick that is actually set, keyed by surface. This is what themeOverrides takes,
 // and an empty object is what leaves the app looking exactly as it always did.
