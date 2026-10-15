@@ -55,6 +55,13 @@ export const pickedAccents = (settings) => {
 export const accentSignature = (settings) =>
 	ACCENT_KEYS.map((key) => (isValidHexColor(settings?.[key]) ? settings[key] : '')).join('|');
 
+// The theme's accent as #rrggbb, or '' when it has none. Theme colors are #aarrggbb, or plain #rrggbb, and the alpha is not wanted.
+export const themeAccentHex = (theme) => {
+	const value = theme?.colors?.accent;
+	const match = typeof value === 'string' ? /^#(?:[0-9a-f]{2})?([0-9a-f]{6})$/i.exec(value) : null;
+	return match ? `#${match[1]}` : '';
+};
+
 // What a surface looks like with nothing picked, for the swatch beside its Default option. A
 // surface the theme reaches follows the theme's accent, and any other keeps the shipped cyan.
 export const defaultAccentSwatch = (surface, theme) => {

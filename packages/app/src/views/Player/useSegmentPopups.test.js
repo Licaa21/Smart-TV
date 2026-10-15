@@ -4,6 +4,8 @@ import useSegmentPopups from './useSegmentPopups';
 
 // The framework's focus needs its own copy of React, so a stand in answers for it.
 jest.mock('@enact/spotlight', () => ({__esModule: true, default: {focus: jest.fn(() => false)}}));
+// The channel list button is a Tizen key, and the platform is not Tizen under test
+jest.mock('../../utils/keys', () => ({...jest.requireActual('../../utils/keys'), isChannelMenuKey: (e) => e.keyCode === 10073}));
 
 const RUNTIME = 100 * 10000000;
 const NEAR_END = 99 * 10000000;
@@ -228,6 +230,104 @@ describe('the skip prompt over the controls, on a seek and under the remote', ()
 		act(() => auto.result.current.checkSegments(200 * SECOND));
 		act(() => auto.result.current.checkSegments(62 * SECOND));
 		expect(auto.onSeekToSegmentEnd).toHaveBeenCalledTimes(1);
+	});
+
+	test('the next episode card a viewer sent away comes back on a seek into the credits', () => {
+		const props = {
+			mediaSegments: {creditsStart: 100 * SECOND, list: [{type: 'outro', start: 100 * SECOND, end: 160 * SECOND}]},
+			nextEpisode: {Id: 'next'},
+			runTimeRef: {current: 170 * SECOND}
+		};
+		const {result} = setupPrompt(props, {replaceSkipOutroWithNextUp: true, nextUpBehavior: 'extended'});
+		playTo(result, 99, 105);
+		expect(result.current.showSkipCredits).toBe(true);
+		act(() => result.current.cancelNextEpisodeCountdown());
+		expect(result.current.showSkipCredits).toBe(false);
+		// Playing on through the credits leaves it away
+		playTo(result, 106, 110);
+		expect(result.current.showSkipCredits).toBe(false);
+		// Seeking somewhere in the credits brings it back
+		act(() => result.current.checkSegments(130 * SECOND));
+		expect(result.current.showSkipCredits).toBe(true);
+	});
+
+	test('a seek to before the credits does not bring the card back early', () => {
+		const props = {
+			mediaSegments: {creditsStart: 100 * SECOND, list: [{type: 'outro', start: 100 * SECOND, end: 160 * SECOND}]},
+			nextEpisode: {Id: 'next'},
+			runTimeRef: {current: 170 * SECOND}
+		};
+		const {result} = setupPrompt(props, {replaceSkipOutroWithNextUp: true, nextUpBehavior: 'extended'});
+		playTo(result, 99, 105);
+		act(() => result.current.cancelNextEpisodeCountdown());
+		act(() => result.current.checkSegments(30 * SECOND));
+		expect(result.current.showSkipCredits).toBe(false);
+		expect(result.current.showNextEpisode).toBe(false);
+	});
+
+	describe('the channel list button', () => {
+		const CHANNEL_LIST = 10073;
+
+		test('brings back the prompt of the segment the viewer is inside after it was sent away', () => {
+			const {result} = setupPrompt();
+			playTo(result, 60, 70);
+			act(() => { result.current.handlePopupKeyDown(key(BACK)); });
+			expect(result.current.skipSegment).toBeNull();
+			let consumed;
+			act(() => { consumed = result.current.handlePopupKeyDown(key(CHANNEL_LIST)); });
+			expect(consumed).toBe(true);
+			expect(result.current.skipSegment).toMatchObject({type: 'intro'});
+		});
+
+		test('brings back a prompt that hid itself', () => {
+			const {result} = setupPrompt({}, {mediaSegmentAutoHide: 's5'});
+			playTo(result, 60, 62);
+			now += 6000;
+			playTo(result, 62, 64);
+			expect(result.current.skipSegment).toBeNull();
+			act(() => { result.current.handlePopupKeyDown(key(CHANNEL_LIST)); });
+			expect(result.current.skipSegment).not.toBeNull();
+		});
+
+		test('is left alone outside every segment, and while the prompt is already up', () => {
+			const outside = setupPrompt();
+			playTo(outside.result, 20, 30);
+			let consumed;
+			act(() => { consumed = outside.result.current.handlePopupKeyDown(key(CHANNEL_LIST)); });
+			expect(consumed).toBe(false);
+
+			const showing = setupPrompt();
+			playTo(showing.result, 60, 70);
+			expect(showing.result.current.skipSegment).not.toBeNull();
+			act(() => { consumed = showing.result.current.handlePopupKeyDown(key(CHANNEL_LIST)); });
+			expect(consumed).toBe(false);
+		});
+
+		test('leaves the key alone inside a segment that offers no prompt', () => {
+			const none = setupPrompt({}, {introAction: 'none'});
+			playTo(none.result, 60, 70);
+			let consumed;
+			act(() => { consumed = none.result.current.handlePopupKeyDown(key(CHANNEL_LIST)); });
+			expect(consumed).toBe(false);
+			const auto = setupPrompt({}, {introAction: 'auto'});
+			playTo(auto.result, 60, 70);
+			act(() => { consumed = auto.result.current.handlePopupKeyDown(key(CHANNEL_LIST)); });
+			expect(consumed).toBe(false);
+		});
+
+		test('brings back the next episode card in the credits', () => {
+			const props = {
+				mediaSegments: {creditsStart: 100 * SECOND, list: [{type: 'outro', start: 100 * SECOND, end: 160 * SECOND}]},
+				nextEpisode: {Id: 'next'},
+				runTimeRef: {current: 170 * SECOND}
+			};
+			const {result} = setupPrompt(props, {replaceSkipOutroWithNextUp: true, nextUpBehavior: 'extended'});
+			playTo(result, 99, 105);
+			act(() => result.current.cancelNextEpisodeCountdown());
+			expect(result.current.showSkipCredits).toBe(false);
+			act(() => { result.current.handlePopupKeyDown(key(CHANNEL_LIST)); });
+			expect(result.current.showSkipCredits).toBe(true);
+		});
 	});
 
 	test('with the controls away, Back sends it off and OK takes it', () => {
