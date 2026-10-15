@@ -37,7 +37,7 @@ import {playerClockStale, playerClockWanted} from '../../utils/playerClock';
 import {useSettings} from '../../context/SettingsContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import * as syncPlayService from '../../services/syncPlay';
-import {getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
+import {canvasRestingPercent, getSubtitleCanvasStyle, getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
 import {applyResumeRewind, skipBackSeconds, skipForwardSeconds, zoomInternalFromSetting, zoomSettingFromInternal} from '../../utils/playbackTuning';
@@ -236,6 +236,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		controlsVisible: controlsVisible && !activeModal,
 		descriptionShown: pauseDescriptionShown && !isLoading && !error,
 		settings: subtitleStyleSettings,
+		measureKey: `${item?.Id}|${item?.Overview}`
+	});
+
+	// The canvas ASS subtitles are drawn on goes up out of the way as well, from where it rests
+	const canvasLift = useSubtitleLift({
+		controlsVisible: controlsVisible && !activeModal,
+		descriptionShown: pauseDescriptionShown && !isLoading && !error,
+		settings: {subtitlePosition: 'absolute', subtitlePositionAbsolute: 100 - canvasRestingPercent(settings, false)},
 		measureKey: `${item?.Id}|${item?.Overview}`
 	});
 
@@ -3348,7 +3356,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				style={isLoading || isAudioMode ? {opacity: 0, pointerEvents: 'none'} : undefined}
 			/>
 
-			<canvas ref={assCanvasRef} className={css.assCanvas} />
+			<canvas ref={assCanvasRef} className={css.assCanvas} style={getSubtitleCanvasStyle(settings, canvasLift, false)} />
 
 			{isLoading && <LoadingAnimationLayer dimmed label={$L('Loading Stream...')} />}
 

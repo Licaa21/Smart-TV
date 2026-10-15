@@ -32,7 +32,7 @@ const SECTIONS = {
 	'playback.qualityDecoding': ['streaming', 'decodingRendering'],
 	'playback.audio': ['audioStream', 'audioOutput', 'passthroughSettings', 'audioAdvanced'],
 	'playback.subtitles': ['subtitlesGeneral', 'subtitleStream', 'subtitleCustomization', 'subtitleRendering'],
-	'playback.subtitleCustomization': ['hdr'],
+	'playback.subtitleCustomization': ['hdr', 'pgs'],
 	'playback.skippingAutoplay': ['playbackEnhancements', 'automaticQueuing'],
 	'playback.skipSegments': ['skipSegmentsPreview'],
 	'playback.syncPlay': ['syncPlayOptions'],

@@ -37,6 +37,12 @@ export const defaultSettings = {
 	subtitleShadowOpacityHdr: 100,
 	subtitleShadowBlurHdr: 0.1,
 	subtitlePositionAbsoluteHdr: 90,
+	// Picture subtitles (PGS) are bitmaps, so only what can be done to a picture applies: its size, how far it is raised
+	// from where the file puts it, how see-through it is, and how bright.
+	pgsSubtitleSize: 'medium',
+	pgsSubtitlePosition: 'bottom',
+	pgsSubtitleOpacity: 100,
+	pgsSubtitleBrightness: 100,
 	seekStep: 10,
 	fallbackAudioLanguage: '',
 	// A track picked by hand starts the series on it next time, ahead of the language settings. This device only.

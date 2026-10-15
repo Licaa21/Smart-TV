@@ -164,6 +164,7 @@ const PlayerControls = ({
 	css,
 	controlsVisible,
 	isHdrContent = false,
+	subtitleKind = 'text',
 	activeModal,
 	isAudioMode,	isLiveTV,	focusRow,
 	title,
@@ -910,6 +911,7 @@ const PlayerControls = ({
 					visible
 					onClose={closeModal}
 					isHdr={isHdrContent}
+					subtitleKind={subtitleKind}
 				/>
 			)}
 		</>
