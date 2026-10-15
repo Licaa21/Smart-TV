@@ -220,6 +220,15 @@
 	background: rgba(255, 255, 255, 0.1);
 }
 
+// The line under a menu that says how to leave it. It is only text, so the remote never stops on it.
+.closeHint {
+	flex: none;
+	text-align: center;
+	color: rgba(255, 255, 255, 0.6);
+	font-size: 18px;
+	padding: 10px 20px;
+}
+
 .settingsModal {
 	width: 700px;
 	height: 80vh;
@@ -240,10 +249,17 @@
 	cursor: pointer;
 	transition: all 0.2s ease;
 	margin: 5px 10px 15px 10px;
+	// A button is as wide as what is in it unless told otherwise, which left the label and its value touching
+	width: calc(100% - 20px);
+	box-sizing: border-box;
 }
 
-// What stands in for the settings when a track has none to offer.
+// What stands in for the settings when a track has none to offer. It is what closes the menu, so it can be focused.
 .settingNote {
+	background: transparent;
+	border: 2px solid transparent;
+	border-radius: 10px;
+	text-align: left;
 	font-size: 22px;
 	line-height: 1.4;
 	color: rgba(255, 255, 255, 0.8);
@@ -251,13 +267,15 @@
 }
 
 .settingItem:hover,
-.settingItem:focus {
+.settingItem:focus,
+.settingNote:focus {
 	background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.3);
 	border-color: var(--theme-accent, #00a4dc);
 	transform: scale(1.02);
 }
 
 .settingLabel {
+	margin-right: 24px;
 	font-size: 24px;
 	color: #fff;
 	font-weight: 500;
