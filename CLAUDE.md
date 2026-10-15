@@ -34,8 +34,7 @@ The rules that matter most, each explained further down:
 | `pr-skip-prompt-over-controls/` | `feature/skip-prompt-over-controls` | Pull request #535 upstream |
 | `local/` | none | Not a branch: backups (`*.bundle`), logs, photos, notes |
 
-This file exists in these four branch folders with only line 3 different. The folders for #534 and #535 have none. It is git-ignored, so a change to it is made in
-all four.
+This file is committed on `implement` and is the copy to edit. `update-daily.sh` brings it into `daily` with the rest of `implement`, and the copies in `main/` and `pr-episode-browser/` are local and untracked, so a change to it is made in all four folders (only line 3 differs, and after a merge into `daily` line 3 has to be put back to say daily). The folders for #534 and #535 have none.
 
 ### Shared dependencies
 
@@ -123,8 +122,7 @@ ode_modules`.
   sections the change made out of date: the layout and flow, the "Upstream changes that are not taken" entries, the
   Moonbase list, the notes about the user's TV, the tools, and what the README tells the user they can see. Remove what
   is stale and do not only add.
-- This file is git-ignored and exists in four folders, so a change to it is made in all four (only line 3 differs). The
-  README is committed on `main` only.
+- This file is committed on `implement` and exists as a local copy in `main/`, `daily/` and `pr-episode-browser/`, so a change to it is made in all four folders (only line 3 differs). The README is committed on `main` only.
 - Say in the report which sections of either were updated, or that none needed it.
 
 ### Using the plugins
