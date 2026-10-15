@@ -47,7 +47,7 @@ if (typeof window !== 'undefined') {
 	window.addEventListener('moonfin:browseRefresh', (e) => {
 		memoryCache.volatileStale = true;
 		// Hiding or ordering a library, or changing the media bar, changes the rows themselves
-		if (e?.detail?.libraries || e?.detail?.featured) memoryCache.screen = null;
+		if (e?.detail?.libraries || e?.detail?.featured || e?.detail?.reload) memoryCache.screen = null;
 	});
 	// A favorite or a playlist changed, which moves the rows built from them
 	window.addEventListener('moonfin:homeRowsChanged', () => {

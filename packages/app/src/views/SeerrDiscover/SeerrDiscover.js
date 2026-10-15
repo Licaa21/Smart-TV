@@ -399,6 +399,13 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 	const rowsRef = useRef({});
 	// Set when the rows have taken long enough that focus goes to what is there rather than waiting.
 	const [gaveUpWaiting, setGaveUpWaiting] = useState(false);
+	// Pressing Discover in the navigation while it is open brings its rows in again.
+	const [reloadKey, setReloadKey] = useState(0);
+	useEffect(() => {
+		const handleRefresh = () => setReloadKey((key) => key + 1);
+		window.addEventListener('moonfin:seerrDiscoverRefresh', handleRefresh);
+		return () => window.removeEventListener('moonfin:seerrDiscoverRefresh', handleRefresh);
+	}, []);
 	const rowsContainerRef = useRef(null);
 
 	// Back on a scrolled discover list returns it to the first row before it leaves
@@ -494,7 +501,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		})();
 
 		return () => { stale = true; };
-	}, [isAuthenticated, contextUser?.seerrUserId]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [isAuthenticated, contextUser?.seerrUserId, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// Load more items for a specific row
 	const loadMoreForRow = useCallback(async (rowId) => {

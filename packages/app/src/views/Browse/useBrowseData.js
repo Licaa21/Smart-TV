@@ -272,10 +272,11 @@ const useBrowseData = ({
 	useEffect(() => {
 		// detail.featured marks refreshes that change what the bar may hold, like hiding a library.
 		// detail.libraries marks a change to the libraries themselves, like their order, which has
-		// to show straight away, so the stored rows go too and the rows are asked for again.
+		// to show straight away, so the stored rows go too and the rows are asked for again. detail.reload is a refresh
+		// the viewer asked for, which does the same.
 		const handleBrowseRefresh = (e) => {
 			clearMemoryCache({keepFeatured: !e?.detail?.featured});
-			if (e?.detail?.libraries) clearBrowseCache().then(() => setReloadKey((key) => key + 1));
+			if (e?.detail?.libraries || e?.detail?.reload) clearBrowseCache().then(() => setReloadKey((key) => key + 1));
 			// The screen on view is still the right one for a refresh that changes nothing in it
 			else if (!e?.detail?.featured) setSnapshotTick((tick) => tick + 1);
 		};
