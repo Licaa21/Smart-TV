@@ -1,9 +1,25 @@
 import {useState, useEffect, useCallback, useRef} from 'react';
+import Spotlight from '@enact/spotlight';
 import {isBackKey} from '../../utils/keys';
 import {shouldAskStillWatching} from '../../utils/stillWatching';
 
 // The next episode is offered once this little of the current one is left.
 const NEAR_END_TICKS = 300000000;
+
+// The position is read twice a second, so a reading that is further from the last than this, forward, or any real step
+// back, is a seek and not playback.
+const SEEK_FORWARD_TICKS = 30000000;
+const SEEK_BACK_TICKS = 10000000;
+
+// The prompt's own button, which the key handler tells apart from the controls underneath.
+// How long after a skip a reading short of the segment's end is still the skip landing.
+const SKIP_SETTLE_MS = 5000;
+
+export const SKIP_PROMPT_ID = 'skip-segment-btn';
+const onSkipPrompt = () => {
+	const active = typeof document !== 'undefined' ? document.activeElement : null;
+	return Boolean(active && active.closest && active.closest(`[data-spotlight-id="${SKIP_PROMPT_ID}"]`));
+};
 
 /**
  * Drives the skip prompt for any segment the server marked up, plus the credits
@@ -19,6 +35,9 @@ const useSegmentPopups = ({
 	hideControls,
 	showControls,
 	onSeekToSegmentEnd,
+	// With the controls up, Up from the playback bar reaches the prompt and Down from it goes back.
+	focusRow,
+	onLeavePromptDown,
 	onPlayNext,
 	onPausePlayback,
 	onStopPlayback,
@@ -40,6 +59,11 @@ const useSegmentPopups = ({
 	}, []);
 
 	const dismissedSegmentsRef = useRef(new Set());
+	// The last position checked, to tell a seek from playback.
+	const lastTicksRef = useRef(null);
+	// The segment just skipped, since the seek that skips it can land a little short of its end and must not read as a
+	// viewer's seek into it.
+	const skippedRef = useRef(null);
 	// When the current skip prompt first appeared, for the auto hide timer.
 	const promptShownAtRef = useRef(null);
 	// Mirrored so the skip handler can stay stable, because the players keep
@@ -143,6 +167,7 @@ const useSegmentPopups = ({
 		if (!target?.end) return;
 		if (pressed) noteViewerActivity();
 		dismissedSegmentsRef.current.add(target.start);
+		skippedRef.current = {start: target.start, at: Date.now()};
 		onSeekToSegmentEnd?.(target.end);
 		setSkipSegment(null);
 	}, [noteViewerActivity, onSeekToSegmentEnd]);
@@ -156,6 +181,8 @@ const useSegmentPopups = ({
 		setNextEpisodeCountdown(null);
 		setAskStillWatching(false);
 		dismissedSegmentsRef.current.clear();
+		lastTicksRef.current = null;
+		skippedRef.current = null;
 		hasTriggeredNextEpisodeRef.current = false;
 		if (nextEpisodeTimerRef.current) {
 			clearInterval(nextEpisodeTimerRef.current);
@@ -173,6 +200,22 @@ const useSegmentPopups = ({
 		const introAction = settings.introAction || 'ask';
 		const outroAction = settings.outroAction || 'ask';
 		const creditsStart = mediaSegments?.creditsStart ?? null;
+
+		// A seek into a segment offers it again, however the prompt for it ended before: dismissed, or hidden after its
+		// few seconds. A segment that skips by itself is left as it is, so winding back into an intro to watch it does
+		// not throw the viewer straight out again. The progress is worked out from where the seek landed.
+		const last = lastTicksRef.current;
+		lastTicksRef.current = ticks;
+		if (last != null && (ticks - last > SEEK_FORWARD_TICKS || last - ticks > SEEK_BACK_TICKS)) {
+			(mediaSegments?.list || []).forEach((seg) => {
+				if (seg.end == null || ticks < seg.start || ticks >= seg.end) return;
+				if (skippedRef.current?.start === seg.start && Date.now() - skippedRef.current.at < SKIP_SETTLE_MS) return;
+				const auto = (seg.type === 'intro' && introAction === 'auto') || (seg.type === 'outro' && outroAction === 'auto');
+				if (auto) return;
+				dismissedSegmentsRef.current.delete(seg.start);
+				if (promptShownAtRef.current?.start === seg.start) promptShownAtRef.current = null;
+			});
+		}
 
 		// Seeking back past where a prompt would first appear makes it upcoming
 		// again, so one that was skipped or dismissed on the way through is offered
@@ -268,13 +311,9 @@ const useSegmentPopups = ({
 
 	// --- Clearing the way for a popup ---
 
-	// Keyed on which segment it is, not the object, because that carries a
-	// countdown that ticks every second and this only has to run once.
+	// Keyed on which segment it is, not the object, because that carries a countdown that ticks every second.
+	// The skip prompt shows over the controls and moves up out of their way, so it clears nothing.
 	const skipSegmentStart = skipSegment?.start ?? null;
-	useEffect(() => {
-		if (skipSegmentStart == null || activeModal) return;
-		hideControls();
-	}, [skipSegmentStart, activeModal, hideControls]);
 
 	useEffect(() => {
 		if (!(showSkipCredits || showNextEpisode) || !nextEpisode || activeModal) return;
@@ -300,52 +339,73 @@ const useSegmentPopups = ({
 			return true;
 		}
 
-		const skipSegmentVisible = skipSegmentStart != null && !activeModal && !controlsVisible;
+		const skipPromptUp = skipSegmentStart != null && !activeModal;
 		const nextEpisodeVisible = (showSkipCredits || showNextEpisode) && nextEpisode && !activeModal && !controlsVisible;
+		const isEnter = key === 'Enter' || e.keyCode === 13;
+		const isUp = key === 'ArrowUp' || e.keyCode === 38;
+		const isDown = key === 'ArrowDown' || e.keyCode === 40;
+		const isSide = key === 'ArrowLeft' || e.keyCode === 37 || key === 'ArrowRight' || e.keyCode === 39;
 
-		if (!skipSegmentVisible && !nextEpisodeVisible) return false;
-
-		const dismissSegment = () => {
-			dismissedSegmentsRef.current.add(skipSegmentStart);
-			setSkipSegment(null);
-		};
-
-		if (skipSegmentVisible) {
-			if (back) {
+		if (skipPromptUp) {
+			const consume = () => {
 				e.preventDefault();
 				e.stopPropagation();
-				dismissSegment();
-				return true;
-			}
-			if (key === 'Enter' || e.keyCode === 13) return false;
-			// Any other key dismisses it and brings the controls back.
-			e.preventDefault();
-			e.stopPropagation();
-			dismissSegment();
-			showControls();
-			return true;
-		}
-
-		// Next episode / skip credits popup
-		if (nextEpisodeVisible) {
-			if (back) {
-				e.preventDefault();
-				e.stopPropagation();
-				cancelNextEpisodeCountdown();
-				return true;
-			}
-			if (key === 'Enter' || e.keyCode === 13) return false;
-			// Allow Left/Right for navigation
-			if (key === 'ArrowLeft' || e.keyCode === 37 || key === 'ArrowRight' || e.keyCode === 39) {
+			};
+			if (!controlsVisible) {
+				// The prompt holds focus while the controls are away. Back sends it away for good and OK takes it, and
+				// any other key is the viewer reaching for the controls, which come up with the prompt still showing.
+				if (back) {
+					consume();
+					dismissedSegmentsRef.current.add(skipSegmentStart);
+					setSkipSegment(null);
+					return true;
+				}
+				if (isEnter) {
+					consume();
+					handleSkipSegment();
+					return true;
+				}
 				return false;
 			}
-			e.preventDefault();
-			e.stopPropagation();
-			return true;
+			// With the controls up, Back closes them and leaves the prompt, which is the player's own handling. Up from
+			// the playback bar reaches the prompt, and it stays put under the arrows until Down goes back to the bar.
+			if (onSkipPrompt()) {
+				if (isDown) {
+					consume();
+					onLeavePromptDown?.();
+					return true;
+				}
+				if (isUp || isSide) {
+					consume();
+					showControls();
+					return true;
+				}
+				return false;
+			}
+			if (isUp && focusRow === 'progress' && Spotlight.focus(SKIP_PROMPT_ID)) {
+				consume();
+				showControls();
+				return true;
+			}
+			return false;
 		}
 
-		return false;
-	}, [askStillWatching, handleStillWatchingContinue, skipSegmentStart, showSkipCredits, showNextEpisode, nextEpisode, activeModal, controlsVisible, showControls, cancelNextEpisodeCountdown]);
+		if (!nextEpisodeVisible) return false;
+
+		// Next episode / skip credits popup
+		if (back) {
+			e.preventDefault();
+			e.stopPropagation();
+			cancelNextEpisodeCountdown();
+			return true;
+		}
+		if (isEnter) return false;
+		// Allow Left/Right for navigation
+		if (isSide) return false;
+		e.preventDefault();
+		e.stopPropagation();
+		return true;
+	}, [askStillWatching, handleStillWatchingContinue, handleSkipSegment, focusRow, onLeavePromptDown, skipSegmentStart, showSkipCredits, showNextEpisode, nextEpisode, activeModal, controlsVisible, showControls, cancelNextEpisodeCountdown]);
 
 	return {
 		askStillWatching,

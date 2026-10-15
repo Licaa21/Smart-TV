@@ -1780,6 +1780,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (!groupSeekTo(endTicks)) seekToTicks(endTicks);
 	}, [seekToTicks, groupSeekTo]);
 
+	// Down from the skip prompt, with the controls up, goes back to the playback bar.
+	const leaveSkipPromptDown = useCallback(() => {
+		setFocusRow('progress');
+		window.requestAnimationFrame(() => Spotlight.focus('progress-bar'));
+	}, []);
+
 	const {
 		skipSegment, showSkipCredits, showNextEpisode, nextEpisodeCountdown,
 		handleSkipSegment, handlePlayNextNow,
@@ -1789,6 +1795,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		mediaSegments, nextEpisode, settings, runTimeRef,
 		activeModal, controlsVisible, hideControls, showControls,
 		onSeekToSegmentEnd,
+		focusRow,
+		onLeavePromptDown: leaveSkipPromptDown,
 		onPlayNext: onPlayNextWithCleanup,
 		onPausePlayback: () => {
 			videoRef.current?.pause();
@@ -3305,7 +3313,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				</NextEpisodeContainer>
 			)}
 
-			{!isLoading && !error && skipSegment && !isAudioMode && !isLiveTV && !activeModal && !controlsVisible && (
+			{!isLoading && !error && skipSegment && !isAudioMode && !isLiveTV && !activeModal && (
 				<SkipSegmentOverlay
 					type={skipSegment.type}
 					remainingSeconds={skipSegment.remainingSeconds}
@@ -3313,6 +3321,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					countdownStyle={settings.nextUpCountdownStyle ?? 'both'}
 					onSkip={handleSkipSegment}
 					spotlightId="skip-segment-btn"
+					controlsVisible={controlsVisible}
+					measureKey={`${item?.Id}|${item?.Overview}`}
 				/>
 			)}
 
