@@ -1,6 +1,6 @@
 import {useState, useEffect, useCallback, useRef} from 'react';
 import Spotlight from '@enact/spotlight';
-import {isBackKey} from '../../utils/keys';
+import {isBackKey, isChannelMenuKey} from '../../utils/keys';
 import {shouldAskStillWatching} from '../../utils/stillWatching';
 
 // The next episode is offered once this little of the current one is left.
@@ -10,6 +10,9 @@ const NEAR_END_TICKS = 300000000;
 // back, is a seek and not playback.
 const SEEK_FORWARD_TICKS = 30000000;
 const SEEK_BACK_TICKS = 10000000;
+
+// Where the next episode is offered from: the credits, or the last stretch of the runtime, whichever comes first.
+const nextUpStartOf = (creditsStart, runTime) => Math.min(creditsStart ?? Infinity, runTime > 0 ? runTime - NEAR_END_TICKS : Infinity);
 
 // The prompt's own button, which the key handler tells apart from the controls underneath.
 // How long after a skip a reading short of the segment's end is still the skip landing.
@@ -205,6 +208,9 @@ const useSegmentPopups = ({
 		const outroAction = settings.outroAction || 'ask';
 		const creditsStart = mediaSegments?.creditsStart ?? null;
 
+		// From here on the next episode is offered, or the credits card in place of the skip prompt
+		const nextUpFrom = nextUpStartOf(creditsStart, runTimeRef.current);
+
 		// A seek into a segment offers it again, however the prompt for it ended before: dismissed, or hidden after its
 		// few seconds. A segment that skips by itself is left as it is, so winding back into an intro to watch it does
 		// not throw the viewer straight out again. The progress is worked out from where the seek landed.
@@ -219,6 +225,8 @@ const useSegmentPopups = ({
 				dismissedSegmentsRef.current.delete(seg.start);
 				if (promptShownAtRef.current?.start === seg.start) promptShownAtRef.current = null;
 			});
+			// The next episode card too: one the viewer sent away comes back when they seek to somewhere it is offered
+			if (ticks >= nextUpFrom) hasTriggeredNextEpisodeRef.current = false;
 		}
 
 		// Seeking back past where a prompt would first appear makes it upcoming
@@ -227,10 +235,6 @@ const useSegmentPopups = ({
 		for (const start of dismissedSegmentsRef.current) {
 			if (ticks < start) dismissedSegmentsRef.current.delete(start);
 		}
-		const nextUpFrom = Math.min(
-			creditsStart ?? Infinity,
-			runTimeRef.current > 0 ? runTimeRef.current - NEAR_END_TICKS : Infinity
-		);
 		if (ticks < nextUpFrom) hasTriggeredNextEpisodeRef.current = false;
 
 		// Set while a skip button is on screen, so the next episode card can hold back.
@@ -314,6 +318,35 @@ const useSegmentPopups = ({
 		}
 	}, [mediaSegments, settings.introAction, settings.nextUpBehavior, settings.outroAction, settings.replaceSkipOutroWithNextUp, settings.mediaSegmentAutoHide, nextEpisode, currentIsPreroll, runTimeRef, handlePlayNextEpisode, handleSkipSegment]);
 
+	// --- Bringing the prompt back by hand ---
+
+	// The channel list button brings back the prompt of the segment the viewer is inside, or the next episode card in the credits,
+	// after it was sent away or hid itself. False when there is nothing hidden to bring back, which leaves the key alone.
+	const reofferPrompt = useCallback(() => {
+		const ticks = lastTicksRef.current;
+		if (ticks == null || skipSegmentRef.current) return false;
+		// Only a segment that would really offer a prompt, the way checkSegments judges it
+		const introAction = settings.introAction || 'ask';
+		const outroAction = settings.outroAction || 'ask';
+		const nextUpWouldShow = Boolean(nextEpisode) && !currentIsPreroll && settings.nextUpBehavior !== 'disabled';
+		const outroBecomesNextUp = settings.replaceSkipOutroWithNextUp === true && nextUpWouldShow;
+		let found = false;
+		(mediaSegments?.list || []).forEach((seg) => {
+			if (seg.end == null || ticks < seg.start || ticks >= seg.end) return;
+			if (seg.type === 'intro' && introAction !== 'ask') return;
+			if (seg.type === 'outro' && (outroAction !== 'ask' || outroBecomesNextUp)) return;
+			found = true;
+			dismissedSegmentsRef.current.delete(seg.start);
+			if (promptShownAtRef.current?.start === seg.start) promptShownAtRef.current = null;
+		});
+		if (nextUpWouldShow && hasTriggeredNextEpisodeRef.current && ticks >= nextUpStartOf(mediaSegments?.creditsStart ?? null, runTimeRef.current)) {
+			found = true;
+			hasTriggeredNextEpisodeRef.current = false;
+		}
+		if (found) checkSegments(ticks);
+		return found;
+	}, [mediaSegments, nextEpisode, runTimeRef, checkSegments, settings.introAction, settings.outroAction, settings.nextUpBehavior, settings.replaceSkipOutroWithNextUp, currentIsPreroll]);
+
 	// --- Clearing the way for a popup ---
 
 	// Keyed on which segment it is, not the object, because that carries a countdown that ticks every second.
@@ -341,6 +374,13 @@ const useSegmentPopups = ({
 				e.stopPropagation();
 				handleStillWatchingContinue();
 			}
+			return true;
+		}
+
+		// The channel list button, with nothing of the prompt on screen, asks for it again
+		if (isChannelMenuKey(e) && !activeModal && !showSkipCredits && !showNextEpisode && reofferPrompt()) {
+			e.preventDefault();
+			e.stopPropagation();
 			return true;
 		}
 
@@ -410,7 +450,7 @@ const useSegmentPopups = ({
 		e.preventDefault();
 		e.stopPropagation();
 		return true;
-	}, [askStillWatching, handleStillWatchingContinue, handleSkipSegment, focusRow, onLeavePromptDown, skipSegmentStart, showSkipCredits, showNextEpisode, nextEpisode, activeModal, controlsVisible, showControls, cancelNextEpisodeCountdown]);
+	}, [askStillWatching, handleStillWatchingContinue, handleSkipSegment, reofferPrompt, focusRow, onLeavePromptDown, skipSegmentStart, showSkipCredits, showNextEpisode, nextEpisode, activeModal, controlsVisible, showControls, cancelNextEpisodeCountdown]);
 
 	return {
 		askStillWatching,

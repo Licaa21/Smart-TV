@@ -1,6 +1,19 @@
-import {ACCENT_KEYS, ACCENT_SURFACES, accentSignature, defaultAccentSwatch, pickedAccent, pickedAccents} from './accentSurfaces';
+import {ACCENT_KEYS, ACCENT_SURFACES, accentSignature, defaultAccentSwatch, pickedAccent, pickedAccents, themeAccentHex} from './accentSurfaces';
 import {defaultSettings} from '../context/defaultSettings';
 import {ACCENT_RULES} from './accentRules.generated';
+
+describe('themeAccentHex', () => {
+	it('drops the alpha of a theme color, which comes first', () => {
+		expect(themeAccentHex({colors: {accent: '#FF00A4DC'}})).toBe('#00A4DC');
+		expect(themeAccentHex({colors: {accent: '#80FF2E92'}})).toBe('#FF2E92');
+	});
+
+	it('takes a plain color as it is, and says nothing for a missing one', () => {
+		expect(themeAccentHex({colors: {accent: '#00a4dc'}})).toBe('#00a4dc');
+		expect(themeAccentHex({colors: {}})).toBe('');
+		expect(themeAccentHex(null)).toBe('');
+	});
+});
 
 describe('accent surfaces', () => {
 	it('has a default setting, empty, for every surface', () => {

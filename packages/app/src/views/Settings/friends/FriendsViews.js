@@ -18,6 +18,7 @@ import {SpottableDiv} from '../settingsSpottables';
 
 import settingsCss from '../Settings.module.less';
 import css from './Friends.module.less';
+import achievementsCss from '../achievements/Achievements.module.less';
 
 const FAILED = () => $L("That didn't work. Try again in a moment.");
 const LOAD_FAILED = () => $L('Could not load this. Check your connection and try again.');
@@ -68,7 +69,7 @@ const Avatar = ({name, online, small}) => (
 );
 
 const PersonRow = ({spotlightId, name, caption, online, trailing, onClick}) => (
-	<SpottableDiv className={settingsCss.listItem} spotlightId={spotlightId} onClick={onClick}>
+	<SpottableDiv className={`${settingsCss.listItem} ${achievementsCss.accentRow}`} spotlightId={spotlightId} onClick={onClick}>
 		<Avatar name={name} online={online} small />
 		<div className={settingsCss.listItemBody}>
 			<div className={settingsCss.listItemHeading}>{name}</div>

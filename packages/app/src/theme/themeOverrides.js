@@ -58,6 +58,11 @@ import ratingsCss from '../components/RatingsRow/RatingsRow.module.less';
 import itemMenuCss from '../components/ItemContextMenu/ItemContextMenu.module.less';
 import skeletonCss from '../components/Skeleton/Skeleton.module.less';
 import playlistSortFilterCss from '../components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less';
+import libraryCss from '../views/Library/Library.module.less';
+import favoritesCss from '../views/Favorites/Favorites.module.less';
+import genreBrowseCss from '../views/GenreBrowse/GenreBrowse.module.less';
+import episodeBrowserCss from '../views/Player/EpisodeBrowser.module.less';
+import minimalistCardsCss from '../views/Details/minimalist/MinimalistCards.module.less';
 
 const STYLE_ELEMENT_ID = 'moonfin-theme-overrides';
 
@@ -190,6 +195,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	const achievementsAccent = makeAccent('achievements');
 	const detailsAccent = makeAccent('details');
 	const homeAccent = makeAccent('home');
+	const playerAccent = makeAccent('player');
 	const buttonNormal = toCssColor(c.buttonNormal);
 	const buttonFocused = toCssColor(c.buttonFocused);
 	const buttonActive = toCssColor(c.buttonActive);
@@ -209,6 +215,11 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	const countBadge = (accent, id) => (picked[id]
 		? `background: ${accent.css}; color: ${accent.on}; border-color: ${accent.on};`
 		: `background: ${badgeUnplayed}; color: ${onBadge}; border-color: ${onBadge};`);
+	// The check on a watched title is a badge color of the theme too. A surface that was given an accent draws it in that
+	// color, with ink chosen to read on it, like the circle counting unplayed episodes.
+	const watchedBadge = (accent, id) => (picked[id]
+		? {fill: accent.css, ink: accent.on}
+		: {fill: badgeWatched, ink: onBadge});
 	const recordingActive = toCssColor(c.recordingActive);
 	const error = toCssColor(c.error || DEFAULT_ERROR_COLOR);
 	const statusAvailable = toCssColor(theme.semantic.statusAvailable);
@@ -307,6 +318,13 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		rules.push(`${selector.split(',').map((part) => `${prefix} ${part.trim()}`).join(', ')} { ${body} }`);
 	};
 	rules.push(`${prefix} { background: ${background}; color: ${onBackground}; }`);
+
+	// The check on a watched title, drawn in the accent of its surface when it has one
+	const watchedRules = (selector, accent, id) => {
+		const look = watchedBadge(accent, id);
+		rule(selector, `background: ${look.fill}; border-color: ${look.ink};`);
+		rule(`${selector} svg`, `fill: ${look.ink}; stroke: ${look.ink};`);
+	};
 
 	// The stylesheets' own accent declarations, for each surface that was given a color. They
 	// come first so the hand-written rules below still win where the two meet.
@@ -499,8 +517,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${searchCss.searchInputFocused}`, `background: ${inputFocused}; border-color: ${focusColor}; box-shadow: ${glowOr('none')};`);
 
 	// Detail screens, classic layout
-	rule(`.${detailsCss.posterBadgeWatched}, .${detailsCss.watchedIndicator}`, `background: ${badgeWatched}; border-color: ${onBadge};`);
-	rule(`.${detailsCss.posterBadgeWatched} svg, .${detailsCss.watchedIndicator} svg`, `fill: ${onBadge}; stroke: ${onBadge};`);
+	watchedRules(`.${detailsCss.posterBadgeWatched}, .${detailsCss.watchedIndicator}`, detailsAccent, 'details');
 	rule(`.${detailsCss.posterBadgeFavorite} svg, .${detailsCss.favoriteBadge} svg`, `fill: ${onBadge}; stroke: ${onBadge};`);
 	rule(`.${detailsCss.posterBadgeFavorite}, .${detailsCss.favoriteBadge}`, `background: ${recordingActive}; border-color: ${onBadge};`);
 	rule(`.${detailsCss.seriesName}, .${detailsCss.tagline}`, `color: ${os(0.7)};`);
@@ -543,6 +560,19 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${detailsCss.actionBtn}:hover, .${detailsCss.actionBtn}:focus`, `background: ${detailsAccent.a(0.3)}; border-color: ${focusColor};`);
 	rule(`.${detailsCss.toast}`, `background: ${surfaceA(0.9)}; color: ${onBackground}; border-color: ${os(0.12)};`);
 
+	// The watched check on the library, favorites and genre screens, and in the episode browser of the player
+	[libraryCss, favoritesCss, genreBrowseCss].forEach((screenCss) => watchedRules(`.${screenCss.watchedBadge}`, homeAccent, 'home'));
+	watchedRules(`.${episodeBrowserCss.watchedBadge}`, playerAccent, 'player');
+
+	// The rows of the achievements and friends screens are Settings rows, which wear the Settings accent. Given an
+	// achievements accent they wear that one, with the selector doubled so it wins over the Settings rules whichever comes last.
+	if (picked.achievements) {
+		const row = `.${settingsCss.listItem}.${achievementsCss.accentRow}`;
+		rule(`${row}:focus`, `border-color: ${achievementsAccent.a(0.72)}; box-shadow: ${glowOr(`0 0 28.7px 0.83px ${achievementsAccent.a(0.22)}`)};`);
+		rule(`${row} .${settingsCss.listItemIcon}`, `background: ${achievementsAccent.a(0.14)}; border-color: ${achievementsAccent.a(0.42)};`);
+		rule(`${row}:focus .${settingsCss.listItemIcon}`, `background: ${achievementsAccent.a(0.22)}; border-color: ${achievementsAccent.a(0.64)};`);
+	}
+
 	// Playlist sort & filter controls
 	rule(`.${playlistSortFilterCss.pill}:focus, .${playlistSortFilterCss.pill}.spottable-focus`, `background: ${focusColor}; border-color: ${focusColor}; color: ${buttonInk};`);
 	rule(`.${playlistSortFilterCss.pillActive}`, `background: ${detailsAccent.a(0.22)}; border-color: ${detailsAccent.css}; color: ${onBackground};`);
@@ -560,8 +590,8 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${modernDetailCss.upNextLabel}`, `color: ${detailsAccent.css};`);
 	rule(`.${modernDetailCss.upNextProgress} > div`, `background: ${detailsAccent.css};`);
 	rule(`.${modernDetailCss.sectionHeading}`, `color: ${onBackground};`);
-	rule(`.${modernDetailCss.episodeWatched}`, `background: ${badgeWatched}; border-color: ${onBadge};`);
-	rule(`.${modernDetailCss.episodeWatched} svg`, `fill: ${onBadge}; stroke: ${onBadge};`);
+	watchedRules(`.${modernDetailCss.episodeWatched}`, detailsAccent, 'details');
+	watchedRules(`.${minimalistCardsCss.watchedBadge}`, detailsAccent, 'details');
 	rule(`.${tabBarCss.tabBar}`, `background: ${os(0.08)};`);
 	rule(`.${modernFileInfoCss.trackActive}`, `border-color: ${detailsAccent.css};`);
 	rule(`.${modernFileInfoCss.showAll}, .${modernFileInfoCss.retry}, .${modernFileInfoCss.reasonHint}`, `color: ${detailsAccent.css};`);
@@ -665,8 +695,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		rule(`.${cardCss.title}`, `color: ${theme.id === 'neon_pulse' ? homeAccent.css : onSurface};`);
 		rule(`.${cardCss.progressBar}`, `background: ${scrim(0.54)};`);
 		rule(`.${cardCss.progress}`, `background: ${homeAccent.css};`);
-		rule(`.${cardCss.watchedBadge}`, `background: ${badgeWatched}; border-color: ${onBadge};`);
-		rule(`.${cardCss.watchedBadge} svg`, `fill: ${onBadge}; stroke: ${onBadge};`);
+		watchedRules(`.${cardCss.watchedBadge}`, homeAccent, 'home');
 		rule(`.${cardCss.unplayedCount}`, countBadge(homeAccent, 'home'));
 		rule(`.${cardCss.favoriteBadge}`, `background: ${recordingActive}; border-color: ${onBadge};`);
 		rule(`.${cardCss.favoriteBadge} svg`, `fill: ${onBadge}; stroke: ${onBadge};`);

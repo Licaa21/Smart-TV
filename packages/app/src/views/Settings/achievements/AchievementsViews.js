@@ -128,7 +128,7 @@ export const useLoadOnOpen = (read) => {
 // A row takes focus even when it does nothing, because a list whose rows cannot be focused is a
 // list the remote cannot scroll.
 const AchievementRow = ({spotlightId, onClick, children}) => (
-	<SpottableDiv className={settingsCss.listItem} spotlightId={spotlightId} onClick={onClick}>
+	<SpottableDiv className={`${settingsCss.listItem} ${css.accentRow}`} spotlightId={spotlightId} onClick={onClick}>
 		{children}
 	</SpottableDiv>
 );
@@ -1136,7 +1136,7 @@ const RerollRow = ({weekly, rerollsLeft = 0, busy, onReroll}) => {
 
 	return (
 		<SpottableDiv
-			className={`${settingsCss.listItem}${offered ? '' : ` ${css.rowSpent}`}`}
+			className={`${settingsCss.listItem} ${css.accentRow}${offered ? '' : ` ${css.rowSpent}`}`}
 			spotlightId={`setting-achievement-reroll-${weekly ? 'weekly' : 'daily'}`}
 			onClick={offered ? handleClick : null}
 		>

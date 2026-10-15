@@ -297,6 +297,49 @@ describe('per-surface accents', () => {
 			});
 		});
 
+		it('keeps the rules for the playlist sort and filter pills', () => {
+			const lines = rulesFor({});
+			expect(lines.some((line) => line.includes('.pill:focus'))).toBe(true);
+			expect(lines.some((line) => line.includes('.pillActive'))).toBe(true);
+		});
+
+		describe('the check on a watched title', () => {
+			const watchedRules = (accents) => rulesFor(accents).filter((line) => line.includes('.watchedBadge {') || line.includes('.posterBadgeWatched') || line.includes('.episodeWatched {'));
+
+			it('keeps the theme badge color until the surface was given an accent', () => {
+				const rules = watchedRules({});
+				expect(rules.length).toBeGreaterThan(0);
+				const fills = rules.filter((rule) => rule.includes('background:')).map((rule) => /background: ([^;]+);/.exec(rule)[1]);
+				// one color everywhere, the theme's, and none of a pick
+				expect(new Set(fills).size).toBe(1);
+				expect(fills[0]).not.toBe('rgb(255, 136, 0)');
+			});
+
+			it('follows the Home accent on the cards and the library screens', () => {
+				const rules = watchedRules({home: '#ff8800'}).filter((rule) => rule.includes('background:'));
+				// the cards of both styles, the library, favorites and genre screens
+				expect(rules.filter((rule) => rule.includes('background: rgb(255, 136, 0)')).length).toBeGreaterThanOrEqual(5);
+			});
+
+			it('follows the Details accent on the details screens and the Player accent in the episode browser', () => {
+				expect(watchedRules({details: '#ff8800'}).some((rule) => rule.includes('background: rgb(255, 136, 0)'))).toBe(true);
+				expect(watchedRules({player: '#ff8800'}).filter((rule) => rule.includes('background: rgb(255, 136, 0)')).length).toBe(1);
+			});
+		});
+
+		describe('the rows of the achievements and friends screens', () => {
+			it('wear the Settings accent until the Achievements surface was given one', () => {
+				expect(rulesFor({settings: '#ff8800'}).some((line) => line.includes('.accentRow:focus'))).toBe(false);
+			});
+
+			it('wear the Achievements accent once it was picked, ahead of the Settings rules', () => {
+				const lines = rulesFor({achievements: '#ff8800', settings: '#0000ff'}).filter((line) => line.includes('.accentRow'));
+				expect(lines.length).toBe(3);
+				lines.forEach((line) => expect(line).toContain('255, 136, 0'));
+				lines.forEach((line) => expect(line).toMatch(/\.listItem\S*\.accentRow|\.listItem\.\S*accentRow/));
+			});
+		});
+
 		describe('the icon box on a focused Settings row', () => {
 			const iconRule = (accents) => rulesFor(accents).find((line) => line.includes('.listItem:focus .listItemIcon {'));
 

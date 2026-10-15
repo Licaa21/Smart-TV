@@ -42,7 +42,7 @@ const postcss = loadTool('postcss');
 // ACCENT_SURFACES in theme/accentSurfaces.js.
 const SURFACE_OF = [
 	['navigation', [/^components\/(NavBar|Sidebar)\//]],
-	['achievements', [/^views\/Settings\/achievements\//]],
+	['achievements', [/^views\/Settings\/(achievements|friends)\//]],
 	['settings', [/^views\/Settings\//]],
 	['skip', [/^views\/Player\/SkipSegmentOverlay/]],
 	['liveTv', [/^views\/(LiveTV|Recordings)\//, /^views\/Player\/ChannelCarousel/]],
