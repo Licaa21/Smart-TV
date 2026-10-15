@@ -115,6 +115,8 @@ export const resolveSkipOverlayLook = (settings = {}) => {
 	return {
 		layout,
 		overlay: placement(position, size),
+		// How far up from the bottom edge the prompt rests, when it sits along the bottom, so it can lift clear of the controls.
+		bottomEdge: splitPosition(position)[0] === 'bottom' ? BOTTOM_EDGE : null,
 		button,
 		accent,
 		icon: accent ? {color: accent} : undefined,

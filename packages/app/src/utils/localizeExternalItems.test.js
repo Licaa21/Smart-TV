@@ -62,6 +62,13 @@ describe('localizeSeerrCards', () => {
 		expect(seerrApi.getMovie).toHaveBeenCalledTimes(1);
 	});
 
+	it('leaves alone a card the library turned out to hold, which still carries the marks of its list', async () => {
+		const held = card(3000, {_resolvedFromExternal: true, Id: 'abc'});
+		const [library] = await localizeSeerrCards([held], 'ro');
+		expect(library).toBe(held);
+		expect(seerrApi.getMovie).not.toHaveBeenCalled();
+	});
+
 	it('asks for a series as a series', async () => {
 		seerrApi.getTv.mockResolvedValue({name: 'Serial', posterPath: '/s.jpg'});
 		const [show] = await localizeSeerrCards([card(2000, {Type: 'Series'})], 'ro');

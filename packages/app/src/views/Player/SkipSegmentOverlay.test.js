@@ -1,7 +1,7 @@
 import {render, screen} from '@testing-library/react';
 
 import {defaultSettings} from '../../context/defaultSettings';
-import SkipSegmentOverlay from './SkipSegmentOverlay';
+import SkipSegmentOverlay, {promptBottomFor} from './SkipSegmentOverlay';
 
 jest.mock('@enact/i18n/$L', () => ({__esModule: true, default: (str) => str}));
 
@@ -137,3 +137,16 @@ describe('SkipSegmentOverlay', () => {
 	});
 });
 
+
+describe('promptBottomFor', () => {
+	test('lifts the prompt above the controls and leaves it alone when it already clears them', () => {
+		// Controls whose top edge is 240px up from a 1080px screen, so the prompt rests 24px above that.
+		expect(promptBottomFor(174, 840, 1080)).toBe(264);
+		expect(promptBottomFor(174, 1000, 1080)).toBeNull();
+	});
+
+	test('does nothing for a prompt that is not along the bottom, or without the controls to measure', () => {
+		expect(promptBottomFor(null, 840, 1080)).toBeNull();
+		expect(promptBottomFor(174, null, 1080)).toBeNull();
+	});
+});
