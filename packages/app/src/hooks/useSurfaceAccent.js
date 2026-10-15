@@ -1,5 +1,5 @@
 import {useSettings} from '../context/SettingsContext';
-import {ACCENT_SURFACES, pickedAccent, themeAccentHex} from '../theme/accentSurfaces';
+import {ACCENT_SURFACES, effectiveAccent, themeAccentHex} from '../theme/accentSurfaces';
 import {ensureVisible} from '../theme/themeSpec';
 
 /**
@@ -19,11 +19,19 @@ import {ensureVisible} from '../theme/themeSpec';
  */
 const useSurfaceAccent = (surfaceId, fallback) => {
 	const {settings, activeTheme} = useSettings();
-	const picked = pickedAccent(settings, surfaceId);
+	const picked = effectiveAccent(settings, surfaceId);
 	// A pick that would vanish into the dark screens is nudged until it shows.
 	if (picked) return ensureVisible(picked, [activeTheme?.colors?.background, activeTheme?.colors?.surface]);
 	const themed = ACCENT_SURFACES.some((surface) => surface.id === surfaceId && surface.themed);
 	return (themed && themeAccentHex(activeTheme)) || fallback;
+};
+
+// Only what was picked for the surface, or the surface it lives in, lifted to be seen, or '' when nothing was. For a place that
+// keeps a color of its own, such as a rank's, until the person chooses one.
+export const usePickedSurfaceAccent = (surfaceId) => {
+	const {settings, activeTheme} = useSettings();
+	const picked = effectiveAccent(settings, surfaceId);
+	return picked ? ensureVisible(picked, [activeTheme?.colors?.background, activeTheme?.colors?.surface]) : '';
 };
 
 export default useSurfaceAccent;

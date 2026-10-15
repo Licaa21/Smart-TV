@@ -14,7 +14,7 @@ import {achievementIconPath} from './achievementIcons';
 import ConfirmSpendDialog from './ConfirmSpendDialog';
 import DetailsTabBar from '../../../components/DetailsTabBar/DetailsTabBar';
 import SettingsView from '../SettingsView';
-import useSurfaceAccent from '../../../hooks/useSurfaceAccent';
+import useSurfaceAccent, {usePickedSurfaceAccent} from '../../../hooks/useSurfaceAccent';
 import {renderSettingsIcon} from '../settingsIcons';
 import {SectionTitle, NavRow, ToggleRow} from '../settingsRows';
 import {SpottableDiv} from '../settingsSpottables';
@@ -24,6 +24,9 @@ import css from './Achievements.module.less';
 import {appLocale} from '../../../utils/appLocale';
 
 const DEFAULT_ACCENT = '#00a4dc';
+
+// The word for a recap is lowercase in some languages, since it also stands in the middle of a sentence, and a title is not
+const upperFirst = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
 // The plugin has no category name for the overall board, but a tab still needs an id of its own.
 const OVERALL_BOARD = 'score';
@@ -230,7 +233,8 @@ const CategorySection = ({group, open, onToggle, onOpenBadge}) => {
 
 const RankHeader = ({rank, summary, worn}) => {
 	const accent = useSurfaceAccent('achievements', DEFAULT_ACCENT);
-	const color = (rank && parseHexColor(rank.tier.color)) || accent;
+	// The server gives each rank a color of its own, which the header keeps until an accent is picked for these screens
+	const color = usePickedSurfaceAccent('achievements') || (rank && parseHexColor(rank.tier.color)) || accent;
 	const avatar = wornAvatarIcon(worn);
 	const title = wornTitle(worn);
 
@@ -431,7 +435,7 @@ export const AchievementsView = ({overview, loading, onReload, onOpen, unlockToa
 			/>
 			<OpenScreenRow
 				id="achievements-recap"
-				title={$L('Recap')}
+				title={upperFirst($L('Recap'))}
 				desc={$L('What you watched recently')}
 				icon="insights"
 				view="achievementsRecap"

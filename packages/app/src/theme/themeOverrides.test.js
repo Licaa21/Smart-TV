@@ -327,9 +327,26 @@ describe('per-surface accents', () => {
 			});
 		});
 
+		describe('the achievements screens inside Settings', () => {
+			it('wear the Settings accent when they were given none, and their own once they have one', () => {
+				const inherited = rulesFor({settings: '#ff8800'}).filter((line) => line.includes('.accentRow'));
+				expect(inherited.length).toBe(3);
+				inherited.forEach((line) => expect(line).toContain('255, 136, 0'));
+				const own = rulesFor({settings: '#ff8800', achievements: '#33cc33'}).filter((line) => line.includes('.accentRow'));
+				own.forEach((line) => expect(line).toContain('51, 204, 51'));
+			});
+
+			it('ring a focused badge in the accent when there is one, and in the focus color otherwise', () => {
+				const ring = (accents) => rulesFor(accents).find((line) => line.includes('.showcaseItem:focus'));
+				expect(ring({achievements: '#ff8800'})).toContain('border-color: rgb(255, 136, 0)');
+				expect(ring({})).not.toContain('rgb(255, 136, 0)');
+				expect(ring({})).toContain('border-color:');
+			});
+		});
+
 		describe('the rows of the achievements and friends screens', () => {
-			it('wear the Settings accent until the Achievements surface was given one', () => {
-				expect(rulesFor({settings: '#ff8800'}).some((line) => line.includes('.accentRow:focus'))).toBe(false);
+			it('keep the look of the theme while no accent was picked', () => {
+				expect(rulesFor({}).some((line) => line.includes('.accentRow'))).toBe(false);
 			});
 
 			it('wear the Achievements accent once it was picked, ahead of the Settings rules', () => {
