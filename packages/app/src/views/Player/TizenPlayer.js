@@ -28,7 +28,7 @@ import {getImageUrl, getLogoUrl} from '../../utils/helpers';
 import {initPgsCanvasRenderer, disposePgsRenderer, clearPgsCanvas} from '../../utils/pgsRenderer';
 import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTime} from '../../utils/assRenderer';
 import {describeHlsManifest} from '../../utils/hlsManifestProbe';
-import {canvasRestingPercent, getSubtitleCanvasStyle, getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
+import {canvasLiftFor, canvasRestingPercent, getSubtitleCanvasStyle, getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
 import {audioStartNeedsServer, openingAudioStream} from '../../utils/audioStartPlan';
@@ -3892,7 +3892,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						height: '100%',
 						zIndex: 100,
 						pointerEvents: 'none',
-						...getSubtitleCanvasStyle(settings, canvasLift, pgsActive)
+						...getSubtitleCanvasStyle(settings, canvasLiftFor(canvasLift, pauseDescriptionShown), pgsActive)
 					}}
 				/>
 			)}
