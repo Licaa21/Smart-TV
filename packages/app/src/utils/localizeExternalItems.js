@@ -82,6 +82,6 @@ export const localizeSeerrCards = (cards, language) => localize(
 		_externalPosterUrl: fields.posterUrl || card._externalPosterUrl,
 		_externalBackdropUrl: fields.backdropUrl || card._externalBackdropUrl
 	}),
-	// Only what came from outside the library, which is never asked about what the library holds
-	(card) => card._seerr === true && card._external === true
+	// Only what came from outside the library. A card the library turned out to hold still carries the marks of the list it came from, and is never asked about
+	(card) => card._seerr === true && card._external === true && !card._resolvedFromExternal
 );

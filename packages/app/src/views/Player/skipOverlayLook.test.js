@@ -184,3 +184,12 @@ describe('resolveSkipOverlayLook', () => {
 	});
 });
 
+
+describe('bottomEdge', () => {
+	test('is how far up a prompt along the bottom rests, and nothing for the others', () => {
+		expect(look({skipOverlayPosition: 'bottomLeft'}).bottomEdge).toBe(174);
+		expect(look().bottomEdge).toBe(174);
+		expect(look({skipOverlayPosition: 'topRight'}).bottomEdge).toBeNull();
+		expect(look({skipOverlayPosition: 'middle'}).bottomEdge).toBeNull();
+	});
+});

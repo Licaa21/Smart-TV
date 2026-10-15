@@ -1,5 +1,6 @@
-import {useCallback, useState} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
+import Spotlight from '@enact/spotlight';
 import {useSettings} from '../../context/SettingsContext';
 import {SpottableButton} from './PlayerConstants';
 import {CountdownRing, SkipGlyph, formatRemaining, useOverlayFocus} from './overlayParts';
@@ -16,6 +17,18 @@ const SEGMENT_LABELS = {
 	preview: 'Preview',
 	recap: 'Recap',
 	commercial: 'Commercial'
+};
+
+// The bar of controls the prompt has to clear, marked by the player, and the room kept between them.
+const CONTROLS_SELECTOR = '[data-player-controls-bottom]';
+const CONTROLS_GAP = 24;
+
+// How far from the bottom edge the prompt sits while the controls are up: above them, the way the subtitles are lifted,
+// and where it always rests once they are gone. Null leaves it where the stylesheet puts it.
+export const promptBottomFor = (restingBottom, controlsTop, innerHeight) => {
+	if (restingBottom == null || !Number.isFinite(controlsTop)) return null;
+	const clear = Math.round(innerHeight - controlsTop + CONTROLS_GAP);
+	return clear > restingBottom ? clear : null;
 };
 
 const ringClasses = {ring: css.ring, svg: css.ringSvg, track: css.ringTrack, value: css.ringValue, center: css.ringCenter};
@@ -37,13 +50,43 @@ const LAYOUT_CLASS = {
  * bar along the bottom edge of the light rectangle, or a fill sweeping across. `preview` draws the same thing inert, inside the settings screen, in place
  * of over the video.
  */
-const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, onSkip, spotlightId, preview = false}) => {
+const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, onSkip, spotlightId, preview = false, controlsVisible = false, measureKey}) => {
 	const {settings} = useSettings();
 	const look = resolveSkipOverlayLook(settings);
 	const [focused, setFocused] = useState(false);
-	const handleFocus = useCallback(() => setFocused(true), []);
-	const handleBlur = useCallback(() => setFocused(false), []);
-	useOverlayFocus(preview ? null : spotlightId);
+	const heldFocusRef = useRef(false);
+	const controlsUpRef = useRef(controlsVisible);
+	controlsUpRef.current = controlsVisible;
+	const handleFocus = useCallback(() => {
+		heldFocusRef.current = true;
+		setFocused(true);
+	}, []);
+	const handleBlur = useCallback(() => {
+		heldFocusRef.current = false;
+		setFocused(false);
+	}, []);
+	// The prompt takes the remote while the controls are away. With them up it leaves focus to them, and is reached with
+	// Up from the playback bar.
+	useOverlayFocus(preview || controlsVisible ? null : spotlightId);
+
+	// Lifted above the bar of controls while it is up, and eased back down when it goes, as the subtitles are.
+	const [lifted, setLifted] = useState(null);
+	useLayoutEffect(() => {
+		if (preview || !controlsVisible || look.bottomEdge == null) {
+			setLifted(null);
+			return;
+		}
+		const bar = document.querySelector(CONTROLS_SELECTOR);
+		setLifted(promptBottomFor(look.bottomEdge, bar ? bar.getBoundingClientRect().top : null, window.innerHeight));
+	}, [preview, controlsVisible, look.bottomEdge, measureKey]);
+
+	// Holding focus when it ends with the controls up would leave the remote on nothing, so it goes back to them.
+	useEffect(() => () => {
+		if (preview || !heldFocusRef.current || !controlsUpRef.current) return;
+		window.requestAnimationFrame(() => {
+			if (!Spotlight.getCurrent() && !Spotlight.focus('progress-bar')) Spotlight.focus('play-pause-btn');
+		});
+	}, [preview]);
 
 	const layout = look.layout;
 	const isCapsule = layout === 'capsule';
@@ -65,7 +108,7 @@ const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, o
 	const buttonClass = [css.button, LAYOUT_CLASS[layout], preview ? css.buttonPreview : ''].filter(Boolean).join(' ');
 
 	return (
-		<div className={preview ? css.overlayPreview : css.overlay} style={look.overlay}>
+		<div className={preview ? css.overlayPreview : css.overlay} style={lifted == null ? look.overlay : {...look.overlay, bottom: `${lifted}px`}}>
 			<Button className={buttonClass} style={button} {...buttonProps}>
 				{layout === 'sweep' && showRing && (
 					<span className={css.sweep} style={{...look.sweep, width: percent}} />
