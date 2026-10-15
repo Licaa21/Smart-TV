@@ -100,6 +100,46 @@ export const getSubtitleOverlayStyle = (settings, lift = 0) => ({
 	WebkitTransform: `translateY(${-lift}px)`
 });
 
+// What a picture subtitle (PGS) can be given: it scales about the bottom edge, goes up by the percent of the screen the
+// position adds to where the file puts it, and fades or dims.
+export const PGS_SIZE_SCALE = {small: 0.8, medium: 1, large: 1.2, xlarge: 1.4};
+export const PGS_RAISE_PERCENT = {bottom: 0, lower: 10, middle: 20, higher: 30};
+
+// Where picture subtitles rest above the bottom of the screen when the file puts them near the edge, in percent. It is
+// what the lift for the controls is measured from.
+const PGS_RESTING_PERCENT = 6;
+export const canvasRestingPercent = (settings, isPgs) => (
+	isPgs ? PGS_RESTING_PERCENT + (PGS_RAISE_PERCENT[settings.pgsSubtitlePosition] || 0) : PGS_RESTING_PERCENT
+);
+
+// The canvas that PGS and ASS subtitles are drawn on. Both move up out of the way of the controls and the pause description
+// by `lift`, as the text subtitles do. A picture subtitle also takes the PGS settings, which an ASS track, drawn from the
+// styling in its own file, does not.
+export const getSubtitleCanvasStyle = (settings, lift = 0, isPgs = false, screenHeight = 1080) => {
+	const raise = isPgs ? ((PGS_RAISE_PERCENT[settings.pgsSubtitlePosition] || 0) / 100) * screenHeight : 0;
+	const scale = isPgs ? (PGS_SIZE_SCALE[settings.pgsSubtitleSize] || 1) : 1;
+	const transform = `translateY(${-Math.round(lift + raise)}px)${scale === 1 ? '' : ` scale(${scale})`}`;
+	const style = {
+		transform,
+		WebkitTransform: transform,
+		transformOrigin: '50% 100%',
+		WebkitTransformOrigin: '50% 100%',
+		transition: 'transform 0.35s ease',
+		WebkitTransition: '-webkit-transform 0.35s ease'
+	};
+	if (isPgs) {
+		const opacity = Number.isFinite(settings.pgsSubtitleOpacity) ? settings.pgsSubtitleOpacity : 100;
+		const brightness = Number.isFinite(settings.pgsSubtitleBrightness) ? settings.pgsSubtitleBrightness : 100;
+		if (opacity < 100) style.opacity = opacity / 100;
+		// Only when dimmed, since a filter over a whole screen of canvas is not free on the older sets
+		if (brightness < 100) {
+			style.filter = `brightness(${brightness}%)`;
+			style.WebkitFilter = style.filter;
+		}
+	}
+	return style;
+};
+
 export const getSubtitleTextStyle = (settings) => {
 	const shadowColor = toCssColor(settings.subtitleShadowColor || '#000000', settings.subtitleShadowOpacity !== undefined ? settings.subtitleShadowOpacity : 100);
 	const blur = `${settings.subtitleShadowBlur || 0.1}em`;

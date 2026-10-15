@@ -100,6 +100,14 @@ export const getSubtitlePositionOptions = () => [
 	{ value: 'absolute', label: $L('Absolute'), offset: 0 }
 ];
 
+// A picture subtitle is placed by its file, so the positions raise it from there rather than set where it rests.
+export const getPgsPositionOptions = () => [
+	{ value: 'bottom', label: $L('Bottom') },
+	{ value: 'lower', label: $L('Lower') },
+	{ value: 'middle', label: $L('Middle') },
+	{ value: 'higher', label: $L('Higher') }
+];
+
 export {getSubtitleColorOptions, getSubtitleShadowColorOptions, getSubtitleBackgroundColorOptions} from '../../utils/subtitleConstants';
 
 export const getSearchDefaultTabOptions = () => [

@@ -69,6 +69,7 @@ import {
 	getSubtitleColorOptions,
 	getSubtitleLanguageOptions,
 	getSubtitleModeOptions,
+	getPgsPositionOptions,
 	getSubtitlePositionOptions,
 	getSubtitleShadowColorOptions,
 	getSubtitleSizeOptions,
@@ -932,7 +933,12 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.SLIDER, key: 'subtitleBackgroundHdr', label: () => $L('Background Opacity'), min: 0, max: 100, step: 5, format: percent, icon: 'opacity', when: whenHdrSubtitles, plainIcon: true},
 					{kind: KIND.OPTION, key: 'subtitleSizeHdr', label: () => $L('Subtitle Size'), options: getSubtitleSizeOptions, fallback: () => $L('Medium'), icon: 'format_size', when: whenHdrSubtitles, plainIcon: true},
 					{kind: KIND.OPTION, key: 'subtitlePositionHdr', label: () => $L('Subtitle Position'), options: getSubtitlePositionOptions, fallback: () => $L('Bottom'), icon: 'vertical_align_bottom', when: whenHdrSubtitles, plainIcon: true},
-					{kind: KIND.SLIDER, key: 'subtitlePositionAbsoluteHdr', label: () => $L('Absolute Position'), min: 0, max: 100, step: 5, format: percent, icon: 'vertical_align_bottom', when: (ctx) => whenHdrSubtitles(ctx) && ctx.settings.subtitlePositionHdr === 'absolute', plainIcon: true}
+					{kind: KIND.SLIDER, key: 'subtitlePositionAbsoluteHdr', label: () => $L('Absolute Position'), min: 0, max: 100, step: 5, format: percent, icon: 'vertical_align_bottom', when: (ctx) => whenHdrSubtitles(ctx) && ctx.settings.subtitlePositionHdr === 'absolute', plainIcon: true},
+					{kind: KIND.SECTION, id: 'pgs', label: () => $L('Picture Subtitles (PGS)')},
+					{kind: KIND.OPTION, key: 'pgsSubtitleSize', label: () => $L('PGS Size'), options: getSubtitleSizeOptions, fallback: () => $L('Medium'), icon: 'format_size', plainIcon: true},
+					{kind: KIND.OPTION, key: 'pgsSubtitlePosition', label: () => $L('PGS Position'), options: getPgsPositionOptions, fallback: () => $L('Bottom'), icon: 'vertical_align_bottom', plainIcon: true},
+					{kind: KIND.SLIDER, key: 'pgsSubtitleOpacity', label: () => $L('PGS Opacity'), min: 10, max: 100, step: 5, format: percent, icon: 'opacity', plainIcon: true},
+					{kind: KIND.SLIDER, key: 'pgsSubtitleBrightness', label: () => $L('PGS Brightness'), min: 20, max: 100, step: 5, format: percent, icon: 'brightness_6', plainIcon: true}
 				]
 			},
 			{

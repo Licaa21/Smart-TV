@@ -7,6 +7,8 @@ import {
 	getSubtitleColorOptions,
 	getSubtitleShadowColorOptions,
 	getSubtitleBackgroundColorOptions,
+	getSubtitleCanvasStyle,
+	canvasRestingPercent,
 	SUBTITLE_STYLE_KEYS
 } from './subtitleConstants';
 
@@ -125,5 +127,41 @@ describe('getSubtitleTextStyle colors', () => {
 
 	it('draws Transparent as nothing at all', () => {
 		expect(getSubtitleTextStyle({...settings, subtitleBackgroundColor: '#00000000', subtitleBackground: 100}).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+	});
+});
+
+describe('the canvas PGS and ASS subtitles are drawn on', () => {
+	it('goes up with the controls and the description, for ASS as well as PGS', () => {
+		expect(getSubtitleCanvasStyle({}, 120, false).transform).toBe('translateY(-120px)');
+		expect(getSubtitleCanvasStyle({}, 0, true).transform).toBe('translateY(0px)');
+		// An ASS track takes nothing else, whatever the picture settings say
+		const ass = getSubtitleCanvasStyle({pgsSubtitleSize: 'large', pgsSubtitleOpacity: 50, pgsSubtitleBrightness: 40}, 0, false);
+		expect(ass.opacity).toBeUndefined();
+		expect(ass.filter).toBeUndefined();
+		expect(ass.transform).toBe('translateY(0px)');
+	});
+
+	it('gives a picture subtitle its size, position, opacity and brightness', () => {
+		const style = getSubtitleCanvasStyle(
+			{pgsSubtitleSize: 'large', pgsSubtitlePosition: 'middle', pgsSubtitleOpacity: 60, pgsSubtitleBrightness: 70},
+			100, true, 1000
+		);
+		// 100 for the controls and 20% of a 1000 pixel screen for the position
+		expect(style.transform).toBe('translateY(-300px) scale(1.2)');
+		expect(style.transformOrigin).toBe('50% 100%');
+		expect(style.opacity).toBe(0.6);
+		expect(style.filter).toBe('brightness(70%)');
+	});
+
+	it('draws a picture subtitle as it is when nothing is changed, with no filter over the screen', () => {
+		const style = getSubtitleCanvasStyle({pgsSubtitleSize: 'medium', pgsSubtitlePosition: 'bottom', pgsSubtitleOpacity: 100, pgsSubtitleBrightness: 100}, 0, true);
+		expect(style.transform).toBe('translateY(0px)');
+		expect(style.opacity).toBeUndefined();
+		expect(style.filter).toBeUndefined();
+	});
+
+	it('measures the lift for a picture subtitle from where its position puts it', () => {
+		expect(canvasRestingPercent({pgsSubtitlePosition: 'higher'}, true)).toBe(36);
+		expect(canvasRestingPercent({pgsSubtitlePosition: 'higher'}, false)).toBe(6);
 	});
 });

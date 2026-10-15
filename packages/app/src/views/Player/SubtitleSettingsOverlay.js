@@ -7,6 +7,7 @@ import {useCallback, useEffect} from 'react';
 import $L from '@enact/i18n/$L';
 import {useSettings} from '../../context/SettingsContext';
 import {isBackKey} from '../../utils/keys';
+import {getPgsPositionOptions} from '../Settings/settingsOptions';
 import {
 	getSubtitleBackgroundColorOptions, getSubtitleColorOptions, getSubtitleShadowColorOptions,
 	resolveSubtitleStyleSettings, subtitleStyleKey
@@ -53,7 +54,9 @@ const getLabel = (options, currentValue, fallback) => {
 
 const stopPropagation = (e) => e.stopPropagation();
 
-const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false}) => {
+// `subtitleKind` is what the track on screen is: text, which takes the style below, a picture (PGS), which takes its own settings,
+// or ASS, which is styled by its own file and has nothing to set here.
+const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false, subtitleKind = 'text'}) => {
 	const {settings, updateSetting} = useSettings();
 	const hdrActive = Boolean(isHdr && settings.subtitleHdrSeparate);
 	const style = resolveSubtitleStyleSettings(settings, isHdr);
@@ -68,10 +71,10 @@ const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false}) => {
 	useEffect(() => {
 		if (visible) {
 			setTimeout(() => {
-				Spotlight.focus('sub-setting-size');
+				Spotlight.focus(subtitleKind === 'ass' ? 'sub-settings-close' : 'sub-setting-size');
 			}, 100);
 		}
-	}, [visible]);
+	}, [visible, subtitleKind]);
 
 	useEffect(() => {
 		if (!visible) return;
@@ -108,6 +111,22 @@ const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false}) => {
 		cycleOption(getSubtitleBackgroundColorOptions(), style.subtitleBackgroundColor, updateSetting, keyFor('subtitleBackgroundColor'));
 	}, [style.subtitleBackgroundColor, updateSetting, keyFor]);
 
+	const handleCyclePgsSize = useCallback(() => {
+		cycleOption(getSubtitleSizeOptions(), settings.pgsSubtitleSize, updateSetting, 'pgsSubtitleSize');
+	}, [settings.pgsSubtitleSize, updateSetting]);
+
+	const handleCyclePgsPosition = useCallback(() => {
+		cycleOption(getPgsPositionOptions(), settings.pgsSubtitlePosition, updateSetting, 'pgsSubtitlePosition');
+	}, [settings.pgsSubtitlePosition, updateSetting]);
+
+	const handlePgsOpacityChange = useCallback((e) => {
+		updateSetting('pgsSubtitleOpacity', e.value);
+	}, [updateSetting]);
+
+	const handlePgsBrightnessChange = useCallback((e) => {
+		updateSetting('pgsSubtitleBrightness', e.value);
+	}, [updateSetting]);
+
 	const handlePositionAbsoluteChange = useCallback((e) => {
 		updateSetting(keyFor('subtitlePositionAbsolute'), e.value);
 	}, [updateSetting, keyFor]);
@@ -137,7 +156,76 @@ const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false}) => {
 				onClick={stopPropagation}
 				spotlightId="subtitle-settings-modal"
 			>
-				<h2 className={css.modalTitle}>{$L('Subtitle Appearance')}</h2>
+				<h2 className={css.modalTitle}>{subtitleKind === 'pgs' ? $L('Picture Subtitles (PGS)') : $L('Subtitle Appearance')}</h2>
+				{subtitleKind === 'ass' && (
+					<p className={css.settingNote}>{$L('This subtitle is styled by its own file, so its look cannot be changed here.')}</p>
+				)}
+				{subtitleKind === 'pgs' && (
+					<Scroller
+						direction="vertical"
+						horizontalScrollbar="hidden"
+						verticalScrollbar="hidden"
+						style={{flex: 1, maxHeight: '60vh'}}
+					>
+						<SpottableButton
+							className={css.settingItem}
+							onClick={handleCyclePgsSize}
+							spotlightId="sub-setting-size"
+							data-spot-default="true"
+						>
+							<span className={css.settingLabel}>{$L('Size')}</span>
+							<span className={css.settingValue}>
+								{getLabel(SUBTITLE_SIZE_OPTIONS, settings.pgsSubtitleSize, $L('Medium'))}
+							</span>
+						</SpottableButton>
+
+						<SpottableButton
+							className={css.settingItem}
+							onClick={handleCyclePgsPosition}
+							spotlightId="sub-setting-position"
+						>
+							<span className={css.settingLabel}>{$L('Position')}</span>
+							<span className={css.settingValue}>
+								{getLabel(getPgsPositionOptions(), settings.pgsSubtitlePosition, $L('Bottom'))}
+							</span>
+						</SpottableButton>
+
+						<div className={css.sliderItem}>
+							<div className={css.sliderLabel}>
+								<span>{$L('PGS Opacity')}</span>
+								<span className={css.sliderValue}>{settings.pgsSubtitleOpacity ?? 100}%</span>
+							</div>
+							<Slider
+								min={10}
+								max={100}
+								step={5}
+								value={settings.pgsSubtitleOpacity ?? 100}
+								onChange={handlePgsOpacityChange}
+								className={css.settingsSlider}
+								tooltip={false}
+								spotlightId="sub-setting-pgsOpacity"
+							/>
+						</div>
+
+						<div className={css.sliderItem}>
+							<div className={css.sliderLabel}>
+								<span>{$L('PGS Brightness')}</span>
+								<span className={css.sliderValue}>{settings.pgsSubtitleBrightness ?? 100}%</span>
+							</div>
+							<Slider
+								min={20}
+								max={100}
+								step={5}
+								value={settings.pgsSubtitleBrightness ?? 100}
+								onChange={handlePgsBrightnessChange}
+								className={css.settingsSlider}
+								tooltip={false}
+								spotlightId="sub-setting-pgsBrightness"
+							/>
+						</div>
+					</Scroller>
+				)}
+				{subtitleKind !== 'pgs' && subtitleKind !== 'ass' && (
 				<Scroller
 					direction="vertical"
 					horizontalScrollbar="hidden"
@@ -305,6 +393,7 @@ const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false}) => {
 						/>
 					</div>
 				</Scroller>
+				)}
 
 				<SpottableButton className={css.closeBtn} onClick={onClose} spotlightId="sub-settings-close">
 					{$L('Press BACK to close')}

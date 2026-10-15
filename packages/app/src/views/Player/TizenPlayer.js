@@ -28,7 +28,7 @@ import {getImageUrl, getLogoUrl} from '../../utils/helpers';
 import {initPgsCanvasRenderer, disposePgsRenderer, clearPgsCanvas} from '../../utils/pgsRenderer';
 import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTime} from '../../utils/assRenderer';
 import {describeHlsManifest} from '../../utils/hlsManifestProbe';
-import {getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
+import {canvasRestingPercent, getSubtitleCanvasStyle, getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
 import {audioStartNeedsServer, openingAudioStream} from '../../utils/audioStartPlan';
@@ -325,6 +325,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// Ref for the Player container DOM element - used to walk up ancestors for transparency
 	const playerContainerRef = useRef(null);
 	const pgsRendererRef = useRef(null);
+	// What the canvas is drawing: picture subtitles (pgs), which take the PGS settings, an ASS track, or nothing
+	const [canvasSubtitle, setCanvasSubtitle] = useState(null);
+	const pgsActive = canvasSubtitle === 'pgs';
 	const pgsCanvasRef = useRef(null);
 	const assRendererRef = useRef(null);
 	const rootFontSizePxRef = useRef(null);
@@ -468,6 +471,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		controlsVisible: controlsVisible && !activeModal,
 		descriptionShown: pauseDescriptionShown,
 		settings: subtitleStyleSettings,
+		measureKey: `${item?.Id}|${item?.Overview}`
+	});
+
+	// The canvas PGS and ASS subtitles are drawn on goes up out of the way of the controls and the description as the text
+	// does. It rests lower than the text, so its lift is measured from where it rests.
+	const canvasLift = useSubtitleLift({
+		controlsVisible: controlsVisible && !activeModal,
+		descriptionShown: pauseDescriptionShown,
+		settings: {subtitlePosition: 'absolute', subtitlePositionAbsolute: 100 - canvasRestingPercent(settings, pgsActive)},
 		measureKey: `${item?.Id}|${item?.Overview}`
 	});
 
@@ -1501,6 +1513,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 		if (renderer) {
 			pgsRendererRef.current = renderer;
+			setCanvasSubtitle('pgs');
 			serverLogger.playback('Subtitle: pgs renderer started', {
 				stream: describeSubtitleStream(stream)
 			});
@@ -1523,6 +1536,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// isCurrent lets the initial load say a newer load took over, so a renderer built
 	// for a stale load is thrown away rather than kept.
 	const startAssRenderer = useCallback(async (stream, isCurrent = () => true) => {
+		setCanvasSubtitle(null);
 		try {
 			const assUrl = playback.getAssSubtitleUrl(stream);
 			const canvas = assUrl ? await waitForSubtitleCanvas(isCurrent) : null;
@@ -1543,6 +1557,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				});
 				disposeAssRenderer(assRendererRef.current);
 				assRendererRef.current = null;
+				// the text events that take over are styled as text again
+				if (isCurrent()) setCanvasSubtitle(null);
 				playback.fetchSubtitleData(stream).then(data => {
 					if (isCurrent()) setSubtitleTrackEvents(data?.TrackEvents || null);
 				}).catch(() => isCurrent() && setSubtitleTrackEvents(null));
@@ -1557,6 +1573,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			}
 			if (renderer) {
 				assRendererRef.current = renderer;
+				setCanvasSubtitle('ass');
 				setSubtitleTrackEvents(null);
 				serverLogger.playback('Subtitle: ass renderer started', {
 					stream: describeSubtitleStream(stream)
@@ -2137,6 +2154,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				disposeAssRenderer(assRendererRef.current);
 				assRendererRef.current = null;
 			}
+			setCanvasSubtitle(null);
 			avplayReadyRef.current = false;
 
 			resetPopups(); // eslint-disable-line no-use-before-define
@@ -2829,6 +2847,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			disposeAssRenderer(assRendererRef.current);
 			assRendererRef.current = null;
 		}
+		// whichever track comes next sets this again if it is drawn on the canvas, and Off leaves nothing on it
+		setCanvasSubtitle(null);
 
 		if (index === -1) {
 			setSelectedSubtitleIndex(-1);
@@ -3871,7 +3891,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						width: '100%',
 						height: '100%',
 						zIndex: 100,
-						pointerEvents: 'none'
+						pointerEvents: 'none',
+						...getSubtitleCanvasStyle(settings, canvasLift, pgsActive)
 					}}
 				/>
 			)}
@@ -3920,6 +3941,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			<PlayerControls
 				isHdrContent={isHdrContent}
+				subtitleKind={canvasSubtitle || 'text'}
 				css={css}
 				controlsVisible={controlsVisible}
 				activeModal={activeModal}
