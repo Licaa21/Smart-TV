@@ -226,6 +226,7 @@ export const ACCENT_RULES = {
 		["views/Details/nouveau/footer/NouveauDetailsFooter.module.less","",".{capabilityRetry}","color","{accent}"],
 		["views/Details/nouveau/hero/NouveauHero.module.less","",".{statusUpcoming}","background","{accent}"],
 		["views/Details/spotlight/SpotlightDetailContent.module.less","",".{tagline}","color","{accent}"],
+		["views/Details/spotlight/SpotlightDetailContent.module.less","",".{versionBadge}","color","{accent}"],
 		["views/Details/spotlight/SpotlightDetailContent.module.less","",".{statusUpcoming}","background","{accent}"]
 	],
 	home: [
