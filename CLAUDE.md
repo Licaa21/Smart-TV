@@ -219,6 +219,13 @@ did, what the fork keeps instead, and what to do on a merge.
 - **Files:** `views/Browse/Browse.js`, `useBrowseData.js`, `useSeerrRows.js`, `useExternalRows.js`, `browseCache.js`,
   `services/seerrApi.js` (request helper) and `services/jellyfinApi.js` (`homeRowsChanged`).
 
+### 5. The language of the TMDB and list rows
+
+- **Upstream:** 5f6e6d7e asks the plugin for the TMDB, IMDb and custom list rows in the app's interface language (`settings.uiLanguage`) and keeps the rows cached per language and per account (`services/externalRowsApi.js`).
+- **The fork keeps:** the language the Jellyfin server is set to for metadata (`currentMetadataLanguage()`) as the language those two calls are given in `views/Browse/useExternalRows.js`, and its own client side pass over what comes back (`localizeSeerrCards` for the rows, `localizeExternalItems` for the seasonal row), since a plugin without the support, 2.4.0, ignores the parameter.
+- **On a merge:** take upstream's `externalRowsApi.js` and its tests whole, which was done in the merge that brought this in, and keep `{language}`, the metadata language, in the two calls in `useExternalRows.js`.
+- **Files:** `views/Browse/useExternalRows.js`, `utils/localizeExternalItems.js`.
+
 ## When the user says Moonbase (the plugin) updated
 
 The fork works around things the Moonbase plugin (Moonfin-Client/Plugin) does not do yet. When the user says a new release is
@@ -230,7 +237,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
    in the metadata language from the plugin. Then remove the client-side pass in `views/Browse/useExternalRows.js`
    (the `localizeSeerrCards` map before the rows are built) and `localizeSeerrCards` itself in
    `utils/localizeExternalItems.js` with its tests. Keep the `language` parameter the client sends
-   (`services/externalRowsApi.js`, `utils/externalHomeRows.js`). Check on the TV first that a list row is in Romanian with the
+   (`services/externalRowsApi.js`, `utils/externalHomeRows.js`, which upstream sends itself now, see entry 5). Check on the TV first that a list row is in Romanian with the
    client pass off, since a copy the plugin cached in English can still come back.
 2. **The seasonal row** (`/Moonfin/...` seasonal endpoint) had no language parameter even in the plugin's master. Keep
    `localizeExternalItems` for it until the plugin adds one.
