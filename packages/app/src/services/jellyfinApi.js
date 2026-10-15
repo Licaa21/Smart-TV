@@ -338,6 +338,17 @@ const matchOnJellyfin = async (wanted) => {
 // Resolves external list items (carrying TMDB/IMDb provider ids) against the
 // local library. Owned titles are swapped for the real library item so they
 // are playable, unowned ones are returned unchanged for the Seerr fallback.
+// The scan runs on the server as the task named RefreshLibrary, so whether it is still going is read from the task list.
+const isLibraryScanRunningVia = async (send) => {
+	try {
+		const tasks = await send('/ScheduledTasks?isHidden=false');
+		const scan = Array.isArray(tasks) ? tasks.find((task) => task.Key === 'RefreshLibrary') : null;
+		return scan ? scan.State === 'Running' || scan.State === 'Cancelling' : null;
+	} catch (err) {
+		return null;
+	}
+};
+
 export const resolveItemsByProviderIds = async (items) => {
 	if (!Array.isArray(items) || items.length === 0 || !currentUser) return items || [];
 	const wanted = items.filter((it) => providerKeys(it.ProviderIds, it.Type).length > 0);
@@ -843,6 +854,9 @@ export const api = {
 	// Scans every library for new and changed files, which is what the server's own Scan All Libraries does.
 	refreshLibraries: () => request('/Library/Refresh', {method: 'POST'}),
 
+	// Whether that scan is still running, or null when the server does not say.
+	isLibraryScanRunning: () => isLibraryScanRunningVia(request),
+
 	deleteItem: (itemId) =>
 		request(`/Items/${itemId}`, {
 			method: 'DELETE'
@@ -1300,6 +1314,8 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		refreshItem: refreshItemVia(serverRequest),
 
 		refreshLibraries: () => serverRequest('/Library/Refresh', {method: 'POST'}),
+
+		isLibraryScanRunning: () => isLibraryScanRunningVia(serverRequest),
 
 		getRemoteImages: (itemId, imageType) =>
 			serverRequest(`/Items/${itemId}/RemoteImages?Type=${imageType}&IncludeAllLanguages=true`),

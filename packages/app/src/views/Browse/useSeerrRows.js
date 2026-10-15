@@ -13,6 +13,16 @@ const useSeerrRows = ({seerrEnabled, seerrAuthenticated, seerrUserId, homeRows, 
 	const [pending, setPending] = useState([]);
 	const reuseRef = useRef(reuse);
 
+	// A refresh the viewer asked for, which brings these rows in again as well as the library's.
+	const [reloadKey, setReloadKey] = useState(0);
+	useEffect(() => {
+		const handleRefresh = (e) => {
+			if (e?.detail?.reload) setReloadKey((key) => key + 1);
+		};
+		window.addEventListener('moonfin:browseRefresh', handleRefresh);
+		return () => window.removeEventListener('moonfin:browseRefresh', handleRefresh);
+	}, []);
+
 	useEffect(() => {
 		if (!seerrEnabled || !seerrAuthenticated) {
 			setSeerrRows([]);
@@ -69,7 +79,7 @@ const useSeerrRows = ({seerrEnabled, seerrAuthenticated, seerrUserId, homeRows, 
 		return () => {
 			cancelled = true;
 		};
-	}, [seerrEnabled, seerrAuthenticated, seerrUserId, homeRows, owner]);
+	}, [seerrEnabled, seerrAuthenticated, seerrUserId, homeRows, owner, reloadKey]);
 
 	return {rows: seerrRows, pending};
 };

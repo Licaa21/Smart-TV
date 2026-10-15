@@ -120,6 +120,19 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 		}
 	}, []);
 
+	// The trailer takes the speakers while it plays, so the app is told when it opens and closes, to put the title's theme
+	// song away and bring it back. The first run, with nothing open, says nothing.
+	const trailerOpen = Boolean(trailerOverlay);
+	const trailerWasOpenRef = useRef(false);
+	useEffect(() => {
+		if (trailerOpen === trailerWasOpenRef.current) return;
+		trailerWasOpenRef.current = trailerOpen;
+		window.dispatchEvent(new CustomEvent('moonfin:trailer', {detail: {open: trailerOpen}}));
+	}, [trailerOpen]);
+	useEffect(() => () => {
+		if (trailerWasOpenRef.current) window.dispatchEvent(new CustomEvent('moonfin:trailer', {detail: {open: false}}));
+	}, []);
+
 	const handleCloseTrailer = useCallback(() => {
 		clearSponsorSkip();
 		sponsorSegmentsRef.current = [];

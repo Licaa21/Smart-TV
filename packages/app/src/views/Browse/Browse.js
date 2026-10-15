@@ -566,6 +566,20 @@ const Browse = ({
 		};
 	}, []);
 
+	// A refresh the viewer asked for takes every row down and brings them back, so where focus stood is noted first, and
+	// the restore that follows a return puts it back. Focus somewhere else, in the navigation, has nothing to put back, and
+	// a place kept from an earlier visit must not pull it into the rows. A Home that is hidden keeps the place it was left at.
+	useEffect(() => {
+		const handleReload = (e) => {
+			if (!e?.detail?.reload || !isVisibleRef.current) return;
+			const rows = contentRowsRef.current;
+			if (rows && rows.contains(document.activeElement)) rememberFocus();
+			else lastFocusState = null;
+		};
+		window.addEventListener('moonfin:browseRefresh', handleReload);
+		return () => window.removeEventListener('moonfin:browseRefresh', handleReload);
+	}, [rememberFocus]);
+
 	const handleSelectItem = useCallback((item) => {
 		mediaPreview.stop('select');
 		onBlurItemThemeMusic?.();

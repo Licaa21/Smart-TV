@@ -20,6 +20,16 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 	const [pending, setPending] = useState([]);
 	const reuseRef = useRef(reuse);
 
+	// A refresh the viewer asked for, which brings these rows in again as well as the library's.
+	const [reloadKey, setReloadKey] = useState(0);
+	useEffect(() => {
+		const handleRefresh = (e) => {
+			if (e?.detail?.reload) setReloadKey((key) => key + 1);
+		};
+		window.addEventListener('moonfin:browseRefresh', handleRefresh);
+		return () => window.removeEventListener('moonfin:browseRefresh', handleRefresh);
+	}, []);
+
 	useEffect(() => {
 		if (!settings.useMoonfinPlugin) {
 			setExternalRows([]);
@@ -183,7 +193,7 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 		settings.seasonalRowEnabled, settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays,
 		settings.mergeRadarrSonarrCalendars,
 		settings.radarrCalendarShowCinema, settings.radarrCalendarShowDigital, settings.radarrCalendarShowPhysical,
-		settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo, owner]);
+		settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo, owner, reloadKey]);
 
 	return {rows: externalRows, pending};
 };

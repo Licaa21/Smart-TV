@@ -201,6 +201,8 @@ const AppContent = (props) => {
 	}, [settingsLoaded, user?.Id, serverUrl, legacyBlockedRatings, updateSettings]);
 
 	const [panelIndex, setPanelIndex] = useState(PANELS.LOGIN);
+	const panelIndexRef = useRef(panelIndex);
+	panelIndexRef.current = panelIndex;
 
 	// Banners for badges the user just unlocked, shown in turn so they dont stack. The plugin's
 	// grouping setting decides between one banner for the lot and one each.
@@ -597,6 +599,26 @@ const AppContent = (props) => {
 			themeMusic.stopThemeMusic();
 		}
 	}, [panelIndex, selectedItem?.Id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+	// A trailer playing over the details screen takes the speakers, so the theme song fades out for it and starts again
+	// when it is closed, if that screen is still the one showing.
+	const themeScreenRef = useRef(null);
+	themeScreenRef.current = {panelIndex, selectedItem, themeMusic};
+	useEffect(() => {
+		const handleTrailer = (event) => {
+			if (!event.detail?.open) {
+				const {panelIndex: panel, selectedItem: shown, themeMusic: theme} = themeScreenRef.current;
+				if (panel === PANELS.DETAILS && shown && THEME_MUSIC_TYPES.includes(shown.Type)) {
+					theme.playThemeMusic(shown.SeriesId || shown.Id);
+				}
+				return;
+			}
+			// Also calls off a theme still being fetched, which a plain fade out would leave to start under the trailer
+			themeScreenRef.current.themeMusic.stopForFocus();
+		};
+		window.addEventListener('moonfin:trailer', handleTrailer);
+		return () => window.removeEventListener('moonfin:trailer', handleTrailer);
+	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// The hardware decoder stays claimed until these are torn down.
 	const releaseVideoElements = useCallback(() => {
@@ -1356,6 +1378,11 @@ const AppContent = (props) => {
 	}, [navigateTo]);
 
 	const handleOpenSeerr = useCallback(() => {
+		// Pressed on Discover itself, it is brought up to date rather than opened again.
+		if (panelIndexRef.current === PANELS.SEERR_DISCOVER) {
+			window.dispatchEvent(new CustomEvent('moonfin:seerrDiscoverRefresh'));
+			return;
+		}
 		navigateTo(PANELS.SEERR_DISCOVER);
 	}, [navigateTo]);
 
@@ -1369,7 +1396,9 @@ const AppContent = (props) => {
 		setStudioFilter(null);
 		setSeerrBrowse(null);
 		setSeerrPerson(null);
-		window.dispatchEvent(new CustomEvent('moonfin:browseRefresh'));
+		// Pressed on Home itself, it is brought up to date, the rows and the media bar as well as what was played.
+		const onHome = panelIndexRef.current === PANELS.BROWSE;
+		window.dispatchEvent(new CustomEvent('moonfin:browseRefresh', onHome ? {detail: {reload: true, featured: true}} : undefined));
 		setPanelIndex(PANELS.BROWSE);
 	}, []);
 
