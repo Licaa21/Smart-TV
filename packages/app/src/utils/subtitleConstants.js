@@ -112,6 +112,11 @@ export const canvasRestingPercent = (settings, isPgs) => (
 	isPgs ? PGS_RESTING_PERCENT + (PGS_RAISE_PERCENT[settings.pgsSubtitlePosition] || 0) : PGS_RESTING_PERCENT
 );
 
+// PGS and ASS rest low, and the tails of letters like p and g hang below the line the lift is measured to, so while the
+// description is showing they go up a little further than the lift. With the controls up the lift is left as it is.
+export const CANVAS_DESCRIPTION_GAP = 24;
+export const canvasLiftFor = (lift, descriptionShown) => (descriptionShown && lift > 0 ? lift + CANVAS_DESCRIPTION_GAP : lift);
+
 // The canvas that PGS and ASS subtitles are drawn on. Both move up out of the way of the controls and the pause description
 // by `lift`, as the text subtitles do. A picture subtitle also takes the PGS settings, which an ASS track, drawn from the
 // styling in its own file, does not.

@@ -9,6 +9,8 @@ import {
 	getSubtitleBackgroundColorOptions,
 	getSubtitleCanvasStyle,
 	canvasRestingPercent,
+	canvasLiftFor,
+	CANVAS_DESCRIPTION_GAP,
 	SUBTITLE_STYLE_KEYS
 } from './subtitleConstants';
 
@@ -158,6 +160,13 @@ describe('the canvas PGS and ASS subtitles are drawn on', () => {
 		expect(style.transform).toBe('translateY(0px)');
 		expect(style.opacity).toBeUndefined();
 		expect(style.filter).toBeUndefined();
+	});
+
+	it('goes a little further up for the description than the lift, and not at all further for the controls', () => {
+		expect(canvasLiftFor(100, true)).toBe(100 + CANVAS_DESCRIPTION_GAP);
+		expect(canvasLiftFor(100, false)).toBe(100);
+		// Nothing in the way, nothing to clear
+		expect(canvasLiftFor(0, true)).toBe(0);
 	});
 
 	it('measures the lift for a picture subtitle from where its position puts it', () => {
