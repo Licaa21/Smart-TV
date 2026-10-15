@@ -134,6 +134,41 @@ export const initPgsCanvasRenderer = async (canvasElement, subtitleStream) => {
 	}
 };
 
+// libpgs keeps the rectangle it last drew on, to clear it again, on the object that draws. Where that object sits inside the
+// renderer is the library's business, so it is looked for a few levels down rather than named.
+const drawnAreaOwners = new WeakMap();
+const findDrawnAreaOwner = (root) => {
+	const queue = [[root, 0]];
+	const seen = new Set();
+	while (queue.length) {
+		const [node, depth] = queue.shift();
+		if (!node || typeof node !== 'object' || seen.has(node)) continue;
+		seen.add(node);
+		const area = node.dirtyArea;
+		if (area && typeof area.x === 'number' && typeof area.width === 'number') return node;
+		if (depth < 3) Object.keys(node).forEach((key) => queue.push([node[key], depth + 1]));
+	}
+	return null;
+};
+
+// Where the last picture subtitle was drawn, as fractions of the canvas, or null when nothing is on it.
+export const pgsDrawnArea = (renderer, canvas) => {
+	if (!renderer || !canvas || !canvas.width || !canvas.height) return null;
+	let owner = drawnAreaOwners.get(renderer);
+	if (owner === undefined) {
+		owner = findDrawnAreaOwner(renderer);
+		drawnAreaOwners.set(renderer, owner);
+	}
+	const area = owner && owner.dirtyArea;
+	if (!area || area.empty || !(area.width > 0) || !(area.height > 0)) return null;
+	return {
+		left: area.x / canvas.width,
+		top: area.y / canvas.height,
+		width: area.width / canvas.width,
+		height: area.height / canvas.height
+	};
+};
+
 export const disposePgsRenderer = (renderer) => {
 	if (renderer?.dispose) {
 		try {

@@ -938,7 +938,9 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.OPTION, key: 'pgsSubtitleSize', label: () => $L('PGS Size'), options: getSubtitleSizeOptions, fallback: () => $L('Medium'), icon: 'format_size', plainIcon: true},
 					{kind: KIND.OPTION, key: 'pgsSubtitlePosition', label: () => $L('PGS Position'), options: getPgsPositionOptions, fallback: () => $L('Bottom'), icon: 'vertical_align_bottom', plainIcon: true},
 					{kind: KIND.SLIDER, key: 'pgsSubtitleOpacity', label: () => $L('PGS Opacity'), min: 10, max: 100, step: 5, format: percent, icon: 'opacity', plainIcon: true},
-					{kind: KIND.SLIDER, key: 'pgsSubtitleBrightness', label: () => $L('PGS Brightness'), min: 20, max: 100, step: 5, format: percent, icon: 'brightness_6', plainIcon: true}
+					{kind: KIND.SLIDER, key: 'pgsSubtitleBrightness', label: () => $L('PGS Brightness'), min: 20, max: 100, step: 5, format: percent, icon: 'brightness_6', plainIcon: true},
+					{kind: KIND.OPTION, key: 'pgsSubtitleBackgroundColor', label: () => $L('PGS Background Color'), options: getSubtitleBackgroundColorOptions, fallback: () => $L('Black'), icon: 'format_color_fill', colorTile: (ctx) => ctx.settings.pgsSubtitleBackgroundColor},
+					{kind: KIND.SLIDER, key: 'pgsSubtitleBackground', label: () => $L('PGS Background Opacity'), min: 0, max: 100, step: 5, format: percent, icon: 'opacity', plainIcon: true}
 				]
 			},
 			{

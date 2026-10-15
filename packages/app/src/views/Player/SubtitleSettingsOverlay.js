@@ -127,6 +127,14 @@ const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false, subtitleKind 
 		updateSetting('pgsSubtitleBrightness', e.value);
 	}, [updateSetting]);
 
+	const handleCyclePgsBackgroundColor = useCallback(() => {
+		cycleOption(getSubtitleBackgroundColorOptions(), settings.pgsSubtitleBackgroundColor, updateSetting, 'pgsSubtitleBackgroundColor');
+	}, [settings.pgsSubtitleBackgroundColor, updateSetting]);
+
+	const handlePgsBackgroundChange = useCallback((e) => {
+		updateSetting('pgsSubtitleBackground', e.value);
+	}, [updateSetting]);
+
 	const handlePositionAbsoluteChange = useCallback((e) => {
 		updateSetting(keyFor('subtitlePositionAbsolute'), e.value);
 	}, [updateSetting, keyFor]);
@@ -221,6 +229,34 @@ const SubtitleSettingsOverlay = ({visible, onClose, isHdr = false, subtitleKind 
 								className={css.settingsSlider}
 								tooltip={false}
 								spotlightId="sub-setting-pgsBrightness"
+							/>
+						</div>
+
+						<SpottableButton
+							className={css.settingItem}
+							onClick={handleCyclePgsBackgroundColor}
+							spotlightId="sub-setting-pgsBgColor"
+						>
+							<span className={css.settingLabel}>{$L('PGS Background Color')}</span>
+							<span className={css.settingValue}>
+								{getLabel(SUBTITLE_BACKGROUND_COLOR_OPTIONS, settings.pgsSubtitleBackgroundColor, $L('Black'))}
+							</span>
+						</SpottableButton>
+
+						<div className={css.sliderItem}>
+							<div className={css.sliderLabel}>
+								<span>{$L('PGS Background Opacity')}</span>
+								<span className={css.sliderValue}>{settings.pgsSubtitleBackground ?? 0}%</span>
+							</div>
+							<Slider
+								min={0}
+								max={100}
+								step={5}
+								value={settings.pgsSubtitleBackground ?? 0}
+								onChange={handlePgsBackgroundChange}
+								className={css.settingsSlider}
+								tooltip={false}
+								spotlightId="sub-setting-pgsBgOpacity"
 							/>
 						</div>
 					</Scroller>

@@ -43,6 +43,9 @@ export const defaultSettings = {
 	pgsSubtitlePosition: 'bottom',
 	pgsSubtitleOpacity: 100,
 	pgsSubtitleBrightness: 100,
+	// A box behind the picture, since it has no background of its own to give. Off while its opacity is 0.
+	pgsSubtitleBackgroundColor: '#000000',
+	pgsSubtitleBackground: 0,
 	seekStep: 10,
 	fallbackAudioLanguage: '',
 	// A track picked by hand starts the series on it next time, ahead of the language settings. This device only.
