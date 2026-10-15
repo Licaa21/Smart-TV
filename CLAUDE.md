@@ -6,7 +6,7 @@ This folder is the **implement** branch.
 
 Personal fork of Moonfin for Smart TVs (Tizen and webOS; an Enact/React app). Upstream is Moonfin-Client/Smart-TV
 (RadicalMuffinMan and the Moonfin contributors). The fork is Licaa21/Smart-TV and holds changes for one person's daily
-use. It is not a project for everyone. Three changes are proposed upstream: the in-player episode browser (pull request #494), a fix for Home cards that opened nothing after playback (#534, merged upstream on 2026-10-15) and the skip prompt over the player controls (#535). Remotes: `origin` is the fork, `upstream` is Moonfin-Client/Smart-TV.
+use. It is not a project for everyone. Three changes are proposed upstream: the in-player episode browser (pull request #494), a fix for Home cards that opened nothing after playback (#534, merged upstream on 2026-10-15, its folder is gone) and the skip prompt over the player controls (#535). Remotes: `origin` is the fork, `upstream` is Moonfin-Client/Smart-TV.
 
 The rules that matter most, each explained further down:
 
@@ -30,11 +30,10 @@ The rules that matter most, each explained further down:
 | `implement/` | `implement` | Where all the fork's own changes are written and committed |
 | `daily/` | `daily` | `main` merged with `implement`. Only used to build the app |
 | `pr-episode-browser/` | `feature/episodeselector-skipperlayout-accentcolors` | Pull request #494 upstream |
-| `pr-home-select-handler/` | `fix/home-rows-stale-select-handler` | Pull request #534 upstream, merged. The folder can go when the user says so |
 | `pr-skip-prompt-over-controls/` | `feature/skip-prompt-over-controls` | Pull request #535 upstream |
 | `local/` | none | Not a branch: backups (`*.bundle`), logs, photos, notes |
 
-This file is committed on `implement` and is the copy to edit. `update-daily.sh` brings it into `daily` with the rest of `implement`, and the copies in `main/` and `pr-episode-browser/` are local and untracked, so a change to it is made in all four folders (only line 3 differs, and after a merge into `daily` line 3 has to be put back to say daily). The folders for #534 and #535 have none.
+This file is committed on `implement` and is the copy to edit. `update-daily.sh` brings it into `daily` with the rest of `implement`, and the copies in `main/` and `pr-episode-browser/` are local and untracked, so a change to it is made in all four folders (only line 3 differs, and after a merge into `daily` line 3 has to be put back to say daily). The folder for #535 has none.
 
 ### Shared dependencies
 
@@ -45,7 +44,7 @@ were on disk. `@moonfin/platform-*` resolve to `main/packages`, so edits to plat
 are not built. App-level code is.
 
 - To add a branch folder: `git worktree add ../<folder> <branch>` from `main/`, then
-  `powershell -File implement/fork-tools/link-modules.ps1 -Folder <folder>`. If the script prints a path error (it did for #534 and #535), make the two junctions by hand: `cmd /c mklink /J <folder>
+  `powershell -File implement/fork-tools/link-modules.ps1 -Folder <folder>`. If the script prints a path error (it did for #534 and #535, whose folders were made by hand), make the two junctions by hand: `cmd /c mklink /J <folder>
 ode_modules <main>
 ode_modules` and the same for `tools
 ode_modules`.
