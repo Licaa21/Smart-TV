@@ -472,6 +472,61 @@ describe('resolveFromEnvelope', () => {
 	});
 });
 
+describe('the per row image types', () => {
+	test('go out under the server row names with Continue Watching on its own key', () => {
+		const profile = localToProfile({
+			homeRowImageTypes: {'latest-media': 'thumb', genres: 'thumb', resume: 'banner', nextup: 'logo'}
+		}, ['homeRowImageTypes']);
+
+		expect(profile.homeRowImageTypes).toBe('latestmedia:thumb,genres:thumb,nextup:logo');
+		expect(profile.homeImageTypeContinueWatching).toBe('banner');
+	});
+
+	test('still go out when the last row is cleared', () => {
+		const profile = localToProfile({homeRowImageTypes: {}}, ['homeRowImageTypes']);
+
+		expect(profile.homeRowImageTypes).toBe('');
+		expect(profile.homeImageTypeContinueWatching).toBe('');
+	});
+
+	test('stay home when another key changed', () => {
+		const profile = localToProfile({homeRowImageTypes: {genres: 'thumb'}, showClock: true}, ['showClock']);
+
+		expect(profile).not.toHaveProperty('homeRowImageTypes');
+		expect(profile).not.toHaveProperty('homeImageTypeContinueWatching');
+	});
+
+	test("come back under this app's row ids, skipping what it doesn't know", () => {
+		const local = profileToLocal({
+			homeRowImageTypes: 'LatestMedia:Thumb,genres:thumb,resume:poster,nosuch:square,rewatch,,imdb_top_250_movies:banner',
+			homeImageTypeContinueWatching: 'Poster'
+		});
+
+		expect(local.homeRowImageTypes).toEqual({
+			'latest-media': 'thumb',
+			genres: 'thumb',
+			'imdb-top250-movies': 'banner',
+			resume: 'poster'
+		});
+	});
+
+	test("take Continue Watching alone when there's no list", () => {
+		expect(profileToLocal({homeImageTypeContinueWatching: 'thumb'}).homeRowImageTypes).toEqual({resume: 'thumb'});
+		expect(profileToLocal({homeImageTypeContinueWatching: ''})).not.toHaveProperty('homeRowImageTypes');
+	});
+
+	test('resolve the list and Continue Watching from their own layers', () => {
+		const resolved = resolveFromEnvelope(
+			{global: {homeImageTypeContinueWatching: 'banner'}, tv: {homeRowImageTypes: 'genres:thumb'}},
+			{homeRowImageTypes: 'nextup:thumb', homeImageTypeContinueWatching: 'Poster'}
+		);
+
+		expect(resolved.homeRowImageTypes).toEqual({genres: 'thumb', resume: 'banner'});
+		expect(resolveFromEnvelope({}, {homeRowImageTypes: 'genres:thumb'}).homeRowImageTypes).toEqual({genres: 'thumb'});
+		expect(resolveFromEnvelope({}, {})).not.toHaveProperty('homeRowImageTypes');
+	});
+});
+
 describe('the profile push queue', () => {
 	const creds = {current: {serverUrl: 'http://server', token: 'token'}};
 	const settingsFor = (syncProfile, changes) => ({...defaultSettings, syncProfile, ...changes});

@@ -16,6 +16,7 @@ import LibraryButtonRow from '../../components/LibraryButtonRow';
 import {SkeletonShimmer, skeletonTitleWidths} from '../../components/Skeleton';
 import {getImageUrl, getBackdropId} from '../../utils/helpers';
 import {focusedCardIndex, rowEntryCardIndex, cardToRestore, focusedRowIndex} from '../../utils/rowFocusMemory';
+import {channelForProgram, isLiveTvProgram} from '../../utils/liveTvLibrary';
 import {radiusToCss, shadowToCss, toCssColor} from '../../theme/themeSpec';
 import DetailSection from './DetailSection';
 import FeaturedBanner from './FeaturedBanner';
@@ -591,6 +592,8 @@ const Browse = ({
 			onSelectLibrary?.(item);
 		} else if (item.Type === 'Recording') {
 			onPlayRecording?.(item);
+		} else if (isLiveTvProgram(item)) {
+			onSelectItem?.(channelForProgram(item));
 		} else {
 			onSelectItem?.(item);
 		}

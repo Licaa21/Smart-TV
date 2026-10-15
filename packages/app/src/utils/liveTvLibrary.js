@@ -6,6 +6,24 @@ export const isLiveTvLibrary = (library) =>
 // Both spellings turn up, so both count as a channel.
 export const isLiveTvChannel = (item) => item?.Type === 'TvChannel' || item?.Type === 'LiveTvChannel';
 
+export const isLiveTvProgram = (item) => (item?.Type === 'Program' || item?.Type === 'LiveTvProgram') && Boolean(item.ChannelId);
+
+// A program has no stream of its own, so watching one means tuning its channel. The server fields
+// come along so a home showing several servers tunes it on the right one.
+export const channelForProgram = (program) => {
+	const channel = {
+		Id: program.ChannelId,
+		Name: program.ChannelName,
+		Type: 'TvChannel',
+		ChannelNumber: program.ChannelNumber,
+		ImageTags: program.ChannelPrimaryImageTag ? {Primary: program.ChannelPrimaryImageTag} : {}
+	};
+	for (const key of Object.keys(program)) {
+		if (key.startsWith('_server')) channel[key] = program[key];
+	}
+	return channel;
+};
+
 // The guide has a button of its own, so the library list drops Live TV rather
 // than offering a second way to the same screen.
 //

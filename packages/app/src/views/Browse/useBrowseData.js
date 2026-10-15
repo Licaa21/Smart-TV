@@ -51,7 +51,7 @@ const hasDynamicRows = (settings, homeRowsConfig) => (
 		// Recommendation rows are only built by fetchAllData, so treat an enabled one
 		// as dynamic config. Otherwise enabling it shows nothing until the cache expires.
 		homeRowsConfig.some((row) => row.enabled && (row.id.startsWith('sinceyouwatched') || row.id === 'rewatch')) ||
-		homeRowsConfig.some((row) => row.enabled && ['audioartists', 'audioalbums', 'audioplaylists', 'resumeaudio', 'activerecordings'].includes(row.id)) ||
+		homeRowsConfig.some((row) => row.enabled && ['audioartists', 'audioalbums', 'audioplaylists', 'resumeaudio', 'activerecordings', 'onnow'].includes(row.id)) ||
 		(settings.pluginSections || []).some((section) => section?.enabled))
 );
 

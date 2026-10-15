@@ -132,11 +132,11 @@ Contributions are welcome. Check the existing issues first, open an issue before
 
 To submit a change, fork the repo, create a feature branch, make your changes with clear commit messages, and open a pull request with a clear description.
 
-## Help translate Moonfin [here](https://translate.moonfin.io/engage/smart-tv/)
+## Help translate Moonfin [here](https://translate.moonfin.io/projects/moonfin/smart-tv/)
 
-<a href="https://translate.moonfin.io/engage/smart-tv/">
+<a href="https://translate.moonfin.io/projects/moonfin/smart-tv/">
   <img
-    src="https://translate.moonfin.io/widgets/smart-tv/-/multi-auto.svg"
+    src="https://translate.moonfin.io/widget/moonfin/smart-tv/multi-auto.svg"
     alt="Moonfin SmartTV translation status by language"
   />
 </a>
@@ -218,7 +218,7 @@ This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Cl
 - **Home after playback:** the cards on Home open again after coming back from playing something. Rows drawn while Home was behind another screen kept a stale handler and opened nothing.
 - **Theme song and trailers:** a trailer opened from a title's details screen takes the speakers, so the theme song fades out for it and comes back when the trailer is closed.
 - **Refreshing Home and Seerr Discover:** pressing Home in the navigation while Home is open reloads its rows and the media bar, and pressing Seerr while Discover is open reloads Discover. The library scan button also refreshes Home once the server has finished scanning, so what it found shows up, and a refresh that happens while you are in the rows puts focus back on the card you were on.
-- **Picture and ASS subtitles:** PGS and ASS subtitles slide up out of the way of the player controls and the pause description, like the text ones do, and a little further for the pause description so the tails of letters are not clipped. PGS has its own settings under Subtitle Customization (size, position, opacity and brightness, since it is a picture and has no text color, background or shadow), and the Subtitle Appearance button in the player shows those while a PGS track is on, a note for an ASS track, which is styled by its own file, and the usual text options for the rest. The webOS player gets the lift for ASS only.
+- **Picture and ASS subtitles:** PGS and ASS subtitles slide up out of the way of the player controls and the pause description, like the text ones do, and a little further for the pause description so the tails of letters are not clipped. PGS has its own settings under Subtitle Customization (size, position, opacity, brightness and a background box with its own color and opacity, drawn behind the picture where the renderer drew it; there is no text color or shadow, since it is a picture), and the Subtitle Appearance button in the player shows those while a PGS track is on, a note for an ASS track, which is styled by its own file, and the usual text options for the rest. The webOS player gets the lift for ASS only.
 - **TMDB key on the TV:** the Moonfin plugin keeps its server-wide TMDB key on the server and never sends it to a client, so the TV cannot read it. Settings, Integrations, TMDB has a field for the TV's own key (the 32 character v3 key, typed with the TV keyboard), saved a moment after typing and kept on this TV only. With it, Seerr titles and episodes are read from TMDB in the Jellyfin language, and the Since You Watched row and the upcoming episode date, which already looked for a key, find it. Ratings, studio logos, thumbnails and the seasonal row still go through the plugin and its own key.
 - **Refresh libraries:** for an administrator, a refresh icon sits right beside the Libraries button in the top navbar (Right from Libraries focuses it) and on the Libraries row of the left sidebar, between the name and its arrow, where Right from the row focuses it. It scans every library on the server. The arrow turns while the server is asked, then a tick pops in for about a second, or a warning sign when it failed.
 - **Search finds a translated title:** the Most relevant row on the Seerr tab ranks a title by the name it was made under as well as the translated one, so "The Wire" finds Cartelul Crimelor. A leading "The", "A" or "An" does not count against a title, so "Flash" ranks The Flash with Flash itself ahead of Flash Gordon.

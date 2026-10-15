@@ -192,9 +192,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	subtitleOffsetRef.current = subtitleOffset;
 	const [controlsVisible, setControlsVisible] = useState(false);
 	const [activeModal, setActiveModal] = useState(null);
-	// Read by the time update, which runs from an interval or a media event and so sees no fresh state.
-	const episodesOpenRef = useRef(false);
-	episodesOpenRef.current = activeModal === 'episodes';
+	// Read by the time update, whose handler only catches up with state after a render.
+	const activeModalRef = useRef(null);
+	activeModalRef.current = activeModal;
 	// Seeded from the advanced playback menu, which picks a cap before playback starts.
 	const [selectedQuality, setSelectedQuality] = useState(initialQuality || null);
 	const [remoteSubtitleResults, setRemoteSubtitleResults] = useState([]);
@@ -1950,8 +1950,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			const rawTime = videoRef.current.currentTime;
 			const time = rawTime;
 			// Nothing on screen reads the time while the episode panel is up, and each update redraws the
-			// whole player, which is what makes that panel drag. The first tick after it closes catches up.
-			if (!episodesOpenRef.current && clockWantedRef.current && playerClockStale({tier: getPerfTier(), time, shownSecond: shownSecondRef.current, isAudioMode: clockAudioRef.current})) {
+			// whole player, which is what makes that panel drag. The first tick after it closes catches up. The offset strip
+			// follows the time closely, so while it is open it gets every tick.
+			if (activeModalRef.current === 'subtitleOffset') {
+				setCurrentTime(time);
+			} else if (activeModalRef.current !== 'episodes' && clockWantedRef.current && playerClockStale({tier: getPerfTier(), time, shownSecond: shownSecondRef.current, isAudioMode: clockAudioRef.current})) {
 				shownSecondRef.current = Math.floor(time);
 				setCurrentTime(time);
 			}
@@ -2048,6 +2051,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 
 		await playback.reportStop(positionRef.current);
+		// the next up countdown can load the next one during the stop, leave its player alone
+		if (prevItemIdRef.current !== item.Id) return;
 
 		if (repeatMode === 'one') {
 			restartCurrent();

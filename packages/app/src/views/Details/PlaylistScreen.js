@@ -1,4 +1,5 @@
-import {useCallback} from 'react';
+import {useState, useCallback, useMemo, useRef, useEffect} from 'react';
+import PropTypes from 'prop-types';
 import $L from '@enact/i18n/$L';
 
 import useItemMenuHold, {itemWithIdAt} from '../../hooks/useItemMenuHold';
@@ -7,6 +8,16 @@ import {DETAIL_ICON_PATHS} from './detailIcons';
 import {SpottableDiv, HorizontalContainer} from './detailsSpottables';
 import {handleSeasonButtonKeyDown} from './detailsFocus';
 import {PosterBadges} from './DetailBadges';
+import PlaylistSortFilterBar, {EmptyPlaylistFilterState, EmptyPlaylistState} from '../../components/PlaylistSortFilterBar';
+import {
+	sortAndFilterPlaylistTracks,
+	showsPlaylistOrder,
+	playlistRowMenu,
+	PLAYLIST_SORT_ORDER,
+	PLAYLIST_SORT_RANDOM,
+	SORT_DIR_ASC,
+	PLAYED_ALL
+} from '../../utils/playlistSortFilter';
 
 import css from './Details.module.less';
 
@@ -16,20 +27,119 @@ const PlaylistScreen = ({
 	showsSection,
 	posterUrl,
 	genres,
-	playlistItems,
+	playlistItems = [],
 	onPlay,
 	onShuffle,
 	onToggleFavorite,
 	onItemSelect,
 	onItemKeyDown,
 	onFocusRow,
-	playlistMenu
+	playlistMenu,
+	spotlightBackRef
 }) => {
-	const playlistItemCount = playlistItems.length;
+	const sortFilterBackRef = useRef(null);
+	useEffect(() => {
+		if (!spotlightBackRef) return undefined;
+		const handler = () => Boolean(sortFilterBackRef.current?.());
+		spotlightBackRef.current = handler;
+		return () => {
+			if (spotlightBackRef.current === handler) spotlightBackRef.current = null;
+		};
+	}, [spotlightBackRef]);
+
+	const [sortBy, setSortBy] = useState(PLAYLIST_SORT_ORDER);
+	const [sortDirection, setSortDirection] = useState(SORT_DIR_ASC);
+	const [playedFilter, setPlayedFilter] = useState(PLAYED_ALL);
+	const [favoriteOnly, setFavoriteOnly] = useState(false);
+	const [mediaTypeFilter, setMediaTypeFilter] = useState(null);
+	const [randomSeed, setRandomSeed] = useState(42);
+
+	const availableMediaTypes = useMemo(() => {
+		const set = new Set();
+		playlistItems.forEach((t) => {
+			const type = t.MediaType || t.Type;
+			if (type) set.add(type);
+		});
+		return Array.from(set);
+	}, [playlistItems]);
+
+	const displayedTracks = useMemo(() => sortAndFilterPlaylistTracks({
+		tracks: playlistItems,
+		sortBy,
+		sortDirection,
+		playedFilter,
+		favoriteOnly,
+		mediaTypeFilter,
+		randomSeed
+	}), [playlistItems, sortBy, sortDirection, playedFilter, favoriteOnly, mediaTypeFilter, randomSeed]);
+
+	const isDefaultOrder = showsPlaylistOrder({sortBy, sortDirection, playedFilter, favoriteOnly, mediaTypeFilter});
+
+	const handleSortChange = useCallback((newSort, newDir) => {
+		setSortBy(newSort);
+		setSortDirection(newDir);
+		if (newSort === PLAYLIST_SORT_RANDOM) {
+			setRandomSeed(Date.now());
+		}
+	}, []);
+
+	const handleFilterChange = useCallback(({playedFilter: pf, favoriteOnly: fo, mediaTypeFilter: mtf}) => {
+		if (pf !== undefined) setPlayedFilter(pf);
+		if (fo !== undefined) setFavoriteOnly(fo);
+		if (mtf !== undefined) setMediaTypeFilter(mtf);
+	}, []);
+
+	const handleReset = useCallback(() => {
+		setSortBy(PLAYLIST_SORT_ORDER);
+		setSortDirection(SORT_DIR_ASC);
+		setPlayedFilter(PLAYED_ALL);
+		setFavoriteOnly(false);
+		setMediaTypeFilter(null);
+		setRandomSeed(Date.now());
+	}, []);
+
+	const handlePlayClick = useCallback(() => {
+		if (displayedTracks.length > 0) {
+			onPlay?.(displayedTracks[0], displayedTracks);
+		}
+	}, [displayedTracks, onPlay]);
+
+	const handleShuffleClick = useCallback(() => {
+		if (displayedTracks.length > 1) {
+			onShuffle?.(displayedTracks);
+		}
+	}, [displayedTracks, onShuffle]);
+
+	const handleItemClick = useCallback((ev) => {
+		const card = ev.currentTarget;
+		const idxStr = card?.getAttribute?.('data-index');
+		const idx = idxStr != null ? parseInt(idxStr, 10) : -1;
+		const track = (idx >= 0 && idx < displayedTracks.length)
+			? displayedTracks[idx]
+			: displayedTracks.find((t) => (t.PlaylistItemId || t.Id) === card?.dataset?.playlistItemId);
+		if (track) {
+			if (onItemSelect) {
+				onItemSelect(ev, track, displayedTracks);
+			} else {
+				onPlay?.(track, displayedTracks);
+			}
+		}
+	}, [displayedTracks, onItemSelect, onPlay]);
+
+	const playlistItemCount = displayedTracks.length;
 	// Holding OK on a row opens its menu.
-	const rowAt = useCallback((target) => itemWithIdAt(playlistItems, 'data-playlist-item-id', target), [playlistItems]);
-	const menuHold = useItemMenuHold(rowAt, playlistMenu);
-	const totalDuration = playlistItems.reduce((sum, t) => sum + (t.RunTimeTicks || 0), 0);
+	const rowAt = useCallback((target) => {
+		const card = target.closest('[data-index]');
+		const idx = card ? parseInt(card.getAttribute('data-index'), 10) : -1;
+		if (idx >= 0 && idx < displayedTracks.length) return displayedTracks[idx];
+		return itemWithIdAt(displayedTracks, 'data-playlist-item-id', target);
+	}, [displayedTracks]);
+	const rowMenuOptions = useMemo(
+		() => playlistRowMenu(playlistMenu, displayedTracks, isDefaultOrder),
+		[playlistMenu, displayedTracks, isDefaultOrder]
+	);
+	const menuHold = useItemMenuHold(rowAt, rowMenuOptions);
+	const totalDuration = displayedTracks.reduce((sum, t) => sum + (t.RunTimeTicks || 0), 0);
 
 	return (
 		<>
@@ -54,16 +164,16 @@ const PlaylistScreen = ({
 			</div>
 
 			<HorizontalContainer className={css.actionButtons} onKeyDown={handleSeasonButtonKeyDown} onFocus={onFocusRow}>
-				{playlistItems.length > 0 && (
-					<SpottableDiv className={css.btnWrapper} onClick={onPlay} onFocus={onFocusRow} spotlightId="details-primary-btn">
+				{displayedTracks.length > 0 && (
+					<SpottableDiv className={css.btnWrapper} onClick={handlePlayClick} onFocus={onFocusRow} spotlightId="details-primary-btn">
 						<div className={css.btnAction}>
 							<span className={css.btnIcon}>▶</span>
 						</div>
 						<span className={css.btnLabel}>{$L('Play')}</span>
 					</SpottableDiv>
 				)}
-				{playlistItems.length > 1 && (
-					<SpottableDiv className={css.btnWrapper} onClick={onShuffle}>
+				{displayedTracks.length > 1 && (
+					<SpottableDiv className={css.btnWrapper} onClick={handleShuffleClick}>
 						<div className={css.btnAction}>
 							<svg className={css.btnIcon} viewBox="0 -960 960 960" fill="currentColor">
 								<path d={DETAIL_ICON_PATHS.shuffle}/>
@@ -82,47 +192,91 @@ const PlaylistScreen = ({
 				</SpottableDiv>
 			</HorizontalContainer>
 
-			<p className={css.playlistHint}>{$L('◀ ▶ to re-order · DEL to remove')}</p>
+			<PlaylistSortFilterBar
+				sortBy={sortBy}
+				sortDirection={sortDirection}
+				onSortChange={handleSortChange}
+				playedFilter={playedFilter}
+				favoriteOnly={favoriteOnly}
+				mediaTypeFilter={mediaTypeFilter}
+				availableMediaTypes={availableMediaTypes}
+				onFilterChange={handleFilterChange}
+				onReset={handleReset}
+				backHandlerRef={sortFilterBackRef}
+			/>
 
-			<div className={`${css.trackList} ${css.playlistItemsList}`} onKeyDown={onItemKeyDown} {...menuHold}>
-				{playlistItems.map((plItem, idx) => {
-					const plDuration = plItem.RunTimeTicks ? formatDuration(plItem.RunTimeTicks) : '';
-					const plArtist = plItem.AlbumArtist || plItem.Artists?.[0] || '';
-					const isAudio = plItem.MediaType === 'Audio';
-					const thumbUrl = plItem.ImageTags?.Primary
-						? getImageUrl(serverUrl, plItem.Id, 'Primary', {maxHeight: 80, quality: 80})
-						: null;
+			{isDefaultOrder && displayedTracks.length > 0 && (
+				<p className={css.playlistHint}>{$L('◀ ▶ to re-order · DEL to remove')}</p>
+			)}
 
-					return (
-						<SpottableDiv
-							key={plItem.PlaylistItemId || plItem.Id}
-							className={css.playlistItem}
-							data-playlist-item-id={plItem.Id}
-							data-playlist-index={idx}
-							onClick={onItemSelect}
-						>
-							<span className={css.trackNumber}>{idx + 1}</span>
-							{thumbUrl && (
-								<div className={css.playlistItemThumb}>
-									<img src={thumbUrl} alt="" />
+			{playlistItems.length === 0 ? (
+				<EmptyPlaylistState />
+			) : displayedTracks.length === 0 ? (
+				<EmptyPlaylistFilterState onReset={handleReset} />
+			) : (
+				<div className={`${css.trackList} ${css.playlistItemsList}`} onKeyDown={isDefaultOrder ? onItemKeyDown : undefined} {...menuHold}>
+					{displayedTracks.map((plItem, idx) => {
+						const plDuration = plItem.RunTimeTicks ? formatDuration(plItem.RunTimeTicks) : '';
+						const plArtist = plItem.AlbumArtist || plItem.Artists?.[0] || '';
+						const isAudio = plItem.MediaType === 'Audio';
+						const thumbUrl = plItem.ImageTags?.Primary
+							? getImageUrl(serverUrl, plItem.Id, 'Primary', {maxHeight: 80, quality: 80})
+							: null;
+
+						return (
+							<SpottableDiv
+								key={plItem.PlaylistItemId || plItem.Id}
+								className={css.playlistItem}
+								data-playlist-item-id={plItem.Id}
+								data-playlist-index={idx}
+								data-index={idx}
+								onClick={handleItemClick}
+							>
+								<span className={css.trackNumber}>{idx + 1}</span>
+								{thumbUrl && (
+									<div className={css.playlistItemThumb}>
+										<img src={thumbUrl} alt="" />
+									</div>
+								)}
+								<div className={css.trackInfo}>
+									<span className={css.trackTitle}>{plItem.Name}</span>
+									{plArtist && <span className={css.trackArtist}>{plArtist}</span>}
+									{!isAudio && plItem.Type && <span className={css.trackArtist}>{plItem.Type}</span>}
 								</div>
-							)}
-							<div className={css.trackInfo}>
-								<span className={css.trackTitle}>{plItem.Name}</span>
-								{plArtist && <span className={css.trackArtist}>{plArtist}</span>}
-								{!isAudio && plItem.Type && <span className={css.trackArtist}>{plItem.Type}</span>}
-							</div>
-							<span className={css.trackDuration}>{plDuration}</span>
-							<div className={css.playlistReorderArrows}>
-								<span className={`${css.reorderArrow} ${idx === 0 ? css.reorderArrowDisabled : ''}`}>▲</span>
-								<span className={`${css.reorderArrow} ${idx === playlistItems.length - 1 ? css.reorderArrowDisabled : ''}`}>▼</span>
-							</div>
-						</SpottableDiv>
-					);
-				})}
-			</div>
+								<span className={css.trackDuration}>{plDuration}</span>
+								{isDefaultOrder && (
+									<div className={css.playlistReorderArrows}>
+										<span className={`${css.reorderArrow} ${idx === 0 ? css.reorderArrowDisabled : ''}`}>▲</span>
+										<span className={`${css.reorderArrow} ${idx === displayedTracks.length - 1 ? css.reorderArrowDisabled : ''}`}>▼</span>
+									</div>
+								)}
+							</SpottableDiv>
+						);
+					})}
+				</div>
+			)}
 		</>
 	);
+};
+
+PlaylistScreen.propTypes = {
+	genres: PropTypes.arrayOf(PropTypes.string),
+	item: PropTypes.object.isRequired,
+	onFocusRow: PropTypes.func,
+	onItemKeyDown: PropTypes.func,
+	onItemSelect: PropTypes.func,
+	onPlay: PropTypes.func,
+	onShuffle: PropTypes.func,
+	onToggleFavorite: PropTypes.func,
+	playlistItems: PropTypes.arrayOf(PropTypes.object),
+	playlistMenu: PropTypes.object,
+	posterUrl: PropTypes.string,
+	serverUrl: PropTypes.string,
+	showsSection: PropTypes.func.isRequired,
+	spotlightBackRef: PropTypes.oneOfType([
+		PropTypes.func,
+		PropTypes.shape({current: PropTypes.any})
+	])
 };
 
 export default PlaylistScreen;

@@ -22,65 +22,66 @@ import m15 from '../components/NoConnection/NoConnection.module.less';
 import m16 from '../components/PersonDetailShell/PersonDetailShell.module.less';
 import m17 from '../components/PersonalRatingDialog/PersonalRatingDialog.module.less';
 import m18 from '../components/PhotoViewer/PhotoViewer.module.less';
-import m19 from '../components/RatingsRow/RatingsRow.module.less';
-import m20 from '../components/SeerrIssueThread/SeerrIssueThread.module.less';
-import m21 from '../components/SeerrNotificationToast/SeerrNotificationToast.module.less';
-import m22 from '../components/SeerrStatusChip/SeerrStatusChip.module.less';
-import m23 from '../components/ServerMessagesDialog/ServerMessagesDialog.module.less';
-import m24 from '../components/ShuffleOverlay/ShuffleOverlay.module.less';
-import m25 from '../components/Sidebar/Sidebar.module.less';
-import m26 from '../components/SpottableInput/SpottableInput.module.less';
-import m27 from '../components/SyncPlayDialog/SyncPlayDialog.module.less';
-import m28 from '../components/TrackOptionRow/TrackOptionRow.module.less';
-import m29 from '../components/TrickplayPreview/TrickplayPreview.module.less';
-import m30 from '../components/TrickplayPreview/TrickplaySettingsPreview.module.less';
-import m31 from '../components/UpdateNotification/UpdateNotification.module.less';
-import m32 from '../components/seerr/SeerrPopups.module.less';
-import m33 from '../components/seerr/SeerrSections.module.less';
-import m34 from '../components/seerr/SeerrStatusBadge.module.less';
-import m35 from '../views/Browse/Browse.module.less';
-import m36 from '../views/Details/Details.module.less';
-import m37 from '../views/Details/ExpandableOverview.module.less';
-import m38 from '../views/Details/ModernDetailContent.module.less';
-import m39 from '../views/Details/ModernFileInformation.module.less';
-import m40 from '../views/Details/SeerrEpisodes.module.less';
-import m41 from '../views/Details/nouveau/cards/NouveauCards.module.less';
-import m42 from '../views/Details/nouveau/footer/NouveauDetailsFooter.module.less';
-import m43 from '../views/Details/nouveau/hero/NouveauHero.module.less';
-import m44 from '../views/Details/spotlight/SpotlightDetailContent.module.less';
-import m45 from '../views/Favorites/Favorites.module.less';
-import m46 from '../views/GamePlayer/GamePlayer.module.less';
-import m47 from '../views/GameSystem/GameSystem.module.less';
-import m48 from '../views/GenreBrowse/GenreBrowse.module.less';
-import m49 from '../views/Genres/Genres.module.less';
-import m50 from '../views/Library/Library.module.less';
-import m51 from '../views/LiveTV/LiveTV.module.less';
-import m52 from '../views/Login/Login.module.less';
-import m53 from '../views/MusicBrowse/MusicBrowse.module.less';
-import m54 from '../views/MusicBrowse/MusicChips.module.less';
-import m55 from '../views/MusicBrowse/MusicHero.module.less';
-import m56 from '../views/Player/ChannelCarousel.module.less';
-import m57 from '../views/Player/EpisodeBrowser.module.less';
-import m58 from '../views/Player/NextUpOverlay.module.less';
-import m59 from '../views/Player/Player.module.less';
-import m60 from '../views/Player/SkipSegmentOverlay.module.less';
-import m61 from '../views/Player/StillWatchingDialog.module.less';
-import m62 from '../views/Player/TizenPlayer.module.less';
-import m63 from '../views/Player/WebOSPlayer.module.less';
-import m64 from '../views/Player/audio/AudioMode.module.less';
-import m65 from '../views/Player/audio/AudioQualityBadge.module.less';
-import m66 from '../views/Player/audio/LyricsPanel.module.less';
-import m67 from '../views/Player/audio/QueuePanel.module.less';
-import m68 from '../views/Recordings/Recordings.module.less';
-import m69 from '../views/Search/Search.module.less';
-import m70 from '../views/SeerrBrowse/SeerrBrowse.module.less';
-import m71 from '../views/SeerrCollection/SeerrCollection.module.less';
-import m72 from '../views/SeerrDiscover/SeerrDiscover.module.less';
-import m73 from '../views/SeerrPerson/SeerrPerson.module.less';
-import m74 from '../views/SeerrRequests/SeerrRequests.module.less';
-import m75 from '../views/Settings/Settings.module.less';
-import m76 from '../views/Settings/achievements/Achievements.module.less';
-import m77 from '../views/Settings/friends/Friends.module.less';
+import m19 from '../components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less';
+import m20 from '../components/RatingsRow/RatingsRow.module.less';
+import m21 from '../components/SeerrIssueThread/SeerrIssueThread.module.less';
+import m22 from '../components/SeerrNotificationToast/SeerrNotificationToast.module.less';
+import m23 from '../components/SeerrStatusChip/SeerrStatusChip.module.less';
+import m24 from '../components/ServerMessagesDialog/ServerMessagesDialog.module.less';
+import m25 from '../components/ShuffleOverlay/ShuffleOverlay.module.less';
+import m26 from '../components/Sidebar/Sidebar.module.less';
+import m27 from '../components/SpottableInput/SpottableInput.module.less';
+import m28 from '../components/SyncPlayDialog/SyncPlayDialog.module.less';
+import m29 from '../components/TrackOptionRow/TrackOptionRow.module.less';
+import m30 from '../components/TrickplayPreview/TrickplayPreview.module.less';
+import m31 from '../components/TrickplayPreview/TrickplaySettingsPreview.module.less';
+import m32 from '../components/UpdateNotification/UpdateNotification.module.less';
+import m33 from '../components/seerr/SeerrPopups.module.less';
+import m34 from '../components/seerr/SeerrSections.module.less';
+import m35 from '../components/seerr/SeerrStatusBadge.module.less';
+import m36 from '../views/Browse/Browse.module.less';
+import m37 from '../views/Details/Details.module.less';
+import m38 from '../views/Details/ExpandableOverview.module.less';
+import m39 from '../views/Details/ModernDetailContent.module.less';
+import m40 from '../views/Details/ModernFileInformation.module.less';
+import m41 from '../views/Details/SeerrEpisodes.module.less';
+import m42 from '../views/Details/nouveau/cards/NouveauCards.module.less';
+import m43 from '../views/Details/nouveau/footer/NouveauDetailsFooter.module.less';
+import m44 from '../views/Details/nouveau/hero/NouveauHero.module.less';
+import m45 from '../views/Details/spotlight/SpotlightDetailContent.module.less';
+import m46 from '../views/Favorites/Favorites.module.less';
+import m47 from '../views/GamePlayer/GamePlayer.module.less';
+import m48 from '../views/GameSystem/GameSystem.module.less';
+import m49 from '../views/GenreBrowse/GenreBrowse.module.less';
+import m50 from '../views/Genres/Genres.module.less';
+import m51 from '../views/Library/Library.module.less';
+import m52 from '../views/LiveTV/LiveTV.module.less';
+import m53 from '../views/Login/Login.module.less';
+import m54 from '../views/MusicBrowse/MusicBrowse.module.less';
+import m55 from '../views/MusicBrowse/MusicChips.module.less';
+import m56 from '../views/MusicBrowse/MusicHero.module.less';
+import m57 from '../views/Player/ChannelCarousel.module.less';
+import m58 from '../views/Player/EpisodeBrowser.module.less';
+import m59 from '../views/Player/NextUpOverlay.module.less';
+import m60 from '../views/Player/Player.module.less';
+import m61 from '../views/Player/SkipSegmentOverlay.module.less';
+import m62 from '../views/Player/StillWatchingDialog.module.less';
+import m63 from '../views/Player/TizenPlayer.module.less';
+import m64 from '../views/Player/WebOSPlayer.module.less';
+import m65 from '../views/Player/audio/AudioMode.module.less';
+import m66 from '../views/Player/audio/AudioQualityBadge.module.less';
+import m67 from '../views/Player/audio/LyricsPanel.module.less';
+import m68 from '../views/Player/audio/QueuePanel.module.less';
+import m69 from '../views/Recordings/Recordings.module.less';
+import m70 from '../views/Search/Search.module.less';
+import m71 from '../views/SeerrBrowse/SeerrBrowse.module.less';
+import m72 from '../views/SeerrCollection/SeerrCollection.module.less';
+import m73 from '../views/SeerrDiscover/SeerrDiscover.module.less';
+import m74 from '../views/SeerrPerson/SeerrPerson.module.less';
+import m75 from '../views/SeerrRequests/SeerrRequests.module.less';
+import m76 from '../views/Settings/Settings.module.less';
+import m77 from '../views/Settings/achievements/Achievements.module.less';
+import m78 from '../views/Settings/friends/Friends.module.less';
 
 export const MODULES = {
 	'components/AccountModal/AccountModal.module.less': m0,
@@ -102,65 +103,66 @@ export const MODULES = {
 	'components/PersonDetailShell/PersonDetailShell.module.less': m16,
 	'components/PersonalRatingDialog/PersonalRatingDialog.module.less': m17,
 	'components/PhotoViewer/PhotoViewer.module.less': m18,
-	'components/RatingsRow/RatingsRow.module.less': m19,
-	'components/SeerrIssueThread/SeerrIssueThread.module.less': m20,
-	'components/SeerrNotificationToast/SeerrNotificationToast.module.less': m21,
-	'components/SeerrStatusChip/SeerrStatusChip.module.less': m22,
-	'components/ServerMessagesDialog/ServerMessagesDialog.module.less': m23,
-	'components/ShuffleOverlay/ShuffleOverlay.module.less': m24,
-	'components/Sidebar/Sidebar.module.less': m25,
-	'components/SpottableInput/SpottableInput.module.less': m26,
-	'components/SyncPlayDialog/SyncPlayDialog.module.less': m27,
-	'components/TrackOptionRow/TrackOptionRow.module.less': m28,
-	'components/TrickplayPreview/TrickplayPreview.module.less': m29,
-	'components/TrickplayPreview/TrickplaySettingsPreview.module.less': m30,
-	'components/UpdateNotification/UpdateNotification.module.less': m31,
-	'components/seerr/SeerrPopups.module.less': m32,
-	'components/seerr/SeerrSections.module.less': m33,
-	'components/seerr/SeerrStatusBadge.module.less': m34,
-	'views/Browse/Browse.module.less': m35,
-	'views/Details/Details.module.less': m36,
-	'views/Details/ExpandableOverview.module.less': m37,
-	'views/Details/ModernDetailContent.module.less': m38,
-	'views/Details/ModernFileInformation.module.less': m39,
-	'views/Details/SeerrEpisodes.module.less': m40,
-	'views/Details/nouveau/cards/NouveauCards.module.less': m41,
-	'views/Details/nouveau/footer/NouveauDetailsFooter.module.less': m42,
-	'views/Details/nouveau/hero/NouveauHero.module.less': m43,
-	'views/Details/spotlight/SpotlightDetailContent.module.less': m44,
-	'views/Favorites/Favorites.module.less': m45,
-	'views/GamePlayer/GamePlayer.module.less': m46,
-	'views/GameSystem/GameSystem.module.less': m47,
-	'views/GenreBrowse/GenreBrowse.module.less': m48,
-	'views/Genres/Genres.module.less': m49,
-	'views/Library/Library.module.less': m50,
-	'views/LiveTV/LiveTV.module.less': m51,
-	'views/Login/Login.module.less': m52,
-	'views/MusicBrowse/MusicBrowse.module.less': m53,
-	'views/MusicBrowse/MusicChips.module.less': m54,
-	'views/MusicBrowse/MusicHero.module.less': m55,
-	'views/Player/ChannelCarousel.module.less': m56,
-	'views/Player/EpisodeBrowser.module.less': m57,
-	'views/Player/NextUpOverlay.module.less': m58,
-	'views/Player/Player.module.less': m59,
-	'views/Player/SkipSegmentOverlay.module.less': m60,
-	'views/Player/StillWatchingDialog.module.less': m61,
-	'views/Player/TizenPlayer.module.less': m62,
-	'views/Player/WebOSPlayer.module.less': m63,
-	'views/Player/audio/AudioMode.module.less': m64,
-	'views/Player/audio/AudioQualityBadge.module.less': m65,
-	'views/Player/audio/LyricsPanel.module.less': m66,
-	'views/Player/audio/QueuePanel.module.less': m67,
-	'views/Recordings/Recordings.module.less': m68,
-	'views/Search/Search.module.less': m69,
-	'views/SeerrBrowse/SeerrBrowse.module.less': m70,
-	'views/SeerrCollection/SeerrCollection.module.less': m71,
-	'views/SeerrDiscover/SeerrDiscover.module.less': m72,
-	'views/SeerrPerson/SeerrPerson.module.less': m73,
-	'views/SeerrRequests/SeerrRequests.module.less': m74,
-	'views/Settings/Settings.module.less': m75,
-	'views/Settings/achievements/Achievements.module.less': m76,
-	'views/Settings/friends/Friends.module.less': m77
+	'components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less': m19,
+	'components/RatingsRow/RatingsRow.module.less': m20,
+	'components/SeerrIssueThread/SeerrIssueThread.module.less': m21,
+	'components/SeerrNotificationToast/SeerrNotificationToast.module.less': m22,
+	'components/SeerrStatusChip/SeerrStatusChip.module.less': m23,
+	'components/ServerMessagesDialog/ServerMessagesDialog.module.less': m24,
+	'components/ShuffleOverlay/ShuffleOverlay.module.less': m25,
+	'components/Sidebar/Sidebar.module.less': m26,
+	'components/SpottableInput/SpottableInput.module.less': m27,
+	'components/SyncPlayDialog/SyncPlayDialog.module.less': m28,
+	'components/TrackOptionRow/TrackOptionRow.module.less': m29,
+	'components/TrickplayPreview/TrickplayPreview.module.less': m30,
+	'components/TrickplayPreview/TrickplaySettingsPreview.module.less': m31,
+	'components/UpdateNotification/UpdateNotification.module.less': m32,
+	'components/seerr/SeerrPopups.module.less': m33,
+	'components/seerr/SeerrSections.module.less': m34,
+	'components/seerr/SeerrStatusBadge.module.less': m35,
+	'views/Browse/Browse.module.less': m36,
+	'views/Details/Details.module.less': m37,
+	'views/Details/ExpandableOverview.module.less': m38,
+	'views/Details/ModernDetailContent.module.less': m39,
+	'views/Details/ModernFileInformation.module.less': m40,
+	'views/Details/SeerrEpisodes.module.less': m41,
+	'views/Details/nouveau/cards/NouveauCards.module.less': m42,
+	'views/Details/nouveau/footer/NouveauDetailsFooter.module.less': m43,
+	'views/Details/nouveau/hero/NouveauHero.module.less': m44,
+	'views/Details/spotlight/SpotlightDetailContent.module.less': m45,
+	'views/Favorites/Favorites.module.less': m46,
+	'views/GamePlayer/GamePlayer.module.less': m47,
+	'views/GameSystem/GameSystem.module.less': m48,
+	'views/GenreBrowse/GenreBrowse.module.less': m49,
+	'views/Genres/Genres.module.less': m50,
+	'views/Library/Library.module.less': m51,
+	'views/LiveTV/LiveTV.module.less': m52,
+	'views/Login/Login.module.less': m53,
+	'views/MusicBrowse/MusicBrowse.module.less': m54,
+	'views/MusicBrowse/MusicChips.module.less': m55,
+	'views/MusicBrowse/MusicHero.module.less': m56,
+	'views/Player/ChannelCarousel.module.less': m57,
+	'views/Player/EpisodeBrowser.module.less': m58,
+	'views/Player/NextUpOverlay.module.less': m59,
+	'views/Player/Player.module.less': m60,
+	'views/Player/SkipSegmentOverlay.module.less': m61,
+	'views/Player/StillWatchingDialog.module.less': m62,
+	'views/Player/TizenPlayer.module.less': m63,
+	'views/Player/WebOSPlayer.module.less': m64,
+	'views/Player/audio/AudioMode.module.less': m65,
+	'views/Player/audio/AudioQualityBadge.module.less': m66,
+	'views/Player/audio/LyricsPanel.module.less': m67,
+	'views/Player/audio/QueuePanel.module.less': m68,
+	'views/Recordings/Recordings.module.less': m69,
+	'views/Search/Search.module.less': m70,
+	'views/SeerrBrowse/SeerrBrowse.module.less': m71,
+	'views/SeerrCollection/SeerrCollection.module.less': m72,
+	'views/SeerrDiscover/SeerrDiscover.module.less': m73,
+	'views/SeerrPerson/SeerrPerson.module.less': m74,
+	'views/SeerrRequests/SeerrRequests.module.less': m75,
+	'views/Settings/Settings.module.less': m76,
+	'views/Settings/achievements/Achievements.module.less': m77,
+	'views/Settings/friends/Friends.module.less': m78
 };
 
 export const ACCENT_RULES = {
@@ -429,6 +431,14 @@ export const ACCENT_RULES = {
 		["components/PersonalRatingDialog/PersonalRatingDialog.module.less","",".{thumbSelected}","background","rgba({rgb}, 0.28)"],
 		["components/PersonalRatingDialog/PersonalRatingDialog.module.less","",".{step}:focus, .{thumb}:focus, .{stars}:focus","background","rgba({rgb}, 0.35)"],
 		["components/PhotoViewer/PhotoViewer.module.less","",".{spinner}","border-top-color","{accent}"],
+		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{pill}:focus, .{pill}.{spottable-focus}","background","{accent}"],
+		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{pill}:focus, .{pill}.{spottable-focus}","border-color","{accent}"],
+		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{pillActive}","background","rgba({rgb}, 0.22)"],
+		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{pillActive}","border-color","{accent}"],
+		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{badge}","background","{accent}"],
+		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{pill}:focus .{badge}, .{pill}.{spottable-focus} .{badge}","color","{accent}"],
+		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{clearFiltersBtn}:focus, .{clearFiltersBtn}.{spottable-focus}","background","{accent}"],
+		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{clearFiltersBtn}:focus, .{clearFiltersBtn}.{spottable-focus}","border-color","{accent}"],
 		["components/SeerrIssueThread/SeerrIssueThread.module.less","",".{description}","border-left","5px solid {accent}"],
 		["components/SeerrIssueThread/SeerrIssueThread.module.less","",".{sendBtn}","background","{accent}"],
 		["components/SeerrNotificationToast/SeerrNotificationToast.module.less","",".{toast}","border-left","4px solid {accent}"],

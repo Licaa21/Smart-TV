@@ -49,6 +49,7 @@ export const buildLoaderContext = ({api, settings, homeRowsConfig, eligibleLibra
 		audioPlaylistsEnabled: settings.displayAudioRows && rowEnabled('audioplaylists'),
 		resumeAudioEnabled: settings.displayAudioRows && rowEnabled('resumeaudio'),
 		recordingsEnabled: rowEnabled('activerecordings'),
+		onNowEnabled: rowEnabled('onnow'),
 		rewatchEnabled: settings.displayRewatchRow !== false && rowEnabled('rewatch'),
 		studiosEnabled: settings.displayStudiosRows && rowEnabled('studios'),
 		enabledPluginSections: (settings.pluginSections || []).filter((section) => section.enabled),
@@ -365,15 +366,16 @@ const loadGenres = async (ctx) => {
 };
 
 const loadPlaylistsAndMusic = async (ctx) => {
-	const {api, appendRows, audioAlbumsEnabled, audioArtistsEnabled, audioPlaylistsEnabled, audioRowsSortBy, audioRowsSortOrder, playlistsSortBy, playlistsSortOrder, recordingsEnabled, resumeAudioEnabled, settings} = ctx;
+	const {api, appendRows, audioAlbumsEnabled, audioArtistsEnabled, audioPlaylistsEnabled, audioRowsSortBy, audioRowsSortOrder, onNowEnabled, playlistsSortBy, playlistsSortOrder, recordingsEnabled, resumeAudioEnabled, settings} = ctx;
 	try {
-		const [playlistsResult, audioArtistsResult, audioAlbumsResult, audioPlaylistsResult, resumeAudioResult, recordingsResult] = await Promise.all([
+		const [playlistsResult, audioArtistsResult, audioAlbumsResult, audioPlaylistsResult, resumeAudioResult, recordingsResult, onNowResult] = await Promise.all([
 			settings.displayPlaylistsRows ? api.getPlaylists(playlistsSortBy, playlistsSortOrder).catch(() => null) : Promise.resolve(null),
 			audioArtistsEnabled ? scopedGetItems(api, {IncludeItemTypes: 'MusicArtist', Limit: 20, SortBy: audioRowsSortBy, SortOrder: audioRowsSortOrder, Fields: HOME_ROW_ITEM_FIELDS}, {via: (params) => api.getAlbumArtists(params)}).catch(() => null) : Promise.resolve(null),
 			audioAlbumsEnabled ? scopedGetItems(api, {IncludeItemTypes: 'MusicAlbum', Recursive: true, SortBy: audioRowsSortBy, SortOrder: audioRowsSortOrder, Limit: 20, Fields: HOME_ROW_ITEM_FIELDS}).catch(() => null) : Promise.resolve(null),
 			audioPlaylistsEnabled ? api.getPlaylists(audioRowsSortBy, audioRowsSortOrder).catch(() => null) : Promise.resolve(null),
 			resumeAudioEnabled ? api.getResumeAudioItems(20).catch(() => null) : Promise.resolve(null),
-			recordingsEnabled ? api.getLiveTvRecordings().catch(() => null) : Promise.resolve(null)
+			recordingsEnabled ? api.getLiveTvRecordings().catch(() => null) : Promise.resolve(null),
+			onNowEnabled ? api.getLiveTvAiringPrograms(20).catch(() => null) : Promise.resolve(null)
 		]);
 
 		const rows = [];
@@ -428,6 +430,14 @@ const loadPlaylistsAndMusic = async (ctx) => {
 				id: 'activerecordings',
 				title: $L('Recordings'),
 				items: recordingsResult.Items,
+				type: 'landscape'
+			});
+		}
+		if (onNowResult?.Items?.length > 0) {
+			rows.push({
+				id: 'onnow',
+				title: $L('On Now'),
+				items: onNowResult.Items,
 				type: 'landscape'
 			});
 		}
@@ -651,7 +661,7 @@ export const BROWSE_ROW_LOADERS = [
 	{load: loadStudios, sections: () => ['studios']},
 	{load: loadFavorites, sections: () => FAVORITE_ROW_CONFIGS.map((row) => row.id)},
 	{load: loadGenres, sections: () => ['genres']},
-	{load: loadPlaylistsAndMusic, sections: () => ['playlists', 'audioartists', 'audioalbums', 'audioplaylists', 'resumeaudio', 'activerecordings']},
+	{load: loadPlaylistsAndMusic, sections: () => ['playlists', 'audioartists', 'audioalbums', 'audioplaylists', 'resumeaudio', 'activerecordings', 'onnow']},
 	{
 		load: loadPluginsAndRecos,
 		sections: (ctx) => [
