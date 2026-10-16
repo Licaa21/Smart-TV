@@ -171,6 +171,20 @@ describe('the skip prompt', () => {
 		expect(result.current.skipSegment).not.toBeNull();
 	});
 
+	test('an older seek landing while a newer one is on its way leaves prompts held', async () => {
+		const {result} = setupPrompt();
+		let landOlder;
+		at(result, 30);
+		act(() => result.current.suppressSeekPrompts(new Promise((resolve) => {
+			landOlder = resolve;
+		})));
+		act(() => result.current.suppressSeekPrompts(new Promise(() => {})));
+		await act(async () => landOlder());
+		act(() => jest.advanceTimersByTime(3000));
+		at(result, 90);
+		expect(result.current.skipSegment).toBeNull();
+	});
+
 	test('after its few seconds it only shows with the controls, until its segment ends', () => {
 		const {result, rerender} = setupPrompt({}, {mediaSegmentAutoHide: 's5'});
 		at(result, 61);

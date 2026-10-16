@@ -79,6 +79,8 @@ const useSegmentPopups = ({
 	// playback is back at its start.
 	const autoSkippedRef = useRef(new Set());
 	const holdPromptsUntilRef = useRef(0);
+	// Only the newest seek's landing ends the hold, since an older one can land while a newer one is on its way.
+	const newestLandingRef = useRef(null);
 	const backHeldUntilRef = useRef(0);
 	const autoHideTimerRef = useRef(null);
 	const promptLapsedRef = useRef(false);
@@ -206,7 +208,9 @@ const useSegmentPopups = ({
 		holdPromptsUntilRef.current = Math.max(holdPromptsUntilRef.current, Date.now() + holdFor);
 		clearSkipPrompt();
 		if (!landing) return;
+		newestLandingRef.current = landing;
 		const landed = () => {
+			if (newestLandingRef.current !== landing) return;
 			holdPromptsUntilRef.current = Date.now() + SEEK_PROMPT_HOLD_MS;
 		};
 		landing.then(landed, landed);
@@ -223,6 +227,7 @@ const useSegmentPopups = ({
 		activeSegmentRef.current = null;
 		autoSkippedRef.current.clear();
 		holdPromptsUntilRef.current = 0;
+		newestLandingRef.current = null;
 		backHeldUntilRef.current = 0;
 		hasTriggeredNextEpisodeRef.current = false;
 		if (nextEpisodeTimerRef.current) {
