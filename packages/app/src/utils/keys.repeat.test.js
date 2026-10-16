@@ -58,6 +58,26 @@ describe('held arrow repeats', () => {
 		expect(stale.defaultPrevented).toBe(true);
 	});
 
+	test('a set that leaves the stamp empty keeps every repeat', () => {
+		const {target, seen} = setup();
+		const raw = (repeat) => {
+			const e = new Event('keydown', {cancelable: true});
+			Object.defineProperties(e, {keyCode: {value: 40}, repeat: {value: repeat}, timeStamp: {value: 0}});
+			target.dispatchEvent(e);
+		};
+		raw(false);
+		raw(true);
+		raw(true);
+		expect(seen).toHaveBeenCalledTimes(3);
+	});
+
+	test('a wait too long to be a slow set is a clock that disagrees, and keeps the repeat', () => {
+		const {target, seen} = setup();
+		send(target, 'keydown', 40, 0, false);
+		send(target, 'keydown', 40, 5000, true);
+		expect(seen).toHaveBeenCalledTimes(2);
+	});
+
 	test('tells what a held key lost once it is let go, and only then', () => {
 		const target = new EventTarget();
 		const report = jest.fn();

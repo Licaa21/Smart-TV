@@ -110,6 +110,8 @@ export const isChannelMenuKey = (e) => {
 // A held arrow repeats at the remote's own rate, which a slow TV can't always keep up with. A repeat that sat
 // waiting behind the last move is dropped, so focus keeps pace with the key and stops when it's let go.
 const STALE_REPEAT_MS = 100;
+// A wait this long is a clock that does not agree with the page's, not a TV that is slow, so the repeat is kept
+const MAX_PLAUSIBLE_WAIT_MS = 2000;
 export const dropStaleArrowRepeats = (target = window, report) => {
 	let held = null;
 	// Some sets stamp their key events on a clock of their own, so every event reads as old by a fixed amount and every
@@ -123,12 +125,14 @@ export const dropStaleArrowRepeats = (target = window, report) => {
 		if (code !== KEYS.UP && code !== KEYS.DOWN && code !== KEYS.LEFT && code !== KEYS.RIGHT) return;
 		const repeat = e.repeat || held === code;
 		held = code;
+		// A set that leaves the stamp empty has nothing to measure a wait by
+		if (!e.timeStamp) return;
 		// Older engines stamp events with the wall clock rather than the page's own.
 		const now = e.timeStamp > 1e12 ? Date.now() : performance.now();
 		const age = now - e.timeStamp;
 		if (age < skew) skew = age;
 		const waited = age - skew;
-		if (!repeat || waited <= STALE_REPEAT_MS) return;
+		if (!repeat || waited <= STALE_REPEAT_MS || waited > MAX_PLAUSIBLE_WAIT_MS) return;
 		dropped += 1;
 		if (waited > worst) worst = waited;
 		e.preventDefault();

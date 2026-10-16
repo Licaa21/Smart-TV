@@ -237,7 +237,7 @@ did, what the fork keeps instead, and what to do on a merge.
 ### 7. Held arrows and the dotted i
 
 - **Upstream:** `dropStaleArrowRepeats` (`utils/keys.js`, #320) drops any repeat of a held arrow whose event timestamp is more than 100 ms old. It trusts `event.timeStamp` to be on the page's clock.
-- **The fork keeps:** the same function with the clock offset learned (`skew`, the least age an arrow press has been seen with, and only age beyond it counts), because on the user's set a held arrow did nothing while single presses worked, which fits every event reading as old. What a held key lost is logged once it is let go ("Held arrow repeats dropped" in the report). The page also switches off the common ligatures (`font-variant-ligatures: no-common-ligatures` in `App.module.less`), since the font's fi glyph took the dot of the first i in "fii" and "fiica".
+- **The fork keeps:** the same function with the clock offset learned (`skew`, the least age an arrow press has been seen with, and only age beyond it counts; an empty stamp, or a wait over two seconds, is left alone as a clock that disagrees), because on the user's set a held arrow did nothing while single presses worked, which fits every event reading as old. What a held key lost is logged once it is let go ("Held arrow repeats dropped" in the report). The page also switches off the common ligatures (`font-variant-ligatures: no-common-ligatures` in `App.module.less`), since the font's fi glyph took the dot of the first i in "fii" and "fiica".
 - **On a merge:** keep the `skew` and the report callback in `dropStaleArrowRepeats` (and its second argument in `index.js`), and the ligature line.
 - **Files:** `utils/keys.js`, `index.js`, `App/App.module.less`.
 

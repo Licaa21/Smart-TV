@@ -73,6 +73,8 @@
 :global(select),
 :global(textarea) {
 	font-family: 'Roboto', 'Sandstone', sans-serif;
+	// Form controls take their own font shorthand from the browser, which puts the ligatures back, so they say it too
+	font-variant-ligatures: no-common-ligatures;
 }
 
 :global(html),
