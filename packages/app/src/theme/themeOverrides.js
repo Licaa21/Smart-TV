@@ -68,7 +68,7 @@ import minimalistCardsCss from '../views/Details/minimalist/MinimalistCards.modu
 const STYLE_ELEMENT_ID = 'moonfin-theme-overrides';
 
 // The contrast the check on a watched title keeps against the badge it is drawn on
-const WATCHED_CHECK_CONTRAST = 4.5;
+const WATCHED_CHECK_CONTRAST = 7;
 
 const hexAlpha = (hex) => Number.parseInt(hex.slice(1, 3), 16) / 255;
 
@@ -334,7 +334,10 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	const watchedRules = (selector, accent, id) => {
 		const look = watchedBadge(accent, id);
 		rule(selector, `background: ${look.fill}; border-color: ${look.ink};`);
-		rule(`${selector} svg`, `fill: ${look.ink}; stroke: ${look.ink};`);
+		// Each selector of a list gets its own svg, and the path is named too: the cards draw theirs with fill="white" on the path,
+		// which an svg's fill never overrides
+		const inks = selector.split(',').map((part) => `${part.trim()} svg, ${part.trim()} svg path`).join(', ');
+		rule(inks, `fill: ${look.ink}; stroke: ${look.ink};`);
 	};
 
 	// The stylesheets' own accent declarations, for each surface that was given a color. They

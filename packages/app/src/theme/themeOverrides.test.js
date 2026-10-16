@@ -332,7 +332,7 @@ describe('per-surface accents', () => {
 			const colorsOf = (accents) => {
 				const lines = rulesFor(accents);
 				const badge = lines.find((line) => line.includes('.watchedBadge {') && line.includes('background:'));
-				const check = lines.find((line) => line.includes('.watchedBadge svg {'));
+				const check = lines.find((line) => line.includes('.watchedBadge svg path {'));
 				return {fill: toHex(/background: ([^;]+);/.exec(badge)[1]), ink: toHex(/ fill: ([^;]+);/.exec(check)[1])};
 			};
 
@@ -342,6 +342,14 @@ describe('per-surface accents', () => {
 					expect(fill).not.toBe(ink);
 					expect(contrastRatio(fill, ink)).toBeGreaterThanOrEqual(4.5);
 				});
+			});
+
+			it('colors the check on the path as well, and on every badge of a list of selectors', () => {
+				const lines = rulesFor({home: '#ffffff', details: '#ffffff'});
+				const checkRules = lines.filter((line) => /(watchedBadge|posterBadgeWatched|watchedIndicator|episodeWatched)[^,{]* svg path/.test(line));
+				expect(checkRules.length).toBeGreaterThan(8);
+				// the poster badge, first of the details pair, is named with its own svg and path
+				expect(lines.some((line) => /posterBadgeWatched[^,]* svg, [^,]*posterBadgeWatched[^,]* svg path/.test(line))).toBe(true);
 			});
 
 			it('keeps it readable on the theme badge too', () => {
