@@ -6,7 +6,7 @@ This folder is the **implement** branch.
 
 Personal fork of Moonfin for Smart TVs (Tizen and webOS; an Enact/React app). Upstream is Moonfin-Client/Smart-TV
 (RadicalMuffinMan and the Moonfin contributors). The fork is Licaa21/Smart-TV and holds changes for one person's daily
-use. It is not a project for everyone. Three changes are proposed upstream: the in-player episode browser (pull request #494), a fix for Home cards that opened nothing after playback (#534, merged upstream on 2026-10-15, its folder is gone) and the skip prompt over the player controls (#535). Remotes: `origin` is the fork, `upstream` is Moonfin-Client/Smart-TV.
+use. It is not a project for everyone. Three changes are proposed upstream: the in-player episode browser (pull request #494), a fix for Home cards that opened nothing after playback (#534, merged upstream on 2026-10-15, its folder is gone) and the skip prompt over the player controls (#535, merged upstream on 2026-10-16 in the maintainer's rewrite, see entry 6 of "Upstream changes that are not taken"). Remotes: `origin` is the fork, `upstream` is Moonfin-Client/Smart-TV.
 
 The rules that matter most, each explained further down:
 
@@ -30,7 +30,7 @@ The rules that matter most, each explained further down:
 | `implement/` | `implement` | Where all the fork's own changes are written and committed |
 | `daily/` | `daily` | `main` merged with `implement`. Only used to build the app |
 | `pr-episode-browser/` | `feature/episodeselector-skipperlayout-accentcolors` | Pull request #494 upstream |
-| `pr-skip-prompt-over-controls/` | `feature/skip-prompt-over-controls` | Pull request #535 upstream |
+| `pr-skip-prompt-over-controls/` | `feature/skip-prompt-over-controls` | Pull request #535 upstream, merged. The folder can go when the user says so |
 | `local/` | none | Not a branch: backups (`*.bundle`), logs, photos, notes |
 
 This file is committed on `implement` and is the copy to edit. `update-daily.sh` brings it into `daily` with the rest of `implement`, and the copies in `main/` and `pr-episode-browser/` are local and untracked, so a change to it is made in all four folders (only line 3 differs, and after a merge into `daily` line 3 has to be put back to say daily). The folder for #535 has none.
@@ -225,6 +225,14 @@ did, what the fork keeps instead, and what to do on a merge.
 - **The fork keeps:** the language the Jellyfin server is set to for metadata (`currentMetadataLanguage()`) as the language those two calls are given in `views/Browse/useExternalRows.js`, and its own client side pass over what comes back (`localizeSeerrCards` for the rows, `localizeExternalItems` for the seasonal row), since a plugin without the support, 2.4.0, ignores the parameter.
 - **On a merge:** take upstream's `externalRowsApi.js` and its tests whole, which was done in the merge that brought this in, and keep `{language}`, the metadata language, in the two calls in `useExternalRows.js`.
 - **Files:** `views/Browse/useExternalRows.js`, `utils/localizeExternalItems.js`.
+
+### 6. The skip prompt
+
+- **Upstream:** took the skip prompt over the controls (#535) and rewrote it ("match Core's skip prompt"): it is offered on the way into a segment, held back after a viewer's seek until a Tizen seek lands (`suppressSeekPrompts`, `noteSeek`), kept with the controls once its time runs out, dismissed first by Back, and placed above the measured controls bar (`data-player-controls-bottom`). Its hook returns `skipPromptShown` and takes `onFocusSeekbar`.
+- **The fork keeps:** its own prompt: seek re-offer by watching the position (a jump forward over 3 s or back over 1 s offers the non-automatic segments again, and a skip that lands short is not re-offered for 5 s), the next up card coming back, the channel list button (CH label, centre of the rocker) bringing the prompt back, Down from the prompt returning to the playback bar (`onLeavePromptDown`), the prompt editor and look (`skipOverlayLook.js`), and the lift above the controls measured with `promptBottomFor`.
+- **Taken from upstream around it:** the `data-player-controls-bottom` and `data-player-controls-row` marks on the controls, `useChannelKeys` (CH +/- jump chapters, then episodes, and change channels on live TV) and the held scrub in the players. The fork's far seek on CH +/- (five times the step) is gone, since a held left or right now speeds up.
+- **On a merge:** keep the fork's `useSegmentPopups.js` (with its tests), `SkipSegmentOverlay.js` and `skipOverlayLook.js` whole, and keep in them the exports the players call, `isSkipPromptFocused` and a `suppressSeekPrompts` that does nothing (the players' seeks call it). In `TizenPlayer.js` and `WebOSPlayer.js` keep the fork's arguments to the hook (`focusRow`, `onLeavePromptDown`), `skipSegment` in the render check and `measureKey` on the overlay.
+- **Files:** `views/Player/useSegmentPopups.js`, `SkipSegmentOverlay.js`, `skipOverlayLook.js`, `TizenPlayer.js`, `WebOSPlayer.js`.
 
 ## When the user says Moonbase (the plugin) updated
 
