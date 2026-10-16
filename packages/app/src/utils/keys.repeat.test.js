@@ -46,6 +46,33 @@ describe('held arrow repeats', () => {
 		expect(seen).toHaveBeenCalledTimes(2);
 	});
 
+	test('a set whose key events all read as old by the same amount still keeps its held repeats', () => {
+		const {target, seen} = setup();
+		send(target, 'keydown', 38, 5000, false);
+		send(target, 'keydown', 38, 5010, true);
+		send(target, 'keydown', 38, 5030, true);
+		expect(seen).toHaveBeenCalledTimes(3);
+		// a real wait on top of that offset is still dropped
+		const stale = send(target, 'keydown', 38, 5400, true);
+		expect(seen).toHaveBeenCalledTimes(3);
+		expect(stale.defaultPrevented).toBe(true);
+	});
+
+	test('tells what a held key lost once it is let go, and only then', () => {
+		const target = new EventTarget();
+		const report = jest.fn();
+		dropStaleArrowRepeats(target, report);
+		send(target, 'keydown', 40, 0, false);
+		send(target, 'keydown', 40, 300, true);
+		send(target, 'keydown', 40, 500, true);
+		expect(report).not.toHaveBeenCalled();
+		send(target, 'keyup', 40, 0);
+		expect(report).toHaveBeenCalledWith({dropped: 2, worstWaitMs: expect.any(Number), skewMs: expect.any(Number)});
+		send(target, 'keydown', 40, 0, false);
+		send(target, 'keyup', 40, 0);
+		expect(report).toHaveBeenCalledTimes(1);
+	});
+
 	test('only the arrows are held back', () => {
 		const {target, seen} = setup();
 		send(target, 'keydown', 13, 0, false);

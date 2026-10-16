@@ -110,8 +110,14 @@ export const isChannelMenuKey = (e) => {
 // A held arrow repeats at the remote's own rate, which a slow TV can't always keep up with. A repeat that sat
 // waiting behind the last move is dropped, so focus keeps pace with the key and stops when it's let go.
 const STALE_REPEAT_MS = 100;
-export const dropStaleArrowRepeats = (target = window) => {
+export const dropStaleArrowRepeats = (target = window, report) => {
 	let held = null;
+	// Some sets stamp their key events on a clock of their own, so every event reads as old by a fixed amount and every
+	// repeat of a held key would be dropped, which left a held arrow doing nothing. That amount is the least age any arrow
+	// press has been seen with, since a real wait only adds to it, and only the age beyond it counts as waiting.
+	let skew = Infinity;
+	let dropped = 0;
+	let worst = 0;
 	target.addEventListener('keydown', (e) => {
 		const code = e.keyCode;
 		if (code !== KEYS.UP && code !== KEYS.DOWN && code !== KEYS.LEFT && code !== KEYS.RIGHT) return;
@@ -119,12 +125,22 @@ export const dropStaleArrowRepeats = (target = window) => {
 		held = code;
 		// Older engines stamp events with the wall clock rather than the page's own.
 		const now = e.timeStamp > 1e12 ? Date.now() : performance.now();
-		if (!repeat || now - e.timeStamp <= STALE_REPEAT_MS) return;
+		const age = now - e.timeStamp;
+		if (age < skew) skew = age;
+		const waited = age - skew;
+		if (!repeat || waited <= STALE_REPEAT_MS) return;
+		dropped += 1;
+		if (waited > worst) worst = waited;
 		e.preventDefault();
 		e.stopImmediatePropagation();
 	}, true);
 	target.addEventListener('keyup', (e) => {
-		if (e.keyCode === held) held = null;
+		if (e.keyCode !== held) return;
+		held = null;
+		// What a held key lost is told once it is let go, for the diagnostic report
+		if (dropped && report) report({dropped, worstWaitMs: Math.round(worst), skewMs: Math.round(skew)});
+		dropped = 0;
+		worst = 0;
 	}, true);
 };
 

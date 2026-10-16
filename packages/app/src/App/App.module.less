@@ -87,6 +87,9 @@
 	background: var(--theme-background, #000b25);
 	color: var(--theme-on-background, #fff);
 	font-family: 'Roboto', 'Sandstone', sans-serif;
+	// The font joins f and i into one glyph that takes the dot of the i, so the first i of "fii" or "fiica" read as a
+	// dotless one. Only that joining is switched off, in every text of the app, which inherits it.
+	font-variant-ligatures: no-common-ligatures;
 }
 
 .app {
