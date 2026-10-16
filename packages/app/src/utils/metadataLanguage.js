@@ -1,6 +1,6 @@
 import serverLogger from '../services/serverLogger';
 import {api as jellyfinApi, getServerUrl, getUserId} from '../services/jellyfinApi';
-import {appLocale} from './appLocale';
+import {uiLocale} from './uiLocale';
 
 // The language Seerr titles are asked for, so a title it only knows by an English text reads the way
 // the library's own do.
@@ -48,7 +48,7 @@ export const resolveMetadataLanguage = (api, key = '') => {
 			})
 			.then((language) => {
 				if (language) return language;
-				const fallback = appLocale() || 'en-US';
+				const fallback = uiLocale() || 'en-US';
 				serverLogger.playback('Metadata language', {language: fallback, from: 'the app language, the server settings could not be read'});
 				return fallback;
 			}));

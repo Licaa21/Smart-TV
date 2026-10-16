@@ -9,9 +9,7 @@ import Spotlight from '@enact/spotlight';
 // underneath instead of the thing on screen.
 export const useOverlayFocus = (spotlightId) => {
 	useEffect(() => {
-		// A preview has no id and must not take the remote from the settings screen it sits in.
-		if (!spotlightId) return;
-		window.requestAnimationFrame(() => Spotlight.focus(spotlightId));
+		if (spotlightId) window.requestAnimationFrame(() => Spotlight.focus(spotlightId));
 	}, [spotlightId]);
 };
 

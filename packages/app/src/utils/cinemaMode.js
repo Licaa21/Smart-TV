@@ -8,10 +8,12 @@ export const isPreroll = (item) => item?._preroll === true;
 // absent setting counts as on, the way the app defaults it.
 export const shouldAutoAdvance = (autoPlayEnabled, item) => autoPlayEnabled !== false || isPreroll(item);
 
-export const nextInQueue = (videoQueue, item) => {
+// A step of -1 gives the one before instead.
+export const nextInQueue = (videoQueue, item, step = 1) => {
 	if (!videoQueue?.length || !item?.Id) return null;
 	const idx = videoQueue.findIndex((entry) => String(entry.Id) === String(item.Id));
-	return idx >= 0 && idx < videoQueue.length - 1 ? videoQueue[idx + 1] : null;
+	const target = idx + step;
+	return idx >= 0 && target >= 0 && target < videoQueue.length ? videoQueue[target] : null;
 };
 
 // Only the caller knows whether this is a fresh start, so it decides when to ask. A failed

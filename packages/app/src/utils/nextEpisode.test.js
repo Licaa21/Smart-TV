@@ -1,5 +1,5 @@
 import {
-	findNextInSeason, findNextSeason, findPreviousInSeason, findPreviousSeason, firstPlayableEpisode, isPlayableEpisode, lastPlayableEpisode
+	findNextInSeason, findNextSeason, firstPlayableEpisode, isPlayableEpisode
 } from './nextEpisode';
 
 const ep = (id, index, extra) => ({Id: id, IndexNumber: index, ...extra});
@@ -100,59 +100,21 @@ describe('isPlayableEpisode', () => {
 	});
 });
 
-describe('findPreviousInSeason', () => {
-	test('returns the episode before', () => {
-		const list = [ep('a', 1), ep('b', 2), ep('c', 3)];
-		expect(findPreviousInSeason(list, 'b')).toBe(list[0]);
-	});
-
-	test('returns null on the first episode', () => {
-		expect(findPreviousInSeason([ep('a', 1), ep('b', 2)], 'a')).toBeNull();
-	});
-
-	test('skips an unaired episode going back', () => {
+describe('stepping back', () => {
+	test('finds the real episode before this one in the season', () => {
 		const list = [ep('a', 1), ep('b', 2, {LocationType: 'Virtual'}), ep('c', 3)];
-		expect(findPreviousInSeason(list, 'c')).toBe(list[0]);
+		expect(findNextInSeason(list, 'c', -1)).toBe(list[0]);
+		expect(findNextInSeason(list, 'a', -1)).toBeNull();
 	});
 
-	test('matches ids across types, because Emby returns numbers', () => {
-		const list = [ep(1, 1), ep(2, 2)];
-		expect(findPreviousInSeason(list, '2')).toBe(list[0]);
+	test('picks the season before by number and stops short of the Specials', () => {
+		const seasons = [season('s0', 0), season('s2', 2), season('s1', 1)];
+		expect(findNextSeason(seasons, 's2', 2, -1)).toBe(seasons[2]);
+		expect(findNextSeason(seasons, 's1', 1, -1)).toBeNull();
 	});
 
-	test('returns null when the episode is not in the list', () => {
-		expect(findPreviousInSeason([ep('a', 1)], 'z')).toBeNull();
-	});
-});
-
-describe('findPreviousSeason', () => {
-	const seasons = [season('s0', 0), season('s1', 1), season('s2', 2), season('s3', 3)];
-
-	test('returns the numbered season below', () => {
-		expect(findPreviousSeason(seasons, 's3', 3)).toBe(seasons[2]);
-	});
-
-	test('does not step back from season 1 into the Specials', () => {
-		expect(findPreviousSeason(seasons, 's1', 1)).toBeNull();
-	});
-
-	test('goes by number, not by the order the server listed them in', () => {
-		const shuffled = [season('s2', 2), season('s0', 0), season('s1', 1)];
-		expect(findPreviousSeason(shuffled, 's2', 2)).toBe(shuffled[2]);
-	});
-
-	test('returns null with nothing to compare', () => {
-		expect(findPreviousSeason([{Id: 'x'}], 'x', undefined)).toBeNull();
-	});
-});
-
-describe('lastPlayableEpisode', () => {
-	test('skips unaired entries at the end of a season', () => {
+	test('takes the last real episode of the season before', () => {
 		const list = [ep('a', 1), ep('b', 2), ep('c', 3, {LocationType: 'Virtual'})];
-		expect(lastPlayableEpisode(list)).toBe(list[1]);
-	});
-
-	test('tolerates a missing list', () => {
-		expect(lastPlayableEpisode(undefined)).toBeNull();
+		expect(firstPlayableEpisode(list, -1)).toBe(list[1]);
 	});
 });

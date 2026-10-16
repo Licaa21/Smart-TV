@@ -10,9 +10,9 @@ import {parseMarkdown, markdownLinks} from '../../utils/markdown';
 import {drawQrCode} from '../../utils/qrCanvas';
 import {MessagesIcon} from '../icons/navIcons';
 import MessageMarkdown from './MessageMarkdown';
+import {uiLocale} from '../../utils/uiLocale';
 
 import css from './ServerMessagesDialog.module.less';
-import {appLocale} from '../../utils/appLocale';
 
 const SpottableButton = Spottable('button');
 const SpottableDiv = Spottable('div');
@@ -27,7 +27,7 @@ const withAlpha = (hex, alpha) => {
 
 const formatWhen = (iso) => {
 	const date = new Date(iso);
-	return `${date.toLocaleDateString(appLocale(), {year: 'numeric', month: 'short', day: 'numeric'})} ${date.toLocaleTimeString(appLocale(), {hour: 'numeric', minute: '2-digit'})}`;
+	return `${date.toLocaleDateString(uiLocale(), {year: 'numeric', month: 'short', day: 'numeric'})} ${date.toLocaleTimeString(uiLocale(), {hour: 'numeric', minute: '2-digit'})}`;
 };
 
 // The link as a QR code for the viewer's phone, in place of the list.

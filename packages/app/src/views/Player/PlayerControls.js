@@ -392,7 +392,7 @@ const PlayerControls = ({
 				</div>
 				)}
 
-				<div className={css.controlsBottom} data-player-controls-bottom="true">
+				<div className={css.controlsBottom} data-player-controls-bottom>
 					{isLiveTV && (() => {
 						// The live timeline is the current program's span, not a seek bar.
 						// Without guide data it falls back to a clock and a LIVE tag.
@@ -463,7 +463,7 @@ const PlayerControls = ({
 					)}
 
 					{!isAudioMode && (topButtons.length > 0 || bottomButtons.length > 0) && (
-						<div className={css.videoControlsRow} onKeyDown={handleButtonsKeyDown}>
+						<div className={css.videoControlsRow} data-player-controls-row onKeyDown={handleButtonsKeyDown}>
 							{topButtons.length > 0 && (
 								<div className={css.transportButtons}>
 									{topButtons.map((btn) => renderControlButton(btn, 'bottom', btn.id === 'playPause' ? 'play-pause-btn' : undefined))}

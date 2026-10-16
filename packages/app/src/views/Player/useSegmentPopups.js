@@ -19,7 +19,7 @@ const nextUpStartOf = (creditsStart, runTime) => Math.min(creditsStart ?? Infini
 const SKIP_SETTLE_MS = 5000;
 
 export const SKIP_PROMPT_ID = 'skip-segment-btn';
-const onSkipPrompt = () => {
+export const isSkipPromptFocused = () => {
 	const active = typeof document !== 'undefined' ? document.activeElement : null;
 	return Boolean(active && active.closest && active.closest(`[data-spotlight-id="${SKIP_PROMPT_ID}"]`));
 };
@@ -414,7 +414,7 @@ const useSegmentPopups = ({
 			}
 			// With the controls up, Back closes them and leaves the prompt, which is the player's own handling. Up from
 			// the playback bar reaches the prompt, and it stays put under the arrows until Down goes back to the bar.
-			if (onSkipPrompt()) {
+			if (isSkipPromptFocused()) {
 				if (isDown) {
 					consume();
 					onLeavePromptDown?.();
@@ -452,6 +452,8 @@ const useSegmentPopups = ({
 		return true;
 	}, [askStillWatching, handleStillWatchingContinue, handleSkipSegment, reofferPrompt, focusRow, onLeavePromptDown, skipSegmentStart, showSkipCredits, showNextEpisode, nextEpisode, activeModal, controlsVisible, showControls, cancelNextEpisodeCountdown]);
 
+	const suppressSeekPrompts = useCallback(() => {}, []);
+
 	return {
 		askStillWatching,
 		handleStillWatchingContinue,
@@ -466,7 +468,10 @@ const useSegmentPopups = ({
 		checkSegments,
 		handlePopupKeyDown,
 		resetPopups,
-		noteViewerActivity
+		noteViewerActivity,
+		// The player's seeks call it to hold the prompt until they land. The prompt here follows the position
+		// itself (see the seek detection), so there is nothing to hold.
+		suppressSeekPrompts
 	};
 };
 

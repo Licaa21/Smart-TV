@@ -9,7 +9,7 @@ import {TEXT_SUBTITLE_CODECS, isAssSubtitleCodec, isPgsSubtitleCodec, isBurnInSu
 import {applyProfileTuning} from '../utils/deviceProfileTuning';
 import {audioChannelCap} from '../utils/audioChannelCap';
 import {audioStartNeedsServer, openingAudioStream} from '../utils/audioStartPlan';
-import {findNextInSeason, findNextSeason, findPreviousInSeason, findPreviousSeason, firstPlayableEpisode, lastPlayableEpisode} from '../utils/nextEpisode';
+import {findNextInSeason, findNextSeason, firstPlayableEpisode} from '../utils/nextEpisode';
 import {videoRangeTypeOf} from '../utils/videoRange';
 import {getVolumeState, lastVolumeState} from './systemVolume';
 import {audioSettingsFor, hasAnimeLabel} from '../utils/animeAudio';
@@ -1320,7 +1320,8 @@ export const getMediaSegments = async (itemId) => {
 	return segments;
 };
 
-export const getNextEpisode = async (item) => {
+// A step of -1 finds the episode before this one instead.
+export const getNextEpisode = async (item, step = 1) => {
 	if (item.Type !== 'Episode' || !item.SeriesId) return null;
 	try {
 		// Autoplay the episode that immediately follows the current one in air order.
@@ -1331,16 +1332,16 @@ export const getNextEpisode = async (item) => {
 
 		const api = getApiForItem(item);
 		const episodesResult = await api.getEpisodes(item.SeriesId, seasonId);
-		const next = findNextInSeason(episodesResult.Items, item.Id);
+		const next = findNextInSeason(episodesResult.Items, item.Id, step);
 		if (next) return next;
 
-		// End of season, so roll into the first episode of the next one.
+		// End of season, so roll into the first episode of the next one, or the last of the one before.
 		const seasonsResult = await api.getSeasons(item.SeriesId);
-		const nextSeason = findNextSeason(seasonsResult.Items, seasonId, item.ParentIndexNumber);
+		const nextSeason = findNextSeason(seasonsResult.Items, seasonId, item.ParentIndexNumber, step);
 		if (!nextSeason) return null;
 
 		const nextSeasonEpisodes = await api.getEpisodes(item.SeriesId, nextSeason.Id);
-		return firstPlayableEpisode(nextSeasonEpisodes.Items);
+		return firstPlayableEpisode(nextSeasonEpisodes.Items, step);
 	} catch (e) {
 		console.warn('[playback] Failed to get next episode:', e.message);
 		return null;
@@ -1364,7 +1365,7 @@ export const getPreviousEpisode = async (item) => {
 
 		const api = getApiForItem(item);
 		const episodesResult = await api.getEpisodes(item.SeriesId, seasonId);
-		const previous = findPreviousInSeason(episodesResult.Items, item.Id);
+		const previous = findNextInSeason(episodesResult.Items, item.Id, -1);
 		if (previous) {
 			logEpisodeLookup('Previous', item, previous);
 			return previous;
@@ -1375,13 +1376,13 @@ export const getPreviousEpisode = async (item) => {
 		let fromSeasonId = seasonId;
 		let fromSeasonNumber = item.ParentIndexNumber;
 		for (;;) {
-			const previousSeason = findPreviousSeason(seasonsResult.Items, fromSeasonId, fromSeasonNumber);
+			const previousSeason = findNextSeason(seasonsResult.Items, fromSeasonId, fromSeasonNumber, -1);
 			if (!previousSeason) {
 				logEpisodeLookup('Previous', item, null);
 				return null;
 			}
 			const previousSeasonEpisodes = await api.getEpisodes(item.SeriesId, previousSeason.Id);
-			const last = lastPlayableEpisode(previousSeasonEpisodes.Items);
+			const last = firstPlayableEpisode(previousSeasonEpisodes.Items, -1);
 			if (last) {
 				logEpisodeLookup('Previous', item, last);
 				return last;

@@ -64,6 +64,11 @@ describe('nextInQueue', () => {
 	it('matches ids across types, since server ids arrive both ways', () => {
 		expect(nextInQueue([{Id: 1}, {Id: 2}], {Id: '1'})).toEqual({Id: 2});
 	});
+
+	it('steps back to the entry before with a step of -1', () => {
+		expect(nextInQueue(queue, {Id: 'feature'}, -1)).toBe(queue[0]);
+		expect(nextInQueue(queue, {Id: 'intro'}, -1)).toBe(null);
+	});
 });
 
 describe('isPreroll', () => {

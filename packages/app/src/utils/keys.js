@@ -39,6 +39,8 @@ const TIZEN_KEYS = {
 	CHANNEL_DOWN: 428,
 };
 
+// The channel buttons reach the page as Page Up and Page Down, and the Magic Remote's pointer
+// hiding comes in as a key of its own.
 const WEBOS_KEYS = {
 	BACK: 461,
 	PLAY: 415,
@@ -46,6 +48,9 @@ const WEBOS_KEYS = {
 	STOP: 413,
 	REWIND: 412,
 	FAST_FORWARD: 417,
+	CHANNEL_UP: 33,
+	CHANNEL_DOWN: 34,
+	POINTER_HIDE: 1537,
 };
 
 // The Vega WebView hands the page the back key as Escape and the transport keys
@@ -100,6 +105,27 @@ const TIZEN_CHANNEL_MENU_KEYS = [458, 10073, 10190];
 export const isChannelMenuKey = (e) => {
 	if (getPlatform() !== 'tizen') return false;
 	return TIZEN_CHANNEL_MENU_KEYS.includes(e.keyCode || e.which);
+};
+
+// A held arrow repeats at the remote's own rate, which a slow TV can't always keep up with. A repeat that sat
+// waiting behind the last move is dropped, so focus keeps pace with the key and stops when it's let go.
+const STALE_REPEAT_MS = 100;
+export const dropStaleArrowRepeats = (target = window) => {
+	let held = null;
+	target.addEventListener('keydown', (e) => {
+		const code = e.keyCode;
+		if (code !== KEYS.UP && code !== KEYS.DOWN && code !== KEYS.LEFT && code !== KEYS.RIGHT) return;
+		const repeat = e.repeat || held === code;
+		held = code;
+		// Older engines stamp events with the wall clock rather than the page's own.
+		const now = e.timeStamp > 1e12 ? Date.now() : performance.now();
+		if (!repeat || now - e.timeStamp <= STALE_REPEAT_MS) return;
+		e.preventDefault();
+		e.stopImmediatePropagation();
+	}, true);
+	target.addEventListener('keyup', (e) => {
+		if (e.keyCode === held) held = null;
+	}, true);
 };
 
 export const ESSENTIAL_KEY_NAMES = [

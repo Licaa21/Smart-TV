@@ -29,8 +29,8 @@ import {
 	getRequestDownloadSummary,
 	isRequestDownloading
 } from '../../utils/seerrStatus';
+import {uiLocale} from '../../utils/uiLocale';
 import css from './SeerrRequests.module.less';
-import {appLocale} from '../../utils/appLocale';
 
 // The stylesheet sizes a row in rem, so the list has to be told its height in the
 // pixels those come out as. Reading the root font size picks up both the screen's
@@ -71,7 +71,7 @@ const formatRequestDate = (iso) => {
 	if (!iso) return '';
 	const parsed = new Date(iso);
 	if (isNaN(parsed.getTime())) return '';
-	return parsed.toLocaleDateString(appLocale(), {year: 'numeric', month: 'short', day: 'numeric'});
+	return parsed.toLocaleDateString(uiLocale(), {year: 'numeric', month: 'short', day: 'numeric'});
 };
 
 const PAGE_SIZE = 20;

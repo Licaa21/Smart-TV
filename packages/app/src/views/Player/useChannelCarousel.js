@@ -195,6 +195,15 @@ const useChannelCarousel = ({item, isLiveTV, liveTvChannels, sortBy, error, cont
 		startSwitch(channel, itemRef.current);
 	}, [closeCarousel, startSwitch]);
 
+	// Channel up and down zap through the same lineup without opening the carousel, and a channel that
+	// fails to start hands back to the one that was playing.
+	const stepChannel = useCallback((step) => {
+		const channels = lineupRef.current;
+		const index = channels.findIndex((channel) => channel.Id === itemRef.current?.Id);
+		if (!isLiveTV || switchRef.current || index < 0 || channels.length < 2) return;
+		startSwitch(channels[(index + step + channels.length) % channels.length], itemRef.current);
+	}, [isLiveTV, startSwitch]);
+
 	const carouselProps = open ? {
 		prewarm: prewarmRef.current,
 		api: carouselApi,
@@ -208,7 +217,7 @@ const useChannelCarousel = ({item, isLiveTV, liveTvChannels, sortBy, error, cont
 		onShowControls: handleShowControls
 	} : null;
 
-	return {carouselOpenRef: openRef, openCarousel, markChannelPlaying, carouselProps};
+	return {carouselOpenRef: openRef, openCarousel, stepChannel, markChannelPlaying, carouselProps};
 };
 
 export default useChannelCarousel;

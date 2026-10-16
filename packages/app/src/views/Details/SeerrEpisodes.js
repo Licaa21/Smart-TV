@@ -3,7 +3,7 @@ import $L from '@enact/i18n/$L';
 import Spotlight from '@enact/spotlight';
 
 import DetailsTabBar from '../../components/DetailsTabBar';
-import {appLocale} from '../../utils/appLocale';
+import {uiLocale} from '../../utils/uiLocale';
 import {channelKeyStep} from '../../utils/channelKeys';
 import {keepEpisodeDialog, takeEpisodeDialog} from '../../utils/episodeDialogReturn';
 import {formatDuration} from '../../utils/helpers';
@@ -24,7 +24,7 @@ const airDateText = (episode) => {
 	if (!episode.PremiereDate) return '';
 	const date = new Date(episode.PremiereDate);
 	if (Number.isNaN(date.getTime())) return '';
-	return date.toLocaleDateString(appLocale(), {year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC'});
+	return date.toLocaleDateString(uiLocale(), {year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC'});
 };
 
 // The card's heading, with the season in it since the cards of a season all start again at one: S2E3: Name.

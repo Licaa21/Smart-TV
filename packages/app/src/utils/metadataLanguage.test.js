@@ -1,4 +1,8 @@
+import {uiLocale} from './uiLocale';
 import {forgetMetadataLanguage, isEnglish, resolveMetadataLanguage, tmdbLanguage} from './metadataLanguage';
+
+// The app's interface language is whatever the test sets, as ilib would answer it
+jest.mock('./uiLocale', () => ({uiLocale: jest.fn()}));
 
 describe('tmdbLanguage', () => {
 	it('sends the language alone, since the server country is a release region', () => {
@@ -19,6 +23,7 @@ describe('resolveMetadataLanguage', () => {
 	beforeEach(() => {
 		forgetMetadataLanguage();
 		localStorage.clear();
+		uiLocale.mockReturnValue(undefined);
 	});
 
 	it('reads the language the server is set to', async () => {
@@ -29,13 +34,13 @@ describe('resolveMetadataLanguage', () => {
 	});
 
 	it('uses the app language where the settings cannot be read', async () => {
-		localStorage.setItem('moonfin_uiLanguage', 'ro-RO');
+		uiLocale.mockReturnValue('ro-RO');
 		const api = {getServerConfiguration: jest.fn().mockRejectedValue(new Error('403'))};
 		await expect(resolveMetadataLanguage(api, 'b')).resolves.toBe('ro-RO');
 	});
 
 	it('keeps a refusal for the session, and tries again after a server that could not be reached', async () => {
-		localStorage.setItem('moonfin_uiLanguage', 'ro-RO');
+		uiLocale.mockReturnValue('ro-RO');
 		const refused = Object.assign(new Error('403'), {status: 403});
 		const api = {getServerConfiguration: jest.fn().mockRejectedValue(refused)};
 		await resolveMetadataLanguage(api, 'd');
@@ -54,7 +59,7 @@ describe('resolveMetadataLanguage', () => {
 	it('gives up on a server that does not answer, and asks again next time', async () => {
 		jest.useFakeTimers();
 		try {
-			localStorage.setItem('moonfin_uiLanguage', 'ro-RO');
+			uiLocale.mockReturnValue('ro-RO');
 			const api = {getServerConfiguration: jest.fn(() => new Promise(() => {}))};
 			const answer = resolveMetadataLanguage(api, 'g');
 			await jest.advanceTimersByTimeAsync(4000);
