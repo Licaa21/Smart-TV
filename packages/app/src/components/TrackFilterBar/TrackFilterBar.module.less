@@ -25,13 +25,16 @@
 
 	&:hover,
 	&:focus {
-		background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.3);
+		background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.4);
 		border-color: var(--theme-accent, #00a4dc);
 	}
 }
 
+// The chosen language keeps a ring, so it still reads as chosen with the focus elsewhere, and its fill stays dark enough
+// for the white name over a light accent
 .chipOn {
-	background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.45);
+	background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.22);
+	border-color: var(--theme-accent, #00a4dc);
 }
 
 .count {
@@ -47,7 +50,18 @@
 	font-size: 22px;
 	color: #ffffff;
 	background: rgba(255, 255, 255, 0.08);
+	border: 2px solid transparent;
 	border-radius: 10px;
+
+	// The focus ring and the lit fill, also while the keyboard has the field
+	&:hover,
+	&:focus,
+	&:focus-within,
+	&[data-focused] {
+		// A light fill under a ring, so the hint inside stays readable over a light accent
+		background: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.16);
+		border-color: var(--theme-accent, #00a4dc);
+	}
 }
 
 .actions {

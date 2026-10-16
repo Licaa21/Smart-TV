@@ -753,10 +753,12 @@
 .dialogTitle {
 	flex-shrink: 0;
 	// The room under the title keeps it clear of the first option, and the line is tall enough for accents and tails
-	padding: (24 * @dp) (24 * @dp) (8 * @dp);
+	padding: (24 * @dp) (24 * @dp) (14 * @dp);
 	font-size: (14 * @dp);
 	font-weight: 600;
 	line-height: (20 * @dp);
+	// A line closes the title, so the options that scroll under it are cut at a clean edge and not mid-row against the text
+	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 	color: #fff;
 }
 
@@ -766,8 +768,12 @@
 	display: flex;
 	flex-direction: column;
 	overflow-y: auto;
-	padding: (12 * @dp) 0 (16 * @dp);
+	padding: (16 * @dp) 0 (16 * @dp);
 	scrollbar-width: none;
+	// Options leaving at the top or the bottom fade out, where they were cut mid-row against the title. The padding is as
+	// tall as the fade, so a list at rest shows its first and last option whole.
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 (16 * @dp), #000 calc(100% - (16 * @dp)), transparent 100%);
+	mask-image: linear-gradient(to bottom, transparent 0, #000 (16 * @dp), #000 calc(100% - (16 * @dp)), transparent 100%);
 
 	&::-webkit-scrollbar {
 		display: none;
