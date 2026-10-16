@@ -12,6 +12,12 @@ export const ModalContainer = SpotlightContainerDecorator({
 	preserveId: true
 }, 'div');
 
+// The strip of chips, search field and buttons over a long picker. Moving inside it stays inside it first, which keeps
+// Left and Right off the long rows of options under it.
+export const ChipRowContainer = SpotlightContainerDecorator({
+	enterTo: 'last-focused'
+}, 'div');
+
 // The sort and settings panels over the library, favorites and genre grids. Held the
 // same way, but coming back in lands wherever the viewer left off.
 export const PanelContainer = SpotlightContainerDecorator({

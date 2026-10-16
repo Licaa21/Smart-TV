@@ -13,7 +13,8 @@ import {formatBitrate, getAudioChannels, getAudioCodec, getHdrType, getVideoCode
 import {getPlatform} from '../../platform';
 import {ModalContainer} from '../../utils/spotlightContainers';
 import {numberedTrackName, sortSubtitleStreams, subtitleTrackDetail, audioTrackDetail} from '../../utils/trackLabels';
-import TrackOptionRow, {TrackDivider} from '../../components/TrackOptionRow';
+import TrackOptionRow from '../../components/TrackOptionRow';
+import FilteredTrackList from '../../components/TrackFilterBar/FilteredTrackList';
 import EpisodeBrowser from './EpisodeBrowser';
 import {
 	SpottableButton, SpottableDiv,
@@ -353,6 +354,42 @@ const PlayerControls = ({
 		</div>
 	);
 
+	// The rows of the Audio and Subtitle pickers, built here so a long list can be filtered by what they say
+	const audioEntries = useMemo(() => audioStreams.map((stream, i) => {
+		const label = numberedTrackName(i + 1, stream.displayTitle, $L('Audio'));
+		const detail = audioTrackDetail({language: stream.language, displayTitle: stream.displayTitle, codec: stream.codec, channels: stream.channels});
+		return {language: stream.language, text: `${label} ${detail}`, label, detail};
+	}), [audioStreams]);
+	const audioRows = useMemo(() => audioStreams.map((stream, i) => (
+		<TrackOptionRow
+			key={stream.index}
+			label={audioEntries[i].label}
+			detail={audioEntries[i].detail}
+			selected={stream.index === selectedAudioIndex}
+			data-index={stream.index}
+			onClick={handleSelectAudio}
+		/>
+	)), [audioStreams, audioEntries, selectedAudioIndex, handleSelectAudio]);
+
+	const preferExternalSubtitles = settings?.preferExternalSubtitles === true;
+	const sortedSubtitles = useMemo(() => sortSubtitleStreams(subtitleStreams, preferExternalSubtitles), [subtitleStreams, preferExternalSubtitles]);
+	const subtitleEntries = useMemo(() => sortedSubtitles.map((stream, i) => {
+		const label = numberedTrackName(i + 1, stream.displayTitle, $L('Subtitle'));
+		const detail = subtitleTrackDetail({name: stream.displayTitle, codec: stream.codec, language: stream.language, isExternal: stream.isExternal, deliveryMethod: stream.deliveryMethod, isForced: stream.isForced, isHearingImpaired: stream.isHearingImpaired});
+		return {language: stream.language, text: `${label} ${detail}`, label, detail};
+	}), [sortedSubtitles]);
+	const subtitleRows = useMemo(() => sortedSubtitles.map((stream, i) => (
+		<TrackOptionRow
+			key={stream.index}
+			label={subtitleEntries[i].label}
+			detail={subtitleEntries[i].detail}
+			selected={stream.index === selectedSubtitleIndex}
+			data-index={stream.index}
+			onClick={handleSelectSubtitle}
+			onKeyDown={handleSubtitleKeyDown}
+		/>
+	)), [sortedSubtitles, subtitleEntries, selectedSubtitleIndex, handleSelectSubtitle, handleSubtitleKeyDown]);
+
 	return (
 		<>
 			<div className={`${css.playerControls} ${controlsVisible && !activeModal ? css.visible : ''} ${isAudioMode ? css.audioControls : ''}`}>
@@ -490,20 +527,13 @@ const PlayerControls = ({
 				<div className={css.trackModal} onClick={closeModal}>
 					<ModalContainer className={css.modalContent} onClick={stopPropagation} data-modal="audio" spotlightId="audio-modal">
 						<h2 className={css.modalTitle}>{$L('Audio Track')}</h2>
-						<div className={css.trackList}>
-							{audioStreams.map((stream, i) => (
-								<TrackOptionRow
-									key={stream.index}
-									label={numberedTrackName(i + 1, stream.displayTitle, $L('Audio'))}
-									detail={audioTrackDetail({language: stream.language, displayTitle: stream.displayTitle, codec: stream.codec, channels: stream.channels})}
-									selected={stream.index === selectedAudioIndex}
-									data-index={stream.index}
-									onClick={handleSelectAudio}
-								/>
-							))}
-							<TrackDivider />
-							<TrackOptionRow label={$L('Cancel')} dimmed onClick={closeModal} />
-						</div>
+						<FilteredTrackList
+								modal="audio"
+								listClassName={css.trackList}
+								entries={audioEntries}
+								rows={audioRows}
+								actions={[{label: $L('Cancel'), dimmed: true, onClick: closeModal}]}
+							/>
 					</ModalContainer>
 				</div>
 			)}
@@ -512,39 +542,27 @@ const PlayerControls = ({
 				<div className={css.trackModal} onClick={closeModal}>
 					<ModalContainer className={css.modalContent} onClick={stopPropagation} data-modal="subtitle" spotlightId="subtitle-modal">
 						<h2 className={css.modalTitle}>{$L('Subtitle Track')}</h2>
-						<div className={css.trackList}>
-							<TrackOptionRow
-								label={$L('None')}
-								selected={selectedSubtitleIndex === -1}
-								data-index={-1}
-								onClick={handleSelectSubtitle}
-								onKeyDown={handleSubtitleKeyDown}
+						<FilteredTrackList
+								modal="subtitle"
+								listClassName={css.trackList}
+								leading={(
+									<TrackOptionRow
+										label={$L('None')}
+										selected={selectedSubtitleIndex === -1}
+										data-index={-1}
+										onClick={handleSelectSubtitle}
+										onKeyDown={handleSubtitleKeyDown}
+									/>
+								)}
+								entries={subtitleEntries}
+								rows={subtitleRows}
+								actions={[
+									{label: $L('Offset'), spotlightId: 'btn-subtitle-offset', onClick: handleOpenSubtitleOffset},
+									{label: $L('Appearance'), spotlightId: 'btn-subtitle-appearance', onClick: handleOpenSubtitleSettings},
+									...(canDownloadRemoteSubtitles ? [{label: $L('Download subtitles...'), detail: $L('Search using the OpenSubtitles plugin'), spotlightId: 'btn-subtitle-download', onClick: handleOpenRemoteSubtitleSearch}] : []),
+									{label: $L('Cancel'), dimmed: true, onClick: closeModal}
+								]}
 							/>
-							{sortSubtitleStreams(subtitleStreams, settings?.preferExternalSubtitles === true).map((stream, i) => (
-								<TrackOptionRow
-									key={stream.index}
-									label={numberedTrackName(i + 1, stream.displayTitle, $L('Subtitle'))}
-									detail={subtitleTrackDetail({name: stream.displayTitle, codec: stream.codec, language: stream.language, isExternal: stream.isExternal, deliveryMethod: stream.deliveryMethod, isForced: stream.isForced, isHearingImpaired: stream.isHearingImpaired})}
-									selected={stream.index === selectedSubtitleIndex}
-									data-index={stream.index}
-									onClick={handleSelectSubtitle}
-									onKeyDown={handleSubtitleKeyDown}
-								/>
-							))}
-							<TrackDivider />
-							<TrackOptionRow label={$L('Offset')} spotlightId="btn-subtitle-offset" onClick={handleOpenSubtitleOffset} />
-							<TrackOptionRow label={$L('Appearance')} spotlightId="btn-subtitle-appearance" onClick={handleOpenSubtitleSettings} />
-							{canDownloadRemoteSubtitles && (
-								<TrackOptionRow
-									label={$L('Download subtitles...')}
-									detail={$L('Search using the OpenSubtitles plugin')}
-									spotlightId="btn-subtitle-download"
-									onClick={handleOpenRemoteSubtitleSearch}
-								/>
-							)}
-							<TrackDivider />
-							<TrackOptionRow label={$L('Cancel')} dimmed onClick={closeModal} />
-						</div>
 					</ModalContainer>
 				</div>
 			)}

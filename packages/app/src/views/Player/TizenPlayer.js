@@ -15,6 +15,7 @@ import {useSettings} from '../../context/SettingsContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import * as syncPlayService from '../../services/syncPlay';
 import {KEYS, isBackKey} from '../../utils/keys';
+import {isTvKeyboardVisible} from '../../components/TVKeyboard/keyboardBus';
 import {getPerfTier} from '../../utils/perfTier';
 import {playerClockStale, playerClockWanted} from '../../utils/playerClock';
 import {blockedKeysReport} from '../../utils/blockedKeys';
@@ -3572,6 +3573,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	useEffect(() => {
 		const handleKeyDown = (e) => {
 			const key = e.key || e.keyCode;
+			// A search field in a picker, or the keyboard opened for it, keeps its own keys: Backspace deletes a letter and Back
+			// closes the keyboard, and neither closes the picker.
+			if (activeModal && (isTvKeyboardVisible() || e.target?.tagName === 'INPUT')) return;
 			// The channel carousel takes every key while it's up.
 			if (carouselOpenRef.current) return;
 
