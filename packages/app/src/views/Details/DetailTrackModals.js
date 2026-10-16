@@ -5,6 +5,7 @@ import {TRANSCODE_QUALITIES} from './detailsMedia';
 import {ModalContainer} from '../../utils/spotlightContainers';
 import {numberedTrackName, subtitleTrackDetail, audioTrackDetail, isExternalSubtitleStream} from '../../utils/trackLabels';
 import TrackOptionRow, {TrackDivider} from '../../components/TrackOptionRow';
+import FilteredTrackList from '../../components/TrackFilterBar/FilteredTrackList';
 import {SpottableButton, SpottableDiv} from './detailsSpottables';
 import DetailPlaybackInfoModal from './DetailPlaybackInfoModal';
 
@@ -48,6 +49,40 @@ const DetailTrackModals = ({
 		const external = withPosition.filter((entry) => isExternalSubtitleStream(entry.stream));
 		return preferExternalSubtitles ? [...external, ...internal] : [...internal, ...external];
 	}, [subtitleStreams, preferExternalSubtitles]);
+
+	// The rows of the Audio and Subtitle pickers, built here so a long list can be filtered by what they say
+	const audioEntries = useMemo(() => audioStreams.map((stream, i) => {
+		const label = numberedTrackName(i + 1, stream.DisplayTitle || stream.Title || stream.Language, $L('Audio'));
+		const detail = audioTrackDetail({language: stream.Language, displayTitle: stream.DisplayTitle, codec: stream.Codec, channels: stream.Channels});
+		return {language: stream.Language, text: `${label} ${detail}`, label, detail};
+	}), [audioStreams]);
+	const audioRows = useMemo(() => audioStreams.map((stream, i) => (
+		<TrackOptionRow
+			key={stream.Index}
+			label={audioEntries[i].label}
+			detail={audioEntries[i].detail}
+			selected={i === selectedAudioIndex}
+			data-index={i}
+			onClick={onSelectAudio}
+		/>
+	)), [audioStreams, audioEntries, selectedAudioIndex, onSelectAudio]);
+
+	const subtitleEntries = useMemo(() => displaySubtitleStreams.map(({stream}, i) => {
+		const name = stream.DisplayTitle || stream.Title || stream.Language;
+		const label = numberedTrackName(i + 1, name, $L('Subtitle'));
+		const detail = subtitleTrackDetail({name, codec: stream.Codec, language: stream.Language, isExternal: stream.IsExternal, deliveryMethod: stream.DeliveryMethod, isForced: stream.IsForced, isHearingImpaired: stream.IsHearingImpaired});
+		return {language: stream.Language, text: `${label} ${detail}`, label, detail};
+	}), [displaySubtitleStreams]);
+	const subtitleRows = useMemo(() => displaySubtitleStreams.map(({stream, position}, i) => (
+		<TrackOptionRow
+			key={stream.Index}
+			label={subtitleEntries[i].label}
+			detail={subtitleEntries[i].detail}
+			selected={position === selectedSubtitleIndex}
+			data-index={position}
+			onClick={onSelectSubtitle}
+		/>
+	)), [displaySubtitleStreams, subtitleEntries, selectedSubtitleIndex, onSelectSubtitle]);
 
 	// The list only stands in for itself once the work is done and there is
 	// nothing to report instead.
@@ -120,20 +155,13 @@ const DetailTrackModals = ({
 				<div className={css.trackModal} onClick={onCloseModal}>
 					<ModalContainer className={css.trackModalPanel} onClick={stopPropagation} data-modal="audio" spotlightId="audio-modal">
 						<h2 className={css.trackModalTitle}>{$L('Audio Track')}</h2>
-						<div className={css.trackList}>
-							{audioStreams.map((stream, i) => (
-								<TrackOptionRow
-									key={stream.Index}
-									label={numberedTrackName(i + 1, stream.DisplayTitle || stream.Title || stream.Language, $L('Audio'))}
-									detail={audioTrackDetail({language: stream.Language, displayTitle: stream.DisplayTitle, codec: stream.Codec, channels: stream.Channels})}
-									selected={i === selectedAudioIndex}
-									data-index={i}
-									onClick={onSelectAudio}
-								/>
-							))}
-							<TrackDivider />
-							<TrackOptionRow label={$L('Cancel')} dimmed onClick={onCloseModal} />
-						</div>
+						<FilteredTrackList
+								modal="audio"
+								listClassName={css.trackList}
+								entries={audioEntries}
+								rows={audioRows}
+								actions={[{label: $L('Cancel'), dimmed: true, onClick: onCloseModal}]}
+							/>
 					</ModalContainer>
 				</div>
 			)}
@@ -141,33 +169,24 @@ const DetailTrackModals = ({
 				<div className={css.trackModal} onClick={onCloseModal}>
 					<ModalContainer className={css.trackModalPanel} onClick={stopPropagation} data-modal="subtitle" spotlightId="subtitle-modal">
 						<h2 className={css.trackModalTitle}>{$L('Subtitle Track')}</h2>
-						<div className={css.trackList}>
-							<TrackOptionRow
-								label={$L('None')}
-								selected={selectedSubtitleIndex === -1}
-								data-index={-1}
-								onClick={onSelectSubtitle}
+						<FilteredTrackList
+								modal="subtitle"
+								listClassName={css.trackList}
+								leading={(
+									<TrackOptionRow
+										label={$L('None')}
+										selected={selectedSubtitleIndex === -1}
+										data-index={-1}
+										onClick={onSelectSubtitle}
+									/>
+								)}
+								entries={subtitleEntries}
+								rows={subtitleRows}
+								actions={[
+									{label: $L('Download subtitles...'), detail: $L('Search using the OpenSubtitles plugin'), spotlightId: 'btn-subtitle-download', onClick: onOpenRemoteSubtitleSearch},
+									{label: $L('Cancel'), dimmed: true, onClick: onCloseModal}
+								]}
 							/>
-							{displaySubtitleStreams.map(({stream, position}, i) => (
-								<TrackOptionRow
-									key={stream.Index}
-									label={numberedTrackName(i + 1, stream.DisplayTitle || stream.Title || stream.Language, $L('Subtitle'))}
-									detail={subtitleTrackDetail({name: stream.DisplayTitle || stream.Title || stream.Language, codec: stream.Codec, language: stream.Language, isExternal: stream.IsExternal, deliveryMethod: stream.DeliveryMethod, isForced: stream.IsForced, isHearingImpaired: stream.IsHearingImpaired})}
-									selected={position === selectedSubtitleIndex}
-									data-index={position}
-									onClick={onSelectSubtitle}
-								/>
-							))}
-							<TrackDivider />
-							<TrackOptionRow
-								label={$L('Download subtitles...')}
-								detail={$L('Search using the OpenSubtitles plugin')}
-								spotlightId="btn-subtitle-download"
-								onClick={onOpenRemoteSubtitleSearch}
-							/>
-							<TrackDivider />
-							<TrackOptionRow label={$L('Cancel')} dimmed onClick={onCloseModal} />
-						</div>
 					</ModalContainer>
 				</div>
 			)}

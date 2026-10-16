@@ -291,6 +291,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
 
 - Accent colors, the skip prompt editor and the Seerr/Home row work are fork-only, in `implement`.
 - Shared filter popup: `packages/app/src/components/FilterPopup`.
+- Long audio and subtitle lists (chips, search, pinned actions, the Channel keys): `packages/app/src/components/TrackFilterBar` and `utils/trackFilter.js`, used by `views/Player/PlayerControls.js` and `views/Details/DetailTrackModals.js`.
 - Home: `packages/app/src/views/Browse/Browse.js`. Seerr screen: `packages/app/src/views/SeerrDiscover/`.
 
 ## The user's TV
