@@ -59,7 +59,7 @@ import LiveFailedCard from './LiveFailedCard';
 import LoadingAnimationLayer from '../../components/LoadingAnimation';
 import useSleepTimer from './useSleepTimer';
 import useSyncPlayCommands from './useSyncPlayCommands';
-import useSegmentPopups from './useSegmentPopups';
+import useSegmentPopups, {isSkipPromptFocused} from './useSegmentPopups';
 import {isPreroll, nextInQueue, shouldAutoAdvance} from '../../utils/cinemaMode';
 import {driftMs, needsSeek, seekLanded, correctionOptions, DRIFT_CHECK_MS, GROUP_SEEK_SETTLE_TIMEOUT_MS} from '../../utils/syncDrift';
 import {createReadyGate} from '../../utils/syncReady';
@@ -1780,14 +1780,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (!groupSeekTo(endTicks)) seekToTicks(endTicks);
 	}, [seekToTicks, groupSeekTo]);
 
-	// Down from the skip prompt, with the controls up, goes back to the playback bar.
-	const leaveSkipPromptDown = useCallback(() => {
+	// Left and Down from the skip prompt, and a skip taken by hand, land on the playback bar.
+	const focusSeekbar = useCallback(() => {
 		setFocusRow('progress');
 		window.requestAnimationFrame(() => Spotlight.focus('progress-bar'));
 	}, []);
 
 	const {
-		skipSegment, showSkipCredits, showNextEpisode, nextEpisodeCountdown,
+		skipSegment, skipPromptShown, suppressSeekPrompts, showSkipCredits, showNextEpisode, nextEpisodeCountdown,
 		handleSkipSegment, handlePlayNextNow,
 		askStillWatching, handleStillWatchingContinue, handleStillWatchingStop, cancelNextEpisodeCountdown,
 		checkSegments, handlePopupKeyDown, resetPopups, noteViewerActivity
@@ -1795,8 +1795,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		mediaSegments, nextEpisode, settings, runTimeRef,
 		activeModal, controlsVisible, hideControls, showControls,
 		onSeekToSegmentEnd,
-		focusRow,
-		onLeavePromptDown: leaveSkipPromptDown,
+		onFocusSeekbar: focusSeekbar,
 		onPlayNext: onPlayNextWithCleanup,
 		onPausePlayback: () => {
 			videoRef.current?.pause();
@@ -2204,13 +2203,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		noteViewerActivity();
 		if (held.ticks != null) {
 			noteSeek();
+			suppressSeekPrompts();
 			seekToTicks(held.ticks);
 		}
 		setIsSeeking(false);
 		videoRef.current?.play()?.catch?.(() => {});
 		healthMonitorRef.current?.setPaused(false);
 		return true;
-	}, [noteViewerActivity, seekToTicks, noteSeek]);
+	}, [noteViewerActivity, seekToTicks, noteSeek, suppressSeekPrompts]);
 
 	// Moving off the bar lands a held scrub where it is and stays paused, and play then carries on
 	// from there.
@@ -2218,9 +2218,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const held = scrubHoldRef.current;
 		if (!held.active || held.ticks == null) return;
 		noteSeek();
+		suppressSeekPrompts();
 		seekToTicks(held.ticks);
 		scrubHoldRef.current = {...held, ticks: null};
-	}, [seekToTicks, noteSeek]);
+	}, [seekToTicks, noteSeek, suppressSeekPrompts]);
 
 	// A skip or a chapter jump lands somewhere the scrub knows nothing about, so a held scrub is
 	// dropped and playback carries on as it was.
@@ -2255,6 +2256,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const scrubBy = useCallback((deltaSeconds) => {
 		if (!videoRef.current) return;
 		noteViewerActivity();
+		suppressSeekPrompts();
 		beginScrub();
 		setIsSeeking(true);
 		const held = scrubHoldRef.current;
@@ -2272,7 +2274,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const ticks = Math.max(0, Math.min(maxTicks, base + Math.floor(deltaSeconds * 10000000)));
 		scrubHoldRef.current = {...held, ticks};
 		setSeekPosition(ticks);
-	}, [noteViewerActivity, beginScrub, seekByOffset, duration, noteSeek]);
+	}, [noteViewerActivity, suppressSeekPrompts, beginScrub, seekByOffset, duration, noteSeek]);
 
 	const handlePlayPause = useCallback(() => {
 		if (resumeHeldScrub()) {
@@ -2312,16 +2314,18 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		noteViewerActivity();
 		dropScrub();
 		noteSeek();
+		suppressSeekPrompts();
 		seekByOffset(-skipBackSeconds(settings));
-	}, [settings, seekByOffset, noteViewerActivity, dropScrub, noteSeek]);
+	}, [settings, seekByOffset, noteViewerActivity, dropScrub, noteSeek, suppressSeekPrompts]);
 
 	const handleForward = useCallback(() => {
 		if (!videoRef.current) return;
 		noteViewerActivity();
 		dropScrub();
 		noteSeek();
+		suppressSeekPrompts();
 		seekByOffset(skipForwardSeconds(settings));
-	}, [settings, seekByOffset, noteViewerActivity, dropScrub, noteSeek]);
+	}, [settings, seekByOffset, noteViewerActivity, dropScrub, noteSeek, suppressSeekPrompts]);
 
 	const playFromSystem = useCallback(() => { if (isPaused) handlePlayPause(); }, [isPaused, handlePlayPause]);
 	const pauseFromSystem = useCallback(() => { if (!isPaused) handlePlayPause(); }, [isPaused, handlePlayPause]);
@@ -2682,9 +2686,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const ticks = parseInt(e.currentTarget.dataset.ticks, 10);
 		if (isNaN(ticks) || ticks < 0) return;
 		dropScrub();
+		suppressSeekPrompts();
 		if (!groupSeekTo(ticks)) seekToTicks(ticks);
 		closeModal();
-	}, [closeModal, seekToTicks, groupSeekTo, dropScrub]);
+	}, [closeModal, seekToTicks, groupSeekTo, dropScrub, suppressSeekPrompts]);
 
 	// Picks an episode from the browser. An episode part way through carries on from where it
 	// stopped and an unstarted one begins at the top, both of which the player already does for
@@ -2707,8 +2712,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const percent = (e.clientX - rect.left) / rect.width;
 		const newTime = percent * duration;
 		const newTicks = Math.floor(newTime * 10000000);
-		if (newTicks && !groupSeekTo(newTicks)) seekToTicks(newTicks);
-	}, [duration, seekToTicks, groupSeekTo]);
+		if (!newTicks) return;
+		suppressSeekPrompts();
+		if (!groupSeekTo(newTicks)) seekToTicks(newTicks);
+	}, [duration, seekToTicks, groupSeekTo, suppressSeekPrompts]);
 
 	const handleProgressKeyDown = useCallback((e) => {
 		if (!videoRef.current) return;
@@ -3115,7 +3122,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			// Left/Right when controls hidden -> show controls and focus on seekbar
 			if (!controlsVisible && !activeModal) {
-				if ((key === 'Enter' || e.keyCode === 13) && (skipSegment || showSkipCredits || showNextEpisode)) {
+				if ((key === 'Enter' || e.keyCode === 13) && (isSkipPromptFocused() || showSkipCredits || showNextEpisode)) {
 					return;
 				}
 				if (key === 'Enter' || e.keyCode === 13) {
@@ -3220,6 +3227,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (!controlsVisible) return;
 
 		window.requestAnimationFrame(() => {
+			// The skip prompt keeps the remote when the controls come up around it.
+			if (isSkipPromptFocused()) return;
 			if (focusRow === 'progress') {
 				Spotlight.focus('progress-bar');
 			} else if (focusRow === 'bottom') {
@@ -3313,8 +3322,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				</NextEpisodeContainer>
 			)}
 
-			{!isLoading && !error && skipSegment && !isAudioMode && !isLiveTV && !activeModal && (
+			{!isLoading && !error && skipPromptShown && !isAudioMode && !isLiveTV && !activeModal && (
 				<SkipSegmentOverlay
+					key={skipSegment.start}
 					type={skipSegment.type}
 					remainingSeconds={skipSegment.remainingSeconds}
 					progress={skipSegment.progress}
@@ -3322,7 +3332,6 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					onSkip={handleSkipSegment}
 					spotlightId="skip-segment-btn"
 					controlsVisible={controlsVisible}
-					measureKey={`${item?.Id}|${item?.Overview}`}
 				/>
 			)}
 

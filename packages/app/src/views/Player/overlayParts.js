@@ -9,7 +9,7 @@ import Spotlight from '@enact/spotlight';
 // underneath instead of the thing on screen.
 export const useOverlayFocus = (spotlightId) => {
 	useEffect(() => {
-		window.requestAnimationFrame(() => Spotlight.focus(spotlightId));
+		if (spotlightId) window.requestAnimationFrame(() => Spotlight.focus(spotlightId));
 	}, [spotlightId]);
 };
 

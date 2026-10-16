@@ -1,5 +1,7 @@
 import {renderHook, act} from '@testing-library/react';
 
+import Spotlight from '@enact/spotlight';
+
 import useSegmentPopups from './useSegmentPopups';
 
 // The framework's focus needs its own copy of React, so a stand in answers for it.
@@ -67,157 +69,201 @@ test('pressing skip counts as the viewer being there, an automatic skip doesnt',
 	expect(second.result.current.askStillWatching).toBe(false);
 });
 
-describe('the skip prompt over the controls, on a seek and under the remote', () => {
+describe('the skip prompt', () => {
 	const SECOND = 10000000;
-	let now;
+	const BACK = 27;
+	const ENTER = 13;
+	const LEFT = 37;
+	const UP = 38;
+	const RIGHT = 39;
+	const DOWN = 40;
 
-	// Playback is read twice a second, so it moves in small steps. A big jump is a seek.
-	const playTo = (result, from, to) => {
-		for (let at = from + 1; at <= to; at += 1) act(() => result.current.checkSegments(at * SECOND));
-	};
-
-	beforeEach(() => {
-		now = 1000000;
-		jest.spyOn(Date, 'now').mockImplementation(() => now);
+	beforeEach(() => jest.useFakeTimers());
+	afterEach(() => {
+		jest.useRealTimers();
+		document.body.innerHTML = '';
+		Spotlight.focus.mockClear();
 	});
-	afterEach(() => jest.restoreAllMocks());
 
 	const setupPrompt = (props = {}, settings = {}) => {
-		const onSeekToSegmentEnd = jest.fn();
-		const showControls = jest.fn();
-		const onLeavePromptDown = jest.fn();
-		const {result} = renderHook((current) => useSegmentPopups({
+		const calls = {onSeekToSegmentEnd: jest.fn(), showControls: jest.fn(), hideControls: jest.fn(), onFocusSeekbar: jest.fn()};
+		const {result, rerender} = renderHook((current) => useSegmentPopups({
 			mediaSegments: {list: [{type: 'intro', start: 60 * SECOND, end: 120 * SECOND}]},
 			nextEpisode: null,
 			settings: {autoPlay: false, introAction: 'ask', ...settings},
 			runTimeRef: {current: 1500 * SECOND},
 			activeModal: null,
 			controlsVisible: false,
-			hideControls: () => {},
-			showControls,
-			onSeekToSegmentEnd,
-			onLeavePromptDown,
+			...calls,
 			onPlayNext: () => {},
 			onPausePlayback: () => {},
 			...current
 		}), {initialProps: props});
-		return {result, onSeekToSegmentEnd, showControls, onLeavePromptDown};
+		return {result, rerender, ...calls};
 	};
-	const key = (keyCode, extra = {}) => ({keyCode, key: extra.key, preventDefault: jest.fn(), stopPropagation: jest.fn()});
-	const BACK = 27;
-	const ENTER = 13;
-
-	test('shows with the controls up, and does not take them away', () => {
-		const hideControls = jest.fn();
-		const {result} = setupPrompt({controlsVisible: true, hideControls});
-		act(() => result.current.checkSegments(70 * SECOND));
-		expect(result.current.skipSegment).not.toBeNull();
-		expect(hideControls).not.toHaveBeenCalled();
-	});
-
-	test('a seek into a dismissed segment offers it again with the progress from where it landed', () => {
-		const {result} = setupPrompt();
-		act(() => result.current.checkSegments(61 * SECOND));
-		act(() => { result.current.handlePopupKeyDown(key(BACK)); });
-		expect(result.current.skipSegment).toBeNull();
-		// Still playing through it, so it stays away.
-		act(() => result.current.checkSegments(61.5 * SECOND));
-		expect(result.current.skipSegment).toBeNull();
-		// Jumping to the middle of it brings it back.
-		act(() => result.current.checkSegments(90 * SECOND));
-		expect(result.current.skipSegment).toMatchObject({type: 'intro', remainingSeconds: 30});
-		expect(result.current.skipSegment.progress).toBeCloseTo(0.5);
-	});
-
-	test('a seek back into it after its few seconds ran out starts the clock over', () => {
-		const {result} = setupPrompt({}, {mediaSegmentAutoHide: 's5'});
-		act(() => result.current.checkSegments(61 * SECOND));
-		now += 6000;
-		playTo(result, 61, 67);
-		expect(result.current.skipSegment).toBeNull();
-		act(() => result.current.checkSegments(62 * SECOND));
-		expect(result.current.skipSegment).not.toBeNull();
-	});
-
-	test('skipping and landing a little short of the end does not offer it again, but a seek into it afterwards does', () => {
-		const {result, onSeekToSegmentEnd} = setupPrompt();
-		playTo(result, 60, 70);
-		act(() => { result.current.handlePopupKeyDown(key(ENTER)); });
-		expect(onSeekToSegmentEnd).toHaveBeenCalledWith(120 * SECOND);
-		// AVPlay put it back on the keyframe before the end.
-		act(() => result.current.checkSegments(118.5 * SECOND));
-		expect(result.current.skipSegment).toBeNull();
-		now += 6000;
-		act(() => result.current.checkSegments(200 * SECOND));
-		act(() => result.current.checkSegments(90 * SECOND));
-		expect(result.current.skipSegment).not.toBeNull();
-	});
-
-	test('a seek out of it takes it away, and a segment that skips itself is not offered on a seek back', () => {
-		const prompt = setupPrompt();
-		act(() => prompt.result.current.checkSegments(61 * SECOND));
-		act(() => prompt.result.current.checkSegments(300 * SECOND));
-		expect(prompt.result.current.skipSegment).toBeNull();
-
-		const auto = setupPrompt({}, {introAction: 'auto'});
-		act(() => auto.result.current.checkSegments(61 * SECOND));
-		expect(auto.onSeekToSegmentEnd).toHaveBeenCalledTimes(1);
-		act(() => auto.result.current.checkSegments(200 * SECOND));
-		act(() => auto.result.current.checkSegments(62 * SECOND));
-		expect(auto.onSeekToSegmentEnd).toHaveBeenCalledTimes(1);
-	});
-
-	test('with the controls away, Back sends it off and OK takes it', () => {
-		const first = setupPrompt();
-		act(() => first.result.current.checkSegments(70 * SECOND));
-		const back = key(BACK);
+	const at = (result, seconds) => act(() => result.current.checkSegments(seconds * SECOND));
+	const press = (result, keyCode) => {
 		let consumed;
-		act(() => { consumed = first.result.current.handlePopupKeyDown(back); });
-		expect(consumed).toBe(true);
-		expect(first.result.current.skipSegment).toBeNull();
-
-		const second = setupPrompt();
-		act(() => second.result.current.checkSegments(70 * SECOND));
-		act(() => { consumed = second.result.current.handlePopupKeyDown(key(ENTER)); });
-		expect(consumed).toBe(true);
-		expect(second.onSeekToSegmentEnd).toHaveBeenCalledWith(120 * SECOND);
-	});
-
-	test('with the controls away, any other key leaves the prompt up for the controls to come up with it', () => {
-		const {result} = setupPrompt();
-		act(() => result.current.checkSegments(70 * SECOND));
-		let consumed;
-		act(() => { consumed = result.current.handlePopupKeyDown(key(39)); });
-		expect(consumed).toBe(false);
-		expect(result.current.skipSegment).not.toBeNull();
-	});
-
-	test('with the controls up, Back is left to close them and the prompt stays', () => {
-		const {result} = setupPrompt({controlsVisible: true});
-		act(() => result.current.checkSegments(70 * SECOND));
-		let consumed;
-		act(() => { consumed = result.current.handlePopupKeyDown(key(BACK)); });
-		expect(consumed).toBe(false);
-		expect(result.current.skipSegment).not.toBeNull();
-	});
-
-	test('with the controls up, Down from the prompt goes back to the bar and the sides stay put', () => {
+		act(() => {
+			consumed = result.current.handlePopupKeyDown({keyCode, preventDefault: jest.fn(), stopPropagation: jest.fn()});
+		});
+		return consumed;
+	};
+	// Stands in for the prompt's button, so the key handler can tell it has focus.
+	const focusPrompt = () => {
 		const button = document.createElement('div');
 		button.setAttribute('data-spotlight-id', 'skip-segment-btn');
 		button.tabIndex = 0;
 		document.body.appendChild(button);
 		button.focus();
-		const {result, onLeavePromptDown, showControls} = setupPrompt({controlsVisible: true});
-		act(() => result.current.checkSegments(70 * SECOND));
-		let consumed;
-		act(() => { consumed = result.current.handlePopupKeyDown(key(40)); });
-		expect(consumed).toBe(true);
-		expect(onLeavePromptDown).toHaveBeenCalled();
-		act(() => { consumed = result.current.handlePopupKeyDown(key(37)); });
-		expect(consumed).toBe(true);
+	};
+
+	test('comes up on the way into a segment and clears the controls away', () => {
+		const {result, hideControls} = setupPrompt({controlsVisible: true});
+		at(result, 61);
+		expect(result.current.skipSegment).toMatchObject({type: 'intro', remainingSeconds: 59});
+		expect(result.current.skipPromptShown).toBe(true);
+		expect(hideControls).toHaveBeenCalled();
+	});
+
+	test('once gone it stays gone until playback leaves the segment and comes back into it', () => {
+		const {result} = setupPrompt();
+		at(result, 61);
+		press(result, BACK);
+		at(result, 62);
+		expect(result.current.skipSegment).toBeNull();
+		at(result, 59);
+		at(result, 60);
+		expect(result.current.skipSegment).not.toBeNull();
+	});
+
+	test('a seek the viewer makes takes it down, and the segment the seek lands in is not offered', () => {
+		const {result} = setupPrompt();
+		at(result, 61);
+		act(() => result.current.suppressSeekPrompts());
+		expect(result.current.skipSegment).toBeNull();
+
+		at(result, 30);
+		act(() => result.current.suppressSeekPrompts());
+		at(result, 90);
+		act(() => jest.advanceTimersByTime(1500));
+		at(result, 91);
+		expect(result.current.skipSegment).toBeNull();
+	});
+
+	test('a seek that reports its landing holds prompts until it lands, and a little after', async () => {
+		const {result} = setupPrompt();
+		let land;
+		at(result, 30);
+		act(() => result.current.suppressSeekPrompts(new Promise((resolve) => {
+			land = resolve;
+		})));
+		act(() => jest.advanceTimersByTime(3000));
+		at(result, 90);
+		expect(result.current.skipSegment).toBeNull();
+		await act(async () => land());
+		at(result, 91);
+		expect(result.current.skipSegment).toBeNull();
+
+		at(result, 30);
+		act(() => jest.advanceTimersByTime(1500));
+		at(result, 60);
+		expect(result.current.skipSegment).not.toBeNull();
+	});
+
+	test('after its few seconds it only shows with the controls, until its segment ends', () => {
+		const {result, rerender} = setupPrompt({}, {mediaSegmentAutoHide: 's5'});
+		at(result, 61);
+		act(() => jest.advanceTimersByTime(5000));
+		expect(result.current.skipPromptShown).toBe(false);
+		expect(press(result, UP)).toBe(true);
+		act(() => jest.runOnlyPendingTimers());
+		expect(Spotlight.focus).toHaveBeenCalledWith('skip-segment-btn');
+		rerender({controlsVisible: true});
+		expect(result.current.skipPromptShown).toBe(true);
+		at(result, 121);
+		expect(result.current.skipPromptShown).toBe(false);
+	});
+
+	test('a skip taken by hand seeks past it and brings the controls up on the bar', () => {
+		const {result, onSeekToSegmentEnd, showControls, onFocusSeekbar} = setupPrompt();
+		at(result, 61);
+		act(() => result.current.handleSkipSegment({type: 'click'}));
+		expect(onSeekToSegmentEnd).toHaveBeenCalledWith(120 * SECOND);
 		expect(showControls).toHaveBeenCalled();
-		act(() => { consumed = result.current.handlePopupKeyDown(key(ENTER)); });
-		expect(consumed).toBe(false);
-		document.body.removeChild(button);
+		expect(onFocusSeekbar).toHaveBeenCalled();
+		// The seek lands a frame short of the end, which is still inside it.
+		at(result, 119.9);
+		expect(result.current.skipSegment).toBeNull();
+	});
+
+	test('a segment that skips itself does it once, until playback is back at its start', () => {
+		const {result, onSeekToSegmentEnd} = setupPrompt({}, {introAction: 'auto'});
+		at(result, 61);
+		at(result, 119.9);
+		at(result, 121);
+		at(result, 90);
+		expect(onSeekToSegmentEnd).toHaveBeenCalledTimes(1);
+		at(result, 59);
+		at(result, 60);
+		expect(onSeekToSegmentEnd).toHaveBeenCalledTimes(2);
+	});
+
+	test('a segment too short to read is not offered, but one over a second still skips itself', () => {
+		const short = {list: [{type: 'intro', start: 60 * SECOND, end: 62 * SECOND}]};
+		const asked = setupPrompt({mediaSegments: short});
+		at(asked.result, 60);
+		expect(asked.result.current.skipSegment).toBeNull();
+
+		const auto = setupPrompt({mediaSegments: short}, {introAction: 'auto'});
+		at(auto.result, 60);
+		expect(auto.onSeekToSegmentEnd).toHaveBeenCalledWith(62 * SECOND);
+	});
+
+	test('Back takes it down with the controls up or not, and a second Back right after goes nowhere', () => {
+		const {result, rerender} = setupPrompt();
+		at(result, 61);
+		rerender({controlsVisible: true});
+		expect(press(result, BACK)).toBe(true);
+		expect(result.current.skipSegment).toBeNull();
+		expect(press(result, BACK)).toBe(true);
+		act(() => jest.advanceTimersByTime(600));
+		expect(press(result, BACK)).toBe(false);
+	});
+
+	test('with the controls away, Up and Down bring them up on it, Right on it does too and Left on it does nothing', () => {
+		focusPrompt();
+		const {result, showControls, onFocusSeekbar} = setupPrompt();
+		at(result, 61);
+		expect(press(result, DOWN)).toBe(true);
+		act(() => jest.runOnlyPendingTimers());
+		expect(Spotlight.focus).toHaveBeenCalledWith('skip-segment-btn');
+		expect(press(result, RIGHT)).toBe(true);
+		expect(showControls).toHaveBeenCalledTimes(2);
+		expect(press(result, LEFT)).toBe(true);
+		expect(showControls).toHaveBeenCalledTimes(2);
+		expect(onFocusSeekbar).not.toHaveBeenCalled();
+		// OK is left to the button.
+		expect(press(result, ENTER)).toBe(false);
+	});
+
+	test('with the controls up, Left and Down from it go to the bar and Right from the last button reaches it', () => {
+		focusPrompt();
+		const {result, onFocusSeekbar} = setupPrompt({controlsVisible: true});
+		at(result, 61);
+		expect(press(result, LEFT)).toBe(true);
+		expect(press(result, DOWN)).toBe(true);
+		expect(press(result, UP)).toBe(true);
+		expect(onFocusSeekbar).toHaveBeenCalledTimes(2);
+
+		const row = document.createElement('div');
+		row.setAttribute('data-player-controls-row', '');
+		row.innerHTML = '<button class="spottable">a</button><button class="spottable">b</button>';
+		document.body.appendChild(row);
+		row.firstChild.focus();
+		expect(press(result, RIGHT)).toBe(false);
+		row.lastChild.focus();
+		expect(press(result, RIGHT)).toBe(true);
+		expect(Spotlight.focus).toHaveBeenCalledWith('skip-segment-btn');
 	});
 });

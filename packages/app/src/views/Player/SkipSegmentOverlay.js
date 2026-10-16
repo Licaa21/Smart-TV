@@ -17,18 +17,12 @@ const SEGMENT_LABELS = {
 	commercial: 'Commercial'
 };
 
-// Where the prompt rests along the bottom edge, as the stylesheet has it, the bar of controls it has to clear, which the
-// player marks, and the room kept between them.
-const RESTING_BOTTOM = 174;
-const CONTROLS_SELECTOR = '[data-player-controls-bottom]';
-const CONTROLS_GAP = 24;
-
-// How far from the bottom edge the prompt sits while the controls are up: above them, the way the subtitles are lifted.
-// Null leaves it where the stylesheet puts it.
-export const promptBottomFor = (restingBottom, controlsTop, innerHeight) => {
-	if (restingBottom == null || !Number.isFinite(controlsTop)) return null;
-	const clear = Math.round(innerHeight - controlsTop + CONTROLS_GAP);
-	return clear > restingBottom ? clear : null;
+// The prompt sits just clear of the controls' bottom bar, which stays laid out while it's hidden, so the prompt keeps its
+// place as the controls come and go. Without the bar the stylesheet's place stands.
+const CONTROLS_BAR_GAP = 6;
+const clearOfControls = () => {
+	const bar = document.querySelector('[data-player-controls-bottom]');
+	return bar && bar.offsetHeight > 0 ? bar.offsetHeight + CONTROLS_BAR_GAP : null;
 };
 
 const ringClasses = {ring: css.ring, svg: css.ringSvg, track: css.ringTrack, value: css.ringValue, center: css.ringCenter};
@@ -37,21 +31,13 @@ const ringClasses = {ring: css.ring, svg: css.ringSvg, track: css.ringTrack, val
  * Offers to jump past a segment the server marked up. The ring drains for as long
  * as the segment has left to run, so the prompt going away is never a surprise.
  */
-const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, onSkip, spotlightId, controlsVisible = false, measureKey}) => {
-	// The prompt takes the remote while the controls are away. With them up it leaves focus to them, and is reached with
-	// Up from the playback bar.
+const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, onSkip, spotlightId, controlsVisible = false}) => {
+	// It takes the remote while the controls are away, and leaves focus where it is while they're up.
 	useOverlayFocus(controlsVisible ? null : spotlightId);
 
-	// Lifted above the bar of controls while it is up, and eased back down when it goes, as the subtitles are.
-	const [lifted, setLifted] = useState(null);
-	useLayoutEffect(() => {
-		if (!controlsVisible) {
-			setLifted(null);
-			return;
-		}
-		const bar = document.querySelector(CONTROLS_SELECTOR);
-		setLifted(promptBottomFor(RESTING_BOTTOM, bar ? bar.getBoundingClientRect().top : null, window.innerHeight));
-	}, [controlsVisible, measureKey]);
+	// Measured again each time the controls come or go, since the bar's rows can change in between.
+	const [bottom, setBottom] = useState(clearOfControls);
+	useLayoutEffect(() => setBottom(clearOfControls()), [controlsVisible]);
 
 	// Holding focus when it ends with the controls up would leave the remote on nothing, so it goes back to them.
 	const heldFocusRef = useRef(false);
@@ -76,7 +62,7 @@ const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, o
 	const numberInRing = showTimer && showRing && remainingSeconds < 60;
 
 	return (
-		<div className={css.overlay} style={lifted == null ? undefined : {bottom: `${lifted}px`}}>
+		<div className={css.overlay} style={bottom == null ? undefined : {bottom: `${bottom}px`}}>
 			<SpottableButton
 				className={css.button}
 				onClick={onSkip}
