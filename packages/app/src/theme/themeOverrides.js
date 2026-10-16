@@ -67,6 +67,9 @@ import minimalistCardsCss from '../views/Details/minimalist/MinimalistCards.modu
 
 const STYLE_ELEMENT_ID = 'moonfin-theme-overrides';
 
+// The contrast the check on a watched title keeps against the badge it is drawn on
+const WATCHED_CHECK_CONTRAST = 4.5;
+
 const hexAlpha = (hex) => Number.parseInt(hex.slice(1, 3), 16) / 255;
 
 const bumpRadius = (radius, extra) => radiusToCss({
@@ -221,10 +224,13 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		? `background: ${accent.css}; color: ${accent.on}; border-color: ${accent.on};`
 		: `background: ${badgeUnplayed}; color: ${onBadge}; border-color: ${onBadge};`);
 	// The check on a watched title is a badge color of the theme too. A surface that was given an accent draws it in that
-	// color, with ink chosen to read on it, like the circle counting unplayed episodes.
-	const watchedBadge = (accent, id) => (picked[id]
-		? {fill: accent.css, ink: accent.on}
-		: {fill: badgeWatched, ink: onBadge});
+	// color, like the circle counting unplayed episodes. The check's own color is moved off the fill when the two are
+	// alike, white on a white pick being the case, so the check is always seen.
+	const watchedBadge = (accent, id) => {
+		const fillHex = picked[id] || c.badgeWatched;
+		const inkHex = ensureVisible(picked[id] ? c.onAccent : c.onBadge, [fillHex], WATCHED_CHECK_CONTRAST);
+		return {fill: picked[id] ? accent.css : badgeWatched, ink: toCssColor(inkHex)};
+	};
 	const recordingActive = toCssColor(c.recordingActive);
 	const error = toCssColor(c.error || DEFAULT_ERROR_COLOR);
 	const statusAvailable = toCssColor(theme.semantic.statusAvailable);
@@ -461,8 +467,11 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${settingsCss.toggleThumb}`, `background: ${onSurface};`);
 	rule(`.${settingsCss.toggleOn} .${settingsCss.toggleThumb}`, `background: ${settingsMarkInk};`);
 	rule(`.${settingsCss.sliderInactive}`, `background: ${rangeTrack};`);
-	rule(`.${settingsCss.sliderActive}`, `background: ${rangeProgress};`);
-	rule(`.${settingsCss.sliderThumb}`, `background: ${toCssColor(c.rangeThumb)};`);
+	// The bars follow the Settings accent once it is picked. A slider is focused while it is being moved, so the
+	// color is nudged away from the focused row's fill as well, which a white pick over a white row would not survive
+	const barMark = toCssColor(ensureVisible(settingsAccent.hex, [c.surface, settingsFocus.fillHex]));
+	rule(`.${settingsCss.sliderActive}`, `background: ${picked.settings ? barMark : rangeProgress};`);
+	rule(`.${settingsCss.sliderThumb}`, `background: ${picked.settings ? barMark : toCssColor(c.rangeThumb)};`);
 	rule(`.${settingsCss.sliderTick}`, `background: ${os(0.38)};`);
 	rule(`.${settingsCss.divider}`, `background: ${os(0.12)};`);
 	rule(`.${settingsCss.dialog}`, `background: ${surface};`);
@@ -517,7 +526,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${settingsCss.themeCardCheck}, .${settingsCss.themeStoreCardAction}`, `color: ${settingsMark};`);
 	rule(`.${settingsCss.playbackTimePreview}`, `background: ${surface};`);
 	rule(`.${settingsCss.playbackTimeBar}`, `background: ${rangeTrack};`);
-	rule(`.${settingsCss.playbackTimeBarFill}`, `background: ${settingsFocus.bar};`);
+	rule(`.${settingsCss.playbackTimeBarFill}`, `background: ${picked.settings ? barMark : settingsFocus.bar};`);
 
 	// Search input
 	rule(`.${searchCss.searchInputWrapper}`, `background: ${inputBackground}; border-color: ${inputBorder};`);

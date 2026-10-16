@@ -327,6 +327,63 @@ describe('per-surface accents', () => {
 			});
 		});
 
+		describe('the check on a watched title, whatever color it sits on', () => {
+			const toHex = (css) => `#${(/rgba?\((\d+), (\d+), (\d+)/.exec(css) || []).slice(1, 4).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}`;
+			const colorsOf = (accents) => {
+				const lines = rulesFor(accents);
+				const badge = lines.find((line) => line.includes('.watchedBadge {') && line.includes('background:'));
+				const check = lines.find((line) => line.includes('.watchedBadge svg {'));
+				return {fill: toHex(/background: ([^;]+);/.exec(badge)[1]), ink: toHex(/ fill: ([^;]+);/.exec(check)[1])};
+			};
+
+			['#ffffff', '#000000', '#808080', '#ff8800'].forEach((pick) => {
+				it(`keeps the check readable on a ${pick} pick`, () => {
+					const {fill, ink} = colorsOf({home: pick});
+					expect(fill).not.toBe(ink);
+					expect(contrastRatio(fill, ink)).toBeGreaterThanOrEqual(4.5);
+				});
+			});
+
+			it('keeps it readable on the theme badge too', () => {
+				const {fill, ink} = colorsOf({});
+				expect(contrastRatio(fill, ink)).toBeGreaterThanOrEqual(4.5);
+			});
+		});
+
+		describe('the bars in Settings', () => {
+			// the last rule is the one that wins, the hand written one after the stylesheets' own
+			const bars = (accents) => {
+				const lines = rulesFor(accents);
+				const of = (name) => /background: ([^;]+);/.exec(lines.filter((line) => line.includes(name) && line.includes('background:')).pop())[1];
+				return {slider: of('.sliderActive {'), thumb: of('.sliderThumb {'), time: of('.playbackTimeBarFill {')};
+			};
+
+			it('keep the theme colors until the Settings accent is picked', () => {
+				const theme = bars({});
+				const picked = bars({settings: '#c2185b'});
+				expect(picked.slider).not.toBe(theme.slider);
+				expect(picked.thumb).not.toBe(theme.thumb);
+				expect(picked.time).not.toBe(theme.time);
+			});
+
+			it('follow the Settings accent once it is picked', () => {
+				const picked = bars({settings: '#c2185b'});
+				expect(picked.slider).toBe(picked.thumb);
+				expect(picked.slider).toBe(picked.time);
+				// near the pick, nudged at most to stay seen
+				const [r, g, b] = /(\d+), (\d+), (\d+)/.exec(picked.slider).slice(1).map(Number);
+				expect(r).toBeGreaterThan(g);
+				expect(r).toBeGreaterThan(b);
+			});
+
+			it('stay visible on the focused row when the pick is the same as its fill', () => {
+				const picked = bars({settings: '#ffffff'});
+				expect(picked.slider).not.toBe('rgb(255, 255, 255)');
+				expect(picked.thumb).not.toBe('rgb(255, 255, 255)');
+				expect(picked.time).not.toBe('rgb(255, 255, 255)');
+			});
+		});
+
 		describe('the achievements screens inside Settings', () => {
 			it('wear the Settings accent when they were given none, and their own once they have one', () => {
 				const inherited = rulesFor({settings: '#ff8800'}).filter((line) => line.includes('.accentRow'));
