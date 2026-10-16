@@ -4,14 +4,24 @@
 	padding: 0 36px 12px;
 }
 
+// One line that slides sideways, since a file with two dozen languages would otherwise fill the dialog with chips and push
+// the tracks off the screen. Nothing but the track list itself is meant to scroll up and down.
 .chips {
 	display: flex;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
+	overflow-x: auto;
 	margin: 0 -5px;
+	scrollbar-width: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
 }
 
 .chip,
 .action {
+	flex-shrink: 0;
+	white-space: nowrap;
 	margin: 0 5px 10px;
 	padding: 8px 18px;
 	font-size: 20px;
@@ -76,7 +86,9 @@
 
 // The tracks under the strip scroll by themselves, so the strip stays where it is
 .scrollList {
-	max-height: 42vh;
+	// What the dialog has left under the title and the strip, so the dialog itself never needs a scrollbar of its own
+	max-height: calc(80vh - 400px);
+	min-height: 120px;
 	overflow-y: auto;
 	scrollbar-width: none;
 
