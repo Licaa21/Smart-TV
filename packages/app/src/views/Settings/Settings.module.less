@@ -752,10 +752,11 @@
 
 .dialogTitle {
 	flex-shrink: 0;
-	padding: (24 * @dp) (24 * @dp) 0;
+	// The room under the title keeps it clear of the first option, and the line is tall enough for accents and tails
+	padding: (24 * @dp) (24 * @dp) (8 * @dp);
 	font-size: (14 * @dp);
 	font-weight: 600;
-	line-height: (17.8 * @dp);
+	line-height: (20 * @dp);
 	color: #fff;
 }
 

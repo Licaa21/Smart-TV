@@ -101,6 +101,7 @@ ode_modules`.
 - After every fix, feature or addition, run the code review (`/code-review`, or a read-only review agent given the diff
   and the context) on the change, and run it more than once: fix what it finds, then review again, until a pass finds
   nothing real. Do this before reporting the work as done.
+- Every change ships with a test for what can be tested (rules, ranking, timing with fake timers, a hook with Spotlight mocked), added in the same commit. What needs a real TV (focus feel, timing on the set) is said so in the report instead.
 - Look at screens in a browser, not just in tests (see "Tools"). TV behaviour itself is only known from a real TV.
 - Do not run the tests while the dev server is up: the server stalls rebuilding. Stop it first.
 
