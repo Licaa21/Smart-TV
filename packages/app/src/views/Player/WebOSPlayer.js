@@ -3201,10 +3201,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				handleBack();
 				return;
 			}
-			if (e.keyCode === KEYS.CHANNEL_UP || e.keyCode === KEYS.CHANNEL_DOWN) {
+			// An open panel keeps the channel keys, the episode browser steps its seasons with them.
+			if ((e.keyCode === KEYS.CHANNEL_UP || e.keyCode === KEYS.CHANNEL_DOWN) && !activeModal) {
 				e.preventDefault();
 				e.stopPropagation();
-				if (!activeModal) handleChannelKey(e.keyCode === KEYS.CHANNEL_UP ? 1 : -1);
+				handleChannelKey(e.keyCode === KEYS.CHANNEL_UP ? 1 : -1);
 				return;
 			}
 
