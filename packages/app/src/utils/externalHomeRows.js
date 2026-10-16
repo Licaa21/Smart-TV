@@ -3,6 +3,7 @@ import seerrApi from '../services/seerrApi';
 import {fetchCustomRow, constructSourceUrl} from '../services/externalRowsApi';
 import {fetchWithTimeout} from './fetchTimeout';
 import {seasonalTitle} from './seasonalTitles';
+import {uiLocale} from './uiLocale';
 
 const HOME_ROW_LIMIT = 20;
 const VALIDATE_TIMEOUT_MS = 45000;
@@ -266,7 +267,7 @@ const formatCalendarDate = (dateStr) => {
 	if (!dateStr) return '';
 	const d = new Date(dateStr);
 	if (Number.isNaN(d.getTime())) return '';
-	return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+	return d.toLocaleDateString(uiLocale(), {month: 'short', day: 'numeric'});
 };
 
 const arrGet = async (url) => {

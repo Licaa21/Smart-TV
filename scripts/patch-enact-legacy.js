@@ -766,6 +766,23 @@ patchFile('@enact/sandstone/internal/Panels/Arrangers.js', [
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PATCH 17: Spotlight Accelerator, every held repeat moves
+//
+// While a direction is held, Spotlight only acts on every third repeat for the
+// first three seconds and every second one for the next three, so holding a key
+// through a long list crawls before it speeds up. Every repeat moves now.
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n[Patch 17] Spotlight Accelerator, every held repeat moves');
+
+patchFile('@enact/spotlight/Accelerator/Accelerator.js', [
+	{
+		find: 'arguments[0] : [3, 3, 3, 2, 2, 2, 1];',
+		replace: 'arguments[0] : [1];',
+		description: 'Accelerator: default frequency moves on every repeat'
+	}
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Summary
 // ─────────────────────────────────────────────────────────────────────────────
 if (failCount > 0) {

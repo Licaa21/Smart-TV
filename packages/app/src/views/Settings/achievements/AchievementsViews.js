@@ -17,6 +17,7 @@ import SettingsView from '../SettingsView';
 import {renderSettingsIcon} from '../settingsIcons';
 import {SectionTitle, NavRow, ToggleRow} from '../settingsRows';
 import {SpottableDiv} from '../settingsSpottables';
+import {uiLocale} from '../../../utils/uiLocale';
 
 import settingsCss from '../Settings.module.less';
 import css from './Achievements.module.less';
@@ -40,7 +41,7 @@ const shell = (color) => ({background: tint(color), borderColor: tint(color, 0.4
 const percent = (value) => `${Math.round(value * 100)}%`;
 
 const mediumDate = (date) =>
-	date.toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
+	date.toLocaleDateString(uiLocale(), {year: 'numeric', month: 'short', day: 'numeric'});
 
 const Icon = ({name, className}) => (
 	<svg className={className} viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true" focusable="false">

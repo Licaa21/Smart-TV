@@ -29,6 +29,7 @@ import {
 	getRequestDownloadSummary,
 	isRequestDownloading
 } from '../../utils/seerrStatus';
+import {uiLocale} from '../../utils/uiLocale';
 import css from './SeerrRequests.module.less';
 
 // The stylesheet sizes a row in rem, so the list has to be told its height in the
@@ -70,7 +71,7 @@ const formatRequestDate = (iso) => {
 	if (!iso) return '';
 	const parsed = new Date(iso);
 	if (isNaN(parsed.getTime())) return '';
-	return parsed.toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
+	return parsed.toLocaleDateString(uiLocale(), {year: 'numeric', month: 'short', day: 'numeric'});
 };
 
 const PAGE_SIZE = 20;

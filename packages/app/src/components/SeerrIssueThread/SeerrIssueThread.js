@@ -10,6 +10,7 @@ import SeerrStatusChip from '../SeerrStatusChip';
 import {ISSUE_STATUS, getIssueStatusInfo, getIssueTypeLabel} from '../../utils/seerrStatus';
 import {isBackKey} from '../../utils/keys';
 import {isTvKeyboardVisible} from '../TVKeyboard/keyboardBus';
+import {uiLocale} from '../../utils/uiLocale';
 
 import css from './SeerrIssueThread.module.less';
 
@@ -24,7 +25,7 @@ const SpottableButton = Spottable('button');
 const formatDate = (dateStr) => {
 	if (!dateStr) return '';
 	try {
-		return new Date(dateStr).toLocaleDateString();
+		return new Date(dateStr).toLocaleDateString(uiLocale());
 	} catch (e) {
 		return '';
 	}

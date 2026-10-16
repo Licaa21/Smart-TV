@@ -97,3 +97,22 @@ describe('isPlayableEpisode', () => {
 		expect(isPlayableEpisode(null)).toBe(false);
 	});
 });
+
+describe('stepping back', () => {
+	test('finds the real episode before this one in the season', () => {
+		const list = [ep('a', 1), ep('b', 2, {LocationType: 'Virtual'}), ep('c', 3)];
+		expect(findNextInSeason(list, 'c', -1)).toBe(list[0]);
+		expect(findNextInSeason(list, 'a', -1)).toBeNull();
+	});
+
+	test('picks the season before by number and stops short of the Specials', () => {
+		const seasons = [season('s0', 0), season('s2', 2), season('s1', 1)];
+		expect(findNextSeason(seasons, 's2', 2, -1)).toBe(seasons[2]);
+		expect(findNextSeason(seasons, 's1', 1, -1)).toBeNull();
+	});
+
+	test('takes the last real episode of the season before', () => {
+		const list = [ep('a', 1), ep('b', 2), ep('c', 3, {LocationType: 'Virtual'})];
+		expect(firstPlayableEpisode(list, -1)).toBe(list[1]);
+	});
+});

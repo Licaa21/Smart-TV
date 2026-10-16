@@ -2,6 +2,7 @@ import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
 import $L from '@enact/i18n/$L';
 import {getImageUrl} from '../../utils/helpers';
 import {KEYS} from '../../utils/keys';
+import {uiLocale} from '../../utils/uiLocale';
 import css from './PhotoViewer.module.less';
 
 const PhotoViewer = ({item, items, serverUrl, onClose}) => {
@@ -119,7 +120,7 @@ const PhotoViewer = ({item, items, serverUrl, onClose}) => {
 	if (!currentPhoto) return null;
 
 	const photoDate = currentPhoto.PremiereDate || currentPhoto.DateCreated;
-	const formattedDate = photoDate ? new Date(photoDate).toLocaleDateString(undefined, {
+	const formattedDate = photoDate ? new Date(photoDate).toLocaleDateString(uiLocale(), {
 		year: 'numeric', month: 'long', day: 'numeric'
 	}) : null;
 
