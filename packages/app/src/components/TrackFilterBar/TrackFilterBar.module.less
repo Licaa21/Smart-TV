@@ -86,6 +86,8 @@
 
 // The tracks under the strip scroll by themselves, so the strip stays where it is
 .scrollList {
+	// The tracks are measured against this box when one is scrolled into view
+	position: relative;
 	// What the dialog has left under the title and the strip, so the dialog itself never needs a scrollbar of its own. The
 	// room kept allows for the buttons wrapping to a second row, as they do with the longer Romanian names.
 	max-height: calc(80vh - 440px);

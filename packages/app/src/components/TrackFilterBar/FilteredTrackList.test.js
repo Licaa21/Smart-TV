@@ -117,7 +117,7 @@ describe('FilteredTrackList', () => {
 	it('takes Channel Up to the strip and Channel Down back to the chosen track', () => {
 		draw(longList);
 		fireEvent.keyDown(screen.getByText('1 - English Forced'), {key: 'ChannelUp'});
-		expect(Spotlight.focus).toHaveBeenLastCalledWith('track-filter-all');
+		expect(Spotlight.focus).toHaveBeenLastCalledWith('track-filter-bar');
 		fireEvent.keyDown(screen.getByText('Offset'), {key: 'ChannelDown'});
 		expect(Spotlight.focus).toHaveBeenLastCalledWith('[data-modal="subtitle"] [data-selected="true"]');
 	});
@@ -127,6 +127,49 @@ describe('FilteredTrackList', () => {
 		draw(longList);
 		fireEvent.keyDown(screen.getByText('Offset'), {key: 'ChannelDown'});
 		expect(Spotlight.focus).toHaveBeenLastCalledWith('[data-modal="subtitle"] [data-index]');
+	});
+
+	describe('Up and Down in a long list', () => {
+		const trackRow = (n) => screen.getByText(`${n} - English ${(n - 1) % 2 ? 'SDH' : 'Forced'}`);
+
+		it('steps to the next track by hand, and keeps the key from Spotlight', () => {
+			draw(longList);
+			const stop = fireEvent.keyDown(trackRow(2), {keyCode: 40});
+			expect(stop).toBe(false);
+			expect(Spotlight.focus).toHaveBeenLastCalledWith(trackRow(3));
+			fireEvent.keyDown(trackRow(3), {keyCode: 38});
+			expect(Spotlight.focus).toHaveBeenLastCalledWith(trackRow(2));
+		});
+
+		it('goes from the first track to None, and from None to the strip', () => {
+			draw(longList);
+			fireEvent.keyDown(trackRow(1), {keyCode: 38});
+			expect(Spotlight.focus).toHaveBeenLastCalledWith(screen.getByText('None'));
+			fireEvent.keyDown(screen.getByText('None'), {keyCode: 38});
+			expect(Spotlight.focus).toHaveBeenLastCalledWith('track-filter-bar');
+		});
+
+		it('stays on the last track when Down has nowhere to go', () => {
+			draw(longList);
+			const last = screen.getByText('14 - Commentary');
+			const stop = fireEvent.keyDown(last, {keyCode: 40});
+			expect(stop).toBe(false);
+			expect(Spotlight.focus).not.toHaveBeenCalled();
+		});
+
+		it('only steps among the tracks the filter kept', () => {
+			draw(longList);
+			fireEvent.click(chip('RON4'));
+			fireEvent.keyDown(screen.getByText('None'), {keyCode: 40});
+			expect(Spotlight.focus).toHaveBeenLastCalledWith(screen.getByText('10 - Romanian 0'));
+		});
+
+		it('leaves Left and Right to the rows', () => {
+			draw(longList);
+			const stop = fireEvent.keyDown(trackRow(2), {keyCode: 39});
+			expect(stop).toBe(true);
+			expect(Spotlight.focus).not.toHaveBeenCalled();
+		});
 	});
 
 	it('leaves the channel keys alone in a short list', () => {

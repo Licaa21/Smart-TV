@@ -114,6 +114,14 @@ describe('the subtitle palette', () => {
 	});
 });
 
+describe('getSubtitleTextStyle ligatures', () => {
+	it('turns them off, so the i after an f keeps its dot', () => {
+		const style = getSubtitleTextStyle({});
+		expect(style.fontVariantLigatures).toBe('none');
+		expect(style.fontFeatureSettings).toContain('"liga" 0');
+	});
+});
+
 describe('getSubtitleTextStyle colors', () => {
 	it('keeps an opaque color as hex', () => {
 		expect(getSubtitleTextStyle(settings).color).toBe('#ffffff');

@@ -10,8 +10,9 @@ import css from './TrackFilterBar.module.less';
 
 const SpottableButton = Spottable('button');
 
-// Where Channel Up lands from anywhere in a long list, which is how the actions are reached without scrolling to them.
-export const TRACK_FILTER_FOCUS_ID = 'track-filter-all';
+// Where Channel Up lands from anywhere in a long list, and Up from its first track, which is how the actions are reached
+// without scrolling to them. The strip hands the remote to the chip, field or button it had last.
+export const TRACK_FILTER_FOCUS_ID = 'track-filter-bar';
 
 // The strip over a long track list: the languages in it as chips, a search field, and the actions that used to sit at the
 // bottom of the list (offset, appearance, download, cancel), so none of them is a scroll away.
@@ -21,11 +22,10 @@ const TrackFilterBar = ({languages, language, query, onLanguage, onQuery, action
 	const handleSearch = useCallback((e) => onQuery(e.target.value), [onQuery]);
 
 	return (
-		<ChipRowContainer className={css.bar}>
+		<ChipRowContainer className={css.bar} spotlightId={TRACK_FILTER_FOCUS_ID}>
 			<div className={css.chips}>
 				<SpottableButton
 					className={[css.chip, !language && css.chipOn].filter(Boolean).join(' ')}
-					spotlightId={TRACK_FILTER_FOCUS_ID}
 					data-language=""
 					onClick={handleChip}
 				>

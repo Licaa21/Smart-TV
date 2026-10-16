@@ -179,6 +179,9 @@ export const getSubtitleTextStyle = (settings) => {
 		fontSize: `${SIZE_MAP[settings.subtitleSize] || 44}px`,
 		backgroundColor: toCssColor(settings.subtitleBackgroundColor || '#000000', settings.subtitleBackground !== undefined ? settings.subtitleBackground : 0),
 		color: toCssColor(settings.subtitleColor || '#ffffff', 100),
+		// The font joins f and i into one glyph that takes the dot of the i, so the i of "fii" read as a dotless one
+		fontVariantLigatures: 'none',
+		fontFeatureSettings: '"liga" 0, "clig" 0',
 		textShadow: `-2px -2px ${blur} ${shadowColor}, 2px -2px ${blur} ${shadowColor}, -2px 2px ${blur} ${shadowColor}, 2px 2px ${blur} ${shadowColor}, 0 0 ${blur} ${shadowColor}`
 	};
 };
