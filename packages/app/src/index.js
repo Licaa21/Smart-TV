@@ -107,8 +107,10 @@ if (isTizen()) {
 const appElement = (<App />);
 
 if (typeof window !== 'undefined') {
-	dropStaleArrowRepeats(window, (lost) => serverLogger.info('Navigation', 'Held arrow repeats dropped', lost));
+	// The watcher goes first: what the other one drops never reaches a listener added after it, and the report is meant to
+	// say what the set sent
 	watchArrowHolds(window, (hold) => serverLogger.info('Navigation', 'Arrow held', hold));
+	dropStaleArrowRepeats(window, (lost) => serverLogger.info('Navigation', 'Held arrow repeats dropped', lost));
 	// The locale strings arrive in their own chunk, so hold the first render until
 	// they land. Otherwise the app paints English and swaps a frame later.
 	localeStringsReady.then(() => {
