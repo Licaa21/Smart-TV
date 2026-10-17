@@ -148,6 +148,48 @@ export const dropStaleArrowRepeats = (target = window, report) => {
 	}, true);
 };
 
+// Says what a held arrow looked like to the page: how many key downs the set sent while it was held, how many of them
+// were flagged as repeats, and how far apart they came. A held key that moves nothing is told apart by this from one the
+// app threw away, since the set may not repeat the key at all. One line per hold of over 600 ms, for the diagnostic report.
+const HOLD_REPORT_MS = 600;
+// A key down this long after the last one is the start of a new hold, whatever came of the one before
+const HOLD_GAP_MS = 1500;
+export const watchArrowHolds = (target = window, report) => {
+	let hold = null;
+	const isArrow = (e) => (e.keyCode >= KEYS.LEFT && e.keyCode <= KEYS.DOWN) || /^Arrow/.test(e.key || '');
+	const finish = (endedBy) => {
+		if (hold && report && hold.last - hold.start >= HOLD_REPORT_MS) {
+			const gaps = [...hold.gaps].sort((a, b) => a - b);
+			report({
+				key: hold.key,
+				keyCode: hold.keyCode,
+				downs: hold.downs,
+				flaggedRepeats: hold.flagged,
+				heldMs: Math.round(hold.last - hold.start),
+				gapMs: gaps.length ? [gaps[0], gaps[Math.floor(gaps.length / 2)], gaps[gaps.length - 1]] : [],
+				endedBy
+			});
+		}
+		hold = null;
+	};
+	target.addEventListener('keydown', (e) => {
+		if (!isArrow(e)) return;
+		const at = performance.now();
+		if (hold && (hold.keyCode !== e.keyCode || at - hold.last > HOLD_GAP_MS)) finish('no key up');
+		if (!hold) hold = {key: e.key, keyCode: e.keyCode, start: at, last: at, downs: 0, flagged: 0, gaps: []};
+		else hold.gaps.push(Math.round(at - hold.last));
+		hold.downs += 1;
+		if (e.repeat) hold.flagged += 1;
+		hold.last = at;
+	}, true);
+	target.addEventListener('keyup', (e) => {
+		if (!hold || e.keyCode !== hold.keyCode) return;
+		// The time of the key up is what a hold is measured to
+		hold.last = performance.now();
+		finish('key up');
+	}, true);
+};
+
 export const ESSENTIAL_KEY_NAMES = [
 	'MediaPlay',
 	'MediaPause',
