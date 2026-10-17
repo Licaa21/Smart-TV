@@ -30,7 +30,9 @@ namespace Moonfin.Xbox
     //   DISPLAY_GET_MODES    (answered with the display as in the boot data)
     //   DISPLAY_SET_FOR_MEDIA {hdr: "hdr10"} (answered with {ok, mode, reason})
     //   DISPLAY_RESTORE      (answered with {ok})
-    //   PLAYER_OPEN          {session, url, hls, startSeconds, autoplay, volume, muted, subtitle} (answered with {ok})
+    //   PLAYER_OPEN          {session, url, hls, reader, fallback, hdr10, startSeconds, autoplay, volume, muted, subtitle} (answered with {ok}),
+    //                        reader "system" to open a file without FFmpeg, fallback to try FFmpeg when that
+    //                        fails, and hdr10 for a file that reader cant say is HDR10
     //   PLAYER_CLOSE         {session} (answered with {ok})
     //   PLAYER_PLAY, PLAYER_PAUSE {session}
     //   PLAYER_SEEK          {session, seconds}

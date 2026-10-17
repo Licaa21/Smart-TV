@@ -51,6 +51,7 @@ const VIDEO = {
 const AUDIO = {
 	aac: ['-c:a', 'aac', '-ac', '2', '-b:a', '128k'],
 	aac51: ['-c:a', 'aac', '-ac', '6', '-b:a', '384k'],
+	aac71: ['-c:a', 'aac', '-ac', '8', '-b:a', '512k'],
 	mp3: ['-c:a', 'libmp3lame', '-ac', '2', '-b:a', '160k'],
 	ac3: ['-c:a', 'ac3', '-ac', '6', '-b:a', '384k'],
 	eac3: ['-c:a', 'eac3', '-ac', '6', '-b:a', '384k'],
@@ -71,12 +72,15 @@ const AUDIO = {
 // reference, and shown without regard for the curve they look washed out.
 const sdrTo = (transfer) => `zscale=min=709:tin=709:pin=709:rin=tv:m=gbr:t=linear:p=2020:r=pc,format=gbrpf32le,zscale=min=gbr:tin=linear:pin=2020:rin=pc:m=2020_ncl:t=${transfer}:p=2020:r=tv:npl=203,format=yuv420p10le`;
 
-// The speaker test gives each of the six channels a tone of its own for two seconds,
-// one after the other in this order, and a low one for the subwoofer, which an
-// encoder filters anything higher out of. probe.js names the speakers in step.
+// The speaker test gives each channel a tone of its own for two seconds, one after the
+// other in the order ffmpeg lays the channels out, and a low one for the subwoofer,
+// which an encoder filters anything higher out of. probe.js names the speakers in step.
 const CHANNEL_SECONDS = 2;
-const CHANNEL_TONES = [440, 554, 659, 50, 784, 988];
-const channelWalk = CHANNEL_TONES
+const CHANNEL_TONES = {
+	'5.1': [440, 554, 659, 50, 784, 988],
+	'7.1': [440, 554, 659, 50, 784, 988, 1175, 1319]
+};
+const channelWalk = (tones) => tones
 	.map((tone, index) => `0.4*sin(2*PI*${tone}*t)*(1-abs(sgn(floor(t/${CHANNEL_SECONDS})-${index})))`)
 	.join('|');
 
@@ -138,10 +142,19 @@ const CLIPS = [
 	{name: 't-sdr-reference.mp4', codec: 'h264', size: '1080p', fps: 30, audio: 'aac', container: 'mp4', seconds: 8},
 	{name: 't-hdr10.mp4', codec: 'hevc10hdr10', size: '1080p', fps: 30, audio: 'aac', container: 'mp4', seconds: 8, filter: sdrTo('smpte2084')},
 	{name: 't-hlg.mp4', codec: 'hevc10hlg', size: '1080p', fps: 30, audio: 'aac', container: 'mp4', seconds: 8, filter: sdrTo('arib-std-b67')},
-	{name: 't-channels-aac51.mp4', codec: 'h264', size: '720p', fps: 30, audio: 'aac51', container: 'mp4', channels: true},
-	{name: 't-channels-ac3.mp4', codec: 'h264', size: '720p', fps: 30, audio: 'ac3', container: 'mp4', channels: true},
-	{name: 't-channels-eac3.mp4', codec: 'h264', size: '720p', fps: 30, audio: 'eac3', container: 'mp4', channels: true}
+	{name: 't-channels-aac51.mp4', codec: 'h264', size: '720p', fps: 30, audio: 'aac51', container: 'mp4', channels: '5.1'},
+	{name: 't-channels-ac3.mp4', codec: 'h264', size: '720p', fps: 30, audio: 'ac3', container: 'mp4', channels: '5.1'},
+	{name: 't-channels-eac3.mp4', codec: 'h264', size: '720p', fps: 30, audio: 'eac3', container: 'mp4', channels: '5.1'},
+
+	// A server's transcode in the shape it sends one, HLS with H.264 and the sound in
+	// MPEG-TS segments. MPEG-TS cant carry 7.1 AAC, so that one comes in fMP4 segments.
+	{name: 't-hls-aac51', codec: 'h264', size: '720p', fps: 30, audio: 'aac51', container: 'hls', channels: '5.1'},
+	{name: 't-hls-ac3', codec: 'h264', size: '720p', fps: 30, audio: 'ac3', container: 'hls', channels: '5.1'},
+	{name: 't-hls-aac71', codec: 'h264', size: '720p', fps: 30, audio: 'aac71', container: 'hls', segments: 'fmp4', channels: '7.1'}
 ];
+
+// A stream is a folder of its playlist and segments
+const outputOf = (clip) => (clip.container === 'hls' ? path.join(MEDIA_DIR, clip.name, 'index.m3u8') : path.join(MEDIA_DIR, clip.name));
 
 const ffmpegArgs = (clip, out) => {
 	const input = ['-hide_banner', '-loglevel', 'error', '-y'];
@@ -149,8 +162,9 @@ const ffmpegArgs = (clip, out) => {
 		const [width, height] = SIZES[clip.size];
 		input.push('-f', 'lavfi', '-i', `testsrc2=size=${width}x${height}:rate=${clip.fps}`);
 	}
-	const sound = clip.channels ? `aevalsrc=exprs='${channelWalk}':channel_layout=5.1:sample_rate=48000` : 'sine=frequency=440:sample_rate=48000';
-	const seconds = clip.channels ? CHANNEL_SECONDS * CHANNEL_TONES.length : clip.seconds || SECONDS;
+	const tones = CHANNEL_TONES[clip.channels];
+	const sound = tones ? `aevalsrc=exprs='${channelWalk(tones)}':channel_layout=${clip.channels}:sample_rate=48000` : 'sine=frequency=440:sample_rate=48000';
+	const seconds = tones ? CHANNEL_SECONDS * tones.length : clip.seconds || SECONDS;
 	input.push('-f', 'lavfi', '-i', sound, '-t', String(seconds));
 
 	const encode = [];
@@ -164,6 +178,10 @@ const ffmpegArgs = (clip, out) => {
 	encode.push(...AUDIO[clip.audio]);
 	if (clip.container === 'mp4' || clip.container === 'm4a' || clip.container === 'mov') encode.push('-movflags', '+faststart');
 	if (clip.container === 'mp4' && (clip.audio === 'opus' || clip.audio === 'flac')) encode.push('-strict', '-2');
+	if (clip.container === 'hls') {
+		const fmp4 = clip.segments === 'fmp4';
+		encode.push('-f', 'hls', '-hls_time', '2', '-hls_playlist_type', 'vod', ...(fmp4 ? ['-hls_segment_type', 'fmp4'] : []), '-hls_segment_filename', path.join(path.dirname(out), fmp4 ? 'seg%d.m4s' : 'seg%d.ts'));
+	}
 	return [...input, ...encode, out];
 };
 
@@ -172,29 +190,37 @@ const wanted = CLIPS.filter((clip) => !only || clip.name.includes(only));
 let made = 0;
 let kept = 0;
 const failed = [];
+const sizeOf = (target) => (fs.statSync(target).isDirectory() ? fs.readdirSync(target).reduce((sum, name) => sum + sizeOf(path.join(target, name)), 0) : fs.statSync(target).size);
+
 for (const clip of wanted) {
-	const out = path.join(MEDIA_DIR, clip.name);
+	const out = outputOf(clip);
 	if (!force && fs.existsSync(out) && fs.statSync(out).size > 0) {
 		kept += 1;
 		continue;
 	}
 	process.stdout.write(`  ${clip.name} ... `);
-	const result = spawnSync(FFMPEG, ffmpegArgs(clip, out), {encoding: 'utf8'});
+	const target = path.join(MEDIA_DIR, clip.name);
+	if (clip.container === 'hls') {
+		fs.rmSync(target, {recursive: true, force: true});
+		fs.mkdirSync(target);
+	}
+	// ffmpeg writes an fMP4 stream's init.mp4 where it runs, so it runs beside the playlist
+	const result = spawnSync(FFMPEG, ffmpegArgs(clip, out), {encoding: 'utf8', cwd: path.dirname(out)});
 	if (result.error) {
 		console.log(`could not run ffmpeg: ${result.error.message}`);
 		process.exit(1);
 	}
 	if (result.status !== 0 || !fs.existsSync(out) || fs.statSync(out).size === 0) {
-		fs.rmSync(out, {force: true});
+		fs.rmSync(target, {recursive: true, force: true});
 		failed.push(clip.name);
 		console.log(`FAILED\n${(result.stderr || '').trim().split('\n').slice(-3).join('\n')}`);
 		continue;
 	}
 	made += 1;
-	console.log(`${Math.round(fs.statSync(out).size / 1024)} KB`);
+	console.log(`${Math.round(sizeOf(target) / 1024)} KB`);
 }
 
-const total = fs.readdirSync(MEDIA_DIR).reduce((sum, name) => sum + fs.statSync(path.join(MEDIA_DIR, name)).size, 0);
+const total = fs.readdirSync(MEDIA_DIR).reduce((sum, name) => sum + sizeOf(path.join(MEDIA_DIR, name)), 0);
 console.log(`\n ${made} made, ${kept} already there, ${failed.length} failed. ${fs.readdirSync(MEDIA_DIR).length} clips, ${(total / 1048576).toFixed(1)} MB in ${MEDIA_DIR}`);
 if (failed.length) {
 	console.log(` Failed: ${failed.join(', ')}`);

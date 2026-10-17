@@ -1,6 +1,6 @@
 // The pieces the favorites, genres and library grids all share: the alphabet strip, the
 // arrow keys that carry focus in and out of the grid, and the settings each grid cycles
-// through. The two key handlers are built once per view rather than per render, since the
+// through. The key handlers are built once per view rather than per render, since the
 // only thing they close over is the id they were given.
 
 import Spotlight from '@enact/spotlight';
@@ -82,8 +82,16 @@ export const createToolbarKeyDown = (gridSpotlightId, aboveSpotlightId) => (e) =
 };
 
 // Up out of the grid goes back to the toolbar, but only from the top of the list. Further
-// down it's left alone so the same key keeps scrolling.
-export const createGridKeyDown = (gridClassName, aboveSpotlightId) => (e) => {
+// down it's left alone so the same key keeps scrolling. A grid with a panel beside it sends
+// Left there too. Both grids only pass on a Left they have no column for, so any Left that
+// gets here comes from the first column.
+export const createGridKeyDown = (gridClassName, aboveSpotlightId, leftSpotlightId) => (e) => {
+	if (e.keyCode === KEYS.LEFT && leftSpotlightId) {
+		e.preventDefault();
+		e.stopPropagation();
+		Spotlight.focus(leftSpotlightId);
+		return;
+	}
 	if (e.keyCode !== KEYS.UP) return;
 
 	const grid = document.querySelector(`.${gridClassName}`);
@@ -92,4 +100,28 @@ export const createGridKeyDown = (gridClassName, aboveSpotlightId) => (e) => {
 	e.preventDefault();
 	e.stopPropagation();
 	Spotlight.focus(aboveSpotlightId);
+};
+
+// Right out of a panel beside the grid goes back to the grid. The letters keep the five-way,
+// since Right steps along their rows and only leaves from the end of one, and so does a
+// search being typed into.
+export const createPanelKeyDown = (gridSpotlightId) => (e) => {
+	if (e.keyCode !== KEYS.RIGHT || e.target.hasAttribute('data-letter') || e.target.tagName === 'INPUT') return;
+
+	e.preventDefault();
+	e.stopPropagation();
+	Spotlight.focus(gridSpotlightId);
+};
+
+// The same Left for a stack of rows, from the first card of any of them. A row wraps Left
+// round to its last card, so this listens in the capture phase to hear the press first.
+export const createRowsLeftKeyDown = (leftSpotlightId) => (e) => {
+	if (e.keyCode !== KEYS.LEFT) return;
+
+	const row = e.target.closest('[data-row-index]');
+	if (!row || row.querySelector('[data-media-card]') !== e.target) return;
+
+	e.preventDefault();
+	e.stopPropagation();
+	Spotlight.focus(leftSpotlightId);
 };

@@ -213,6 +213,8 @@ const ModernMediaRow = ({
 
 	if (!items || items.length === 0) return null;
 
+	const focusedIndex = focusedItemId ? items.findIndex((item) => item.Id === focusedItemId) : -1;
+
 	return (
 		<RowContainer
 			ref={rowElementRef}
@@ -229,6 +231,7 @@ const ModernMediaRow = ({
 				<div className={css.items}>
 					{items.map((item, index) => {
 						const spotlightId = `media-${keyPrefix}-${item.Id}`;
+						const besideFocus = focusedIndex >= 0 && Math.abs(index - focusedIndex) === 1;
 						const isFirst = index === 0;
 						const isLast = index === items.length - 1;
 						return (
@@ -247,6 +250,7 @@ const ModernMediaRow = ({
 								isFocused={focusedItemId === item.Id}
 								detailsWidth={details?.spotlightId === spotlightId ? details.width : undefined}
 								isLibraryRow={rowId === 'library-tiles'}
+								warmFocusArt={besideFocus}
 							/>
 						);
 					})}

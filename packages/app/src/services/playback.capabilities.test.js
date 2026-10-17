@@ -1,6 +1,6 @@
 import * as playback from './playback';
 import * as jellyfinApi from './jellyfinApi';
-import {getDeviceCapabilities} from './deviceProfile';
+import {getDeviceCapabilities, getDeviceProfile} from './deviceProfile';
 import {linkBitrate} from './linkBitrate';
 
 jest.mock('./jellyfinApi', () => {
@@ -18,7 +18,7 @@ jest.mock('./jellyfinApi', () => {
 	};
 });
 jest.mock('./deviceProfile', () => ({
-	getDeviceProfile: async () => ({}),
+	getDeviceProfile: jest.fn(),
 	getDeviceCapabilities: jest.fn()
 }));
 jest.mock('./linkBitrate', () => ({linkBitrate: jest.fn()}));
@@ -41,6 +41,7 @@ beforeEach(async () => {
 	jest.clearAllMocks();
 	jest.spyOn(console, 'log').mockImplementation(() => {});
 	api.reportPlaybackStopped.mockResolvedValue(null);
+	getDeviceProfile.mockResolvedValue({});
 	api.getPlaybackInfo.mockResolvedValue({
 		PlaySessionId: 'session',
 		MediaSources: [{Id: 'source', SupportsDirectPlay: true, Container: 'mkv', MediaStreams: []}]
@@ -159,5 +160,32 @@ describe('frames that never reach the screen', () => {
 		for (let i = 0; i < 30; i++) second(video, 12);
 
 		expect(monitor.checkHealth()).toBe(true);
+	});
+});
+
+describe('the transcoding profile that only offers AV1', () => {
+	const profile = {TranscodingProfiles: [
+		{Container: 'ts', Type: 'Video', VideoCodec: 'hevc,h264'},
+		{Container: 'mp4', Type: 'Video', VideoCodec: 'av1'}
+	]};
+	const episode = {Id: 'episode-1', Type: 'Episode', MediaStreams: [
+		{Type: 'Subtitle', Index: 2, Codec: 'dvdsub'},
+		{Type: 'Subtitle', Index: 3, Codec: 'subrip'}
+	]};
+	const sentCodecs = () => api.getPlaybackInfo.mock.calls[0][1].DeviceProfile.TranscodingProfiles.map((p) => p.VideoCodec);
+
+	beforeEach(() => {
+		getDeviceCapabilities.mockResolvedValue({});
+		getDeviceProfile.mockResolvedValue(profile);
+	});
+
+	test('is left out when a subtitle gets burned in, since the video has to be encoded', async () => {
+		await playback.getPlaybackInfo(episode.Id, {item: episode, subtitleStreamIndex: 2});
+		expect(sentCodecs()).toEqual(['hevc,h264']);
+	});
+
+	test('stays for a subtitle the TV draws itself', async () => {
+		await playback.getPlaybackInfo(episode.Id, {item: episode, subtitleStreamIndex: 3});
+		expect(sentCodecs()).toEqual(['hevc,h264', 'av1']);
 	});
 });

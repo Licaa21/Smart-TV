@@ -466,7 +466,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	const api = options.item ? getApiForItem(options.item) : jellyfinApi.api;
 	const creds = options.item ? getServerCredentials(options.item) : null;
 
-	const deviceProfile = applyProfileTuning(
+	let deviceProfile = applyProfileTuning(
 		options.deviceProfile || await getDeviceProfile(serverType, profileOptions, api),
 		storedSettings,
 		capabilities
@@ -509,6 +509,12 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	// When the user hasn't explicitly picked a subtitle, omit the index entirely so
 	// the server applies their preferred-subtitle-language / SubtitleMode default.
 	const sentSubtitleStreamIndex = hasExplicitSubtitle ? subtitleStreamIndex : undefined;
+	// Burning a subtitle in means encoding the video, and a transcoding profile that only offers
+	// AV1 would ask for an AV1 encode most servers cant do, so it sits those requests out.
+	if (requestedSubStream && subtitleStreamIndex >= 0 &&
+			(isBurnInSubtitleCodec(requestedSubStream.Codec) || isPgsSubtitleCodec(requestedSubStream.Codec))) {
+		deviceProfile = {...deviceProfile, TranscodingProfiles: deviceProfile.TranscodingProfiles?.filter((p) => p.VideoCodec !== 'av1')};
+	}
 	if (subtitleIsPgs) {
 		console.log('[playback] PGS subtitle selected, negotiating without it to avoid server burn-in');
 	}

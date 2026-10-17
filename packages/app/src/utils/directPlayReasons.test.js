@@ -128,6 +128,15 @@ describe('formatDirectPlayReason', () => {
 		expect(formatDirectPlayReason(reason, {audioPassthroughMode: 'manual'}).hint).toBeNull();
 	});
 
+	test('points at no passthrough setting on Xbox', () => {
+		window.__MOONFIN_XBOX__ = {v: 1};
+		try {
+			expect(formatDirectPlayReason({reason: 'AudioCodecNotSupported', codec: 'truehd'}, {audioPassthroughMode: 'auto'}).hint).toBeNull();
+		} finally {
+			delete window.__MOONFIN_XBOX__;
+		}
+	});
+
 	test('says what the channel count is', () => {
 		expect(formatDirectPlayReason({reason: 'AudioChannelsNotSupported', audioChannels: 8}).description)
 			.toBe('Audio channel count (8ch) exceeds the player limit.');

@@ -5,6 +5,7 @@ using Windows.Data.Json;
 using Windows.Foundation.Collections;
 using Windows.Media;
 using Windows.Media.Core;
+using Windows.Media.MediaProperties;
 using Windows.Media.Playback;
 using Windows.Media.Streaming.Adaptive;
 using Windows.Security.Cryptography.Certificates;
@@ -31,7 +32,10 @@ namespace Moonfin.Xbox
     // Files are opened through FFmpeg, which reads them in one pass and hands the
     // picture to the console's decoders, since the system's own reader crawls on a slow
     // link and wont take HEVC out of a Matroska file. The server's HLS transcodes go
-    // through the system's adaptive source.
+    // through the system's adaptive source. With passthrough on, the page sends a film
+    // whose sound a receiver decodes to the system's reader after all, since FFmpeg
+    // decodes that sound to PCM and the reader hands it to the console as it is. FFmpeg
+    // takes the file when that reader cant play it.
     internal sealed class NativePlayer
     {
         private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(250);
@@ -57,6 +61,9 @@ namespace Moonfin.Xbox
         private int wantsSubtitle = -1;
         private bool wantsPlay;
         private bool opened;
+        private Uri openedUri;
+        private bool fallsBack;
+        private bool wantsHdr10;
 
         public NativePlayer(MediaPlayerElement element, UIElement backdrop, CoreDispatcher dispatcher, Action<string, IJsonValue> send, Func<string, bool> acceptsUntrusted)
         {
@@ -146,43 +153,20 @@ namespace Moonfin.Xbox
             wantsSubtitle = (int)payload.GetNamedNumber("subtitle", -1);
             player.Volume = payload.GetNamedNumber("volume", 1);
             player.IsMuted = payload.GetNamedBoolean("muted", false);
+            bool systemReader = Bridge.NamedString(payload, "reader") == "system";
+            // A film the page sent to the system's reader goes to FFmpeg if that reader cant
+            // play it, and the probe, which asks for no fallback, hears that it failed.
+            fallsBack = systemReader && payload.GetNamedBoolean("fallback", false);
+            wantsHdr10 = systemReader && payload.GetNamedBoolean("hdr10", false);
+            openedUri = uri;
 
             try
             {
-                bool untrusted = acceptsUntrusted(uri.Authority);
-                if (payload.GetNamedBoolean("hls", false))
+                if (await LoadAsync(uri, payload.GetNamedBoolean("hls", false), systemReader))
                 {
-                    if (untrusted) client = UntrustingClient();
-                    AdaptiveMediaSourceCreationResult created = untrusted
-                        ? await AdaptiveMediaSource.CreateFromUriAsync(uri, client)
-                        : await AdaptiveMediaSource.CreateFromUriAsync(uri);
-                    if (created.Status != AdaptiveMediaSourceCreationStatus.Success)
-                    {
-                        Fail(created.Status == AdaptiveMediaSourceCreationStatus.UnsupportedManifestContentType ? 4 : 2, "Playlist " + created.Status);
-                        MainPage.Current?.Reply(message, Ok(), null);
-                        return;
-                    }
-                    adaptive = created.MediaSource;
-                    source = MediaSource.CreateFromAdaptiveMediaSource(adaptive);
-                    item = new MediaPlaybackItem(source);
+                    Show();
+                    player.Source = item;
                 }
-                else if (string.Equals(uri.Host, MainPage.AppHost, StringComparison.OrdinalIgnoreCase))
-                {
-                    // A file of the package, which the probe plays. FFmpeg cant see the
-                    // WebView's name for it, so it is opened from the package itself.
-                    StorageFile packaged = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///www" + uri.AbsolutePath));
-                    packagedStream = await packaged.OpenReadAsync();
-                    file = await FFmpegMediaSource.CreateFromStreamAsync(packagedStream, FileConfig(false));
-                    item = file.CreateMediaPlaybackItem();
-                }
-                else
-                {
-                    file = await FFmpegMediaSource.CreateFromUriAsync(url, FileConfig(untrusted));
-                    item = file.CreateMediaPlaybackItem();
-                }
-
-                Show();
-                player.Source = item;
                 MainPage.Current?.Reply(message, Ok(), null);
             }
             catch (Exception ex)
@@ -191,6 +175,114 @@ namespace Moonfin.Xbox
                 Fail(2, ex.Message);
                 MainPage.Current?.Reply(message, Ok(), null);
             }
+        }
+
+        // Makes the item for a stream, false when its playlist was turned away.
+        private async Task<bool> LoadAsync(Uri uri, bool hls, bool systemReader)
+        {
+            bool untrusted = acceptsUntrusted(uri.Authority);
+            bool packaged = string.Equals(uri.Host, MainPage.AppHost, StringComparison.OrdinalIgnoreCase);
+            if (hls)
+            {
+                AdaptiveMediaSourceCreationResult created;
+                if (packaged)
+                {
+                    // A stream of the package, which the probe plays as a server transcode.
+                    // The system's source cant see the WebView's name for it either, so the
+                    // playlist and its segments are read from the package itself.
+                    packagedStream = await (await PackagedFile(uri)).OpenReadAsync();
+                    created = await AdaptiveMediaSource.CreateFromStreamAsync(packagedStream, uri, "application/vnd.apple.mpegurl");
+                }
+                else
+                {
+                    if (untrusted) client = UntrustingClient();
+                    created = untrusted
+                        ? await AdaptiveMediaSource.CreateFromUriAsync(uri, client)
+                        : await AdaptiveMediaSource.CreateFromUriAsync(uri);
+                }
+                if (created.Status != AdaptiveMediaSourceCreationStatus.Success)
+                {
+                    Fail(created.Status == AdaptiveMediaSourceCreationStatus.UnsupportedManifestContentType ? 4 : 2, "Playlist " + created.Status);
+                    return false;
+                }
+                adaptive = created.MediaSource;
+                if (packaged) adaptive.DownloadRequested += ServeFromPackage;
+                source = MediaSource.CreateFromAdaptiveMediaSource(adaptive);
+                item = new MediaPlaybackItem(source);
+            }
+            else if (systemReader && !untrusted)
+            {
+                // The system's own reader, which hands the console the sound as it is in the
+                // file, so a receiver can decode it. It takes no certificate the console
+                // refuses, so such a server's files stay with FFmpeg.
+                source = packaged ? MediaSource.CreateFromStorageFile(await PackagedFile(uri)) : MediaSource.CreateFromUri(uri);
+                item = new MediaPlaybackItem(source);
+            }
+            else if (packaged)
+            {
+                // A file of the package, which the probe plays. FFmpeg cant see the
+                // WebView's name for it, so it is opened from the package itself.
+                packagedStream = await (await PackagedFile(uri)).OpenReadAsync();
+                file = await FFmpegMediaSource.CreateFromStreamAsync(packagedStream, FileConfig(false));
+                item = file.CreateMediaPlaybackItem();
+            }
+            else
+            {
+                file = await FFmpegMediaSource.CreateFromUriAsync(uri.OriginalString, FileConfig(untrusted));
+                item = file.CreateMediaPlaybackItem();
+            }
+            return true;
+        }
+
+        // The system's reader turned the file away or found no picture in it, so FFmpeg
+        // opens it after all, and decodes the sound as it does for any other file.
+        private async void FallBackToFFmpeg(string why)
+        {
+            HostLog.Write("player", "The system reader could not play " + openedUri.Host + " (" + why + "), so FFmpeg opens it");
+            double forSession = session;
+            fallsBack = false;
+            wantsHdr10 = false;
+            ReleaseSource();
+            try
+            {
+                await LoadAsync(openedUri, false, false);
+                if (session == forSession) player.Source = item;
+            }
+            catch (Exception ex)
+            {
+                if (session == forSession) Fail(2, ex.Message);
+            }
+        }
+
+        private static async Task<StorageFile> PackagedFile(Uri uri)
+        {
+            return await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///www" + uri.AbsolutePath));
+        }
+
+        // The segments of a stream of the package, read from it as the source asks for them.
+        private static async void ServeFromPackage(AdaptiveMediaSource sender, AdaptiveMediaSourceDownloadRequestedEventArgs args)
+        {
+            AdaptiveMediaSourceDownloadRequestedDeferral deferral = args.GetDeferral();
+            try
+            {
+                args.Result.Buffer = await FileIO.ReadBufferAsync(await PackagedFile(args.ResourceUri));
+                args.Result.ContentType = SegmentType(args.ResourceUri.AbsolutePath);
+            }
+            catch (Exception ex)
+            {
+                HostLog.Write("player", "Could not read " + args.ResourceUri.AbsolutePath + " from the package: " + ex.Message);
+            }
+            finally
+            {
+                deferral.Complete();
+            }
+        }
+
+        private static string SegmentType(string path)
+        {
+            if (path.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase)) return "application/vnd.apple.mpegurl";
+            if (path.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".m4s", StringComparison.OrdinalIgnoreCase)) return "video/mp4";
+            return "video/mp2t";
         }
 
         private static MediaSourceConfig FileConfig(bool untrusted)
@@ -240,6 +332,8 @@ namespace Moonfin.Xbox
             opened = false;
             wantsPlay = false;
             wantsSubtitle = -1;
+            fallsBack = false;
+            wantsHdr10 = false;
             session = -1;
             try
             {
@@ -249,10 +343,14 @@ namespace Moonfin.Xbox
             {
                 // nothing was playing
             }
-            player.Source = null;
             element.Visibility = Visibility.Collapsed;
             backdrop.Visibility = Visibility.Collapsed;
+            ReleaseSource();
+        }
 
+        private void ReleaseSource()
+        {
+            player.Source = null;
             item = null;
             file?.Dispose();
             file = null;
@@ -347,10 +445,16 @@ namespace Moonfin.Xbox
         private async void OnOpened()
         {
             if (item == null || player.Source != item) return;
+            // A Matroska file whose picture the system's reader cant take out opens as sound alone
+            if (fallsBack && item.VideoTracks.Count == 0)
+            {
+                FallBackToFFmpeg("no picture");
+                return;
+            }
             opened = true;
             item.AudioTracksChanged += (sender, args) => OnUi(() => Push("audioTracks", Tracks()));
 
-            if (file?.CurrentVideoStream?.HasHdrMetadata == true && DisplayModes.DisplayHasHdr10())
+            if ((file?.CurrentVideoStream?.HasHdrMetadata == true || wantsHdr10) && DisplayModes.DisplayHasHdr10())
             {
                 JsonObject answer = await DisplayModes.SetForHdr10Async();
                 answer.SetNamedValue("hdr", JsonValue.CreateStringValue("hdr10"));
@@ -374,6 +478,11 @@ namespace Moonfin.Xbox
 
         private void OnFailed(MediaPlayerFailedEventArgs args)
         {
+            if (fallsBack && !opened)
+            {
+                FallBackToFFmpeg(args.Error + ": " + args.ErrorMessage);
+                return;
+            }
             int code;
             switch (args.Error)
             {
@@ -493,7 +602,30 @@ namespace Moonfin.Xbox
                 if (video != null) payload.SetNamedValue("videoDecoder", JsonValue.CreateStringValue(video.CodecName + " " + video.DecoderEngine));
                 if (audio != null) payload.SetNamedValue("audioDecoder", JsonValue.CreateStringValue(audio.CodecName + " " + audio.DecoderEngine));
             }
+            string format = AudioFormat();
+            if (format != null) payload.SetNamedValue("audioFormat", JsonValue.CreateStringValue(format));
             return payload;
+        }
+
+        // The format the console gets for the playing track. A compressed one such as EAC3,
+        // or a GUID for TrueHD and DTS, can go on to a receiver, and PCM or Float means
+        // FFmpeg decoded it.
+        private string AudioFormat()
+        {
+            if (item == null || item.AudioTracks.Count == 0) return null;
+            int index = Math.Max(0, item.AudioTracks.SelectedIndex);
+            try
+            {
+                AudioEncodingProperties format = item.AudioTracks[index].GetEncodingProperties();
+                // An fMP4 stream's AAC has no channel count until it is decoded
+                string channels = format.ChannelCount > 0 ? " " + format.ChannelCount + " ch" : "";
+                return format.Subtype + channels + " " + format.SampleRate + " Hz";
+            }
+            catch (Exception)
+            {
+                // not every source says
+                return null;
+            }
         }
 
         private static JsonObject Ok()

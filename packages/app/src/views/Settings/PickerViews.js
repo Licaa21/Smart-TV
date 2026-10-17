@@ -1,4 +1,5 @@
 /* eslint-disable react/jsx-no-bind */
+import {useState} from 'react';
 import $L from '@enact/i18n/$L';
 
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -101,6 +102,41 @@ export const BlockedRatingsView = ({ratings, blocked, loading, loadFailed, onTog
 			{!loading && unranked.map((rating) => (
 				<BlockedRatingRow key={rating} rating={rating} isBlocked={blocked.includes(rating)} onToggleRating={onToggleRating} />
 			))}
+		</SettingsView>
+	);
+};
+
+// The languages a subtitle download searches, with the ticked ones listed
+// first. Once the cap is reached the unticked rows dim.
+export const SubtitleDownloadLanguagesView = ({options, picked, max, onToggleLanguage}) => {
+	// Ordered once on open, so a press never moves the row under focus
+	const [ordered] = useState(() => [
+		...options.filter(({value}) => picked.includes(value)),
+		...options.filter(({value}) => !picked.includes(value))
+	]);
+	return (
+		<SettingsView spotlightId='subtitle-download-languages-view' title={$L('Subtitle Download Languages')} clean>
+			<div className={css.editorLead}>
+				{$L('Languages to search when downloading subtitles, up to {max}. With none ticked, one language is picked from the video.').replace('{max}', max)}
+			</div>
+			{ordered.map(({value, label}) => {
+				const ticked = picked.includes(value);
+				const locked = !ticked && picked.length >= max;
+				return (
+					<SpottableDiv
+						key={value}
+						className={css.listItem}
+						style={locked ? {opacity: 0.4} : undefined}
+						onClick={() => onToggleLanguage(value)}
+						spotlightId={`subtitle-download-language-${value}`}
+					>
+						{renderSettingsIcon(ticked ? 'check_box' : 'check_box_outline_blank', false, true)}
+						<div className={css.listItemBody}>
+							<div className={css.listItemHeading}>{label}</div>
+						</div>
+					</SpottableDiv>
+				);
+			})}
 		</SettingsView>
 	);
 };

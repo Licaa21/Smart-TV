@@ -227,6 +227,12 @@ export const getHomeRowsStyleOptions = () => [
 	{ value: 'v1', label: $L('Classic') }
 ];
 
+export const getLibraryStyleOptions = () => [
+	{ value: 'classic', label: $L('Classic') },
+	{ value: 'modern', label: $L('Modern') },
+	{ value: 'docked', label: $L('Docked') }
+];
+
 export const getModernCardTransitionSpeedOptions = () => [
 	{ value: 'extraSlow', label: $L('Extra Slow') },
 	{ value: 'slow', label: $L('Slow') },

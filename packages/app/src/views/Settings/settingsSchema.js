@@ -19,6 +19,7 @@ import {
 	getGenresRowItemFilterOptions,
 	getHomeRowSortOptions, getPlaylistCollectionSortOptions,
 	getHomeRowsStyleOptions,
+	getLibraryStyleOptions,
 	getModernCardTransitionSpeedOptions,
 	getImageTypeOptions,
 	getLoadingAnimationImageOptions,
@@ -136,9 +137,13 @@ const whenScreensaverComponent = (ctx) => ctx.settings.screensaverEnabled && ctx
 const whenScreensaverStatic = (ctx) => whenScreensaverComponent(ctx) && ctx.settings.screensaverMovement === 'staticCorner';
 const whenLoadingAnimation = (ctx) => ctx.settings.loadingAnimationImage !== 'none';
 const whenTrickplay = (ctx) => isTrickplayOn(ctx.settings);
-// A Fire TV and an Xbox play through a browser video element with no passthrough of its own
+// A Fire TV plays through a browser video element and an Xbox has a passthrough switch
+// of its own, so neither uses these rows
 const inBrowserElement = (ctx) => ctx.isVega || ctx.isXbox;
 const whenPassthrough = (ctx) => ctx.settings.audioPassthroughMode === 'manual' && !inBrowserElement(ctx);
+// Only the Xbox console player can hand the console a file's sound as it is
+const whenXboxPassthrough = (ctx) => ctx.isXbox && ctx.settings.xboxNativePlayer !== false;
+const xboxPassesThrough = (ctx) => whenXboxPassthrough(ctx) && !!ctx.settings.xboxPassthrough;
 // The platforms where the app can be told to accept a certificate the device refuses
 const whenCertificateChoice = (ctx) => ctx.isWebOS || ctx.isVega || ctx.isXbox;
 // Samsung sets decode AC3 and E-AC3 themselves, so these two toggles only do anything on webOS
@@ -531,6 +536,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.NAV, id: 'libraryOrder', label: () => $L('Library Order'), desc: () => $L('Choose the order of your libraries'), icon: 'swap_vert', keywords: () => ['reorder libraries', 'sort libraries', 'my media', 'navbar'], action: (ctx) => ctx.actions.openLibraryOrder()},
 					{kind: KIND.TOGGLE, key: 'unifiedLibraryMode', label: () => $L('Multi-Server Libraries'), desc: () => $L('Show libraries from all connected servers'), icon: 'dns'},
 					{kind: KIND.SECTION, id: 'libraryView', label: () => $L('Library View')},
+					{kind: KIND.OPTION, key: 'libraryStyle', label: () => $L('Library Style'), desc: () => $L('Classic is the original header with a row of icons. Modern puts search, sort, group and filters in one labeled bar. Docked moves them into a panel down the left side.'), options: getLibraryStyleOptions, fallback: () => $L('Classic'), icon: 'view_sidebar'},
 					{kind: KIND.TOGGLE, key: 'groupItemsIntoCollections', label: () => $L('Group Items into Collections'), desc: () => $L('Hide Collection associated library items when browsing libraries'), icon: 'collections_bookmark'},
 					{kind: KIND.TOGGLE, key: 'showMediaDetailsOnLibraryPage', label: () => $L('Show Media Details'), desc: () => $L('Show details of the selected item at the top of Library pages.'), icon: 'info_outline'},
 					{kind: KIND.TOGGLE, key: 'useDetailedSubHeadings', label: () => $L('Use Detailed Sub-Headings'), desc: () => $L('Show detailed or minimal subrow on Library pages.'), icon: 'subtitles'},
@@ -786,6 +792,8 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.TOGGLE, key: 'preferDefaultAudioTrack', label: () => $L('Prefer Default Audio Track'), desc: () => $L('Prefer original audio track over localized dub.'), icon: 'audiotrack'},
 					{kind: KIND.TOGGLE, key: 'preferAudioDescription', label: () => $L('Prefer Audio Description Tracks'), desc: () => $L('Prefer audio description tracks over normal tracks.'), icon: 'hearing'},
 					{kind: KIND.SECTION, id: 'audioOutput', label: () => $L('Audio Output')},
+					{kind: KIND.TEXT, id: 'xboxAudioOutput', text: () => $L("Unless Passthrough is on, Moonfin decodes all sound on the console and sends it on as PCM, so TrueHD, DTS-HD and Atmos do not reach a receiver as they are. What the receiver shows follows the console's own audio settings."), when: (ctx) => ctx.isXbox && !xboxPassesThrough(ctx)},
+					{kind: KIND.TOGGLE, key: 'xboxPassthrough', label: () => $L('Passthrough (Experimental)'), desc: () => $L("Send TrueHD, DTS and Dolby Digital tracks to your receiver as they are. Needs Allow passthrough on in the console's audio settings. Takes effect on the next playback"), icon: 'surround_sound', when: whenXboxPassthrough},
 					{kind: KIND.OPTION, key: 'audioPassthroughMode', label: () => $L('Passthrough'), desc: () => $L('How compressed surround sound reaches your TV or receiver.'), options: getPassthroughModeOptions, fallback: () => $L('Auto'), icon: 'surround_sound', when: (ctx) => !inBrowserElement(ctx)},
 					{kind: KIND.TOGGLE, key: 'downmixToStereo', label: () => $L('Downmix to Stereo'), desc: () => $L('Mix all decoded audio down to two channels.'), icon: 'speaker'},
 					{kind: KIND.TOGGLE, key: 'stereoUpmixEnabled', label: () => $L('Stereo to Surround Upmix'), desc: () => $L('Upmix stereo audio to 5.1 surround via server transcoding'), icon: 'equalizer', when: (ctx) => !ctx.settings.downmixToStereo},
@@ -811,6 +819,19 @@ export const SETTINGS_SCHEMA = [
 				rows: [
 					{kind: KIND.SECTION, id: 'subtitlesGeneral', label: () => $L('General')},
 					{kind: KIND.OPTION, key: 'subtitleMode', label: () => $L('Subtitle Mode'), options: getSubtitleModeOptions, fallback: () => $L('Flagged'), icon: 'subtitles'},
+					{
+						kind: KIND.NAV,
+						id: 'subtitleDownloadLanguages',
+						label: () => $L('Subtitle Download Languages'),
+						desc: (ctx) => {
+							const picked = ctx.settings.subtitleDownloadLanguages || [];
+							if (picked.length === 0) return $L('Auto');
+							const options = getSubtitleLanguageOptions();
+							return picked.map((code) => options.find((option) => option.value === code)?.label || code).join(', ');
+						},
+						icon: 'download',
+						action: (ctx) => ctx.actions.openSubtitleDownloadLanguages()
+					},
 					{kind: KIND.SECTION, id: 'subtitleStream', label: () => $L('Subtitle Stream'), when: whenSubtitlesOn},
 					{kind: KIND.OPTION, key: 'subtitleLanguage', label: () => $L('Default Subtitle Language'), options: getSubtitleLanguageOptions, fallback: () => $L('None'), icon: 'language', when: whenSubtitlesOn, padded: true},
 					{kind: KIND.OPTION, key: 'fallbackSubtitleLanguage', label: () => $L('Fallback Subtitle Language'), options: getSubtitleLanguageOptions, fallback: () => $L('None'), icon: 'language', when: whenSubtitlesOn, padded: true},

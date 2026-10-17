@@ -1,6 +1,6 @@
 import Spotlight from '@enact/spotlight';
 
-import {capitalize, createGridKeyDown, createToolbarKeyDown, cycleValue, filterByStartLetter, stopPropagation} from './gridChrome';
+import {capitalize, createGridKeyDown, createPanelKeyDown, createRowsLeftKeyDown, createToolbarKeyDown, cycleValue, filterByStartLetter, stopPropagation} from './gridChrome';
 import {KEYS} from './keys';
 
 jest.mock('@enact/spotlight', () => ({__esModule: true, default: {focus: jest.fn()}}));
@@ -142,6 +142,116 @@ describe('createGridKeyDown', () => {
 
 			expect(Spotlight.focus).not.toHaveBeenCalled();
 			expect(e.preventDefault).not.toHaveBeenCalled();
+		});
+	});
+
+	// The grids only pass Left on from their first column, so the handler can send it
+	// straight to the panel beside them wherever the grid has scrolled to.
+	test('left goes to the panel beside the grid when there is one', () => {
+		withGrid(200);
+		const e = keyEvent(KEYS.LEFT);
+
+		createGridKeyDown('grid-class', 'above', 'panel')(e);
+
+		expect(Spotlight.focus).toHaveBeenCalledWith('panel');
+		expect(e.preventDefault).toHaveBeenCalled();
+		expect(e.stopPropagation).toHaveBeenCalled();
+	});
+
+	test('up still goes above with a panel beside the grid', () => {
+		withGrid(0);
+
+		createGridKeyDown('grid-class', 'above', 'panel')(keyEvent(KEYS.UP));
+
+		expect(Spotlight.focus).toHaveBeenCalledWith('above');
+	});
+});
+
+describe('createRowsLeftKeyDown', () => {
+	// Two rows of two cards, the way the grouped library lays them out.
+	const rows = () => {
+		const root = document.createElement('div');
+		root.innerHTML = [0, 1].map((row) => (
+			`<div data-row-index="${row}"><h2>Row</h2><div><div data-media-card></div><div data-media-card></div></div></div>`
+		)).join('');
+		return root.querySelectorAll('[data-media-card]');
+	};
+	const leftFrom = (target) => ({...keyEvent(KEYS.LEFT), target});
+
+	test('left from the first card of any row goes to the panel', () => {
+		const cards = rows();
+		[cards[0], cards[2]].forEach((card) => {
+			jest.clearAllMocks();
+			const e = leftFrom(card);
+
+			createRowsLeftKeyDown('panel')(e);
+
+			expect(Spotlight.focus).toHaveBeenCalledWith('panel');
+			expect(e.preventDefault).toHaveBeenCalled();
+			expect(e.stopPropagation).toHaveBeenCalled();
+		});
+	});
+
+	test('left further along a row is left for the row to move', () => {
+		const e = leftFrom(rows()[1]);
+
+		createRowsLeftKeyDown('panel')(e);
+
+		expect(Spotlight.focus).not.toHaveBeenCalled();
+		expect(e.preventDefault).not.toHaveBeenCalled();
+	});
+
+	test('other keys and presses outside a row are left alone', () => {
+		const first = rows()[0];
+		const outside = document.createElement('div');
+
+		createRowsLeftKeyDown('panel')({...keyEvent(KEYS.RIGHT), target: first});
+		createRowsLeftKeyDown('panel')(leftFrom(outside));
+
+		expect(Spotlight.focus).not.toHaveBeenCalled();
+	});
+});
+
+describe('createPanelKeyDown', () => {
+	const rightFrom = (target) => ({...keyEvent(KEYS.RIGHT), target});
+
+	test('right from a panel control goes to the grid', () => {
+		const e = rightFrom(document.createElement('button'));
+
+		createPanelKeyDown('grid-area')(e);
+
+		expect(Spotlight.focus).toHaveBeenCalledWith('grid-area');
+		expect(e.preventDefault).toHaveBeenCalled();
+		expect(e.stopPropagation).toHaveBeenCalled();
+	});
+
+	// The letters sit seven to a row, so Right has to keep stepping along them.
+	test('right from a letter is left to the five-way', () => {
+		const letter = document.createElement('button');
+		letter.setAttribute('data-letter', 'B');
+		const e = rightFrom(letter);
+
+		createPanelKeyDown('grid-area')(e);
+
+		expect(Spotlight.focus).not.toHaveBeenCalled();
+		expect(e.preventDefault).not.toHaveBeenCalled();
+	});
+
+	test('right in a search being typed into moves the caret instead', () => {
+		const e = rightFrom(document.createElement('input'));
+
+		createPanelKeyDown('grid-area')(e);
+
+		expect(Spotlight.focus).not.toHaveBeenCalled();
+	});
+
+	test('every other key is left to bubble', () => {
+		[KEYS.LEFT, KEYS.UP, KEYS.DOWN].forEach((keyCode) => {
+			const e = {...keyEvent(keyCode), target: document.createElement('button')};
+
+			createPanelKeyDown('grid-area')(e);
+
+			expect(Spotlight.focus).not.toHaveBeenCalled();
 		});
 	});
 });

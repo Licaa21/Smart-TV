@@ -27,7 +27,9 @@ import {
 	leavesPlayerInBackground,
 	resumesAfterFirstFrame,
 	showHostSubtitle,
-	notePlaybackError
+	notePlaybackError,
+	getHostAudioOutput,
+	chooseHostReader
 } from '../../services/video';
 import {KEYS, isBackKey} from '../../utils/keys';
 import {useSettings} from '../../context/SettingsContext';
@@ -72,6 +74,8 @@ import {
 } from './PlayerConstants';
 import {
 	toSubtitleLanguage,
+	subtitleDownloadLanguages,
+	searchRemoteSubtitlesIn,
 	mapSubtitleStreamsFromMediaSource,
 	mapRemoteSubtitleOptions,
 	pollForSubtitleAppearance,
@@ -1037,8 +1041,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					};
 				} else if (autoAudio) {
 					setSelectedAudioIndex(autoAudio.index);
-					// Only switch via the audioTracks API when it isn't the file's native default
-					pendingAudioRef.current = !audioNegotiated && autoAudio.index !== defaultAudio?.index
+					// Direct play always sets the chosen track, since the TV can start on another one
+					// whatever the file flags as default.
+					pendingAudioRef.current = !audioNegotiated
+						&& (result.playMethod === playback.PlayMethod.DirectPlay || autoAudio.index !== defaultAudio?.index)
 						? {streamIndex: autoAudio.index, audioStreams: result.audioStreams || []}
 						: null;
 				}
@@ -1608,6 +1614,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				hls.loadSource(srcUrl);
 			} else {
 				destroyHlsPlayer();
+				chooseHostReader(video, playback.getCurrentSession());
 				video.src = srcUrl;
 				// Pass DV / codec hints so Starfish can activate the right decoder
 				if (mimeType) video.type = mimeType;
@@ -1645,14 +1652,23 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					if (video.audioTracks?.length > 1) {
 						const matchIndex = matchAudioTrack(video.audioTracks, pending.audioStreams, pending.streamIndex);
 						if (matchIndex >= 0) {
-							for (let i = 0; i < video.audioTracks.length; i++) {
-								video.audioTracks[i].enabled = (i === matchIndex);
+							const playingIndex = Array.prototype.findIndex.call(video.audioTracks, (track) => track.enabled);
+							const switched = playingIndex !== matchIndex;
+							if (switched) {
+								for (let i = 0; i < video.audioTracks.length; i++) {
+									video.audioTracks[i].enabled = (i === matchIndex);
+								}
 							}
-							console.log('[Player] Applied initial audio track via audioTracks API, index:', pending.streamIndex, 'matchIndex:', matchIndex);
+							serverLogger.playback('Audio: initial track set', {
+								jellyfinIndex: pending.streamIndex,
+								matchIndex,
+								playingIndex,
+								switched
+							});
 						}
 						pendingAudioRef.current = null;
-					} else if (video.audioTracks?.length > 0) {
-						// Single audio track, nothing to switch
+					} else if (!video.audioTracks || video.audioTracks.length > 0) {
+						// No track list or a single track, nothing to switch
 						pendingAudioRef.current = null;
 					}
 				}
@@ -1816,6 +1832,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			}
 
 			setDuration(videoRef.current.duration);
+
+			// Whether the sound was decoded or passed on explains what the receiver shows
+			getHostAudioOutput().then((output) => {
+				if (output) serverLogger.playback('Playback: audio output', output);
+			});
 
 			const p = videoRef.current.play();
 			if (p && typeof p.catch === 'function') {
@@ -2506,15 +2527,18 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 		const selectedSubtitle = subtitleStreams.find((s) => s.index === selectedSubtitleIndex);
 		const selectedAudio = audioStreams.find((s) => s.index === selectedAudioIndex);
-		const language = toSubtitleLanguage(
-			selectedSubtitle?.language,
-			selectedAudio?.language,
-			subtitleStreams[0]?.language,
-			audioStreams[0]?.language
+		const languages = subtitleDownloadLanguages(
+			settings.subtitleDownloadLanguages,
+			toSubtitleLanguage(
+				selectedSubtitle?.language,
+				selectedAudio?.language,
+				subtitleStreams[0]?.language,
+				audioStreams[0]?.language
+			)
 		);
 
 		try {
-			const results = await jellyfinApi.searchRemoteSubtitles(item.Id, language);
+			const results = await searchRemoteSubtitlesIn(jellyfinApi, item.Id, languages);
 			setRemoteSubtitleResults(mapRemoteSubtitleOptions(results));
 			window.requestAnimationFrame(() => {
 				const firstResult = document.querySelector('[data-modal="subtitleDownload"] button');
@@ -2526,7 +2550,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		} finally {
 			setIsSearchingRemoteSubtitles(false);
 		}
-	}, [item, subtitleStreams, selectedSubtitleIndex, audioStreams, selectedAudioIndex, openModal]);
+	}, [item, subtitleStreams, selectedSubtitleIndex, audioStreams, selectedAudioIndex, openModal, settings.subtitleDownloadLanguages]);
 
 	const handleSelectRemoteSubtitle = useCallback(async (e) => {
 		const index = parseInt(e.currentTarget.dataset.index, 10);

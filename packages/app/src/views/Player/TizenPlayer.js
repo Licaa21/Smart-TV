@@ -56,6 +56,8 @@ import LiveFailedCard from './LiveFailedCard';
 import LoadingAnimationLayer from '../../components/LoadingAnimation';
 import {
 	toSubtitleLanguage,
+	subtitleDownloadLanguages,
+	searchRemoteSubtitlesIn,
 	mapSubtitleStreamsFromMediaSource,
 	mapRemoteSubtitleOptions,
 	pollForSubtitleAppearance,
@@ -2653,15 +2655,18 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 		const selectedSubtitle = subtitleStreams.find((s) => s.index === selectedSubtitleIndex);
 		const selectedAudio = audioStreams.find((s) => s.index === selectedAudioIndex);
-		const language = toSubtitleLanguage(
-			selectedSubtitle?.language,
-			selectedAudio?.language,
-			subtitleStreams[0]?.language,
-			audioStreams[0]?.language
+		const languages = subtitleDownloadLanguages(
+			settings.subtitleDownloadLanguages,
+			toSubtitleLanguage(
+				selectedSubtitle?.language,
+				selectedAudio?.language,
+				subtitleStreams[0]?.language,
+				audioStreams[0]?.language
+			)
 		);
 
 		try {
-			const results = await jellyfinApi.searchRemoteSubtitles(item.Id, language);
+			const results = await searchRemoteSubtitlesIn(jellyfinApi, item.Id, languages);
 			setRemoteSubtitleResults(mapRemoteSubtitleOptions(results));
 			window.requestAnimationFrame(() => {
 				const firstResult = document.querySelector('[data-modal="subtitleDownload"] button');
@@ -2673,7 +2678,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		} finally {
 			setIsSearchingRemoteSubtitles(false);
 		}
-	}, [item, subtitleStreams, selectedSubtitleIndex, audioStreams, selectedAudioIndex, openModal]);
+	}, [item, subtitleStreams, selectedSubtitleIndex, audioStreams, selectedAudioIndex, openModal, settings.subtitleDownloadLanguages]);
 
 	const handleSelectRemoteSubtitle = useCallback(async (e) => {
 		const index = parseInt(e.currentTarget.dataset.index, 10);

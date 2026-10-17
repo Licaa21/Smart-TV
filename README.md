@@ -24,7 +24,7 @@ Moonfin is a Jellyfin and Emby client for Samsung Smart TVs (Tizen), LG Smart TV
 ## Features
 
 - **Hardware-accelerated playback** through Samsung AVPlay, webOS Starfish, the Fire TV WebView and the Xbox console's own player, with direct play first and a transcode fallback only when needed.
-- **Lossless audio passthrough** for DTS, DTS-HD, and Dolby TrueHD to a capable receiver.
+- **Lossless audio passthrough** for DTS, DTS-HD, and Dolby TrueHD to a capable receiver on LG and Samsung TVs. On Xbox, an experimental Passthrough setting does the same for TrueHD, DTS and Dolby Digital. Without it, the console decodes the sound and sends it to the receiver as PCM.
 - **Multi-server and Emby support**, including Emby Connect, Quick Connect, and a unified library view across all your Jellyfin servers.
 - **A setup wizard on first run** that walks you through the look of the app with live previews built from your own artwork, including five detail screen styles: Classic, Modern, Spotlight, Nouveau, and Minimalist.
 - **Kids Mode and Blocked Ratings.** Kids Mode strips the app back for a child and locks the way out with a PIN, and blocked ratings apply everywhere, from home rows and search to detail screens and playback.

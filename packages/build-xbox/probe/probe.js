@@ -467,39 +467,52 @@
 	const nativePlayer = boot && boot.nativePlayer ? section('Console player (what the host plays)') : null;
 	let nativeSession = 0;
 
-	const playClipNative = async ({label, url, video: hasVideo}) => {
-		report(nativePlayer, label, 'playing', 'wait');
+	// Plays a clip in the console player for playFor ms, or to its end without it, and
+	// resolves with what it did and the player's state while it played.
+	const playNative = async (clip, {hls = false, reader, playFor, onTime} = {}) => {
 		const session = ++nativeSession;
-		const seen = {playing: false, error: null};
+		const seen = {playing: false, ended: false, error: null};
 		const listener = (e) => {
 			const message = e.detail;
 			if (!message || message.type !== 'PLAYER_EVENT' || !message.payload || message.payload.session !== session) return;
-			if (message.payload.event === 'playing') seen.playing = true;
-			if (message.payload.event === 'error') seen.error = message.payload.message;
+			const {event, position} = message.payload;
+			if (event === 'playing') seen.playing = true;
+			if (event === 'ended') seen.ended = true;
+			if (event === 'error') seen.error = message.payload.message;
+			if (event === 'timeupdate' && onTime) onTime(position);
 		};
 		window.addEventListener(PAGE_EVENT, listener);
-		const problems = [];
 		let state = null;
 		try {
-			await askShell('PLAYER_OPEN', {session, url: new URL(url, location.href).href, hls: false, startSeconds: 0, autoplay: true, volume: 1, muted: false}, CLIP_START_MS);
+			await askShell('PLAYER_OPEN', {session, url: new URL(clip.url, location.href).href, hls, reader, startSeconds: 0, autoplay: true, volume: 1, muted: false}, CLIP_START_MS);
 			const rect = video.getBoundingClientRect();
 			toShell('PLAYER_SET_RECT', {session, x: rect.left, y: rect.top, width: rect.width, height: rect.height});
 			const started = Date.now();
 			while (!seen.playing && !seen.error && Date.now() - started < CLIP_START_MS) await wait(250);
-			if (seen.playing) await wait(CLIP_PLAY_MS);
+			if (seen.playing) await wait(playFor || 1500);
 			state = await askShell('PLAYER_GET_STATE', {session}, 5000);
-			if (seen.error) problems.push(seen.error);
-			else if (!seen.playing) problems.push('never started playing');
-			else {
-				if (state.position < 2) problems.push(`time only reached ${state.position.toFixed(1)} s`);
-				if (hasVideo !== false && !(state.width > 0)) problems.push('no picture decoded');
+			if (seen.playing && !playFor) {
+				while (!seen.ended && !seen.error && Date.now() - started < CLIP_END_MS) await wait(250);
 			}
 		} catch (e) {
-			problems.push(e.message);
+			seen.error = seen.error || e.message;
 		}
 		window.removeEventListener(PAGE_EVENT, listener);
 		await askShell('PLAYER_CLOSE', {session}, 5000).catch(() => {});
-		const decoders = state ? [state.videoDecoder, state.audioDecoder].filter(Boolean).join(', ') : '';
+		return {seen, state};
+	};
+
+	const playClipNative = async ({label, url, video: hasVideo}) => {
+		report(nativePlayer, label, 'playing', 'wait');
+		const {seen, state} = await playNative({url}, {playFor: CLIP_PLAY_MS});
+		const problems = [];
+		if (seen.error) problems.push(seen.error);
+		else if (!seen.playing) problems.push('never started playing');
+		else {
+			if (state.position < 2) problems.push(`time only reached ${state.position.toFixed(1)} s`);
+			if (hasVideo !== false && !(state.width > 0)) problems.push('no picture decoded');
+		}
+		const decoders = state ? [state.videoDecoder, state.audioDecoder, state.audioFormat].filter(Boolean).join(', ') : '';
 		const where = state ? `${state.width}x${state.height} t=${(state.position || 0).toFixed(1)}` : '';
 		report(nativePlayer, label, problems.length ? `FAIL ${problems.join(', ')} (${where})` : `plays ${where} ${decoders}`, problems.length ? 'fail' : 'ok');
 		return !problems.length;
@@ -736,7 +749,13 @@
 	// The order and length of the tones are those of probe/make-clips.js.
 	const SPEAKERS = ['Front left', 'Front right', 'Centre', 'Subwoofer (a low hum)', 'Surround left', 'Surround right'];
 	const SPEAKER_SECONDS = 2;
+	// 7.1 puts the back pair before the sides
+	const SPEAKERS_71 = [...SPEAKERS.slice(0, 4), 'Surround back left', 'Surround back right', 'Surround left', 'Surround right'];
 	const WHERE_FROM = ['Each speaker in turn', 'All from the front or the TV', 'Some were missing', 'No sound at all'];
+	const showSpeaker = (label, speakers = SPEAKERS) => (time) => {
+		const speaker = speakers[Math.min(speakers.length - 1, Math.floor(time / SPEAKER_SECONDS))];
+		setStatus(`${label}: ${speakers.length} tones, one speaker at a time.\nNow playing: ${speaker}`);
+	};
 
 	const surroundTest = async () => {
 		const surround = section('Surround sound test');
@@ -756,20 +775,55 @@
 				report(surround, label, 'clip not in this build, make it with probe/make-clips.js', 'fail');
 				continue;
 			}
-			const played = await playThrough(clip, (time) => {
-				const speaker = SPEAKERS[Math.min(SPEAKERS.length - 1, Math.floor(time / SPEAKER_SECONDS))];
-				setStatus(`${label}: six tones, one speaker at a time.\nNow playing: ${speaker}`);
-			});
+			const played = await playThrough(clip, showSpeaker(label));
 			report(surround, `${label} clip`, played);
 			report(surround, `${label} heard from`, await ask(`${label}: where did the six tones come from?`, WHERE_FROM));
 		}
 		report(surround, 'receiver or soundbar showed', await ask('What did your receiver or soundbar show while the tones played?', ['Dolby Digital, DTS or Atmos', 'PCM or Multichannel', 'It does not say, or there is none']));
 	};
 
+	// Whether the console passes compressed sound on to a receiver. Each clip opens with
+	// the system's own reader, which hands the console the sound as it is in the file,
+	// where FFmpeg would decode it to PCM. Only the receiver can say whether it went on as
+	// a bitstream, which needs Allow passthrough on. The transcodes have the shape of a
+	// server's transcode and play through the system's HLS source like the app's do. The
+	// 7.1 one comes in fMP4 segments, since MPEG-TS cant carry 7.1 AAC.
+	const PASSTHROUGH_CLIPS = [
+		{label: 'Dolby TrueHD clip', name: 'a-truehd-in-mkv.mkv'},
+		{label: 'DTS clip', name: 'a-dts-in-mkv.mkv'},
+		{label: 'Dolby Digital Plus clip', name: 'a-eac3-in-mkv.mkv'},
+		{label: 'AAC 5.1 transcode', name: 't-hls-aac51', hls: true, speakers: SPEAKERS},
+		{label: 'Dolby Digital 5.1 transcode', name: 't-hls-ac3', hls: true, speakers: SPEAKERS},
+		{label: 'AAC 7.1 transcode in fMP4', name: 't-hls-aac71', hls: true, speakers: SPEAKERS_71}
+	];
+	const RECEIVER_SHOWED = ['Dolby TrueHD or Atmos', 'Dolby Digital or Dolby Digital Plus', 'DTS or DTS-HD', 'PCM, Multi Ch or Dolby Surround', 'No sound', 'It does not say, or there is none'];
+
+	const passthroughTest = async () => {
+		const passthrough = section('Passthrough test (console player)');
+		report(passthrough, 'Allow passthrough', await ask("In the console's Settings, General, Volume & audio output, is Allow passthrough on?", ['Yes', 'No', 'Not there, or not sure']));
+		report(passthrough, 'Audio setup', await ask("Which one is chosen in the console's Settings, General, Audio setup?", ['Stereo uncompressed', '5.1 uncompressed', '7.1 uncompressed', 'Dolby Digital', 'DTS Digital Surround', 'Dolby Atmos for home theater', 'DTS:X for home theater', 'Not sure']));
+
+		for (const {label, name, hls, speakers} of PASSTHROUGH_CLIPS) {
+			const clip = clipNamed(name);
+			if (!clip) {
+				report(passthrough, label, 'not in this build, make it with probe/make-clips.js', 'fail');
+				continue;
+			}
+			if (!hls) setStatus(`${label} through the system's reader.\nWatch what your receiver shows.`);
+			const {seen, state} = await playNative(clip, hls ? {hls, onTime: showSpeaker(label, speakers)} : {reader: 'system'});
+			const said = seen.error ? `FAIL ${seen.error}` : !seen.playing ? 'FAIL never started playing' : seen.ended ? 'played to the end' : 'FAIL did not finish';
+			report(passthrough, label, said, /^FAIL/.test(said) ? 'fail' : 'ok');
+			report(passthrough, `${label} given to the console as`, (state && state.audioFormat) || 'not reported');
+			if (hls) report(passthrough, `${label} heard from`, await ask(`${label}: where did the ${speakers.length} tones come from?`, WHERE_FROM));
+			report(passthrough, `${label} receiver showed`, await ask(`What did your receiver show during the ${label}?`, RECEIVER_SHOWED));
+		}
+	};
+
 	const runAll = run('Run', playAll);
 	button('Run all tests and send the report', runAll);
 	button('HDR test', run('HDR test', hdrTest));
 	button('Surround sound test', run('Surround sound test', surroundTest));
+	if (nativePlayer) button('Passthrough test', run('Passthrough test', passthroughTest));
 	button(handoff ? 'Back to Moonfin' : 'Exit', leave);
 
 	// For a debugger or a script to start the run without a controller.

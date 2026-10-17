@@ -14,8 +14,9 @@ import {
 } from '@moonfin/platform-webos/video';
 import {onShellMessage, postToShell} from './bridge';
 import {noteHevcRefusal} from './deviceProfile';
+import {getState} from './hostPlayer';
 import {pressOnFocused, raiseHostBack} from './keys';
-import {closeNativeVideo, getNativeVideoElement, isNativePlayerEnabled, isNativeVideoElement, placeNativeVideo} from './nativeVideo';
+import {closeNativeVideo, getNativeVideoElement, isNativePlayerEnabled, isNativeVideoElement, isPassthroughEnabled, placeNativeVideo} from './nativeVideo';
 
 export {giveControllerToGame} from './keys';
 
@@ -205,3 +206,47 @@ export const setDisplayWindow = async () => isNativePlayerEnabled() && placeNati
 export const keepScreenOn = async (enable) => postToShell('KEEP_DISPLAY_ACTIVE', {active: !!enable});
 
 export const getAudioOutputInfo = async () => null;
+
+// The sound a receiver decodes itself. FFmpeg decodes it to PCM, and the system's reader
+// hands it to the console as it is in the file, which passes it on.
+const BITSTREAM_CODECS = ['truehd', 'dts', 'eac3', 'ac3'];
+// What the console shows as HDR10, Dolby Vision over an HDR10 base included
+const HDR10_RANGE = /^(HDR10|DOVIWith)/i;
+
+const playingAudio = (session) => {
+	const streams = (session?.mediaSource?.MediaStreams || []).filter((stream) => stream.Type === 'Audio');
+	return streams.find((stream) => stream.Index === session.audioStreamIndex) || streams.find((stream) => stream.IsDefault) || streams[0];
+};
+
+// With passthrough on, a film played as it is whose sound a receiver decodes opens with
+// the system's reader, and the host falls back to FFmpeg when that reader cant play it.
+// A track switched to later stays with whichever opened the file.
+export const chooseHostReader = (video, session) => {
+	if (!isNativeVideoElement(video)) return;
+	const picture = (session?.mediaSource?.MediaStreams || []).find((stream) => stream.Type === 'Video');
+	const wanted = isPassthroughEnabled() && session?.playMethod === 'DirectPlay' && !!picture &&
+		BITSTREAM_CODECS.includes((playingAudio(session)?.Codec || '').toLowerCase());
+	video.useSystemReaderNative(wanted, wanted && HDR10_RANGE.test(videoRangeTypeOf(picture)));
+};
+
+// Windows names the formats it has no short name for by a GUID
+const FORMAT_NAMES = {
+	'{EB27CEC4-163E-4CA3-8B74-8E25F91B517E}': 'TrueHD',
+	'{A2E58EB7-0FA9-48BB-A40C-FA0E156D0645}': 'DTS',
+	'{6D703461-767A-494D-B478-F29D25DC9037}': 'AAC'
+};
+const readableFormat = (format) => (format ? format.replace(/^\{[0-9A-F-]+\}/i, (guid) => FORMAT_NAMES[guid.toUpperCase()] || guid) : null);
+
+// The decoder the console player plays the sound with, such as "truehd FFmpegSoftwareDecoder",
+// and the format it gives the console, such as "TrueHD 8 ch 48000 Hz" or "PCM 8 ch 48000 Hz".
+// Only a file FFmpeg opened names a decoder.
+export const getHostAudioOutput = async () => {
+	if (!isNativePlayerEnabled()) return null;
+	try {
+		const state = await getState();
+		if (!state?.audioDecoder && !state?.audioFormat) return null;
+		return {decoder: state.audioDecoder || null, format: readableFormat(state.audioFormat)};
+	} catch (e) {
+		return null;
+	}
+};

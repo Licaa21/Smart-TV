@@ -11,6 +11,7 @@ import SubtitleOffsetOverlay from './SubtitleOffsetOverlay';
 import SubtitleSettingsOverlay from './SubtitleSettingsOverlay';
 import {formatBitrate, getAudioChannels, getAudioCodec, getHdrType, getVideoCodec} from '../../utils/mediaStreamFacts';
 import {getPlatform} from '../../platform';
+import {getHostAudioOutput} from '../../services/video';
 import {ModalContainer} from '../../utils/spotlightContainers';
 import {numberedTrackName, sortSubtitleStreams, subtitleTrackDetail, audioTrackDetail} from '../../utils/trackLabels';
 import TrackOptionRow, {TrackDivider} from '../../components/TrackOptionRow';
@@ -202,6 +203,19 @@ const PlayerControls = ({
 	const [logoLoadFailed, setLogoLoadFailed] = useState(false);
 	const [croppedLogoUrl, setCroppedLogoUrl] = useState(null);
 	const [logoAspectRatio, setLogoAspectRatio] = useState(null);
+	const [audioOutput, setAudioOutput] = useState(null);
+
+	// Read each time the panel opens, since a track change can change it
+	useEffect(() => {
+		if (activeModal !== 'info') return undefined;
+		let current = true;
+		getHostAudioOutput().then((output) => {
+			if (current) setAudioOutput(output);
+		});
+		return () => {
+			current = false;
+		};
+	}, [activeModal]);
 
 	// A tag that resolved but whose image 404s (stale cache, server hiccup) should
 	// still fall back to text instead of leaving a broken image in the corner.
@@ -814,6 +828,18 @@ const PlayerControls = ({
 											<span className={css.infoLabel}>{$L('Channels')}</span>
 											<span className={css.infoValue}>{getAudioChannels(audioStream)}</span>
 										</div>
+										{audioOutput?.decoder && (
+											<div className={css.infoRow}>
+												<span className={css.infoLabel}>{$L('Decoder')}</span>
+												<span className={css.infoValue}>{audioOutput.decoder}</span>
+											</div>
+										)}
+										{audioOutput?.format && (
+											<div className={css.infoRow}>
+												<span className={css.infoLabel}>{$L('Sent to Console')}</span>
+												<span className={css.infoValue}>{audioOutput.format}</span>
+											</div>
+										)}
 										{audioStream.BitRate && (
 											<div className={css.infoRow}>
 												<span className={css.infoLabel}>{$L('Audio Bitrate')}</span>

@@ -17,6 +17,8 @@ import {MATERIAL_ICON_PATHS} from '../Settings/materialIconMap';
 import {fetchPrerolls} from '../../utils/cinemaMode';
 import {
 	toSubtitleLanguage,
+	subtitleDownloadLanguages,
+	searchRemoteSubtitlesIn,
 	mapRemoteSubtitleOptions,
 	pollForSubtitleAppearance,
 	remoteSubtitleSearchError,
@@ -554,20 +556,19 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay, onSelectItem, onSelec
 			const audios = ms?.MediaStreams?.filter(s => s.Type === 'Audio') || [];
 			const currentSub = selectedSubtitleIndex >= 0 ? subs[selectedSubtitleIndex] : null;
 			const currentAudio = audios[selectedAudioIndex];
-			const language = toSubtitleLanguage(
-				currentSub?.Language,
-				currentAudio?.Language,
-				subs[0]?.Language
+			const languages = subtitleDownloadLanguages(
+				settings.subtitleDownloadLanguages,
+				toSubtitleLanguage(currentSub?.Language, currentAudio?.Language, subs[0]?.Language)
 			);
-			const results = await effectiveApi.searchRemoteSubtitles(item.Id, language);
-			setRemoteSubtitleResults(mapRemoteSubtitleOptions(Array.isArray(results) ? results : results?.SearchResults || []));
+			const results = await searchRemoteSubtitlesIn(effectiveApi, item.Id, languages);
+			setRemoteSubtitleResults(mapRemoteSubtitleOptions(results));
 		} catch (err) {
 			setRemoteSubtitleResults([]);
 			setRemoteSubtitleError(remoteSubtitleSearchError(err));
 		} finally {
 			setIsSearchingRemoteSubtitles(false);
 		}
-	}, [item, selectedVersionIndex, selectedSubtitleIndex, selectedAudioIndex, effectiveApi, openModal]);
+	}, [item, selectedVersionIndex, selectedSubtitleIndex, selectedAudioIndex, effectiveApi, openModal, settings.subtitleDownloadLanguages]);
 
 	const handleSelectRemoteSubtitle = useCallback(async (e) => {
 		const index = parseInt(e.currentTarget.dataset.index, 10);

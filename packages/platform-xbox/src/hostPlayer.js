@@ -14,6 +14,8 @@ export const setVolume = (session, volume, muted) => postToShell('PLAYER_SET_VOL
 export const selectAudio = (session, index) => postToShell('PLAYER_SELECT_AUDIO', {session, index});
 export const selectSubtitle = (session, index) => postToShell('PLAYER_SELECT_SUBTITLE', {session, index});
 export const setRect = (session, rect) => postToShell('PLAYER_SET_RECT', {session, ...rect});
+// Where the player is, with the decoders it opened the stream with
+export const getState = () => askShell('PLAYER_GET_STATE');
 
 // Calls back with every event the player pushes, and returns the remover.
 export const onPlayerEvent = (handler) => onShellMessage('PLAYER_EVENT', handler);

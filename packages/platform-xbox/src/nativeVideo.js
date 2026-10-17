@@ -29,16 +29,18 @@ const PLAYS_NATIVELY = /^(application\/(x-mpegurl|vnd\.apple\.mpegurl)|video\/(m
 
 let element = null;
 
-// The console player plays unless the host doesnt have one or the viewer turned it off.
-export const isNativePlayerEnabled = () => {
-	if (!nativePlayerAvailable()) return false;
+const savedSettings = () => {
 	try {
-		const settings = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || '{}');
-		return settings.xboxNativePlayer !== false;
+		return JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || '{}') || {};
 	} catch (e) {
-		return true;
+		return {};
 	}
 };
+
+// The console player plays unless the host doesnt have one or the viewer turned it off.
+export const isNativePlayerEnabled = () => nativePlayerAvailable() && savedSettings().xboxNativePlayer !== false;
+
+export const isPassthroughEnabled = () => isNativePlayerEnabled() && savedSettings().xboxPassthrough === true;
 
 export const isNativeVideoElement = (candidate) => !!candidate && candidate === element;
 
@@ -81,6 +83,7 @@ const createFacade = () => {
 		volume: 1,
 		muted: false,
 		subtitle: -1,
+		systemReader: null,
 		autoplay: false,
 		playing: [],
 		closing: null
@@ -219,7 +222,10 @@ const createFacade = () => {
 		state.tracks = [];
 		state.selectedTrack = -1;
 		const hls = /^application\/(x-mpegurl|vnd\.apple\.mpegurl)$/i.test(video.type || '') || /\.m3u8(\?|$)/i.test(url);
-		hostPlayer.openStream(state.session, {url, hls, startSeconds, autoplay: !state.paused || state.autoplay, volume: state.volume, muted: state.muted, subtitle: state.subtitle}).catch((err) => {
+		// The choice holds for this one open, so a stream nobody chose for leaves it to FFmpeg
+		const reader = state.systemReader ? {reader: 'system', fallback: true, hdr10: state.systemReader.hdr10} : {};
+		state.systemReader = null;
+		hostPlayer.openStream(state.session, {url, hls, ...reader, startSeconds, autoplay: !state.paused || state.autoplay, volume: state.volume, muted: state.muted, subtitle: state.subtitle}).catch((err) => {
 			onEvent({session: state.session, event: 'error', code: 2, message: err.message});
 		});
 	};
@@ -347,6 +353,11 @@ const createFacade = () => {
 		return Promise.race([state.closing, new Promise((resolve) => setTimeout(resolve, CLOSE_WAIT_MS))]);
 	};
 	video.sessionNative = () => state.session;
+	// Whether the next stream opens with the system's reader, and whether it is HDR10,
+	// which only FFmpeg would have read out of the file
+	video.useSystemReaderNative = (on, hdr10) => {
+		state.systemReader = on ? {hdr10: !!hdr10} : null;
+	};
 	// Which of the file's subtitle tracks the host draws, kept across reopens of the stream
 	video.selectSubtitleNative = (index) => {
 		state.subtitle = Number.isInteger(index) ? index : -1;

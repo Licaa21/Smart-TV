@@ -316,6 +316,23 @@ describe('SYNCABLE_KEYS', () => {
 	});
 });
 
+describe('the library style', () => {
+	test('defaults to classic', () => {
+		expect(defaultSettings.libraryStyle).toBe('classic');
+	});
+
+	test('takes and sends each style under its own name', () => {
+		['classic', 'modern', 'docked'].forEach((style) => {
+			expect(profileToLocal({libraryStyle: style})).toEqual({libraryStyle: style});
+			expect(localToProfile({...defaultSettings, libraryStyle: style}, ['libraryStyle'])).toEqual({libraryStyle: style});
+		});
+	});
+
+	test('keeps the style it has when the profile names one this app has no way to draw', () => {
+		expect(profileToLocal({libraryStyle: 'grid'})).toEqual({});
+	});
+});
+
 describe('the media preview switches', () => {
 	test('default to off with sound on', () => {
 		expect(defaultSettings.episodePreviewEnabled).toBe(false);

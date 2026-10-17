@@ -40,6 +40,35 @@ export const toSubtitleLanguage = (...languages) => {
 	return 'eng';
 };
 
+// The most languages one download searches, since each is its own request to
+// the subtitle providers.
+export const MAX_SUBTITLE_DOWNLOAD_LANGUAGES = 5;
+
+// The languages picked in settings, or the single guess when none are.
+export const subtitleDownloadLanguages = (picked, guess) => {
+	const languages = Array.isArray(picked)
+		? [...new Set(picked.filter(Boolean))].slice(0, MAX_SUBTITLE_DOWNLOAD_LANGUAGES)
+		: [];
+	return languages.length > 0 ? languages : [guess];
+};
+
+// Searches every language at once and lists the results language by language,
+// in the order given. A language that fails is left out, and its error only
+// surfaces when no language found anything.
+export const searchRemoteSubtitlesIn = async (api, itemId, languages) => {
+	const settled = await Promise.allSettled(
+		languages.map((language) => api.searchRemoteSubtitles(itemId, language))
+	);
+	const results = settled.flatMap((outcome) => {
+		if (outcome.status !== 'fulfilled') return [];
+		const found = outcome.value;
+		return Array.isArray(found) ? found : found?.SearchResults || [];
+	});
+	const failure = settled.find((outcome) => outcome.status === 'rejected');
+	if (results.length === 0 && failure) throw failure.reason;
+	return results;
+};
+
 export const mapSubtitleStreamsFromMediaSource = (mediaSource, serverUrl, options = {}) => {
 	const {includeEmbeddedNative = false} = options;
 	if (!mediaSource?.MediaStreams) return [];

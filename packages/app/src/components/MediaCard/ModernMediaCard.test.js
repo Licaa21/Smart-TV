@@ -61,14 +61,25 @@ const seerrShow = (overrides = {}) => ({
 	...overrides
 });
 
+// Nothing loads in the test DOM, so a focused card waits out its art before it opens.
+const ART_WAIT_MS = 300;
+const passArtWait = () => act(() => {
+	jest.advanceTimersByTime(ART_WAIT_MS);
+});
+
 const draw = (item, isFocused) => {
 	const {unmount} = render(<ModernMediaCard item={item} serverUrl="http://server" isFocused={isFocused} />);
+	passArtWait();
 	const src = screen.getByRole('img').getAttribute('src');
 	unmount();
 	return src;
 };
 
-beforeEach(() => setTmdbThumbsAvailable(true));
+beforeEach(() => {
+	jest.useFakeTimers();
+	setTmdbThumbsAvailable(true);
+});
+afterEach(() => jest.useRealTimers());
 afterAll(() => setTmdbThumbsAvailable(false));
 
 describe('ModernMediaCard with a Seerr title', () => {
@@ -84,6 +95,7 @@ describe('ModernMediaCard with a Seerr title', () => {
 
 	it('hands over to the backdrop when the thumb fails to load', () => {
 		render(<ModernMediaCard item={seerrShow()} serverUrl="http://server" isFocused />);
+		passArtWait();
 		fireEvent.error(screen.getByRole('img'));
 		expect(screen.getByRole('img').getAttribute('src')).toBe(BACKDROP);
 	});
@@ -100,6 +112,53 @@ describe('ModernMediaCard with a Seerr title', () => {
 	it('grows an owned outside list title into its library thumb', () => {
 		const owned = seerrShow({Id: 'lib1', _external: true, _resolvedFromExternal: true, ImageTags: {Primary: 'p', Thumb: 't'}});
 		expect(draw(owned, true)).toContain('/Items/lib1/Images/Thumb');
+	});
+});
+
+describe('ModernMediaCard growing on focus', () => {
+	// Each test gets its own title, since art that has loaded stays remembered.
+	const thumbed = (id) => ({Id: id, Name: 'Film', Type: 'Movie', ProductionYear: 2020, ImageTags: {Primary: 'p', Thumb: 't'}});
+	const RealImage = window.Image;
+	let loads;
+
+	beforeEach(() => {
+		loads = [];
+		window.Image = function FakeImage () {
+			const art = {};
+			loads.push(art);
+			return art;
+		};
+	});
+	afterEach(() => {
+		window.Image = RealImage;
+	});
+
+	const shown = () => screen.getByRole('img').getAttribute('src');
+
+	it('keeps the poster until the wide art has loaded, then grows into it', () => {
+		render(<ModernMediaCard item={thumbed('loads')} serverUrl="http://server" isFocused />);
+		expect(shown()).toContain('/Images/Primary');
+		expect(loads[0].src).toContain('/Images/Thumb');
+
+		act(() => loads[0].onload());
+		expect(shown()).toContain('/Images/Thumb');
+	});
+
+	it('grows anyway once the art takes too long', () => {
+		render(<ModernMediaCard item={thumbed('slow')} serverUrl="http://server" isFocused />);
+		passArtWait();
+		expect(shown()).toContain('/Images/Thumb');
+	});
+
+	it('fetches the wide art ahead for a card beside the focused one, which then opens at once', () => {
+		const {rerender} = render(<ModernMediaCard item={thumbed('beside')} serverUrl="http://server" warmFocusArt />);
+		expect(shown()).toContain('/Images/Primary');
+		expect(loads.map((art) => art.src)).toEqual([expect.stringContaining('/Images/Thumb')]);
+
+		act(() => loads[0].onload());
+		rerender(<ModernMediaCard item={thumbed('beside')} serverUrl="http://server" isFocused />);
+		expect(shown()).toContain('/Images/Thumb');
+		expect(loads).toHaveLength(1);
 	});
 });
 

@@ -35,6 +35,10 @@ export const getSharedVideoElement = (...args) => impl.getSharedVideoElement(...
 export const leavesPlayerInBackground = () => !!impl.leavesPlayerInBackground;
 export const resumesAfterFirstFrame = (mediaSource) => !!impl.resumesAfterFirstFrame?.(mediaSource);
 export const notePlaybackError = (...args) => impl?.notePlaybackError?.(...args);
+// A platform whose own player can open a file more than one way, told what is about to play,
+// and what that player then does with the sound
+export const chooseHostReader = (...args) => impl?.chooseHostReader?.(...args);
+export const getHostAudioOutput = async () => (impl?.getHostAudioOutput ? impl.getHostAudioOutput() : null);
 // A platform whose own player draws a bitmap subtitle format the page cant, and the call
 // that picks the track by stream index, with -1 for none.
 export const rendersSubtitleInHost = (codec) => !!impl?.rendersSubtitleInHost?.(codec);
