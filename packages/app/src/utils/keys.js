@@ -107,34 +107,26 @@ export const isChannelMenuKey = (e) => {
 	return TIZEN_CHANNEL_MENU_KEYS.includes(e.keyCode || e.which);
 };
 
-// A held arrow repeats at the remote's own rate, which a slow TV can't always keep up with. A repeat that sat
-// waiting behind the last move is dropped, so focus keeps pace with the key and stops when it's let go.
-const STALE_REPEAT_MS = 100;
-// A wait this long is a clock that does not agree with the page's, not a TV that is slow, so the repeat is kept
-const MAX_PLAUSIBLE_WAIT_MS = 2000;
+// A held arrow repeats at the remote's own rate, which a slow TV can't always keep up with. The repeats that pile up
+// behind a slow move reach the page in a burst once it is free, so a repeat that comes right on the heels of the last
+// arrow is dropped, which keeps focus in step with the key and stops it when the key is let go. The event's own stamp is
+// not used: the Q67A stamps every repeat 100 to 400 ms old although they arrive on the remote's beat of about 108 ms, so
+// judging by it dropped every repeat of a hold.
+const BURST_MS = 40;
 export const dropStaleArrowRepeats = (target = window, report) => {
 	let held = null;
-	// Some sets stamp their key events on a clock of their own, so every event reads as old by a fixed amount and every
-	// repeat of a held key would be dropped, which left a held arrow doing nothing. That amount is the least age any arrow
-	// press has been seen with, since a real wait only adds to it, and only the age beyond it counts as waiting.
-	let skew = Infinity;
+	let lastDown = -Infinity;
 	let dropped = 0;
-	let worst = 0;
 	target.addEventListener('keydown', (e) => {
 		const code = e.keyCode;
 		if (code !== KEYS.UP && code !== KEYS.DOWN && code !== KEYS.LEFT && code !== KEYS.RIGHT) return;
 		const repeat = e.repeat || held === code;
 		held = code;
-		// A set that leaves the stamp empty has nothing to measure a wait by
-		if (!e.timeStamp) return;
-		// Older engines stamp events with the wall clock rather than the page's own.
-		const now = e.timeStamp > 1e12 ? Date.now() : performance.now();
-		const age = now - e.timeStamp;
-		if (age < skew) skew = age;
-		const waited = age - skew;
-		if (!repeat || waited <= STALE_REPEAT_MS || waited > MAX_PLAUSIBLE_WAIT_MS) return;
+		const at = performance.now();
+		const burst = at - lastDown < BURST_MS;
+		lastDown = at;
+		if (!repeat || !burst) return;
 		dropped += 1;
-		if (waited > worst) worst = waited;
 		e.preventDefault();
 		e.stopImmediatePropagation();
 	}, true);
@@ -142,9 +134,8 @@ export const dropStaleArrowRepeats = (target = window, report) => {
 		if (e.keyCode !== held) return;
 		held = null;
 		// What a held key lost is told once it is let go, for the diagnostic report
-		if (dropped && report) report({dropped, worstWaitMs: Math.round(worst), skewMs: Math.round(skew)});
+		if (dropped && report) report({dropped});
 		dropped = 0;
-		worst = 0;
 	}, true);
 };
 
