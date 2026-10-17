@@ -307,6 +307,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
 - Shared filter popup: `packages/app/src/components/FilterPopup`.
 - Long audio and subtitle lists (chips, search, pinned actions, the Channel keys): `packages/app/src/components/TrackFilterBar` and `utils/trackFilter.js`, used by `views/Player/PlayerControls.js` and `views/Details/DetailTrackModals.js`.
 - Home: `packages/app/src/views/Browse/Browse.js`. Seerr screen: `packages/app/src/views/SeerrDiscover/`.
+- Screens without a library of their own (a genre or studio opened from Home, the Genres screen with no library chosen, and the Seerr browse screen) are laid out by the movies library, or the shows one for series only: `utils/styleLibrary.js`, `hooks/useStyleLibraries.js`, `useStorage` keys `library_*_<library id>`. The Library screen takes its cards, grid, letters, sort and group from it and writes changes back to it (`followsLibrary` in `views/Library/Library.js`); the Seerr browse screen takes cards and the Library Style header (`LibraryHeaders.js` with the optional controls left out).
 
 ## The user's TV
 

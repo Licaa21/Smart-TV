@@ -22,6 +22,8 @@ import RatingsRow from '../../components/RatingsRow';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
 import FilterPopup, {FilterOption} from '../../components/FilterPopup';
 import {useStorage} from '../../hooks/useStorage';
+import useStyleLibraries from '../../hooks/useStyleLibraries';
+import {onlySeries, pickStyleLibrary} from '../../utils/styleLibrary';
 import {buildFilterParams, facetRows} from '../../utils/libraryFilters';
 import {foldForSearch} from '../../utils/accentFolding';
 import {keepFocusInView} from '../../utils/focusScroll';
@@ -32,7 +34,7 @@ import useStartLetter from '../../hooks/useStartLetter';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import useItemMenuHold, {cardIndexOf} from '../../hooks/useItemMenuHold';
 import {GRID_DIRECTIONS, IMAGE_SIZES, IMAGE_TYPES, capitalize, createGridKeyDown, createRowsLeftKeyDown, createToolbarKeyDown, cycleValue, focusOverhang, horizontalCellPad, stopPropagation} from '../../utils/gridChrome';
-import {HOME_ICON, Letters, LibraryDock, LibraryTitle, ModernBar, ModernLetters, SEARCH_ICON, SETTINGS_ICON, SORT_ICON} from './LibraryHeaders';
+import {DOCK_WIDTH, HOME_ICON, Letters, LibraryDock, LibraryTitle, ModernBar, ModernLetters, SEARCH_ICON, SETTINGS_ICON, SORT_ICON, libraryStyleOf} from './LibraryHeaders';
 import LibrarySkeleton from './LibrarySkeleton';
 
 import css from './Library.module.less';
@@ -82,8 +84,6 @@ const FOLDER_DETAIL_TYPES = ['Series', 'BoxSet', 'Playlist', 'MusicAlbum', 'Musi
 
 // The inset the stylesheet keeps either side of the grid, both sides added up.
 const GRID_INSET = 174;
-// The Docked panel's width, matched in the stylesheet. The grid keeps its own inset beside it.
-const DOCK_WIDTH = 420;
 // The least room a row leaves between two cards.
 const MIN_ROW_GAP = 6;
 
@@ -223,9 +223,6 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 
 	const isMusicLibrary = library?.CollectionType?.toLowerCase() === 'music';
 	const isSeriesLibrary = library?.CollectionType?.toLowerCase() === 'tvshows';
-	const activeSortOptions = isMusicLibrary
-		? MUSIC_SORT_OPTIONS
-		: SORT_OPTIONS.filter(o => !o.seriesOnly || isSeriesLibrary);
 	const isPlaylistLibrary = library?.CollectionType?.toLowerCase() === 'playlists';
 	const isSquareDefault = isMusicLibrary || isPlaylistLibrary;
 
@@ -255,20 +252,39 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const [focusedItem, setFocusedItem] = useState(null);
 	const [musicGridView, setMusicGridView] = useState(null);
 	const libraryId = library?.Id || (genreFilter ? `genre-${genreFilter}` : studioFilter ? `studio-${studioFilter}` : 'default');
-	const [imageSize, setImageSize] = useStorage(`library_imageSize_${libraryId}`, 'medium');
-	const [imageType, setImageType] = useStorage(`library_imageType_${libraryId}`, isSquareDefault ? 'square' : 'poster');
-	const [gridDirection, setGridDirection] = useStorage(`library_gridDirection_${libraryId}`, 'vertical');
-	const [storedGroupBy, setGroupBy] = useStorage(`library_groupBy_${libraryId}`, 'none');
+	// A genre or studio opened with no library of its own is laid out by the library it stands for, the movies one or
+	// the shows one when all it lists is series, so its cards, grid, letters, sort and group are as set there and a
+	// change made here is made there.
+	const followsLibrary = Boolean(genreFilter || studioFilter) && !library?.Id;
+	const styleLibraries = useStyleLibraries(api, followsLibrary);
+	const seriesOnlyRef = useRef({name: null, value: false});
+	const filterName = genreFilter || studioFilter;
+	if (followsLibrary && allItems.length > 0 && seriesOnlyRef.current.name !== filterName) {
+		seriesOnlyRef.current = {name: filterName, value: onlySeries(allItems)};
+	}
+	const styleLibrary = followsLibrary
+		? pickStyleLibrary(styleLibraries, seriesOnlyRef.current.name === filterName && seriesOnlyRef.current.value ? 'tvshows' : 'movies')
+		: null;
+	const layoutId = styleLibrary?.Id || libraryId;
+	const followedSeries = styleLibrary?.CollectionType?.toLowerCase() === 'tvshows';
+	const activeSortOptions = isMusicLibrary
+		? MUSIC_SORT_OPTIONS
+		: SORT_OPTIONS.filter(o => !o.seriesOnly || isSeriesLibrary || followedSeries);
+	const [imageSize, setImageSize, sizeLoaded] = useStorage(`library_imageSize_${layoutId}`, 'medium');
+	const [imageType, setImageType, typeLoaded] = useStorage(`library_imageType_${layoutId}`, isSquareDefault ? 'square' : 'poster');
+	const [gridDirection, setGridDirection, directionLoaded] = useStorage(`library_gridDirection_${layoutId}`, 'vertical');
+	const [storedGroupBy, setGroupBy, groupLoaded] = useStorage(`library_groupBy_${layoutId}`, 'none');
 	const [folderView, setFolderView] = useStorage(`library_folderView_${libraryId}`, 'off');
-	const [sortKey, setSortKey] = useStorage(`library_sortKey_${libraryId}`, 'SortName');
-	const [sortOrder, setSortOrder] = useStorage(`library_sortOrder_${libraryId}`, '');
+	const [sortKey, setSortKey, sortKeyLoaded] = useStorage(`library_sortKey_${layoutId}`, 'SortName');
+	const [sortOrder, setSortOrder, sortOrderLoaded] = useStorage(`library_sortOrder_${layoutId}`, '');
 	const [searchQuery, setSearchQuery] = useState('');
-	const [cardText, setCardText] = useStorage(`library_cardText_${libraryId}`, 'on');
-	const [letterNav, setLetterNav] = useStorage(`library_letterNav_${libraryId}`, 'on');
+	const [cardText, setCardText, cardTextLoaded] = useStorage(`library_cardText_${layoutId}`, 'on');
+	const [letterNav, setLetterNav, letterNavLoaded] = useStorage(`library_letterNav_${layoutId}`, 'on');
+	// The grid waits for the library's settings, so it is not drawn at the defaults and then again.
+	const layoutPending = followsLibrary && (styleLibraries === null || !(sizeLoaded && typeLoaded && directionLoaded && groupLoaded && sortKeyLoaded && sortOrderLoaded && cardTextLoaded && letterNavLoaded));
 	const showCardText = cardText !== 'off';
 	const showLetterNav = letterNav !== 'off';
-	// A style this app doesn't know, say one a newer client synced, reads as Classic.
-	const libraryStyle = settings.libraryStyle === 'modern' || settings.libraryStyle === 'docked' ? settings.libraryStyle : 'classic';
+	const libraryStyle = libraryStyleOf(settings);
 	const isDocked = libraryStyle === 'docked';
 	const detailedSubtitles = settings.useDetailedSubHeadings !== false;
 	const isMixedContentLibrary = library != null && (!library.CollectionType || library.CollectionType.toLowerCase() === 'folders');
@@ -293,7 +309,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const isMusicBrowseHome = isMusicLibrary && !isFilterMode && !isFolderView && !musicGridView;
 
 	const isMovieLibrary = library?.CollectionType?.toLowerCase() === 'movies';
-	const canGroup = (isMovieLibrary || isSeriesLibrary) && !isFolderView;
+	const canGroup = (isMovieLibrary || isSeriesLibrary || Boolean(styleLibrary)) && !isFolderView;
 	// A stored value the options no longer carry falls back to the plain grid
 	const groupBy = LIBRARY_GROUP_OPTIONS.indexOf(storedGroupBy) !== -1 ? storedGroupBy : 'none';
 	const playlistGroupingOn = settings.playlistsGroupByType !== false;
@@ -786,7 +802,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	// past where it was.
 	useEffect(() => {
 		if (showSortPanel || showSettingsPanel || apiFetchIndexRef.current === 0) return undefined;
-		if (items.length === 0 || isLoading || initialFocusDoneRef.current) return undefined;
+		if (items.length === 0 || isLoading || layoutPending || initialFocusDoneRef.current) return undefined;
 		const back = returnTo && returnTo.libraryId === libraryId && !groupedActive ? returnTo : null;
 		const index = back ? items.findIndex((item) => item.Id === back.itemId) : -1;
 		if (back && index < 0 && apiFetchIndexRef.current < totalCount && items.length <= back.index + 150) {
@@ -800,7 +816,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 			initialFocusDoneRef.current = true;
 		}, 100);
 		return () => clearTimeout(id);
-	}, [items, isLoading, groupedActive, showSortPanel, showSettingsPanel, libraryId, totalCount, loadItems, scrollGridTo]);
+	}, [items, isLoading, layoutPending, groupedActive, showSortPanel, showSettingsPanel, libraryId, totalCount, loadItems, scrollGridTo]);
 
 	// Choosing the sort already in use turns it around rather than doing nothing.
 	const handleSortSelect = useCallback((ev) => {
@@ -1478,7 +1494,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 				)}
 
 				<GridContainer className={css.gridContainer} spotlightId="library-grid-area">
-					{isLoading && items.length === 0 ? (
+					{(isLoading && items.length === 0) || layoutPending ? (
 						<div className={css.gridWrapper}>
 							<LibrarySkeleton
 								gridWidth={gridWidth}
