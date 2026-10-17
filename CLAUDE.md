@@ -309,6 +309,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
 - Long audio and subtitle lists (chips, search, pinned actions, the Channel keys): `packages/app/src/components/TrackFilterBar` and `utils/trackFilter.js`, used by `views/Player/PlayerControls.js` and `views/Details/DetailTrackModals.js`.
 - Home: `packages/app/src/views/Browse/Browse.js`. Seerr screen: `packages/app/src/views/SeerrDiscover/`.
 - Screens without a library of their own (a genre or studio opened from Home, the Genres screen with no library chosen, and the Seerr browse screen) are laid out by the movies library, or the shows one for series only: `utils/styleLibrary.js`, `hooks/useStyleLibraries.js`, `useStorage` keys `library_*_<library id>`. The Library screen takes its cards, grid, letters, sort and group from it and writes changes back to it (`followsLibrary` in `views/Library/Library.js`); the Seerr browse screen takes cards and the Library Style header (`LibraryHeaders.js` with the optional controls left out).
+- Filters on those screens are only the ones that fit a list that is not a library: the Library in genre or studio mode offers Sort By, Favorites, Played Status and My Rating (no Features, Quality or Source, and none of the server-wide lists, since `getQueryFilters` cannot be scoped to a genre or studio); the Seerr browse screen has no Movies / TV Shows switch and no genre list on a genre screen; `GenreBrowse` has no Movies / TV Shows filter. The Seerr option lists are read as arrays only.
 
 ## The user's TV
 

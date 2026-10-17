@@ -669,11 +669,12 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	}, [library, sortKey, sortOrder, favoritesOnly, playedFilter, likedFilter, seriesFilter, featureFilters, qualityFilters, videoSourceFilters, genreFilters, ratingFilters, tagFilters, yearFilters, audioLanguageFilters, subtitleLanguageFilters, musicContentType, isFolderView, currentFolderId, genreFilter, studioFilter, isMusicBrowseHome, settings.groupItemsIntoCollections]);
 
 	// The values the library actually holds, read once per library so opening
-	// the filter panel does not wait on the network.
+	// the filter panel does not wait on the network. A genre or studio has none: the server only lists
+	// what a whole library holds, which is not what is on that screen, so it offers no such groups.
 	useEffect(() => {
 		let cancelled = false;
 		setFacetValues(null);
-		if (!effectiveApi?.getQueryFilters || isMusicBrowseHome) return undefined;
+		if (!effectiveApi?.getQueryFilters || isMusicBrowseHome || isFilterMode) return undefined;
 		effectiveApi.getQueryFilters(library?.Id, getItemTypeForLibrary())
 			.then(values => {
 				if (!cancelled) setFacetValues(values);
@@ -682,7 +683,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		return () => {
 			cancelled = true;
 		};
-	}, [effectiveApi, library, isMusicBrowseHome, getItemTypeForLibrary]);
+	}, [effectiveApi, library, isMusicBrowseHome, isFilterMode, getItemTypeForLibrary]);
 
 	// Favorites is the albums grid with the filter on rather than a type of its own.
 	const handleOpenMusicGrid = useCallback((target) => {
@@ -1308,7 +1309,8 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const hasActiveFilters = filterParts.length > 0 ||
 		audioLanguageFilters.length > 0 ||
 		subtitleLanguageFilters.length > 0;
-	const showVideoFilters = !isMusicLibrary && !isPlaylistLibrary;
+	// Features, quality and source are about the files in a library, which a genre or studio screen is not
+	const showVideoFilters = !isMusicLibrary && !isPlaylistLibrary && !isFilterMode;
 	// Emby's items query has no 4K flag and its series status holds only
 	// continuing and ended, so those options stay out of the panel there.
 	const supported = (options) => options.filter(o => !o.jellyfinOnly || serverType !== 'emby');
