@@ -276,6 +276,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
   `Moonfin_Tizen_Regular_v<version>_Lica_Fork.wgt`, for example `Moonfin_Tizen_Regular_v2.10.0_Lica_Fork.wgt`.
 - They are ignored by git and never committed, and no other folder keeps any. One file, rebuilt over the old one. A
   throwaway test build gets a clearly different name and is deleted after.
+- Each build is also put on the fork's "latest" GitHub release (`build-daily-wgt.sh` deletes the release and makes it again with the new file, so the link stays the same and the history does not grow). The package itself still never goes in a branch. If `gh` is missing or signed out the build says so and keeps the file here. Link: https://github.com/Licaa21/Smart-TV/releases/tag/latest
 - The build runs the lint and a CSS check against the old TV browsers (chrome >= 38), so `gap`, `grid-gap` and similar
   fail it. Use flex with margins.
 
