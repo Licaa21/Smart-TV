@@ -59,7 +59,8 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const [items, setItems] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [totalCount, setTotalCount] = useState(0);
-	const [mediaType, setMediaType] = useState(() => {
+	// A genre, studio, network or keyword lists the kind of title it was opened for, so the screen has no switch for it
+	const [mediaType] = useState(() => {
 		if (saved?.mediaType) return saved.mediaType;
 		// Studios are movies only, networks are TV only
 		if (browseType === 'studio') return 'movie';
@@ -236,16 +237,17 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const loadFilterOptions = useCallback(async () => {
 		if (filterOptionsRequestedRef.current) return;
 		filterOptionsRequestedRef.current = true;
+		// A genre screen is already in its genre, so it has no list of genres to pick
 		const [genres, languages] = await Promise.all([
-			(mediaType === 'tv' ? seerrApi.getGenreSliderTv() : seerrApi.getGenreSliderMovies()).catch(() => []),
+			browseType === 'genre' ? [] : (mediaType === 'tv' ? seerrApi.getGenreSliderTv() : seerrApi.getGenreSliderMovies()).catch(() => []),
 			seerrApi.getLanguages().catch(() => [])
 		]);
-		setFilterGenres(genres || []);
-		setFilterLanguages((languages || [])
-			.filter((l) => l.iso_639_1)
+		setFilterGenres(Array.isArray(genres) ? genres.filter((g) => g && g.id !== undefined && g.name) : []);
+		setFilterLanguages((Array.isArray(languages) ? languages : [])
+			.filter((l) => l && l.iso_639_1)
 			.map((l) => ({code: l.iso_639_1, name: l.english_name || l.name || l.iso_639_1}))
 			.sort((a, b) => a.name.localeCompare(b.name)));
-	}, [mediaType]);
+	}, [mediaType, browseType]);
 
 	const handleOpenFilterModal = useCallback(() => {
 		loadFilterOptions();
@@ -265,16 +267,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		return () => { if (backHandlerRef.current === handler) backHandlerRef.current = null; };
 	}, [backHandlerRef, showFilterModal]);
 
-	const handleFilterSelect = useCallback((ev) => {
-		const key = ev.currentTarget?.dataset?.filterKey;
-		if (key) {
-			setMediaType(key);
-			setShowFilterModal(false);
-		}
-	}, []);
-
-	// Genres and statuses belong to one media type, so switching type drops
-	// them and refetches the genre list on the next panel open.
+	// Genres and statuses belong to one media type, so a new one starts them over
 	useEffect(() => {
 		filterOptionsRequestedRef.current = false;
 		setFilterGenres([]);
@@ -368,8 +361,6 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 
 	const currentFilter = getFilterOptions().find(o => o.key === mediaType);
 
-	// Check if we should show the filter (not for studio/network which are media-type specific)
-	const showMediaTypeFilter = browseType === 'genre' || browseType === 'keyword' || browseType === 'all';
 
 	const getBrowseTypeLabel = () => {
 		switch (browseType) {
@@ -457,20 +448,6 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const activeSort = sortOptions.find((option) => sortBy.startsWith(option.key + '.'));
 	const sortDirection = sortBy.endsWith('.asc') ? '↑' : '↓';
 	const filterGroups = [
-		showMediaTypeFilter && {
-			key: 'type',
-			title: $L('Media Type'),
-			summary: optionLabel(getFilterOptions(), mediaType),
-			body: () => getFilterOptions().map((option) => (
-				<FilterOption
-					key={option.key}
-					label={option.label}
-					selected={mediaType === option.key}
-					onClick={handleFilterSelect}
-					data-filter-key={option.key}
-				/>
-			))
-		},
 		{
 			key: 'sort',
 			title: $L('Sort By'),

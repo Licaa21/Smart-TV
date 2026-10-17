@@ -30,12 +30,6 @@ const SORT_OPTIONS = [
 	{key: 'Random,Ascending', label: $L('Random')}
 ];
 
-const FILTER_OPTIONS = [
-	{key: 'all', label: $L('All')},
-	{key: 'Movie', label: $L('Movies')},
-	{key: 'Series', label: $L('TV Shows')}
-];
-
 const LETTERS = ['#', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
 const BACKDROP_DEBOUNCE_MS = 300;
@@ -48,11 +42,9 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 	const [isLoading, setIsLoading] = useState(true);
 	const [serverTotalCount, setServerTotalCount] = useState(0);
 	const [sortBy, setSortBy] = useState('SortName,Ascending');
-	const [filterType, setFilterType] = useState('all');
 	const [startLetter, setStartLetter] = useState(null);
 	const [backdropUrl, setBackdropUrl] = useState('');
 	const [showSortModal, setShowSortModal] = useState(false);
-	const [showFilterModal, setShowFilterModal] = useState(false);
 
 	const backdropTimeoutRef = useRef(null);
 	const backdropSetRef = useRef(false);
@@ -136,13 +128,7 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 				params.ParentId = libraryId;
 			}
 
-			if (filterType !== 'all') {
-				params.IncludeItemTypes = groupCollections && (filterType === 'Movie' || filterType === 'Series')
-					? `${filterType},BoxSet`
-					: filterType;
-			} else {
-				params.IncludeItemTypes = groupCollections ? 'Movie,Series,BoxSet' : 'Movie,Series';
-			}
+			params.IncludeItemTypes = groupCollections ? 'Movie,Series,BoxSet' : 'Movie,Series';
 
 			if (startLetter) {
 				if (startLetter === '#') {
@@ -224,7 +210,7 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 				setIsLoading(false);
 			}
 		}
-	}, [api, genre, libraryId, sortBy, filterType, startLetter, serverUrl, isRangeLoaded, settings.groupItemsIntoCollections, compact, parentalFilter]);
+	}, [api, genre, libraryId, sortBy, startLetter, serverUrl, isRangeLoaded, settings.groupItemsIntoCollections, compact, parentalFilter]);
 
 	useEffect(() => {
 		if (genre) {
@@ -240,7 +226,7 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 			backdropSetRef.current = false;
 			loadItems(0, true);
 		}
-	}, [genre, sortBy, filterType, startLetter, loadItems]);
+	}, [genre, sortBy, startLetter, loadItems]);
 
 	const updateBackdrop = useCallback((ev) => {
 		const itemIndex = ev.currentTarget?.dataset?.index;
@@ -284,28 +270,22 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 		setShowSortModal(true);
 	}, []);
 
-	const handleOpenFilterModal = useCallback(() => {
-		setShowFilterModal(true);
-	}, []);
-
 	const handleCloseModal = useCallback(() => {
 		setShowSortModal(false);
-		setShowFilterModal(false);
 	}, []);
 
 	useEffect(() => {
 		if (!backHandlerRef) return;
 		const handler = () => {
-			if (showSortModal || showFilterModal) {
+			if (showSortModal) {
 				setShowSortModal(false);
-				setShowFilterModal(false);
 				return true;
 			}
 			return false;
 		};
 		backHandlerRef.current = handler;
 		return () => { if (backHandlerRef.current === handler) backHandlerRef.current = null; };
-	}, [backHandlerRef, showSortModal, showFilterModal]);
+	}, [backHandlerRef, showSortModal]);
 
 	useEffect(() => {
 		return () => {
@@ -320,14 +300,6 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 		if (key) {
 			setSortBy(key);
 			setShowSortModal(false);
-		}
-	}, []);
-
-	const handleFilterSelect = useCallback((ev) => {
-		const key = ev.currentTarget?.dataset?.filterKey;
-		if (key) {
-			setFilterType(key);
-			setShowFilterModal(false);
 		}
 	}, []);
 
@@ -411,7 +383,6 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 	}, [serverUrl, handleItemClick, updateBackdrop, loadItems, isRangeLoaded, unloadDistantItems, itemsVersion, compact, serverTotalCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const currentSort = SORT_OPTIONS.find(o => o.key === sortBy);
-	const currentFilter = FILTER_OPTIONS.find(o => o.key === filterType);
 
 	if (!genre) {
 		return (
@@ -445,7 +416,7 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 					<div className={css.titleSection}>
 						<div className={css.title}>{genre.name}</div>
 						<div className={css.subtitle}>
-							{currentSort ? $L(currentSort.label) : ''} • {currentFilter ? $L(currentFilter.label) : ''}
+							{currentSort ? $L(currentSort.label) : ''}
 							{startLetter && ` • ${$L('Starting with "{letter}"').replace('{letter}', startLetter)}`}
 						</div>
 					</div>
@@ -461,16 +432,6 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 							<path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z" />
 						</svg>
 						{currentSort ? $L(currentSort.label) : ''}
-					</SpottableButton>
-
-					<SpottableButton
-						className={css.filterButton}
-						onClick={handleOpenFilterModal}
-					>
-						<svg viewBox="0 0 24 24">
-							<path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
-						</svg>
-						{currentFilter ? $L(currentFilter.label) : ''}
 					</SpottableButton>
 
 					<div className={css.letterNav}>
@@ -523,27 +484,6 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 								selected={sortBy === option.key}
 								onClick={handleSortSelect}
 								data-sort-key={option.key}
-							/>
-						))
-					}]}
-					onClose={handleCloseModal}
-				/>
-			)}
-
-			{showFilterModal && (
-				<FilterPopup
-					title={$L('Filter')}
-					spotlightId="genre-browse-filter-popup"
-					groups={[{
-						key: 'filter',
-						title: $L('Filter'),
-						body: () => FILTER_OPTIONS.map((option) => (
-							<FilterOption
-								key={option.key}
-								label={$L(option.label)}
-								selected={filterType === option.key}
-								onClick={handleFilterSelect}
-								data-filter-key={option.key}
 							/>
 						))
 					}]}
