@@ -60,6 +60,9 @@ export const defaultSettings = {
 	// No audioCodecOrder until one is saved. Tracks then rank as they always did, by language and flags
 	// and channel count, and the codec page lists the codecs in their usual order to start from.
 	fallbackSubtitleLanguage: '',
+	// Languages a subtitle download searches. Empty searches the one the
+	// player guesses. Kept on this device, not synced.
+	subtitleDownloadLanguages: [],
 	preferSdhSubtitles: false,
 	preferTextSubtitles: false,
 	preferExternalSubtitles: false,
@@ -71,6 +74,7 @@ export const defaultSettings = {
 	mediaSegmentAutoHide: 'off',
 	cinemaModeEpisodesEnabled: false,
 	xboxNativePlayer: true,
+	xboxPassthrough: false,
 	trickPlayMode: 'single',
 	trickPlayPreviewScale: 30,
 	trickPlayVerticalPosition: 0,
@@ -245,6 +249,7 @@ export const defaultSettings = {
 	cardFocusZoom: true,
 	useDetailedSubHeadings: true,
 	showMediaDetailsOnLibraryPage: true,
+	libraryStyle: 'classic',
 	hideBackdropsInLibraries: false,
 	useSeriesThumbnails: false,
 	// The server keys, as the other clients store them, so they sync as they are.

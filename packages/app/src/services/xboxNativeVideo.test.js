@@ -1,5 +1,5 @@
 import {getSharedVideoElement as webOSVideoElement} from '../../../platform-webos/src/video';
-import {cleanupVideoElement, getSharedVideoElement, notePlaybackError, rendersSubtitleInHost, resumesAfterFirstFrame, setDisplayWindow, showHostSubtitle, waitForDecoderRelease} from '../../../platform-xbox/src/video';
+import {chooseHostReader, cleanupVideoElement, getHostAudioOutput, getSharedVideoElement, notePlaybackError, rendersSubtitleInHost, resumesAfterFirstFrame, setDisplayWindow, showHostSubtitle, waitForDecoderRelease} from '../../../platform-xbox/src/video';
 import {isNativePlayerEnabled} from '../../../platform-xbox/src/nativeVideo';
 
 const SETTINGS_KEY = 'moonfin_settings';
@@ -72,6 +72,57 @@ describe('the video element backed by the console player', () => {
 		window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({xboxNativePlayer: false}));
 		expect(isNativePlayerEnabled()).toBe(false);
 		expect(getSharedVideoElement()).toBe(webOSVideoElement());
+	});
+
+	test('names the decoder the console player plays the sound with, and the format it gives the console', async () => {
+		const file = getHostAudioOutput();
+		reply(lastOf('PLAYER_GET_STATE').id, {opened: true, audioDecoder: 'truehd FFmpegSoftwareDecoder', audioFormat: 'PCM 8 ch 48000 Hz'});
+		expect(await file).toEqual({decoder: 'truehd FFmpegSoftwareDecoder', format: 'PCM 8 ch 48000 Hz'});
+
+		// The system's reader names no decoder, and Windows names TrueHD by a GUID
+		const passedOn = getHostAudioOutput();
+		reply(lastOf('PLAYER_GET_STATE').id, {opened: true, audioFormat: '{eb27cec4-163e-4ca3-8b74-8e25f91b517e} 8 ch 48000 Hz'});
+		expect(await passedOn).toEqual({decoder: null, format: 'TrueHD 8 ch 48000 Hz'});
+
+		const transcode = getHostAudioOutput();
+		reply(lastOf('PLAYER_GET_STATE').id, {opened: true, audioFormat: '{6D703461-767A-494D-B478-F29D25DC9037} 48000 Hz'});
+		expect(await transcode).toEqual({decoder: null, format: 'AAC 48000 Hz'});
+
+		const nothing = getHostAudioOutput();
+		reply(lastOf('PLAYER_GET_STATE').id, {opened: false});
+		expect(await nothing).toBeNull();
+
+		sent.length = 0;
+		window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({xboxNativePlayer: false}));
+		expect(await getHostAudioOutput()).toBeNull();
+		expect(messages('PLAYER_GET_STATE')).toHaveLength(0);
+	});
+
+	test('with passthrough on, opens a film whose sound a receiver decodes with the system reader, once', () => {
+		const film = (codec, extra = {}) => ({
+			playMethod: 'DirectPlay',
+			audioStreamIndex: 1,
+			mediaSource: {MediaStreams: [{Type: 'Video', Codec: 'hevc', VideoRangeType: 'HDR10'}, {Type: 'Audio', Codec: codec, Index: 1}, {Type: 'Audio', Codec: 'aac', Index: 2}]},
+			...extra
+		});
+		const video = getSharedVideoElement();
+		const openWith = (session) => {
+			chooseHostReader(video, session);
+			return openStream(video).payload;
+		};
+
+		expect(openWith(film('truehd'))).not.toHaveProperty('reader');
+
+		window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({xboxPassthrough: true}));
+		expect(openWith(film('truehd'))).toMatchObject({reader: 'system', fallback: true, hdr10: true});
+		expect(openWith(film('DTS'))).toMatchObject({reader: 'system'});
+		expect(openWith(film('eac3', {audioStreamIndex: 2}))).not.toHaveProperty('reader');
+		expect(openWith(film('ac3', {playMethod: 'Transcode'}))).not.toHaveProperty('reader');
+
+		// The next stream nobody chose for goes back to FFmpeg
+		chooseHostReader(video, film('ac3'));
+		openStream(video);
+		expect(openStream(video).payload).not.toHaveProperty('reader');
 	});
 
 	test('opens the stream through the host with the resume point taken off the address', () => {

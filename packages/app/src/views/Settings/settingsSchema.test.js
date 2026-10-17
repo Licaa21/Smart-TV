@@ -166,6 +166,24 @@ describe('settings schema', () => {
 		});
 	});
 
+	test('only Xbox explains that its sound is decoded on the console, until passthrough is on', () => {
+		const note = allRows().find(({row}) => row.id === 'xboxAudioOutput').row;
+		const xbox = {...ctx, isWebOS: false, isXbox: true};
+		expect(note.when(xbox)).toBe(true);
+		expect(note.when(ctx)).toBeFalsy();
+		expect(note.when({...xbox, settings: {...defaultSettings, xboxPassthrough: true}})).toBe(false);
+		expect(note.when({...xbox, settings: {...defaultSettings, xboxPassthrough: true, xboxNativePlayer: false}})).toBe(true);
+	});
+
+	test('Xbox passthrough is offered only with the console player', () => {
+		const toggle = allRows().find(({row}) => row.key === 'xboxPassthrough').row;
+		const xbox = {...ctx, isWebOS: false, isXbox: true};
+		expect(defaultSettings.xboxPassthrough).toBe(false);
+		expect(toggle.when(xbox)).toBe(true);
+		expect(toggle.when({...xbox, settings: {...defaultSettings, xboxNativePlayer: false}})).toBe(false);
+		expect(toggle.when(ctx)).toBeFalsy();
+	});
+
 	// The fallback stands in for the value on the row's chip, so it's one of the chip texts
 	test('every option row falls back to what one of its own options shows on the chip', () => {
 		const mismatched = [];

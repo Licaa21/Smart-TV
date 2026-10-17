@@ -7,13 +7,13 @@
 // with the Visual Studio Build Tools and their UWP workload. Pass --no-msix to stop
 // once the web app is in place, which works on any system.
 //
-//   node build.js [--debug] [--tester] [--store] [--no-msix] [--no-web] [--probe-clips] [--dev-url <url>] [--install <console>]
+//   node build.js [--debug] [--tester] [--store] [--no-msix] [--no-web] [--probe-clips] [--clips <name,name>] [--dev-url <url>] [--install <console>]
 //   node build.js --probe [--debug] [--server <url>] [--emby <url>] [--image <url>] [--report <url>] [--media <label=url>]... [--install <console>]
 //
 // The app carries the device probe, which Settings opens for a signed in user, see
 // probe/probe.js. --probe-clips adds the test clips its playback run plays, made
 // beforehand with probe/make-clips.js. They are some 70 MB, so no build takes them
-// unless asked.
+// unless asked. --clips takes only the ones named, for testers sent to one test.
 //
 // --tester makes the package to hand to testers. Its version counts up so it installs
 // over the build they already have.
@@ -75,7 +75,8 @@ const PAGE_ASSETS = [
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
 const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : null);
-const bundlesClips = () => flag('--probe-clips');
+const chosenClips = () => (option('--clips') || '').split(',').filter(Boolean);
+const bundlesClips = () => flag('--probe-clips') || chosenClips().length > 0;
 const everyOption = (name) => args.map((arg, index) => (arg === name ? args[index + 1] : null)).filter(Boolean);
 
 const run = (cmd, opts = {}) => {
@@ -223,10 +224,17 @@ const writeProbe = (dir, {assets = '', clips = true} = {}) => {
 	}
 
 	const mediaSource = path.join(PROBE_DIR, 'media');
-	const bundled = clips && fs.existsSync(mediaSource) ? fs.readdirSync(mediaSource).filter((name) => MEDIA_FILE.test(name)).sort() : [];
-	if (bundled.length) {
+	const chosen = chosenClips();
+	const missing = chosen.filter((name) => !fs.existsSync(path.join(mediaSource, name)));
+	if (missing.length) throw new Error(`--clips names clips that are not in probe/media: ${missing.join(', ')}. Make them with node probe/make-clips.js`);
+	const names = clips && fs.existsSync(mediaSource) ? fs.readdirSync(mediaSource).filter((name) => !chosen.length || chosen.includes(name)).sort() : [];
+	const bundled = names.filter((name) => MEDIA_FILE.test(name));
+	// An HLS stream is a folder of its playlist and segments
+	const streams = names.filter((name) => fs.existsSync(path.join(mediaSource, name, 'index.m3u8')));
+	if (bundled.length || streams.length) {
 		fs.mkdirSync(path.join(dir, 'media'), {recursive: true});
 		for (const name of bundled) fs.copyFileSync(path.join(mediaSource, name), path.join(dir, 'media', name));
+		for (const name of streams) copyDirRecursive(path.join(mediaSource, name), path.join(dir, 'media', name));
 	}
 
 	const config = {
@@ -239,6 +247,7 @@ const writeProbe = (dir, {assets = '', clips = true} = {}) => {
 			// A clip named t- belongs to a test a person has to judge, and the unattended run
 			// leaves it out.
 			...bundled.map((name) => ({label: name, url: `media/${name}`, video: !AUDIO_ONLY.test(name), interactive: /^t-/.test(name)})),
+			...streams.map((name) => ({label: name, url: `media/${name}/index.m3u8`, video: true, interactive: /^t-/.test(name)})),
 			...everyOption('--media').map((entry) => {
 				const split = entry.indexOf('=');
 				return split === -1 ? {label: entry, url: entry} : {label: entry.slice(0, split), url: entry.slice(split + 1)};
@@ -246,7 +255,7 @@ const writeProbe = (dir, {assets = '', clips = true} = {}) => {
 		]
 	};
 	fs.writeFileSync(path.join(dir, 'probe-config.js'), `window.PROBE_CONFIG = ${JSON.stringify(config, null, '\t')};\n`);
-	return {config, bundled};
+	return {config, bundled: [...bundled, ...streams]};
 };
 
 // The probe as a package of its own, for a device the app doesnt start on.

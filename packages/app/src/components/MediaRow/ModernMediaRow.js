@@ -97,10 +97,10 @@ const ModernMediaRow = ({
 		// The next cards are drawn as focus nears the end of those that are.
 		const grownCard = e.target.closest('.spottable');
 		if (grownCard && grownCard.parentNode && items && items.length > 0) {
-			const focusedIndex = Array.prototype.indexOf.call(grownCard.parentNode.children, grownCard);
+			const grownIndex = Array.prototype.indexOf.call(grownCard.parentNode.children, grownCard);
 			setShownCount((current) => {
 				const count = Math.min(items.length, current === null ? initialRowCount(items.length) : current);
-				const grown = grownRowCount(count, focusedIndex, items.length);
+				const grown = grownRowCount(count, grownIndex, items.length);
 				return grown === count ? current : grown;
 			});
 		}
@@ -233,6 +233,8 @@ const ModernMediaRow = ({
 
 	if (!items || items.length === 0) return null;
 
+	const focusedIndex = focusedItemId ? items.findIndex((item) => item.Id === focusedItemId) : -1;
+
 	return (
 		<RowContainer
 			ref={rowElementRef}
@@ -249,6 +251,7 @@ const ModernMediaRow = ({
 				<div className={css.items}>
 					{items.slice(0, limit).map((item, index) => {
 						const spotlightId = `media-${keyPrefix}-${item.Id}`;
+						const besideFocus = focusedIndex >= 0 && Math.abs(index - focusedIndex) === 1;
 						const isFirst = index === 0;
 						const isLast = index === limit - 1;
 						return (
@@ -268,6 +271,7 @@ const ModernMediaRow = ({
 								detailsWidth={details?.spotlightId === spotlightId ? details.width : undefined}
 								isLibraryRow={rowId === 'library-tiles'}
 								rowImageType={rowImageType}
+								warmFocusArt={besideFocus}
 							/>
 						);
 					})}

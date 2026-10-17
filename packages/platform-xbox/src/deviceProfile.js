@@ -179,10 +179,11 @@ const SUBTITLE_PROFILES = [
 // instead of being burned in by the server
 const buildSubtitleProfiles = (caps) => SUBTITLE_PROFILES.map((profile) => (caps.nativePlayer && isBurnInSubtitleCodec(profile.Format) ? {...profile, Method: 'Embed'} : profile));
 
-// Every transcode is H.264 and AAC in TS segments, which hls.js plays wherever
-// the WebView has no HLS player of its own.
-const TRANSCODING_PROFILES = [
-	{Container: 'ts', Type: 'Video', AudioCodec: 'aac', VideoCodec: 'h264', Context: 'Streaming', Protocol: 'hls', MaxAudioChannels: '2', MinSegments: '1', BreakOnNonKeyFrames: false},
+// Every transcode is H.264 and AAC over HLS. The WebView gets stereo in TS segments,
+// which hls.js plays wherever it has no HLS player of its own. The console player
+// gets up to 7.1 in fMP4 segments, since TS cant carry AAC past 5.1.
+const buildTranscodingProfiles = (caps) => [
+	{Container: caps.nativePlayer ? 'mp4' : 'ts', Type: 'Video', AudioCodec: 'aac', VideoCodec: 'h264', Context: 'Streaming', Protocol: 'hls', MaxAudioChannels: caps.nativePlayer ? '8' : '2', MinSegments: '1', BreakOnNonKeyFrames: false},
 	{Container: 'mp4', Type: 'Video', AudioCodec: 'aac', VideoCodec: 'h264', Context: 'Static'},
 	{Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3', Context: 'Streaming', Protocol: 'http'},
 	{Container: 'aac', Type: 'Audio', AudioCodec: 'aac', Context: 'Streaming', Protocol: 'http'}
@@ -228,7 +229,7 @@ export const getJellyfinDeviceProfile = async () => {
 		MaxStaticMusicBitrate: 40_000_000,
 		MusicStreamingTranscodingBitrate: 384_000,
 		DirectPlayProfiles: buildDirectPlayProfiles(caps),
-		TranscodingProfiles: TRANSCODING_PROFILES,
+		TranscodingProfiles: buildTranscodingProfiles(caps),
 		CodecProfiles: codecProfiles,
 		SubtitleProfiles: buildSubtitleProfiles(caps),
 		ResponseProfiles: [
@@ -238,8 +239,8 @@ export const getJellyfinDeviceProfile = async () => {
 	};
 };
 
-// The transcodes are already H.264 and stereo AAC, so the retry after a failed
-// transcode asks for the same thing.
+// The transcodes are already H.264 and AAC, so the retry after a failed transcode
+// asks for the same thing.
 export const getH264FallbackProfile = () => getJellyfinDeviceProfile();
 
 export const getDeviceId = () => {

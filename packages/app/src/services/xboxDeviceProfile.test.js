@@ -242,6 +242,14 @@ describe('the profile with the console player', () => {
 		expect(getPlayMethod(source({MediaStreams: [{Type: 'Video', Codec: 'h264', VideoRangeType: 'SDR', Width: 1920}, {Type: 'Audio', Codec: 'dts', Index: 1}]}), capabilities)).toBe('DirectPlay');
 	});
 
+	test('transcodes to 7.1 AAC in fMP4 for the console player and stereo TS for the WebView', async () => {
+		await capabilitiesFor(nativeBoot());
+		expect((await getJellyfinDeviceProfile()).TranscodingProfiles[0]).toMatchObject({Protocol: 'hls', Container: 'mp4', AudioCodec: 'aac', MaxAudioChannels: '8'});
+		window.localStorage.setItem('moonfin_settings', JSON.stringify({xboxNativePlayer: false}));
+		await capabilitiesFor(nativeBoot());
+		expect((await getJellyfinDeviceProfile()).TranscodingProfiles[0]).toMatchObject({Protocol: 'hls', Container: 'ts', MaxAudioChannels: '2'});
+	});
+
 	test('turned off, the WebView answers as before', async () => {
 		window.localStorage.setItem('moonfin_settings', JSON.stringify({xboxNativePlayer: false}));
 		window.HTMLMediaElement.prototype.canPlayType.mockImplementation((type) => (/hvc1/.test(type) ? '' : canPlayType(type)));

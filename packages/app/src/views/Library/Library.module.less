@@ -297,6 +297,208 @@
 	}
 }
 
+/* ── Modern ──────────────────────────────────────────────── */
+/* The title gets a line of its own on the left, and every control shares the bar
+   under it, each labelled with what it is set to. */
+.modernTitle {
+	display: -webkit-flex;
+	display: flex;
+	-webkit-align-items: baseline;
+	align-items: baseline;
+	min-width: 0;
+	padding: 24px 87px 12px;
+}
+
+.modernBar {
+	display: -webkit-flex;
+	display: flex;
+	-webkit-align-items: center;
+	align-items: center;
+	margin: 0 87px 14px;
+	padding: 8px;
+	border-radius: 24px;
+	background: rgba(30, 30, 40, 0.72);
+	background: rgba(var(--theme-surface-rgb, 30, 30, 40), 0.72);
+}
+
+.barSearch {
+	-webkit-flex: 1;
+	flex: 1;
+	min-width: 0;
+}
+
+/* The toolbar button, grown to the height of the search field beside it. */
+.barButton {
+	.toolbar-button();
+	width: 66px;
+	height: 66px;
+	min-width: 66px;
+	border-radius: 16px;
+	transition: none;
+}
+
+.barButton:focus .toolbarIcon {
+	fill: #101010;
+	fill: var(--theme-background, #101010);
+}
+
+/* Bare until focused, then filled the way the toolbar buttons are. The icons and the
+   value take the control's own colour, so they flip with it. */
+.barPill,
+.dockRow {
+	display: -webkit-flex;
+	display: flex;
+	-webkit-align-items: center;
+	align-items: center;
+	height: 66px;
+	box-sizing: border-box;
+	border: 3px solid transparent;
+	border-radius: 16px;
+	background: none;
+	color: #ffffff;
+	color: var(--theme-on-surface, #ffffff);
+	white-space: nowrap;
+	cursor: pointer;
+
+	&:focus {
+		outline: none;
+		background: #ffffff;
+		background: var(--theme-on-surface, #ffffff);
+		border-color: #ffffff;
+		border-color: var(--theme-focus-border-color, #ffffff);
+		color: #101010;
+		color: var(--theme-background, #101010);
+	}
+}
+
+.barPill {
+	-webkit-flex-shrink: 0;
+	flex-shrink: 0;
+	padding: 0 22px 0 18px;
+	font-size: 22px;
+}
+
+.pillIcon {
+	width: 28px;
+	height: 28px;
+	-webkit-flex-shrink: 0;
+	flex-shrink: 0;
+	fill: currentColor;
+	opacity: 0.7;
+}
+
+.pillArrow {
+	width: 22px;
+	height: 22px;
+	-webkit-flex-shrink: 0;
+	flex-shrink: 0;
+	fill: currentColor;
+}
+
+.pillLabel {
+	font-weight: 600;
+}
+
+.pillValue {
+	max-width: 240px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	opacity: 0.65;
+}
+
+.letterRow {
+	display: -webkit-flex;
+	display: flex;
+	-webkit-align-items: center;
+	align-items: center;
+	padding: 12px 87px 14px;
+}
+
+/* ── Docked ──────────────────────────────────────────────── */
+/* A fixed panel down the left. The grid keeps its own inset beside it, and the script
+   takes the panel's width (DOCK_WIDTH) off the room it fits the columns into. */
+.dock {
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	z-index: 1;
+	width: 420px;
+	box-sizing: border-box;
+	padding: 36px 30px 24px;
+	overflow: hidden;
+	background: rgba(22, 22, 22, 0.88);
+	background: rgba(var(--theme-surface-rgb, 22, 22, 22), 0.88);
+	border-right: 1px solid rgba(255, 255, 255, 0.06);
+	border-right: 1px solid rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.06);
+}
+
+.contentDocked {
+	margin-left: 420px;
+	padding-top: 30px;
+	box-sizing: border-box;
+}
+
+.dockHeader {
+	display: -webkit-flex;
+	display: flex;
+	-webkit-align-items: center;
+	align-items: center;
+	margin-bottom: 24px;
+}
+
+/* The title and count stack beside Home rather than sharing a line. */
+.dockTitle {
+	-webkit-flex: 1;
+	flex: 1;
+	min-width: 0;
+	margin-left: 14px;
+
+	.itemCount {
+		margin-left: 0;
+	}
+}
+
+.dockSearch {
+	margin-bottom: 24px;
+}
+
+.dockRow {
+	width: 100%;
+	padding: 0 14px 0 16px;
+	font-size: 20px;
+	text-align: left;
+
+	.pillValue {
+		max-width: 150px;
+	}
+}
+
+.dockRowLabel {
+	-webkit-flex: 1;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-weight: 600;
+}
+
+.dockLetters {
+	margin-top: 20px;
+	padding-top: 24px;
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	border-top: 1px solid rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.08);
+}
+
+/* Seven letters to a row, from a fixed width rather than a grid the older engines lack. */
+.letterGrid {
+	display: -webkit-flex;
+	display: flex;
+	-webkit-flex-wrap: wrap;
+	flex-wrap: wrap;
+	width: 364px;
+}
+
 /* ── Grid ────────────────────────────────────────────────── */
 /* The horizontal inset lives on .grid rather than here, because .gridWrapper is
    positioned against this element's padding box and would ignore it. */
@@ -836,11 +1038,17 @@
 	.settingsHeader,
 	.settingValue,
 	.cardSubtitle,
-	.musicViewLabel {
+	.musicViewLabel,
+	.pillValue {
 		color: var(--theme-on-surface, #00e5ff);
 	}
 
-	.toolbarIcon {
+	.toolbarIcon,
+	.pillIcon {
+		fill: var(--theme-on-surface, #00e5ff);
+	}
+
+	.barButton:focus .toolbarIcon {
 		fill: var(--theme-on-surface, #00e5ff);
 	}
 
@@ -853,6 +1061,9 @@
 	}
 
 	.toolbarBtn:focus,
+	.barButton:focus,
+	.barPill:focus,
+	.dockRow:focus,
 	.musicHomeBtn:focus,
 	.musicViewBtn:focus,
 	.letterButton:focus,
@@ -876,8 +1087,18 @@
 	.radioFill {
 		background: var(--theme-accent, #ff2e92);
 	}
+
+	.barPill:focus,
+	.dockRow:focus {
+		color: var(--theme-on-surface, #00e5ff);
+	}
 }
 
 // Gap fallbacks, see styles/mixins.less. These sit last so a child that
 // declares its own margin further up cant beat them.
 .focusedMeta { .flex-wrap-gap(6px; 12px); }
+.modernBar { .flex-row-gap(6px); }
+.barPill { .flex-row-gap(10px); }
+.dockRow { .flex-row-gap(12px); }
+.dockRows { .flex-col-gap(4px); }
+.letterGrid { .flex-wrap-gap(8px); }

@@ -8,7 +8,10 @@ import {
 	remoteSubtitleSearchError,
 	remoteSubtitleDownloadError,
 	pollForSubtitleAppearance,
-	SUBTITLE_APPEARANCE_DELAYS
+	SUBTITLE_APPEARANCE_DELAYS,
+	subtitleDownloadLanguages,
+	searchRemoteSubtitlesIn,
+	MAX_SUBTITLE_DOWNLOAD_LANGUAGES
 } from './remoteSubtitleUtils';
 
 const mediaSource = (streams, over = {}) => ({MediaStreams: streams, ...over});
@@ -214,5 +217,51 @@ describe('pollForSubtitleAppearance', () => {
 
 		await expect(found).resolves.toEqual({Index: 7});
 		expect(probe).toHaveBeenCalledTimes(2);
+	});
+});
+
+// Issue #1283: downloads can search several languages picked in settings.
+describe('subtitleDownloadLanguages', () => {
+	test('the picked languages replace the guess', () => {
+		expect(subtitleDownloadLanguages(['hrv', 'deu'], 'eng')).toEqual(['hrv', 'deu']);
+	});
+
+	test('none picked searches the guess', () => {
+		expect(subtitleDownloadLanguages([], 'eng')).toEqual(['eng']);
+		expect(subtitleDownloadLanguages(undefined, 'eng')).toEqual(['eng']);
+	});
+
+	test('never searches more than the cap', () => {
+		const picked = ['eng', 'deu', 'hrv', 'fra', 'spa', 'ita', 'jpn'];
+		expect(subtitleDownloadLanguages(picked, 'eng')).toHaveLength(MAX_SUBTITLE_DOWNLOAD_LANGUAGES);
+	});
+});
+
+describe('searchRemoteSubtitlesIn', () => {
+	const api = (answers) => ({
+		searchRemoteSubtitles: jest.fn((itemId, language) => answers[language])
+	});
+
+	test('lists the results language by language in the order given', async () => {
+		const results = await searchRemoteSubtitlesIn(api({
+			hrv: Promise.resolve([{Id: 'h1'}]),
+			deu: Promise.resolve({SearchResults: [{Id: 'd1'}]})
+		}), 'item', ['hrv', 'deu']);
+		expect(results.map((r) => r.Id)).toEqual(['h1', 'd1']);
+	});
+
+	test('a failed language still shows the others', async () => {
+		const results = await searchRemoteSubtitlesIn(api({
+			hrv: Promise.reject(new Error('rate limited')),
+			deu: Promise.resolve([{Id: 'd1'}])
+		}), 'item', ['hrv', 'deu']);
+		expect(results.map((r) => r.Id)).toEqual(['d1']);
+	});
+
+	test('nothing found with a failure reports the failure', async () => {
+		await expect(searchRemoteSubtitlesIn(api({
+			hrv: Promise.reject(new Error('rate limited')),
+			deu: Promise.resolve([])
+		}), 'item', ['hrv', 'deu'])).rejects.toThrow('rate limited');
 	});
 });
