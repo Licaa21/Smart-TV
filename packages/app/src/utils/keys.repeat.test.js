@@ -71,100 +71,83 @@ describe('what a held arrow looked like', () => {
 });
 
 describe('held arrow repeats', () => {
-	const setup = () => {
+	let now;
+	beforeEach(() => {
+		now = 0;
+		jest.spyOn(performance, 'now').mockImplementation(() => now);
+	});
+	afterEach(() => jest.restoreAllMocks());
+
+	const setup = (report) => {
 		const target = new EventTarget();
-		dropStaleArrowRepeats(target);
+		dropStaleArrowRepeats(target, report);
 		const seen = jest.fn();
 		target.addEventListener('keydown', seen);
 		return {target, seen};
 	};
-	const send = (target, type, keyCode, ageMs, repeat) => {
+	// The stamp is junk on purpose: the Q67A reads every repeat 100 to 400 ms old, and the rule must not look at it
+	const send = (target, type, keyCode, at, repeat = false) => {
+		now = at;
 		const e = new Event(type, {cancelable: true});
-		Object.defineProperties(e, {
-			keyCode: {value: keyCode},
-			repeat: {value: repeat},
-			timeStamp: {value: Date.now() - ageMs}
-		});
+		Object.defineProperties(e, {keyCode: {value: keyCode}, repeat: {value: repeat}, timeStamp: {value: at - 400}});
 		target.dispatchEvent(e);
 		return e;
 	};
 
-	test('a repeat that waited behind a slow move is dropped, a fresh one goes through', () => {
+	test('repeats arriving on the remote beat all move, whatever their stamp says', () => {
 		const {target, seen} = setup();
-		send(target, 'keydown', 40, 0, false);
-		send(target, 'keydown', 40, 20, true);
-		const stale = send(target, 'keydown', 40, 400, true);
-		expect(seen).toHaveBeenCalledTimes(2);
-		expect(stale.defaultPrevented).toBe(true);
+		send(target, 'keydown', 40, 0);
+		for (let at = 350; at < 3000; at += 108) send(target, 'keydown', 40, at);
+		expect(seen).toHaveBeenCalledTimes(1 + Math.ceil((3000 - 350) / 108));
 	});
 
-	test('a first press always goes through, however long it waited', () => {
+	test('a backlog flushed in a burst after a stall keeps its first and drops the rest', () => {
 		const {target, seen} = setup();
-		send(target, 'keydown', 39, 400, false);
-		expect(seen).toHaveBeenCalledTimes(1);
+		send(target, 'keydown', 40, 0);
+		send(target, 'keydown', 40, 108);
+		send(target, 'keydown', 40, 500);
+		const queued = send(target, 'keydown', 40, 510);
+		send(target, 'keydown', 40, 520);
+		expect(seen).toHaveBeenCalledTimes(3);
+		expect(queued.defaultPrevented).toBe(true);
+	});
+
+	test('a first press always goes through, even right after another key', () => {
+		const {target, seen} = setup();
+		send(target, 'keydown', 40, 0);
+		send(target, 'keyup', 40, 5);
+		send(target, 'keydown', 39, 10);
+		expect(seen).toHaveBeenCalledTimes(2);
 	});
 
 	test('an engine without the repeat flag still has its held repeats told apart', () => {
 		const {target, seen} = setup();
 		send(target, 'keydown', 37, 0);
-		send(target, 'keydown', 37, 400);
+		send(target, 'keydown', 37, 10);
 		expect(seen).toHaveBeenCalledTimes(1);
-		send(target, 'keyup', 37, 0);
-		send(target, 'keydown', 37, 400);
-		expect(seen).toHaveBeenCalledTimes(2);
-	});
-
-	test('a set whose key events all read as old by the same amount still keeps its held repeats', () => {
-		const {target, seen} = setup();
-		send(target, 'keydown', 38, 5000, false);
-		send(target, 'keydown', 38, 5010, true);
-		send(target, 'keydown', 38, 5030, true);
-		expect(seen).toHaveBeenCalledTimes(3);
-		// a real wait on top of that offset is still dropped
-		const stale = send(target, 'keydown', 38, 5400, true);
-		expect(seen).toHaveBeenCalledTimes(3);
-		expect(stale.defaultPrevented).toBe(true);
-	});
-
-	test('a set that leaves the stamp empty keeps every repeat', () => {
-		const {target, seen} = setup();
-		const raw = (repeat) => {
-			const e = new Event('keydown', {cancelable: true});
-			Object.defineProperties(e, {keyCode: {value: 40}, repeat: {value: repeat}, timeStamp: {value: 0}});
-			target.dispatchEvent(e);
-		};
-		raw(false);
-		raw(true);
-		raw(true);
-		expect(seen).toHaveBeenCalledTimes(3);
-	});
-
-	test('a wait too long to be a slow set is a clock that disagrees, and keeps the repeat', () => {
-		const {target, seen} = setup();
-		send(target, 'keydown', 40, 0, false);
-		send(target, 'keydown', 40, 5000, true);
+		send(target, 'keyup', 37, 20);
+		send(target, 'keydown', 37, 30);
 		expect(seen).toHaveBeenCalledTimes(2);
 	});
 
 	test('tells what a held key lost once it is let go, and only then', () => {
-		const target = new EventTarget();
 		const report = jest.fn();
-		dropStaleArrowRepeats(target, report);
-		send(target, 'keydown', 40, 0, false);
-		send(target, 'keydown', 40, 300, true);
-		send(target, 'keydown', 40, 500, true);
+		const {target} = setup(report);
+		send(target, 'keydown', 40, 0);
+		send(target, 'keydown', 40, 10);
+		send(target, 'keydown', 40, 20);
 		expect(report).not.toHaveBeenCalled();
-		send(target, 'keyup', 40, 0);
-		expect(report).toHaveBeenCalledWith({dropped: 2, worstWaitMs: expect.any(Number), skewMs: expect.any(Number)});
-		send(target, 'keydown', 40, 0, false);
-		send(target, 'keyup', 40, 0);
+		send(target, 'keyup', 40, 30);
+		expect(report).toHaveBeenCalledWith({dropped: 2});
+		send(target, 'keydown', 40, 500);
+		send(target, 'keyup', 40, 510);
 		expect(report).toHaveBeenCalledTimes(1);
 	});
 
 	test('only the arrows are held back', () => {
 		const {target, seen} = setup();
-		send(target, 'keydown', 13, 0, false);
-		send(target, 'keydown', 13, 400, true);
+		send(target, 'keydown', 13, 0);
+		send(target, 'keydown', 13, 5, true);
 		expect(seen).toHaveBeenCalledTimes(2);
 	});
 });
