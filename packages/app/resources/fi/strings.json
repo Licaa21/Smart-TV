@@ -2446,5 +2446,11 @@
     "Media Preview": "Median esikatselu",
     "Play a short clip of the focused card after a moment.": "Näytä hetken kuluttua lyhyt pätkä kyseisestä kortista.",
     "Play the preview with sound.": "Toista esikatselu äänellä.",
-    "Preview Audio": "Äänen esikatselu"
+    "Preview Audio": "Äänen esikatselu",
+    "Prefer external subtitles": "Käytä ulkoisia tekstityksiä",
+    "Prefer text subtitles": "Mieluummin tekstitykset",
+    "Prioritize external subtitle files over embedded tracks": "Aseta ulkoiset tekstitystiedostot etusijalle upotettuihin tekstityksiin nähden",
+    "Prioritize text-based subtitles (SRT, VTT) over image-based formats (PGS, VobSub)": "Aseta tekstipohjaiset tekstitykset (SRT, VTT) etusijalle kuvapohjaisiin muotoihin (PGS, VobSub) nähden",
+    "File Details": "Tiedoston tiedot",
+    "On Now": "Nyt Esityksessä"
 }
