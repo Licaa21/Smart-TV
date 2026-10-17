@@ -748,7 +748,7 @@
     "Below bar, left": "Sota la barra, a l'esquerra",
     "Below bar, right": "A sota de la barra, a la dreta",
     "Choose which time labels appear around the playback progress bar.": "Tria quines etiquetes de temps apareixen al voltant de la barra de progrés de reproducció.",
-    "Couldn't load the Theme Store. Check your connection and try again.": "No s'ha pogut carregar la botiga de temes. Verifica la teva conexió i intenta-ho de nou.",
+    "Couldn't load the Theme Store. Check your connection and try again.": "No s'ha pogut carregar la botiga de temes. Verifica la teva connexió i intenta-ho de nou.",
     "EAC3 Passthrough": "Passthrough EAC3",
     "Ends at": "Acaba a",
     "For TV series, use the main series artwork instead of the episode thumbnail.": "Per a les sèries, utilitza l'obra artística principal de la sèrie en lloc de la miniatura de l'episodi.",
@@ -2446,5 +2446,11 @@
     "Media Preview": "Vista prèvia dels mitjans",
     "Play a short clip of the focused card after a moment.": "Reprodueix un clip breu de la targeta enfocada al cap d'un moment.",
     "Play the preview with sound.": "Reprodueix la vista prèvia amb so.",
-    "Preview Audio": "Vista prèvia d'àudio"
+    "Preview Audio": "Vista prèvia d'àudio",
+    "Prefer external subtitles": "Prefereix els subtítols externs",
+    "Prefer text subtitles": "Prefereix els subtítols de text",
+    "Prioritize external subtitle files over embedded tracks": "Dona prioritat als fitxers de subtítols externs per sobre de les pistes incrustades",
+    "Prioritize text-based subtitles (SRT, VTT) over image-based formats (PGS, VobSub)": "Dona prioritat als subtítols de text (SRT, VTT) per sobre dels formats basats en imatges (PGS, VobSub)",
+    "File Details": "Detalls del fitxer",
+    "On Now": "Ara"
 }
