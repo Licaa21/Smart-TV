@@ -6,11 +6,14 @@ import {useSeerr} from '../../context/SeerrContext';
 import {useSettings} from '../../context/SettingsContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import FilterPopup, {FilterOption} from '../../components/FilterPopup';
-import {getFromStorage} from '../../services/storage';
+import {useStorage} from '../../hooks/useStorage';
+import useStyleLibraries from '../../hooks/useStyleLibraries';
+import {pickStyleLibrary} from '../../utils/styleLibrary';
 import {focusOverhang, horizontalCellPad} from '../../utils/gridChrome';
 import {useAuth} from '../../context/AuthContext';
 import ScreenBackdrop from '../../components/ScreenBackdrop';
 import libraryCss from '../Library/Library.module.less';
+import {DOCK_WIDTH, LibraryDock, LibraryTitle, ModernBar, libraryStyleOf} from '../Library/LibraryHeaders';
 import * as seerrApi from '../../services/seerrApi';
 import {buildSeerrDiscoverParams, getSeerrSortOptions, getSeerrTvStatusOptions, getSeerrMinRatingOptions, getSeerrMinVoteOptions, getSeerrRuntimeOptions, getSeerrReleaseOptions, hasSeerrDiscoverFilters} from '../../utils/seerrBrowseFilters';
 import {browseStateKey, readBrowseState, writeBrowseState} from './seerrBrowseState';
@@ -65,50 +68,20 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	});
 	const [initialLoadDone, setInitialLoadDone] = useState(false);
 	const [showFilterModal, setShowFilterModal] = useState(false);
-	// The grid is laid out by the settings of the library it stands for, the movies library for movies and
-	// the shows library for shows, read here and changed only in that library, so a card is the same
-	// size and shape in both.
+	// The grid is laid out by the settings of the library it stands for, the movies library for movies and the shows
+	// library for shows, so a card is the same size and shape here as there.
 	const {api} = useAuth();
-	const [layout, setLayout] = useState({size: 'medium', type: 'poster', direction: 'vertical', text: 'on'});
+	const libraries = useStyleLibraries(api);
+	const layoutId = pickStyleLibrary(libraries, mediaType === 'tv' ? 'tvshows' : 'movies')?.Id || 'seerr-browse';
+	const [imageSize, , sizeLoaded] = useStorage(`library_imageSize_${layoutId}`, 'medium');
+	const [imageType, , typeLoaded] = useStorage(`library_imageType_${layoutId}`, 'poster');
+	const [gridDirection, , directionLoaded] = useStorage(`library_gridDirection_${layoutId}`, 'vertical');
+	const [cardText, , cardTextLoaded] = useStorage(`library_cardText_${layoutId}`, 'on');
 	// The grid waits for the library's settings, so it is not drawn at the defaults and then again.
-	const [layoutLoaded, setLayoutLoaded] = useState(false);
-	useEffect(() => {
-		let cancelled = false;
-		const wanted = mediaType === 'tv' ? 'tvshows' : 'movies';
-		setLayoutLoaded(false);
-		const readLayout = async () => {
-			const defaults = {size: 'medium', type: 'poster', direction: 'vertical', text: 'on'};
-			try {
-				const views = await api.getLibraries();
-				const library = (views?.Items || []).find((candidate) => candidate.CollectionType === wanted);
-				if (!library) return defaults;
-				const [size, type, direction, text] = await Promise.all([
-					getFromStorage(`library_imageSize_${library.Id}`),
-					getFromStorage(`library_imageType_${library.Id}`),
-					getFromStorage(`library_gridDirection_${library.Id}`),
-					getFromStorage(`library_cardText_${library.Id}`)
-				]);
-				return {
-					size: size || defaults.size,
-					type: type || defaults.type,
-					direction: direction || defaults.direction,
-					text: text || defaults.text
-				};
-			} catch (err) {
-				return defaults;
-			}
-		};
-		readLayout().then((found) => {
-			if (cancelled) return;
-			setLayout(found);
-			setLayoutLoaded(true);
-		});
-		return () => { cancelled = true; };
-	}, [api, mediaType]);
-	const imageSize = layout.size;
-	const imageType = layout.type;
-	const gridDirection = layout.direction;
-	const showCardText = layout.text !== 'off';
+	const layoutLoaded = libraries !== null && sizeLoaded && typeLoaded && directionLoaded && cardTextLoaded;
+	const showCardText = cardText !== 'off';
+	const libraryStyle = libraryStyleOf(settings);
+	const isDocked = libraryStyle === 'docked';
 	const [sortBy, setSortBy] = useState(saved?.sortBy || 'popularity.desc');
 	const [genreIds, setGenreIds] = useState(saved?.genreIds || []);
 	const [tvStatuses, setTvStatuses] = useState(saved?.tvStatuses || []);
@@ -320,7 +293,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const textHeight = showCardText ? 61 : 0;
 	const cardHeight = posterHeight + textHeight;
 	// A focused card grows past its cell, so the cell is padded by what it grows into.
-	const gridInset = GRID_INSET + (settings.navbarPosition === 'left' ? SIDEBAR_INSET : 0);
+	const gridInset = GRID_INSET + (settings.navbarPosition === 'left' ? SIDEBAR_INSET : 0) + (isDocked ? DOCK_WIDTH : 0);
 	const cellPadX = horizontalCellPad(cardWidth, window.innerWidth - gridInset);
 	const cellPadY = Math.max(MIN_ROW_GAP, focusOverhang(cardHeight));
 	const gridItemSize = useMemo(
@@ -613,29 +586,56 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	return (
 		<div className={`${css.page} ${settings.navbarPosition === 'left' ? css.pageLeftNav : ''}`}>
 			<ScreenBackdrop item={backdropItem} />
-			<div className={css.content}>
-				<div className={css.header}>
-					<div className={css.titleSection}>
-						<div className={css.browseTypeLabel}>{getBrowseTypeLabel()}</div>
-						<div className={css.title}>{item.name}</div>
-						<div className={css.subtitle}>
-							{currentFilter?.label}
-							{totalCount > 0 && ` • ${totalCount} ${$L('items')}`}
+			{isDocked && (
+				<div className={css.dockHost}>
+					<LibraryDock
+						isFolderView={false}
+						folderStack={[]}
+						rootName={item.name}
+						displayName={item.name}
+						shownCount={totalCount || items.length}
+						sortLabel={activeSort?.label}
+						sortAscending={sortBy.endsWith('.asc')}
+						onSort={handleOpenFilterModal}
+					/>
+				</div>
+			)}
+			<div className={isDocked ? `${css.content} ${css.contentDocked}` : css.content}>
+				{libraryStyle === 'classic' && (
+					<>
+						<div className={css.header}>
+							<div className={css.titleSection}>
+								<div className={css.browseTypeLabel}>{getBrowseTypeLabel()}</div>
+								<div className={css.title}>{item.name}</div>
+								<div className={css.subtitle}>
+									{currentFilter?.label}
+									{totalCount > 0 && ` • ${totalCount} ${$L('items')}`}
+								</div>
+							</div>
 						</div>
-					</div>
-				</div>
 
-				<div className={css.toolbar}>
-					<SpottableButton
-						className={css.filterButton}
-						onClick={handleOpenFilterModal}
-					>
-						<svg viewBox="0 0 24 24">
-							<path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
-						</svg>
-						{$L('Sort & Filter')}
-					</SpottableButton>
-				</div>
+						<div className={css.toolbar}>
+							<SpottableButton
+								className={css.filterButton}
+								onClick={handleOpenFilterModal}
+							>
+								<svg viewBox="0 0 24 24">
+									<path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+								</svg>
+								{$L('Sort & Filter')}
+							</SpottableButton>
+						</div>
+
+					</>
+				)}
+				{libraryStyle === 'modern' && (
+					<>
+						<div className={libraryCss.modernTitle}>
+							<LibraryTitle isFolderView={false} folderStack={[]} displayName={item.name} shownCount={totalCount || items.length} />
+						</div>
+						<ModernBar sortLabel={activeSort?.label} sortAscending={sortBy.endsWith('.asc')} onSort={handleOpenFilterModal} />
+					</>
+				)}
 
 				<div className={css.gridContainer}>
 					{(isLoading && items.length === 0) || !layoutLoaded ? (

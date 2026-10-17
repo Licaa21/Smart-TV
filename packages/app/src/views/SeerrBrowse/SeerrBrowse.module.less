@@ -16,6 +16,25 @@
 	padding-left: 110px;
 }
 
+// The Docked panel stands beside the page's own top or left navbar, and the content leaves it room.
+.dockHost {
+	position: absolute;
+	top: 130px;
+	bottom: 0;
+	left: 0;
+	width: 420px;
+	z-index: 2;
+}
+
+.pageLeftNav .dockHost {
+	top: 40px;
+	left: 110px;
+}
+
+.contentDocked {
+	margin-left: 420px;
+}
+
 .content {
 	position: relative;
 	z-index: 1;

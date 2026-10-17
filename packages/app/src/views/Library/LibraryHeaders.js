@@ -11,6 +11,11 @@ import {LETTERS, createPanelKeyDown, createToolbarKeyDown} from '../../utils/gri
 
 import css from './Library.module.less';
 
+// A style this app doesn't know, say one a newer client synced, reads as Classic.
+export const libraryStyleOf = (settings) => (settings.libraryStyle === 'modern' || settings.libraryStyle === 'docked' ? settings.libraryStyle : 'classic');
+// The Docked panel's width, matched in the stylesheet
+export const DOCK_WIDTH = 420;
+
 const SpottableButton = Spottable('button');
 const ToolbarContainer = SpotlightContainerDecorator({enterTo: 'last-focused', restrict: 'self-first'}, 'div');
 
@@ -123,13 +128,13 @@ export const ModernBar = memo(({
 	onSearchChange, onHome, onSort, onGroup, onShow, onSettings, onKeyDown
 }) => (
 	<ToolbarContainer className={css.modernBar} spotlightId="library-bar" onKeyDown={onKeyDown}>
-		<IconButton path={HOME_ICON} small onClick={onHome} spotlightId="library-home-btn" />
-		<Search className={css.barSearch} value={searchQuery} onChange={onSearchChange} />
+		{onHome && <IconButton path={HOME_ICON} small onClick={onHome} spotlightId="library-home-btn" />}
+		{onSearchChange && <Search className={css.barSearch} value={searchQuery} onChange={onSearchChange} />}
 		<SpottableButton className={css.barPill} onClick={onSort} spotlightId="library-sort-btn">
 			<Icon path={SORT_ICON} />
 			<span className={css.pillLabel}>{$L('Sort')}</span>
 			<span className={css.pillValue}>{sortLabel}</span>
-			<SortArrow ascending={sortAscending} />
+			{sortAscending !== undefined && <SortArrow ascending={sortAscending} />}
 		</SpottableButton>
 		{canGroup && (
 			<SpottableButton className={css.barPill} onClick={onGroup} spotlightId="library-group-btn">
@@ -138,12 +143,14 @@ export const ModernBar = memo(({
 				<span className={css.pillValue}>{groupLabel}</span>
 			</SpottableButton>
 		)}
-		<SpottableButton className={css.barPill} onClick={onShow} spotlightId="library-show-btn">
-			<Icon path={SHOW_ICON} small />
-			<span className={css.pillLabel}>{$L('Show')}</span>
-			<span className={css.pillValue}>{showLabel}</span>
-		</SpottableButton>
-		<IconButton path={SETTINGS_ICON} onClick={onSettings} spotlightId="library-settings-btn" />
+		{onShow && (
+			<SpottableButton className={css.barPill} onClick={onShow} spotlightId="library-show-btn">
+				<Icon path={SHOW_ICON} small />
+				<span className={css.pillLabel}>{$L('Show')}</span>
+				<span className={css.pillValue}>{showLabel}</span>
+			</SpottableButton>
+		)}
+		{onSettings && <IconButton path={SETTINGS_ICON} onClick={onSettings} spotlightId="library-settings-btn" />}
 	</ToolbarContainer>
 ));
 
@@ -172,7 +179,7 @@ export const LibraryDock = memo(({
 }) => (
 	<ToolbarContainer className={css.dock} spotlightId="library-dock" onKeyDown={handleDockKeyDown}>
 		<div className={css.dockHeader}>
-			<IconButton path={HOME_ICON} small onClick={onHome} spotlightId="library-home-btn" />
+			{onHome && <IconButton path={HOME_ICON} small onClick={onHome} spotlightId="library-home-btn" />}
 			<div className={css.dockTitle}>
 				<LibraryTitle
 					isFolderView={isFolderView}
@@ -184,14 +191,14 @@ export const LibraryDock = memo(({
 				/>
 			</div>
 		</div>
-		<Search className={css.dockSearch} value={searchQuery} onChange={onSearchChange} />
+		{onSearchChange && <Search className={css.dockSearch} value={searchQuery} onChange={onSearchChange} />}
 		<div className={css.dockRows}>
 			<DockRow path={SORT_ICON} label={$L('Sort By')} value={sortLabel} onClick={onSort} spotlightId="library-sort-btn">
-				<SortArrow ascending={sortAscending} />
+				{sortAscending !== undefined && <SortArrow ascending={sortAscending} />}
 			</DockRow>
 			{canGroup && <DockRow path={GROUP_ICON} small label={$L('Group By')} value={groupLabel} onClick={onGroup} spotlightId="library-group-btn" />}
-			<DockRow path={SHOW_ICON} small label={$L('Show')} value={showLabel} onClick={onShow} spotlightId="library-show-btn" />
-			<DockRow path={DISPLAY_ICON} small label={$L('Display')} value={displayLabel} onClick={onSettings} spotlightId="library-settings-btn" />
+			{onShow && <DockRow path={SHOW_ICON} small label={$L('Show')} value={showLabel} onClick={onShow} spotlightId="library-show-btn" />}
+			{onSettings && <DockRow path={DISPLAY_ICON} small label={$L('Display')} value={displayLabel} onClick={onSettings} spotlightId="library-settings-btn" />}
 		</div>
 		{showLetters && (
 			<div className={css.dockLetters}>

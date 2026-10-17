@@ -241,6 +241,13 @@ did, what the fork keeps instead, and what to do on a merge.
 - **On a merge:** keep the arrival rule, never `event.timeStamp`, and the report callback in `dropStaleArrowRepeats` (and its second argument in `index.js`), `watchArrowHolds`, and the ligature line. Upstream's patch to Spotlight's Accelerator (`scripts/patch-enact-legacy.js`, patch 17) is taken as it is.
 - **Files:** `utils/keys.js`, `index.js`, `App/App.module.less`.
 
+### 8. The Library's sort and filter panel
+
+- **Upstream:** 7d9d9e0e added the Classic, Modern and Docked library styles (`views/Library/LibraryHeaders.js`, the `libraryStyle` setting), and the Sort & Filter side panel with its accordion of groups stays upstream's own.
+- **The fork keeps:** the three styles as upstream has them, but every sort and filter button in all of them (Sort, Show, and the Classic toolbar's) opens the shared `FilterPopup`, not the panel. Show opens it on Played Status (`popupGroup`), the others on Sort By. Group By and Display still open the settings panel, on their own rows. The library page has no Refresh button, in any style. The default style is upstream's (Classic).
+- **On a merge:** keep `FilterPopup` and its groups in `Library.js`, the `popupGroup` state, `sortButtonId` and `settingsButtonId` on `useSortSettingsPanels`, and upstream's `LibraryHeaders.js` and style code as they come. Upstream's `expandedSection`, `handleSectionExpand` and `sortFocusId` are the old panel's and stay out. Modern cards: keep the fork's `rowArtwork` (the row's artwork choice) passed into upstream's `cardImageUrl`, with the Seerr titled thumb still ahead of it.
+- **Files:** `views/Library/Library.js`, `components/FilterPopup/`, `hooks/useSortSettingsPanels.js`, `components/MediaCard/ModernMediaCard.js`.
+
 ## When the user says Moonbase (the plugin) updated
 
 The fork works around things the Moonbase plugin (Moonfin-Client/Plugin) does not do yet. When the user says a new release is
@@ -300,6 +307,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
 - Shared filter popup: `packages/app/src/components/FilterPopup`.
 - Long audio and subtitle lists (chips, search, pinned actions, the Channel keys): `packages/app/src/components/TrackFilterBar` and `utils/trackFilter.js`, used by `views/Player/PlayerControls.js` and `views/Details/DetailTrackModals.js`.
 - Home: `packages/app/src/views/Browse/Browse.js`. Seerr screen: `packages/app/src/views/SeerrDiscover/`.
+- Screens without a library of their own (a genre or studio opened from Home, the Genres screen with no library chosen, and the Seerr browse screen) are laid out by the movies library, or the shows one for series only: `utils/styleLibrary.js`, `hooks/useStyleLibraries.js`, `useStorage` keys `library_*_<library id>`. The Library screen takes its cards, grid, letters, sort and group from it and writes changes back to it (`followsLibrary` in `views/Library/Library.js`); the Seerr browse screen takes cards and the Library Style header (`LibraryHeaders.js` with the optional controls left out).
 
 ## The user's TV
 
