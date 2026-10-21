@@ -63,6 +63,18 @@ const withoutHiddenViews = async (views, user) => {
 export const getUserImageUrl = (serverUrl, userId, imageTag, type) =>
 	buildUserImageUrl(serverUrl, userId, imageTag, type || serverType);
 
+// Who wants to know when the signed-in server refuses a request. A user whose access schedule
+// has just ended is refused everything, which nothing else would tell the app.
+const forbiddenListeners = new Set();
+export const onForbidden = (listener) => {
+	forbiddenListeners.add(listener);
+	return () => forbiddenListeners.delete(listener);
+};
+
+// Parents the server refused are remembered so they aren't asked for again, which has to be
+// forgotten when the refusal might have been about the hour and not the parent.
+export const clearAccessDenied = () => accessDeniedParentIds.clear();
+
 export const setAuth = (userId, token) => {
 	currentUser = userId;
 	accessToken = token;
@@ -218,6 +230,7 @@ const request = async (endpoint, options = {}) => {
 		if ((response.status === 401 || response.status === 403) && parentId) {
 			accessDeniedParentIds.add(parentId);
 		}
+		if (response.status === 403) forbiddenListeners.forEach((listener) => listener());
 		const error = new Error('API Error: ' + response.status);
 		error.status = response.status;
 		error.connectionType = classifyError(error);
@@ -233,8 +246,34 @@ const request = async (endpoint, options = {}) => {
 	return JSON.parse(text);
 };
 
-export function reportCapabilities() {
+let userRead = null;
+
+// Several callers read the user as the app starts, so a read still on its way, or one answered
+// in the last few seconds, is shared.
+const readCurrentUser = () => {
+	const session = `${currentServer}|${currentUser}|${accessToken}`;
+	if (userRead && userRead.session === session && (!userRead.at || Date.now() - userRead.at < 5000)) {
+		return userRead.promise;
+	}
+	const entry = {session, at: 0, promise: request(`/Users/${currentUser}`)};
+	userRead = entry;
+	entry.promise.then(() => {
+		entry.at = Date.now();
+	}, () => {
+		if (userRead === entry) userRead = null;
+	});
+	return entry.promise;
+};
+
+let capabilitiesSent = null;
+
+// Signing in reports what this session can do and the socket opening a moment later would send it
+// again, so the socket skips a report made for the same session in the last few seconds.
+export function reportCapabilities({unlessRecent = false} = {}) {
 	if (!currentServer || !accessToken) return;
+	const session = `${currentServer}|${accessToken}`;
+	if (unlessRecent && capabilitiesSent?.session === session && Date.now() - capabilitiesSent.at < 10000) return;
+	capabilitiesSent = {session, at: Date.now()};
 	request('/Sessions/Capabilities/Full', {
 		method: 'POST',
 		body: {
@@ -509,12 +548,17 @@ export const api = {
 
 	getMediaSegments: (itemId) => request(`/MediaSegments/${itemId}`),
 
-	getUserConfiguration: () => request(`/Users/${currentUser}`),
+	getUserConfiguration: () => readCurrentUser(),
 
-	updateUserConfiguration: (config) => request(userRoutes.configuration(), {
-		method: 'POST',
-		body: config
-	}),
+	getCurrentUser: () => request('/Users/Me'),
+
+	updateUserConfiguration: (config) => {
+		userRead = null;
+		return request(userRoutes.configuration(), {
+			method: 'POST',
+			body: config
+		});
+	},
 
 	getLatest: (libraryId, limit = 20) =>
 		request(`${userRoutes.latest()}ParentId=${libraryId}&Limit=${limit}&Fields=${encodeURIComponent(HOME_ROW_ITEM_FIELDS)}&ImageTypeLimit=1&GroupItems=true`),
@@ -641,7 +685,7 @@ export const api = {
 	// Episodes and music videos get their own rows on a person, and the newest
 	// work is the part worth opening on.
 	getItemsByPerson: (personId, limit = 100) =>
-		request(`${userRoutes.items()}PersonIds=${personId}&Recursive=true&IncludeItemTypes=Movie,Series,MusicVideo,Episode&SortBy=PremiereDate&SortOrder=Descending&Limit=${limit}&Fields=PrimaryImageAspectRatio,ProductionYear,OfficialRating,BasicSyncInfo`),
+		request(`${userRoutes.items()}PersonIds=${personId}&Recursive=true&IncludeItemTypes=Movie,Series,MusicVideo,Episode&SortBy=PremiereDate&SortOrder=Descending&Limit=${limit}&Fields=PrimaryImageAspectRatio,ProductionYear,OfficialRating,BasicSyncInfo,People`),
 
 	getFavorites: (limit = 50) =>
 		request(`${userRoutes.items()}IsFavorite=true&Recursive=true&Limit=${limit}&Fields=PrimaryImageAspectRatio,ProductionYear,OfficialRating`),
@@ -1043,7 +1087,7 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		getPerson: (itemId) => serverRequest(serverUserRoutes.item(itemId)),
 
 		getItemsByPerson: (personId, limit = 100) =>
-			serverRequest(`${serverUserRoutes.items()}PersonIds=${personId}&Recursive=true&IncludeItemTypes=Movie,Series,MusicVideo,Episode&SortBy=PremiereDate&SortOrder=Descending&Limit=${limit}&Fields=PrimaryImageAspectRatio,ProductionYear,OfficialRating,BasicSyncInfo`),
+			serverRequest(`${serverUserRoutes.items()}PersonIds=${personId}&Recursive=true&IncludeItemTypes=Movie,Series,MusicVideo,Episode&SortBy=PremiereDate&SortOrder=Descending&Limit=${limit}&Fields=PrimaryImageAspectRatio,ProductionYear,OfficialRating,BasicSyncInfo,People`),
 
 		getItems: (params = {}) => {
 			// Manually build query string to match main api.getItems behavior

@@ -705,7 +705,7 @@ const NouveauDetailContent = (props) => {
 			<NouveauPosterCard
 				imageUrl={spotlightItemImageUrl(effectiveServerUrl, entry)}
 				title={entry.Name}
-				subtitle={entry.ProductionYear ? String(entry.ProductionYear) : null}
+				subtitle={entry.Subtitle || (entry.ProductionYear ? String(entry.ProductionYear) : null)}
 				width={posterWidth}
 				height={posterHeight}
 				selectKey={entry.Id}

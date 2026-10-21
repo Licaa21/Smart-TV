@@ -1,4 +1,4 @@
-import {api, createApiForServer, setServer, setServerType, setAuth, resolveItemsByProviderIds, resetLibraryIndexForTests} from './jellyfinApi';
+import {api, createApiForServer, setServer, setServerType, setAuth, reportCapabilities, resolveItemsByProviderIds, resetLibraryIndexForTests} from './jellyfinApi';
 import {platformFetch} from './secureFetch';
 
 jest.mock('./secureFetch', () => ({platformFetch: jest.fn()}));
@@ -173,5 +173,37 @@ describe('stopActiveEncodings', () => {
 		expect(url).toContain('http://other/Videos/ActiveEncodings?deviceId=');
 		expect(url).toContain('&playSessionId=session-2');
 		expect(options.method).toBe('DELETE');
+	});
+});
+
+describe('reads made as the app starts', () => {
+	const userReads = () => platformFetch.mock.calls.filter((call) => /\/Users\/user-2$/.test(urlOf(call)));
+	const capabilityReports = () => platformFetch.mock.calls.filter((call) => urlOf(call).includes('/Sessions/Capabilities/Full'));
+
+	beforeEach(() => {
+		setServerType('jellyfin');
+		setAuth('user-2', 'token-2');
+	});
+
+	test('callers reading the user at the same time share one request', async () => {
+		platformFetch.mockClear();
+		await Promise.all([api.getUserConfiguration(), api.getUserConfiguration(), api.getUserConfiguration()]);
+		expect(userReads()).toHaveLength(1);
+	});
+
+	test('saving the configuration makes the next read go to the server', async () => {
+		await api.getUserConfiguration();
+		await api.updateUserConfiguration({});
+		platformFetch.mockClear();
+		await api.getUserConfiguration();
+		expect(userReads()).toHaveLength(1);
+	});
+
+	test("the socket opening right after sign in doesn't report capabilities again", () => {
+		platformFetch.mockClear();
+		reportCapabilities({unlessRecent: true});
+		expect(capabilityReports()).toHaveLength(0);
+		reportCapabilities();
+		expect(capabilityReports()).toHaveLength(1);
 	});
 });

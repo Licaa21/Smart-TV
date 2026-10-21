@@ -1,6 +1,9 @@
 import * as playback from '../services/playback';
+import {runPlayerCommand} from '../services/remoteControl';
 
 export const stopPlaybackForTrailer = async (excludedVideo = null) => {
+	// Music left playing behind the screens stops the way its Stop button would, pill and all.
+	await runPlayerCommand('stop');
 	const session = playback.getCurrentSession();
 	const videoElements = Array.from(document.querySelectorAll('video'));
 	const activeVideo = videoElements.find((video) => !video.paused && Number.isFinite(video.currentTime) && video.currentTime > 0);

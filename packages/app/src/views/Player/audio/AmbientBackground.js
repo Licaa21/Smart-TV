@@ -8,7 +8,8 @@ import css from './AmbientBackground.module.less';
 // large blurred surface is far more than these TV GPUs want to redraw.
 const readThemeAccent = () => {
 	if (typeof window === 'undefined') return '';
-	return window.getComputedStyle(document.documentElement).getPropertyValue('--theme-accent').trim();
+	// Engines without custom properties, like webOS 3, hand back null here.
+	return (window.getComputedStyle(document.documentElement).getPropertyValue('--theme-accent') || '').trim();
 };
 
 const AmbientBackground = ({artworkUrl, children}) => {

@@ -1,5 +1,6 @@
 import {getAuthHeader, getServerUrl} from './jellyfinApi';
 import {mediaServerQueue} from '../utils/requestQueue';
+import {getFromStorage, saveToStorage} from './storage';
 
 const seriesCache = {};
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -8,6 +9,35 @@ const negativeCache = {};
 const NEGATIVE_CACHE_TTL_MS = 3 * 60 * 1000;
 
 const pendingSeries = {};
+
+// The first series asked for goes out alone, and the rest wait to hear whether the feature is on,
+// since a row of cards all asking at once would otherwise each be told it's off.
+let firstSeries = null;
+
+// A series' markers rarely change, so they're kept between launches by server and a cold start
+// doesn't ask again for every series card on Home.
+const STORAGE_KEY = 'anime_markers_series';
+const STORED_TTL_MS = 24 * 60 * 60 * 1000;
+const SAVE_DELAY_MS = 3000;
+let stored = null;
+let saveTimer = null;
+
+const loadStored = () => {
+	if (!stored) stored = getFromStorage(STORAGE_KEY).then((saved) => saved || {}, () => ({}));
+	return stored;
+};
+
+const saveStored = () => {
+	clearTimeout(saveTimer);
+	saveTimer = setTimeout(async () => {
+		const entries = await loadStored();
+		const now = Date.now();
+		Object.keys(entries).forEach((k) => {
+			if (now - entries[k].fetchedAt >= STORED_TTL_MS) delete entries[k];
+		});
+		saveToStorage(STORAGE_KEY, entries).catch(() => {});
+	}, SAVE_DELAY_MS);
+};
 
 const itemAudio = {};
 const itemAsked = {};
@@ -57,8 +87,21 @@ export const fetchSeriesMarkers = async (seriesId, options = {}) => {
 	const baseUrl = options.serverUrl || getServerUrl();
 	if (!baseUrl) return null;
 
+	const ahead = firstSeries;
 	const run = (async () => {
 		try {
+			const entries = await loadStored();
+			const storedKey = `${baseUrl}|${key}`;
+			const saved = entries[storedKey];
+			if (saved && (Date.now() - saved.fetchedAt) < STORED_TTL_MS) {
+				seriesCache[key] = saved;
+				return saved.data;
+			}
+			if (ahead) {
+				await ahead;
+				if (featureOff()) return null;
+			}
+
 			const url = `${baseUrl}/Moonfin/AnimeMarkers/Series?seriesId=${encodeURIComponent(seriesId)}`;
 			const response = await request(url, options.signal);
 
@@ -101,6 +144,8 @@ export const fetchSeriesMarkers = async (seriesId, options = {}) => {
 
 			const data = {episodes, seasons};
 			seriesCache[key] = {fetchedAt: Date.now(), data};
+			entries[storedKey] = seriesCache[key];
+			saveStored();
 			return data;
 		} catch (e) {
 			if (e?.name !== 'AbortError') negativeCache[key] = Date.now();
@@ -111,6 +156,7 @@ export const fetchSeriesMarkers = async (seriesId, options = {}) => {
 	})();
 
 	pendingSeries[key] = run;
+	if (!firstSeries) firstSeries = run;
 	return run;
 };
 
@@ -234,6 +280,7 @@ export const clearAnimeMarkerCache = () => {
 	Object.keys(itemFailedAt).forEach(k => delete itemFailedAt[k]);
 	itemQueue.clear();
 	itemBaseUrl = null;
+	firstSeries = null;
 	featureOffAt = 0;
 	itemFeatureOffAt = 0;
 };

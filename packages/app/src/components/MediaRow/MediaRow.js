@@ -43,7 +43,8 @@ const MediaRow = ({
 	spotlightId: rowSpotlightId,
 	menuOptions,
 	loading,
-	titleWidth
+	titleWidth,
+	deferImages = false
 }) => {
 	const {settings} = useSettings();
 	const scrollerRef = useRef(null);
@@ -57,7 +58,7 @@ const MediaRow = ({
 		const el = rowElementRef.current;
 		registerRowRef?.(rowIndex, el);
 		return () => registerRowRef?.(rowIndex, null);
-	}, [rowIndex, registerRowRef]);
+	}, [rowIndex, registerRowRef, loading]);
 
 	useEffect(() => {
 		scrollerRectRef.current = null;
@@ -198,6 +199,7 @@ const MediaRow = ({
 									onFocusItem={onFocusItem}
 									showServerBadge={showServerBadge}
 									eagerLoad={rowIndex === 0}
+									deferImage={deferImages}
 									spotlightId={spotlightId}
 									onSpotlightLeft={isFirst && !onSeeAll ? handleWrapLeft : null}
 									onSpotlightRight={isLast ? handleWrapRight : null}
@@ -226,6 +228,7 @@ const areRowPropsEqual = (prev, next) => {
 	if (prev.menuOptions !== next.menuOptions) return false;
 	if (prev.spotlightId !== next.spotlightId) return false;
 	if (prev.loading !== next.loading || prev.titleWidth !== next.titleWidth) return false;
+	if (prev.deferImages !== next.deferImages) return false;
 	// Compare presence, not identity: an inline arrow from a caller would defeat
 	// the whole comparator.
 	if (!prev.onSeeAll !== !next.onSeeAll) return false;

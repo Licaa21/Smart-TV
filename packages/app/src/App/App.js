@@ -1,4 +1,4 @@
-import {useState, useCallback, useEffect, useMemo, lazy, Suspense, useRef} from 'react';
+import {useState, useCallback, useEffect, useLayoutEffect, useMemo, lazy, Suspense, useRef} from 'react';
 import {isKidsMode, blockedPanels, allowedPanel} from '../utils/kidsMode';
 import {
 	hashPin, pinMatches, lockoutRemaining, registerFailedAttempt, clearedLockout, tooManyAttempts,
@@ -63,12 +63,17 @@ import TVKeyboard from '../components/TVKeyboard/TVKeyboard';
 import {isTvKeyboardVisible, closeTvKeyboard} from '../components/TVKeyboard/keyboardBus';
 import useInactivityTimer from '../hooks/useInactivityTimer';
 import {useThemeMusic} from '../hooks/useThemeMusic';
+import {useAccessSchedule} from '../hooks/useAccessSchedule';
+import {shiftedNow} from '../utils/clock';
+import TimesUp from '../components/TimesUp/TimesUp';
 import {buildThemeCssVars, toRgbTriplet} from '../theme/themeSpec';
 import {applyThemeOverrides} from '../theme/themeOverrides';
 import {resolveOverlayColor} from '../theme/overlayColors';
 import Login from '../views/Login';
 import Browse from '../views/Browse';
 import {isGameLibrary, refreshGameLibraries, resolveGameLibraryId} from '../utils/gameLibrary';
+import {afterHomeReady} from '../utils/homeReady';
+import {setMusicPlaying} from '../utils/sharedVideoOwner';
 
 const Details = lazy(() => import('../views/Details'));
 const Library = lazy(() => import('../views/Library'));
@@ -163,7 +168,7 @@ const PANELS = {
 };
 
 const AppContent = (props) => {
-	const {isAuthenticated, isLoading, logout, serverUrl, serverName, api, user, hasMultipleServers, accessToken, connectionState, revalidateSession} = useAuth();
+	const {isAuthenticated, isLoading, logout, serverUrl, serverName, api, user, hasMultipleServers, accessToken, connectionState, revalidateSession, leaveSession, serverType} = useAuth();
 	const {settings, activeTheme, syncOnLogin, updateSettings, loaded: settingsLoaded} = useSettings();
 	const {streamNotification, dismissStreamNotification, pluginInfo} = useSeerr();
 	const {pendingPopups, markPopupsRead} = useServerMessages();
@@ -254,6 +259,23 @@ const AppContent = (props) => {
 	const [playbackOptions, setPlaybackOptions] = useState(null);
 	const [isResume, setIsResume] = useState(false);
 	const [isPlayerPaused, setIsPlayerPaused] = useState(false);
+	// Backing out of the music player keeps the same player playing, drawn hidden behind the screens.
+	const [musicInBackground, setMusicInBackground] = useState(false);
+	const backgroundMusic = musicInBackground && Boolean(playingItem) && panelIndex !== PANELS.PLAYER;
+	const navMusic = useMemo(
+		() => (backgroundMusic ? {item: playingItem, paused: isPlayerPaused} : null),
+		[backgroundMusic, playingItem, isPlayerPaused]
+	);
+	// A layout effect, so Home's trailers see it before their own effects decide to start.
+	useLayoutEffect(() => setMusicPlaying(backgroundMusic), [backgroundMusic]);
+	// A change of signed in user that didn't stop the music first, like an added account or an
+	// expired session, stops it here. So does opening sign in, which has no mini player to stop it.
+	const musicUserRef = useRef(null);
+	useEffect(() => {
+		const signingIn = panelIndex === PANELS.LOGIN || panelIndex === PANELS.ADD_SERVER || panelIndex === PANELS.ADD_USER;
+		if (!backgroundMusic) musicUserRef.current = user?.Id;
+		else if (signingIn || user?.Id !== musicUserRef.current) remoteControl.runPlayerCommand('stop');
+	}, [backgroundMusic, user?.Id, panelIndex]);
 	const [trailerPreviewActive, setTrailerPreviewActive] = useState(false);
 	const [panelHistory, setPanelHistory] = useState([]);
 	const [seerrBrowse, setSeerrBrowse] = useState(null);
@@ -440,7 +462,7 @@ const AppContent = (props) => {
 				setLibraries(libs);
 				// Warm the plugin's game library list so selecting a tile can tell a game
 				// library from a normal one without waiting on a request.
-				refreshGameLibraries();
+				afterHomeReady().then(refreshGameLibraries);
 			} catch (err) {
 				console.error('Failed to fetch libraries:', err);
 			}
@@ -546,7 +568,7 @@ const AppContent = (props) => {
 	const THEME_MUSIC_TYPES = ['Movie', 'Series', 'Season', 'Episode'];
 
 	useEffect(() => {
-		if (panelIndex === PANELS.DETAILS && selectedItem && THEME_MUSIC_TYPES.includes(selectedItem.Type)) {
+		if (panelIndex === PANELS.DETAILS && selectedItem && THEME_MUSIC_TYPES.includes(selectedItem.Type) && !backgroundMusic) {
 			themeMusic.playThemeMusic(selectedItem.SeriesId || selectedItem.Id);
 		} else if (panelIndex === PANELS.PLAYER) {
 			themeMusic.stopThemeMusicImmediate();
@@ -554,13 +576,57 @@ const AppContent = (props) => {
 			themeMusic.cancelDelayed();
 			themeMusic.stopThemeMusic();
 		}
-	}, [panelIndex, selectedItem?.Id]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [panelIndex, selectedItem?.Id, backgroundMusic]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	// The hardware decoder stays claimed until these are torn down.
 	const releaseVideoElements = useCallback(() => {
 		const videoElements = document.querySelectorAll('video');
 		videoElements.forEach(video => {
 			cleanupVideoElement(video);
+		});
+	}, []);
+
+	// A user outside the hours their account allows can't do anything on the server, so the
+	// app says so and stops what is playing. The check is run again whenever the app comes back.
+	const recheckAccessRef = useRef(null);
+	const {blocked: timesUp, nextAccess, recheck: recheckAccess} = useAccessSchedule({
+		userId: isAuthenticated ? user?.Id : null,
+		enabled: serverType !== 'emby',
+		fetchUser: () => api.getUserConfiguration(),
+		// The user's own record honors the schedule, so a 403 there is the server turning them away.
+		serverRefuses: () => api.getCurrentUser().then(() => false, (err) => (err?.status === 403 ? true : null)),
+		getNow: () => shiftedNow(settings.timeOffsetHours),
+		onBlocked: () => {
+			releaseVideoElements();
+			setPlayingItem(null);
+			setPlaybackOptions(null);
+			setIsResume(false);
+			setIsPlayerPaused(false);
+			setPanelHistory([]);
+			setPanelIndex(PANELS.BROWSE);
+			themeMusic.stopThemeMusicImmediate();
+		}
+	});
+	recheckAccessRef.current = recheckAccess;
+	const timesUpRef = useRef(false);
+	timesUpRef.current = timesUp;
+
+	// What was refused while the hours were closed is allowed again once they open.
+	useEffect(() => {
+		if (!timesUp) jellyfinApi.clearAccessDenied();
+	}, [timesUp]);
+
+	// An administrator can end the hours while someone is watching. Every request is refused from
+	// then on, so a refusal is the cue to look, not more than every few seconds.
+	useEffect(() => {
+		let last = 0;
+		return jellyfinApi.onForbidden(() => {
+			// While blocked every request is refused, the check's own question included.
+			if (timesUpRef.current) return;
+			const now = Date.now();
+			if (now - last < 5000) return;
+			last = now;
+			recheckAccessRef.current?.();
 		});
 	}, []);
 
@@ -596,6 +662,7 @@ const AppContent = (props) => {
 		};
 
 		const handleVisibilityVisible = () => {
+			recheckAccessRef.current?.();
 			revalidateSession();
 		};
 
@@ -614,6 +681,7 @@ const AppContent = (props) => {
 				if (isAuthenticated) {
 					setPanelIndex(PANELS.BROWSE);
 				}
+				recheckAccessRef.current?.();
 			} finally {
 				activateApp();
 			}
@@ -735,7 +803,7 @@ const AppContent = (props) => {
 				e.preventDefault();
 				e.stopPropagation();
 
-				if (isPinGateActive) {
+				if (isPinGateActive || timesUp) {
 					return;
 				}
 
@@ -807,7 +875,14 @@ const AppContent = (props) => {
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [panelIndex, handleBack, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay]);
+	}, [panelIndex, handleBack, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, timesUp, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay]);
+
+	// The account stays saved, so it can be chosen again from the picker once its hours are back.
+	const handleTimesUpSwitchUser = useCallback(() => {
+		leaveSession();
+		setPanelHistory([]);
+		setPanelIndex(PANELS.LOGIN);
+	}, [leaveSession]);
 
 	const handleLoggedIn = useCallback(() => {
 		setPanelHistory([]);
@@ -952,18 +1027,21 @@ const AppContent = (props) => {
 		navigateTo(PANELS.GAME_DETAILS);
 	}, [navigateTo]);
 
-	const handlePlayGame = useCallback((gameLibrary, game, opts) => {
+	const handlePlayGame = useCallback(async (gameLibrary, game, opts) => {
+		if (backgroundMusic) await remoteControl.runPlayerCommand('stop');
 		setSelectedGameLibrary(gameLibrary);
 		setSelectedGame(game);
 		setGameStartFresh(!!(opts && opts.fresh));
 		navigateTo(PANELS.GAME_PLAYER);
-	}, [navigateTo]);
+	}, [navigateTo, backgroundMusic]);
 
-	const handlePlay = useCallback((item, resume, options) => {
+	const handlePlay = useCallback(async (item, resume, options) => {
 		if (item.MediaType === 'Book' && item.Path?.toLowerCase().endsWith('.cbz')) {
 			setComicViewerItem(item);
 			return;
 		}
+		// Music left playing behind the screens reports its stop before the new item opens.
+		if (backgroundMusic) await remoteControl.releasePlayer();
 		if (isSyncPlayInGroup) {
 			syncPlaySetNewQueue([item.Id]);
 		} else if (settings.syncplayEnabled !== false && settings.syncplayAutoOpen) {
@@ -973,7 +1051,7 @@ const AppContent = (props) => {
 		setPlaybackOptions(options || null);
 		setIsResume(!!resume);
 		navigateTo(PANELS.PLAYER);
-	}, [navigateTo, isSyncPlayInGroup, openSyncPlay, settings.syncplayAutoOpen, settings.syncplayEnabled, syncPlaySetNewQueue]);
+	}, [navigateTo, isSyncPlayInGroup, openSyncPlay, settings.syncplayAutoOpen, settings.syncplayEnabled, syncPlaySetNewQueue, backgroundMusic]);
 
 	const playSyncPlayItem = useCallback((item) => {
 		if (panelIndex === PANELS.PLAYER && playingItem?.Id === item.Id) return;
@@ -1042,9 +1120,23 @@ const AppContent = (props) => {
 		setPlayingItem(null);
 		setPlaybackOptions(null);
 		setIsResume(false);
-		handleBack();
+		setMusicInBackground(false);
+		// Music stopped from the mini player ends wherever the viewer already is.
+		if (panelIndex === PANELS.PLAYER) handleBack();
 		window.dispatchEvent(new CustomEvent('moonfin:browseRefresh'));
-	}, [handleBack, panelHistory, selectedItem, playingItem]);
+	}, [handleBack, panelHistory, selectedItem, playingItem, panelIndex]);
+
+	const handlePlayerBackground = useCallback(() => {
+		setMusicInBackground(true);
+		handleBack();
+	}, [handleBack]);
+
+	const handleOpenMusic = useCallback(() => navigateTo(PANELS.PLAYER), [navigateTo]);
+
+	// Landing on the player screen by any route takes the music out of the background.
+	useEffect(() => {
+		if (panelIndex === PANELS.PLAYER) setMusicInBackground(false);
+	}, [panelIndex]);
 
 	// The guide button on the live TV OSD always lands on the guide, not wherever
 	// playback was launched from. When the player was opened from the guide its
@@ -1475,6 +1567,19 @@ const AppContent = (props) => {
 		);
 	}
 
+	if (timesUp) {
+		return (
+			<div className={css.app} {...props}>
+				<TimesUp
+					nextAccess={nextAccess}
+					now={shiftedNow(settings.timeOffsetHours)}
+					clockDisplay={settings.clockDisplay}
+					onSwitchUser={handleTimesUpSwitchUser}
+				/>
+			</div>
+		);
+	}
+
 	if (isPinGateActive) {
 		return (
 			<div className={css.app} {...props}>
@@ -1575,6 +1680,8 @@ const AppContent = (props) => {
 					onUserMenu={handleOpenAccountModal}
 					onMessages={handleOpenServerMessages}
 					onFriends={handleOpenFriends}
+					music={navMusic}
+					onOpenMusic={handleOpenMusic}
 				/>
 			) : showNavBar ? (
 				<NavBar
@@ -1594,6 +1701,8 @@ const AppContent = (props) => {
 					onUserMenu={handleOpenAccountModal}
 					onMessages={handleOpenServerMessages}
 					onFriends={handleOpenFriends}
+					music={navMusic}
+					onOpenMusic={handleOpenMusic}
 				/>
 			) : null}
 			<ItemMenuProvider onPlay={handlePlayFromMenu} onOpenItem={handleSelectItem} backRef={itemMenuBackRef}>
@@ -1630,6 +1739,8 @@ const AppContent = (props) => {
 								onSelectItem={handleSelectItem}
 								onViewPhoto={handleViewPhoto}
 								onHome={handleHome}
+								onPlay={handlePlay}
+								onSearch={handleOpenSearch}
 									backHandlerRef={backHandlerRef}
 							/>
 							)}
@@ -1649,29 +1760,8 @@ const AppContent = (props) => {
 								/>
 							)}
 						</Panel>
-						<Panel>
-							{panelIndex === PANELS.PLAYER && playingItem && (
-								<Player
-									item={playingItem}
-									resume={isResume}
-									initialMediaSourceId={playbackOptions?.mediaSourceId}
-									initialAudioIndex={playbackOptions?.audioStreamIndex}
-									initialSubtitleIndex={playbackOptions?.subtitleStreamIndex}
-									initialStartPositionTicks={playbackOptions?.startPositionTicks}
-									initialQuality={playbackOptions?.forceBitrate}
-									forceTranscode={playbackOptions?.forceTranscode}
-									audioPlaylist={playbackOptions?.audioPlaylist}
-									videoQueue={playbackOptions?.videoQueue}
-									liveTvChannels={playbackOptions?.liveTvChannels}
-									onEnded={handlePlayerEnd}
-									onBack={handlePlayerEnd}
-									onGuide={handlePlayerGuide}
-									onPlayNext={handlePlayNext}
-									onSelectPerson={handleSelectPersonFromPlayer}
-									onPausedChange={setIsPlayerPaused}
-								/>
-							)}
-						</Panel>
+						{/* The player's place in the panel order. It's drawn after the panels so music can keep playing behind them. */}
+						<Panel />
 						<Panel>
 							{panelIndex === PANELS.FAVORITES && (
 								<Favorites onSelectItem={handleSelectItem} onSelectPerson={handleSelectPerson} onHome={handleHome} backHandlerRef={backHandlerRef} />
@@ -1829,6 +1919,32 @@ const AppContent = (props) => {
 						</Panel>
 					</Panels>
 				</Suspense>
+				{/* Its own boundary, so a screen loading for the first time can't swap out music playing behind it. */}
+				<Suspense fallback={<PanelLoader />}>
+					{playingItem && (panelIndex === PANELS.PLAYER || backgroundMusic) && (
+						<Player
+							item={playingItem}
+							resume={isResume}
+							initialMediaSourceId={playbackOptions?.mediaSourceId}
+							initialAudioIndex={playbackOptions?.audioStreamIndex}
+							initialSubtitleIndex={playbackOptions?.subtitleStreamIndex}
+							initialStartPositionTicks={playbackOptions?.startPositionTicks}
+							initialQuality={playbackOptions?.forceBitrate}
+							forceTranscode={playbackOptions?.forceTranscode}
+							audioPlaylist={playbackOptions?.audioPlaylist}
+							videoQueue={playbackOptions?.videoQueue}
+							liveTvChannels={playbackOptions?.liveTvChannels}
+							background={backgroundMusic}
+							onBackground={handlePlayerBackground}
+							onEnded={handlePlayerEnd}
+							onBack={handlePlayerEnd}
+							onGuide={handlePlayerGuide}
+							onPlayNext={handlePlayNext}
+							onSelectPerson={handleSelectPersonFromPlayer}
+							onPausedChange={setIsPlayerPaused}
+						/>
+					)}
+				</Suspense>
 				{/* Covered screens hide Home rather than unmount it, so going back is instant and lands on
 				the same card. It's let go at sign in and during playback, which wants the memory. */}
 				{panelIndex !== PANELS.LOGIN && panelIndex !== PANELS.PLAYER && panelIndex !== PANELS.GAME_PLAYER && (
@@ -1846,7 +1962,7 @@ const AppContent = (props) => {
 							onOpenSeerrShortcut={handleOpenSeerrShortcut}
 							isVisible={panelIndex === PANELS.BROWSE && !showSettingsPanel}
 							backHandlerRef={backHandlerRef}
-							onFocusItemThemeMusic={themeMusic.playThemeMusicDelayed}
+							onFocusItemThemeMusic={backgroundMusic ? undefined : themeMusic.playThemeMusicDelayed}
 							onBlurItemThemeMusic={themeMusic.cancelDelayed}
 							onLeaveThemeMusic={themeMusic.stopThemeMusic}
 							onHoldThemeMusic={themeMusic.holdThemeMusic}

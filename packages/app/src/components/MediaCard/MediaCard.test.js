@@ -131,6 +131,13 @@ describe('MediaCard in other rows', () => {
 	});
 });
 
+it('holds the artwork back while its row is far from focus', () => {
+	const {rerender} = render(<MediaCard item={seerrMovie()} serverUrl="http://server" rowImageType="poster" deferImage />);
+	expect(document.querySelector('img').hasAttribute('src')).toBe(false);
+	rerender(<MediaCard item={seerrMovie()} serverUrl="http://server" rowImageType="poster" />);
+	expect(document.querySelector('img').getAttribute('src')).toBe(POSTER);
+});
+
 // A controller that records what the card asks of it and lets a test move the phase.
 const fakeController = () => {
 	const listeners = {};

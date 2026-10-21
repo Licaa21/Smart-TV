@@ -12,6 +12,7 @@ import {canScoreSeedLocally, getOnlineRecommendations, getRecommendations, merge
 import {fetchMissingCollectionItems} from './seerrMissingCollectionItems';
 import {buildCollectionIndex, fetchCollectionPage} from './collectionPlaylist';
 import {sectionVisibility} from '../../utils/detailSectionLayout';
+import {withPersonRoles} from '../../utils/personCredits';
 import {isBlocked as isContentBlocked, isBlockedNow, observeItem} from '../../services/blockedContentGate';
 import {getActiveParentalFilter, withoutBlockedItems} from '../../services/parentalControls';
 import * as userDataSync from '../../services/userDataSync';
@@ -433,7 +434,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 
 				if (data.Type === 'Person') {
 					const filmography = await effectiveApi.getItemsByPerson(itemId, 50).catch(() => null);
-					if (filmography) setSimilar(tagWithServerInfo(withoutBlockedItems(filmography.Items || [])));
+					if (filmography) setSimilar(tagWithServerInfo(withPersonRoles(withoutBlockedItems(filmography.Items || []), itemId)));
 				}
 			};
 

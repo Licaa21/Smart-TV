@@ -16,7 +16,7 @@ import {
 	resolvePreviewTarget,
 	supportsMediaPreview
 } from '../../services/mediaPreviewSource';
-import {claimSharedVideo, releaseSharedVideo} from '../../utils/sharedVideoOwner';
+import {claimSharedVideo, isMusicPlaying, releaseSharedVideo} from '../../utils/sharedVideoOwner';
 import {coverVideoInBox, resetVideoBox} from '../../utils/videoCover';
 
 const noop = () => {};
@@ -246,7 +246,7 @@ export const createMediaPreviewController = ({getSettings, api, onThemeMusicHold
 	const schedule = (key, item) => {
 		if (key) focused = {key, item};
 		if (current && current.key === key) return;
-		const qualifies = enabled && !!key && supportsMediaPreview(item);
+		const qualifies = enabled && !!key && supportsMediaPreview(item) && !isMusicPlaying();
 		if (current) stop(qualifies ? 'replaced' : 'blur');
 		if (!qualifies) return;
 		requestId += 1;

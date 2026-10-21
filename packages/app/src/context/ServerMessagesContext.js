@@ -2,6 +2,7 @@ import {createContext, useContext, useState, useEffect, useCallback, useMemo, us
 import * as seerrApi from '../services/seerrApi';
 import {parseServerMessages} from '../services/serverMessages';
 import {getFromStorage, saveToStorage} from '../services/storage';
+import {afterHomeReady} from '../utils/homeReady';
 import {useAuth} from './AuthContext';
 import {useSeerr} from './SeerrContext';
 
@@ -70,6 +71,8 @@ export const ServerMessagesProvider = ({children}) => {
 			}
 
 			if (!supported || !serverUrl || !accessToken) return;
+			await afterHomeReady();
+			if (stale) return;
 
 			let payload;
 			try {

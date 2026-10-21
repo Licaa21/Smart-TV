@@ -65,6 +65,16 @@ export const splitFilmography = (items, showsSection = SHOWS_EVERYTHING) => {
 	return {movies, series, guestAppearances, musicVideos};
 };
 
+// What the person plays in each title rides along as the card's second line,
+// and the rest of the cast is let go. Several roles arrive one per line.
+export const withPersonRoles = (items, personId) => items.map(({People, ...item}) => {
+	const role = (People || [])
+		.filter((person) => person.Id === personId)
+		.map((person) => String(person.Role || '').split('\n').map((line) => line.trim()).filter(Boolean).join(', '))
+		.find(Boolean);
+	return role ? {...item, Subtitle: role} : item;
+});
+
 const creditTitle = (credit) => credit.title || credit.name || credit.originalTitle || credit.originalName || '';
 
 const creditDate = (credit) => credit.releaseDate || credit.release_date || credit.firstAirDate || credit.first_air_date || null;

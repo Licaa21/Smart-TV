@@ -771,3 +771,11 @@ describe('friends and chat', () => {
 		expect(JSON.parse(init.body)).toEqual({AppearOffline: true, EnableUnlockToasts: true, HideNowPlaying: false, HideLastWatched: false, MessageNotifications: false});
 	});
 });
+
+describe('preferences read at start-up', () => {
+	test('the unlock and privacy readers share one request', async () => {
+		serve({'users/user1/preferences': {EnableUnlockToasts: true, AppearOffline: false}});
+		await Promise.all([api.fetchUnlockToastSettings(), api.fetchSocialPrivacy()]);
+		expect(paths().filter((path) => path.startsWith('users/user1/preferences'))).toHaveLength(1);
+	});
+});

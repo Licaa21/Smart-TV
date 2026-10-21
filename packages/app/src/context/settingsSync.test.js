@@ -14,7 +14,7 @@ jest.mock('../services/seerrApi', () => ({saveMoonfinProfile: jest.fn(() => Prom
 import {saveMoonfinProfile} from '../services/seerrApi';
 import {
 	SYNCABLE_KEYS, SYNC_PROFILES, __pushQueue, activeSyncProfile, defaultSettings, flushSettingsPush,
-	localToProfile, profileToLocal, resolveFromEnvelope
+	localToProfile, profileToLocal, resolveFromEnvelope, sameSyncedValue
 } from './SettingsContext';
 import {__resetHomeLayoutPassthrough, homeRowsFromProfile} from '../utils/homeLayout';
 
@@ -333,6 +333,23 @@ describe('the library style', () => {
 	});
 });
 
+describe('the music library style', () => {
+	test('defaults to immersive', () => {
+		expect(defaultSettings.musicLibraryStyle).toBe('immersive');
+	});
+
+	test('takes and sends each style under its own name', () => {
+		['classic', 'quickAccess', 'immersive'].forEach((style) => {
+			expect(profileToLocal({musicLibraryStyle: style})).toEqual({musicLibraryStyle: style});
+			expect(localToProfile({...defaultSettings, musicLibraryStyle: style}, ['musicLibraryStyle'])).toEqual({musicLibraryStyle: style});
+		});
+	});
+
+	test('keeps the style it has when the profile names one this app has no way to draw', () => {
+		expect(profileToLocal({musicLibraryStyle: 'bookstore'})).toEqual({});
+	});
+});
+
 describe('the media preview switches', () => {
 	test('default to off with sound on', () => {
 		expect(defaultSettings.episodePreviewEnabled).toBe(false);
@@ -620,4 +637,12 @@ describe('the profile push queue', () => {
 			['global', {navbarPosition: 'left'}, 'http://server', 'token']
 		]);
 	});
+});
+
+test('Home rows read back from the webOS database still match the server copy', () => {
+	const server = [{id: 'resume', name: 'Continue Watching', enabled: true, order: 0}];
+	const kept = [{_id: '1a', enabled: true, id: 'resume', name: 'Continue Watching', order: 0}];
+	expect(sameSyncedValue(server, kept)).toBe(true);
+	expect(sameSyncedValue(server, [{...kept[0], enabled: false}])).toBe(false);
+	expect(sameSyncedValue(server, [...kept, {_id: '1b', id: 'nextup', enabled: true, order: 1}])).toBe(false);
 });

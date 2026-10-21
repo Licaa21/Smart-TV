@@ -6,6 +6,7 @@ import $L from '@enact/i18n/$L';
 import {isBackKey, KEYS} from '../../utils/keys';
 import {exitApp} from '../../utils/appLifecycle';
 import {isVega} from '../../platform';
+import useReturnFocus from '../../hooks/useReturnFocus';
 
 import css from './ExitDialog.module.less';
 
@@ -18,6 +19,8 @@ const DialogContainer = SpotlightContainerDecorator({
 const SpottableButton = Spottable('button');
 
 const ExitDialog = ({open, onCancel, onExit}) => {
+	useReturnFocus(open);
+
 	useEffect(() => {
 		if (open) {
 			const t = setTimeout(() => Spotlight.focus('exit-cancel-btn'), 100);

@@ -1,7 +1,8 @@
-import {useCallback} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
 import {getImageUrl} from '../../../utils/helpers';
 import {pointerHover} from '../../../utils/focusScroll';
+import LoopMarquee from '../../../components/LoopMarquee';
 import {SpottableDiv} from '../PlayerConstants';
 
 import css from './QueuePanel.module.less';
@@ -18,15 +19,22 @@ const QueueRow = ({track, isCurrent, serverUrl, focusDisabled, onSelect, onFocus
 	const artId = track.AlbumId || track.Id;
 	const artUrl = artId ? getImageUrl(track._serverUrl || serverUrl, artId, 'Primary', {maxHeight: 96}) : null;
 
+	const [focused, setFocused] = useState(false);
 	const handleClick = useCallback(() => onSelect(track), [onSelect, track]);
-	const handleFocus = useCallback((e) => onFocusRow(e.currentTarget), [onFocusRow]);
+	const handleFocus = useCallback((e) => {
+		setFocused(true);
+		onFocusRow(e.currentTarget);
+	}, [onFocusRow]);
+	const handleBlur = useCallback(() => setFocused(false), []);
 
 	return (
 		<SpottableDiv
 			className={`${css.row} ${isCurrent ? css.rowCurrent : ''}`}
+			data-panel-entry={isCurrent ? 'true' : undefined}
 			spotlightDisabled={focusDisabled}
 			onClick={handleClick}
 			onFocus={handleFocus}
+			onBlur={handleBlur}
 		>
 			<div className={css.thumb}>
 				{artUrl
@@ -34,7 +42,7 @@ const QueueRow = ({track, isCurrent, serverUrl, focusDisabled, onSelect, onFocus
 					: <div className={css.thumbPlaceholder} />}
 			</div>
 			<div className={css.rowText}>
-				<div className={css.rowTitle}>{track.Name}</div>
+				<LoopMarquee className={css.rowTitle} text={track.Name} active={focused} />
 				<div className={css.rowArtist}>{artistOf(track)}</div>
 			</div>
 			{isCurrent && <div className={css.rowIcon}><IconEqualizer /></div>}
@@ -42,15 +50,26 @@ const QueueRow = ({track, isCurrent, serverUrl, focusDisabled, onSelect, onFocus
 	);
 };
 
-// The Up Next list. Rows are focusable so the remote's 5-way walks them, and the
-// container traps focus until left or back takes it back to the tabs.
+// Sets scrollTop by hand, since webOS 2 and old WebKit don't take scrollIntoView options.
+const scrollRowToTop = (container, el) => {
+	if (container && el) container.scrollTop = el.offsetTop;
+};
+
+// The whole queue, played tracks included. Rows are focusable so the remote's
+// 5-way walks them, and whichever row has focus sits at the top of the list.
 const QueuePanel = ({items, currentId, serverUrl, focusDisabled, onSelectTrack, scrollerRef}) => {
 	const handleFocusRow = useCallback((el) => {
-		const container = scrollerRef?.current;
-		if (!container || !el || pointerHover()) return;
-		// scrollIntoView options are unsupported on webOS 2 and old WebKit
-		container.scrollTop = el.offsetTop - (container.clientHeight / 2) + (el.offsetHeight / 2);
+		if (!pointerHover()) scrollRowToTop(scrollerRef?.current, el);
 	}, [scrollerRef]);
+
+	// It opens on the playing track and follows playback, except while the
+	// remote is inside, where the focused row stays put.
+	const focusDisabledRef = useRef(focusDisabled);
+	focusDisabledRef.current = focusDisabled;
+	useEffect(() => {
+		const container = scrollerRef?.current;
+		if (focusDisabledRef.current) scrollRowToTop(container, container?.querySelector('[data-panel-entry]'));
+	}, [currentId, items, scrollerRef]);
 
 	if (!items || items.length === 0) {
 		return <div className={css.empty}>{$L('Queue is empty')}</div>;

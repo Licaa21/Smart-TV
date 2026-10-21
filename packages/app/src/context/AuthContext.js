@@ -299,6 +299,9 @@ export const AuthProvider = ({children}) => {
 	 * Switch to a different server/user
 	 */
 	const switchUser = useCallback(async (serverId, userId) => {
+		// Music left playing behind the screens is the leaving user's, so it stops while their
+		// sign in can still report it.
+		await remoteControl.runPlayerCommand('stop');
 		try {
 			const success = await multiServerManager.setActiveServer(serverId, userId);
 			if (!success) return false;
@@ -424,6 +427,7 @@ export const AuthProvider = ({children}) => {
 	}, []);
 
 	const logout = useCallback(async () => {
+		await remoteControl.runPlayerCommand('stop');
 		if (activeServerInfo) {
 			await multiServerManager.removeServer(activeServerInfo.serverId, activeServerInfo.userId);
 		}
@@ -455,6 +459,7 @@ export const AuthProvider = ({children}) => {
 	 * Full logout - remove all servers and users
 	 */
 	const logoutAll = useCallback(async () => {
+		await remoteControl.runPlayerCommand('stop');
 		// Clear all caches first
 		clearAllCaches();
 
@@ -516,6 +521,17 @@ export const AuthProvider = ({children}) => {
 		}
 	}, [isAuthenticated]);
 
+	/**
+	 * Leave the signed-in user without forgetting them: their saved sign-in stays, so they are
+	 * on the picker to be chosen again. For when the account can't be used for now.
+	 */
+	const leaveSession = useCallback(() => {
+		jellyfinApi.setAuth(null, null);
+		setAccessToken(null);
+		setUser(null);
+		setIsAuthenticated(false);
+	}, []);
+
 	// The session socket, and the watched state and remote control it carries, belong to whoever
 	// is signed in, so all of it starts over when the account or the server changes. A server that
 	// restarts forgets what this session can do, so it's told again on every connect.
@@ -525,7 +541,7 @@ export const AuthProvider = ({children}) => {
 		userDataSync.bindTo(serverSocket.onMessage, jellyfinApi.getUserId());
 		remoteControl.bindTo(serverSocket.onMessage);
 		const stopReporting = serverSocket.onConnectionChange((open) => {
-			if (open) jellyfinApi.reportCapabilities();
+			if (open) jellyfinApi.reportCapabilities({unlessRecent: true});
 		});
 		return () => {
 			stopReporting();
@@ -608,6 +624,7 @@ export const AuthProvider = ({children}) => {
 		loginWithToken,
 		logout,
 		logoutAll,
+		leaveSession,
 		switchUser,
 		removeUser,
 		removeServerEntry,
@@ -643,6 +660,7 @@ export const AuthProvider = ({children}) => {
 		loginWithToken,
 		logout,
 		logoutAll,
+		leaveSession,
 		switchUser,
 		removeUser,
 		removeServerEntry,

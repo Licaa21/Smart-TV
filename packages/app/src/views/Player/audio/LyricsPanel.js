@@ -19,11 +19,9 @@ const LyricsPanel = ({lines, activeIndex, isLoading, error, isSynced, isFocusabl
 		container.scrollTop = el.offsetTop - (container.clientHeight * 0.3) + (el.offsetHeight / 2);
 	}, [activeIndex, isFocusable]);
 
+	// The cursor line sits at the top of the panel, like the queue's focused row.
 	const handleFocusLine = useCallback((e) => {
-		const container = scrollerRef.current;
-		const el = e.currentTarget;
-		if (!container || !el) return;
-		container.scrollTop = el.offsetTop - (container.clientHeight / 2) + (el.offsetHeight / 2);
+		if (scrollerRef.current) scrollerRef.current.scrollTop = e.currentTarget.offsetTop;
 	}, []);
 
 	const handleSelectLine = useCallback((e) => {
@@ -46,6 +44,7 @@ const LyricsPanel = ({lines, activeIndex, isLoading, error, isSynced, isFocusabl
 							key={index}
 							className={css.cursorLine}
 							data-lyric-index={index}
+							data-panel-entry={index === Math.max(activeIndex, 0) ? 'true' : undefined}
 							onClick={handleSelectLine}
 							onFocus={handleFocusLine}
 						>

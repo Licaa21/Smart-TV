@@ -6,10 +6,12 @@ import Hls from 'hls.js';
 import * as playback from '../../services/playback';
 import {getImageUrl, getLogoUrl} from '../../utils/helpers';
 import {api as jellyfinApi, createApiForServer, getServerUrl} from '../../services/jellyfinApi';
+import {getApiForItem} from '../../services/connectionPool';
 import AudioMode from './audio/AudioMode';
 import useAudioTransport from './audio/useAudioTransport';
 import useLyrics from './audio/useLyrics';
-import {handleAudioFocusKey, exitAudioPanel, nextAudioFocusRow, AUDIO_FOCUS_IDS} from './audio/audioFocus';
+import useSkipFailedTrack from './audio/useSkipFailedTrack';
+import {handleAudioFocusKey, exitAudioPanel, nextAudioFocusRow, focusAudioRow, forgetDockFocus} from './audio/audioFocus';
 import {detectPlatformVersion, getH264FallbackProfile} from '../../services/deviceProfile';
 import {initPgsRenderer, initPgsInBandRenderer, disposePgsRenderer} from '../../utils/pgsRenderer';
 import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTime, clearAssCanvas} from '../../utils/assRenderer';
@@ -31,7 +33,7 @@ import {
 	getHostAudioOutput,
 	chooseHostReader
 } from '../../services/video';
-import {KEYS, isBackKey} from '../../utils/keys';
+import {KEYS, isBackKey, isMediaKey} from '../../utils/keys';
 import {useSettings} from '../../context/SettingsContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import * as syncPlayService from '../../services/syncPlay';
@@ -137,7 +139,7 @@ const renderInfoVideoExtra = ({css: c, videoStream}) => (
 	) : null
 );
 
-const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialSubtitleIndex, initialStartPositionTicks, initialQuality, forceTranscode, onEnded, onBack, onGuide, onPlayNext, onSelectPerson, audioPlaylist, videoQueue, liveTvChannels, onPausedChange}) => {
+const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialSubtitleIndex, initialStartPositionTicks, initialQuality, forceTranscode, onEnded, onBack, onGuide, onPlayNext, onSelectPerson, audioPlaylist, videoQueue, liveTvChannels, onPausedChange, background, onBackground}) => {
 	const {settings, updateSetting} = useSettings();
 	const {isInGroup, lastCommand} = useSyncPlay();
 	const syncPlayCommandRef = useRef(false);
@@ -213,7 +215,6 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const [hasTriedTranscode, setHasTriedTranscode] = useState(false);
 	const [focusRow, setFocusRow] = useState('bottom');
 	const [isAudioMode, setIsAudioMode] = useState(false);
-	const [audioTab, setAudioTab] = useState('queue');
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [zoomMode, setZoomMode] = useState(() => zoomInternalFromSetting(settings.playerZoomMode));
 	const [videoDisplayAspectRatio, setVideoDisplayAspectRatio] = useState(null);
@@ -352,10 +353,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const {
 		shuffleMode, repeatMode, hasNextTrack, hasPrevTrack,
 		handleToggleShuffle, handleToggleRepeat, setShuffleMode, setRepeatMode, handleNextTrack, handlePrevTrack,
-		handleSelectQueueTrack, handleSeekToLyric, handleEnterAudioPanel, getNextStep
+		handleSelectQueueTrack, handleSeekToLyric, audioPanel, handleSelectAudioPanel, queueTracks, getNextStep
 	} = useAudioTransport({
 		item, audioPlaylist, isAudioMode, onPlayNext, positionRef,
-		restartCurrent, seekTo, getPositionSeconds, setFocusRow
+		restartCurrent, seekTo, getPositionSeconds, setFocusRow,
+		hasLyrics: lyrics.lines.length > 0
 	});
 
 	const destroyHlsPlayer = () => {
@@ -459,7 +461,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		shuffleMode, repeatMode, selectedQuality,
 		selectedSubtitleIndex, canDownloadRemoteSubtitles: !isAudioMode && Boolean(item?.Id), hasCastMembers, zoomModeLabel, zoomModeKey: zoomMode,
 		sleepMinutes,
-		canBrowseEpisodes: canBrowseEpisodes({item, isLiveTV, isAudioMode})
+		canBrowseEpisodes: canBrowseEpisodes({item, isLiveTV, isAudioMode}),
+		isFavorite, hasLyrics: lyrics.lines.length > 0, audioPanel
 	});
 
 	useEffect(() => {
@@ -884,6 +887,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				prevItemIdRef.current = item.Id;
 			}
 			setIsLoading(true);
+			// A video taking over from music opens on its own screen, not the music player's.
+			setIsAudioMode((wasAudio) => wasAudio && (item?.MediaType === 'Audio' || item?.Type === 'Audio'));
 			setError(null);
 			scrubHoldRef.current = {active: false, wasPlaying: false, ticks: null};
 			setMediaSegments(null);
@@ -1145,7 +1150,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				setSubtitle(displaySubtitle);
 				setLogoUrl(isLiveTV ? null : getLogoUrl(item?._serverUrl || getServerUrl(), item, {maxWidth: 800, quality: 90}));
 				setIsAudioMode(shouldUseAudioMode);
-				setFocusRow('bottom');
+				// The next track keeps the music player's focus wherever the remote left it.
+				setFocusRow((row) => (shouldUseAudioMode && (row === 'panel' || row === 'progress') ? row : 'bottom'));
 				setIsFavorite(!!item.UserData?.IsFavorite);
 
 				// Audio mode: always show controls, skip video-only features
@@ -2002,7 +2008,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const startFailure = playbackStartTimedOutRef.current && !isPaused;
 		// A channel that fails to open reads as paused too, so only the viewer's own pause holds a live error back.
 		const paused = isPaused || (!isLiveTV && videoRef.current?.paused);
-		if (paused && !startFailure) {
+		// A file the set refuses reads as paused as well, so a pause before the source opened holds nothing back.
+		if (paused && !startFailure && videoRef.current?.readyState) {
 			console.log('[Player] Ignoring error while paused');
 			return;
 		}
@@ -2206,6 +2213,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		await teardownPlayback();
 		onBack?.();
 	}, [teardownPlayback, onBack]);
+
+	useSkipFailedTrack({error, background, item, hasNextTrack, handleNextTrack, handleBack});
 
 	const handleOpenGuide = useCallback(async () => {
 		await teardownPlayback();
@@ -2780,15 +2789,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			const next = isAudioMode ? nextAudioFocusRow('progress', 'up') : 'bottom';
 			setFocusRow(next);
 			setIsSeeking(false);
-			window.requestAnimationFrame(() => Spotlight.focus(isAudioMode ? AUDIO_FOCUS_IDS[next] : 'play-pause-btn'));
+			if (isAudioMode) focusAudioRow(next);
+			else window.requestAnimationFrame(() => Spotlight.focus('play-pause-btn'));
 		} else if (e.key === 'ArrowDown' || e.keyCode === 40) {
 			e.preventDefault();
 			settleHeldScrub();
 			setFocusRow('bottom');
 			setIsSeeking(false);
-			if (isAudioMode) {
-				window.requestAnimationFrame(() => Spotlight.focus('play-pause-btn'));
-			}
+			if (isAudioMode) focusAudioRow('bottom');
 		}
 	}, [heldSeekStep, scrubBy, resumeHeldScrub, settleHeldScrub, showControls, handlePlayPause, isAudioMode]);
 
@@ -2802,9 +2810,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const newState = !isFavorite;
 		setIsFavorite(newState);
 		try {
-			const serverUrl = item._serverUrl || getServerUrl();
-			const serverApi = serverUrl ? createApiForServer(serverUrl) : jellyfinApi;
-			await serverApi.setFavorite(item.Id, newState);
+			await (getApiForItem(item) || jellyfinApi).setFavorite(item.Id, newState);
 		} catch (err) {
 			console.error('[Player] Failed to toggle favorite:', err);
 			setIsFavorite(!newState);
@@ -2873,9 +2879,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			case 'shuffle': handleToggleShuffle(); break;
 			case 'repeat': handleToggleRepeat(); break;
 			case 'favorite': handleToggleFavorite(); break;
+			case 'addToPlaylist': openModal('playlist'); break;
+			case 'lyrics':
+			case 'queue': handleSelectAudioPanel(action); break;
 			default: break;
 		}
-	}, [showControls, handlePlayPause, handleRewind, handleForward, openModal, handleOpenCast, handleToggleZoom, handleOpenGuide, openCarousel, handlePlayNextNow, handleNextTrack, handlePrevTrack, handleToggleShuffle, handleToggleRepeat, handleToggleFavorite]);
+	}, [showControls, handlePlayPause, handleRewind, handleForward, openModal, handleOpenCast, handleToggleZoom, handleOpenGuide, openCarousel, handlePlayNextNow, handleNextTrack, handlePrevTrack, handleToggleShuffle, handleToggleRepeat, handleToggleFavorite, handleSelectAudioPanel]);
 
 	const handleControlButtonClick = useCallback((e) => {
 		const action = e.currentTarget.dataset.action;
@@ -3081,6 +3090,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	useEffect(() => {
 		const handleKeyDown = (e) => {
+			// Music playing behind the other screens leaves the remote to them, all but its media keys.
+			if (background && !isMediaKey(e)) return;
 			const key = e.key || e.keyCode;
 			// The channel carousel takes every key while it's up.
 			if (carouselOpenRef.current) return;
@@ -3152,12 +3163,19 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				e.preventDefault();
 				e.stopPropagation();
 				if (activeModal) {
-					closeModal();
+					// The playlist dialog takes Back itself so it can leave its name form first
+					if (activeModal !== 'playlist') closeModal();
 					return;
 				}
 				// Back leaves the queue or lyrics panel before it leaves the player
 				if (isAudioMode && focusRow === 'panel') {
 					exitAudioPanel(setFocusRow);
+					return;
+				}
+				// Back keeps the music going on the screen underneath, with the mini player up.
+				if (isAudioMode && onBackground) {
+					forgetDockFocus();
+					onBackground();
 					return;
 				}
 				if (controlsVisible) {
@@ -3274,22 +3292,30 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		return Math.max(progressPercent, Math.min(100, percent));
 	}, [displayTime, duration, progressPercent]);
 
+	// The loading screen unmounts the controls, so the next load has to put focus back too.
 	useEffect(() => {
-		if (!controlsVisible) return;
+		if (!controlsVisible || background || (isLoading && !isAudioMode)) return;
 
 		window.requestAnimationFrame(() => {
 			// The skip prompt keeps the remote when the controls come up around it.
 			if (isSkipPromptFocused()) return;
+			// The music player moves its own focus and stays up between tracks, so this
+			// only picks up focus that went missing, like a lyrics toggle a track took away.
+			if (isAudioMode) {
+				if (document.activeElement === document.body) focusAudioRow(focusRow);
+				return;
+			}
 			if (focusRow === 'progress') {
 				Spotlight.focus('progress-bar');
 			} else if (focusRow === 'bottom') {
 				Spotlight.focus('play-pause-btn');
 			}
 		});
-	}, [focusRow, controlsVisible]);
+	}, [focusRow, controlsVisible, isLoading, background, isAudioMode, lyrics.lines.length]);
 
 	return (
-		<div className={css.container} onClick={!isLoading && !error ? handleSurfaceClick : undefined}>
+		// Hidden rather than unmounted in the background, since taking the video element out of the page would pause it.
+		<div className={css.container} style={background ? {display: 'none'} : undefined} onClick={!isLoading && !error ? handleSurfaceClick : undefined}>
 			<div
 				ref={containerRef}
 				className={css.videoPlayer}
@@ -3298,7 +3324,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			<canvas ref={assCanvasRef} className={css.assCanvas} />
 
-			{isLoading && <LoadingAnimationLayer dimmed label={$L('Loading Stream...')} />}
+			{/* The music player stays up while the next track loads, so focus and the queue stay put. */}
+			{isLoading && !isAudioMode && <LoadingAnimationLayer dimmed label={$L('Loading Stream...')} />}
 
 			{error && !isLiveTV && (
 				<div className={css.error}>
@@ -3310,22 +3337,20 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 			{error && isLiveTV && !carouselProps && <LiveFailedCard channelName={item.Name} onRetry={handleRetryChannel} />}
 
-			{!isLoading && !error && isAudioMode && (
+			{!error && isAudioMode && (
 				<AudioMode
 					item={item}
 					title={title}
 					subtitle={subtitle}
 					serverUrl={getServerUrl()}
-					isFavorite={isFavorite}
-					onToggleFavorite={handleToggleFavorite}
 					focusRow={focusRow}
-					activeTab={audioTab}
-					onSelectTab={setAudioTab}
-					onEnterPanel={handleEnterAudioPanel}
-					audioPlaylist={audioPlaylist}
+					panel={audioPanel}
+					audioPlaylist={queueTracks}
 					onSelectTrack={handleSelectQueueTrack}
 					lyrics={lyrics}
 					onSeekToLine={handleSeekToLyric}
+					playlistOpen={activeModal === 'playlist'}
+					onClosePlaylist={closeModal}
 				/>
 			)}
 
@@ -3394,7 +3419,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				/>
 			)}
 
-			{!isLoading && !error && <PlayerControls
+			{(!isLoading || isAudioMode) && !error && <PlayerControls
 				isHdrContent={isHdrContent}
 				css={css}
 				controlsVisible={controlsVisible}

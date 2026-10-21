@@ -90,6 +90,9 @@ export const isBackKey = (e) => {
 	return code === KEYS.BACK || code === 27 || code === 8;
 };
 
+// The transport keys, which music playing behind the other screens still answers.
+export const isMediaKey = (e) => [KEYS.PLAY, KEYS.PAUSE, KEYS.PLAY_PAUSE, KEYS.STOP, KEYS.FAST_FORWARD, KEYS.REWIND].includes(e.keyCode || e.which);
+
 // A remote with a menu key does with one press what the others do by holding OK.
 export const isMenuKey = (e) => KEYS.MENU !== undefined && (e.keyCode || e.which) === KEYS.MENU;
 
@@ -98,21 +101,34 @@ export const isExitKey = (e) => {
 	return (e.keyCode || e.which) === TIZEN_KEYS.EXIT;
 };
 
-// A held arrow repeats at the remote's own rate, which a slow TV can't always keep up with. A repeat that sat
-// waiting behind the last move is dropped, so focus keeps pace with the key and stops when it's let go.
-const STALE_REPEAT_MS = 100;
-export const dropStaleArrowRepeats = (target = window) => {
+// A slow TV can take longer to draw a move than the remote takes to repeat a held arrow. Older engines
+// stamp events when they're handled, so a repeat's wait can't be read off the event. A repeat that
+// arrives before the last move has been drawn is dropped, so focus keeps pace with the key and stops
+// when it's let go. A separate press always goes through.
+const MAX_DRAW_WAIT_MS = 1000;
+export const paceArrowKeys = (target = window) => {
 	let held = null;
+	let drawing = false;
+	let acceptedAt = 0;
+	// A message posted from the next frame's callback is handled once that frame has been drawn.
+	const channel = new MessageChannel();
+	channel.port1.onmessage = () => {
+		drawing = false;
+	};
 	target.addEventListener('keydown', (e) => {
 		const code = e.keyCode;
 		if (code !== KEYS.UP && code !== KEYS.DOWN && code !== KEYS.LEFT && code !== KEYS.RIGHT) return;
 		const repeat = e.repeat || held === code;
 		held = code;
-		// Older engines stamp events with the wall clock rather than the page's own.
-		const now = e.timeStamp > 1e12 ? Date.now() : performance.now();
-		if (!repeat || now - e.timeStamp <= STALE_REPEAT_MS) return;
-		e.preventDefault();
-		e.stopImmediatePropagation();
+		// A page that stops drawing, hidden behind another app for one, can't hold the arrows forever.
+		if (repeat && drawing && Date.now() - acceptedAt < MAX_DRAW_WAIT_MS) {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			return;
+		}
+		drawing = true;
+		acceptedAt = Date.now();
+		window.requestAnimationFrame(() => channel.port2.postMessage(null));
 	}, true);
 	target.addEventListener('keyup', (e) => {
 		if (e.keyCode === held) held = null;

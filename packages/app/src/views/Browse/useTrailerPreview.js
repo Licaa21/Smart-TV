@@ -1,10 +1,11 @@
 import {useState, useEffect, useCallback, useRef} from 'react';
 import {buildQueryString} from '../../utils/urlCompat';
 import {stopPlaybackForTrailer} from '../../utils/trailerPlayback';
-import {claimSharedVideo, ownsSharedVideo, releaseSharedVideo} from '../../utils/sharedVideoOwner';
+import {claimSharedVideo, isMusicPlaying, ownsSharedVideo, releaseSharedVideo} from '../../utils/sharedVideoOwner';
 import {coverVideoInBox} from '../../utils/videoCover';
 import {createApiForServer, getApiKey, getServerUrl as getDefaultServerUrl} from '../../services/jellyfinApi';
 import serverLogger from '../../services/serverLogger';
+import {afterHomeReady} from '../../utils/homeReady';
 import css from './Browse.module.less';
 
 const TRAILER_REVEAL_MS = 3000;
@@ -26,6 +27,7 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 	// banners can hold their carousel while the trailer is already audible.
 	const [trailerHolding, setTrailerHolding] = useState(false);
 	const [screensaverActive, setScreensaverActive] = useState(false);
+	const [homeReady, setHomeReady] = useState(false);
 
 	// Mirrored so a new handler each render cant restart the trailer, since
 	// startTrailerPreview sits in the main effect's dependencies.
@@ -404,7 +406,17 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 	}, [stopTrailer, stopWatch, preferMuted, showCaptions, captionLanguage, removeCaptionTrack, releaseStream]);
 
 	useEffect(() => {
-		if (!enabled || !isVisible || !currentItem || screensaverActive) {
+		let live = true;
+		afterHomeReady().then(() => {
+			if (live) setHomeReady(true);
+		});
+		return () => {
+			live = false;
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!enabled || !homeReady || !isVisible || !currentItem || screensaverActive || isMusicPlaying()) {
 			stopTrailer();
 			return;
 		}
@@ -460,7 +472,7 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 			cancelled = true;
 			stopTrailer();
 		};
-	}, [currentItem, isVisible, screensaverActive, enabled, getLocalTrailerStreamUrlForItem, getRemoteTrailersForItem, startTrailerPreview, stopTrailer]);
+	}, [currentItem, isVisible, screensaverActive, enabled, homeReady, getLocalTrailerStreamUrlForItem, getRemoteTrailersForItem, startTrailerPreview, stopTrailer]);
 
 	useEffect(() => {
 		const handleScreensaver = (e) => setScreensaverActive(!!e.detail?.active);

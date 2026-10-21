@@ -2,6 +2,7 @@ import {isWebOS, isLegacyTizen} from '../platform';
 import {fetchWithTimeout} from '../utils/fetchTimeout';
 import {mediaServerQueue} from '../utils/requestQueue';
 import {normalizeWatchlistBody} from './seerrApi.watchlistShape';
+import {sharePending} from '../utils/sharePending';
 
 let moonfinMode = false;
 let jellyfinServerUrl = null;
@@ -267,9 +268,7 @@ const normalizeMoonfinStreamEvent = (payload) => {
 	return normalizeKeys(parsed);
 };
 
-export const moonfinPing = async (serverUrl, token) => {
-	const sUrl = serverUrl || jellyfinServerUrl;
-	const sToken = token || jellyfinAccessToken;
+const pingOnce = async (sUrl, sToken) => {
 	if (!sUrl || !sToken) {
 		throw new Error('Server URL and token required');
 	}
@@ -298,6 +297,11 @@ export const moonfinPing = async (serverUrl, token) => {
 		throw new Error('Invalid response from Moonfin Ping');
 	}
 };
+
+// More than one caller pings at launch, so a ping still on its way is shared.
+const sharedPing = sharePending((sUrl, sToken) => `${sUrl}|${sToken}`, pingOnce);
+
+export const moonfinPing = (serverUrl, token) => sharedPing(serverUrl || jellyfinServerUrl, token || jellyfinAccessToken);
 
 // The messages the admin wrote for this viewer, as the plugin sends them.
 export const getMoonfinMessages = async (serverUrl, token) => {

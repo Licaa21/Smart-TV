@@ -16,7 +16,15 @@ export const MUSIC_FOCUS_IDS = {
 	[CHIPS]: 'music-chips',
 	home: 'music-home-btn',
 	filter: 'music-filter-btn',
-	panel: 'music-filter-panel'
+	panel: 'music-filter-panel',
+	// The stops the Quick Access and Immersive chains land on, each the first thing in its section.
+	tabs: 'music-tabs',
+	play: 'music-play',
+	latest: 'music-latest',
+	lastPlayed: 'music-last-played',
+	genres: 'music-genre-0',
+	quick: 'music-quick-0',
+	railOverview: 'music-rail-overview'
 };
 
 // The hero drops out when the library has nothing to feature. The chips never

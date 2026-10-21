@@ -227,6 +227,7 @@ export const defaultSettings = {
 	useDetailedSubHeadings: true,
 	showMediaDetailsOnLibraryPage: true,
 	libraryStyle: 'classic',
+	musicLibraryStyle: 'immersive',
 	hideBackdropsInLibraries: false,
 	useSeriesThumbnails: false,
 	// The server keys, as the other clients store them, so they sync as they are.

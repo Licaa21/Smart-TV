@@ -10,7 +10,7 @@
  * Flags:
  *   --legacy               - Target Tizen 2.4 (strips Smart Hub Preview service
  *                            and Tizen 4+ metadata from config.xml)
- *   --oblong               - Use oblong (512x423) launcher icon instead of square
+ *   --oblong               - Use oblong (1920x1080) launcher icon instead of square
  *
  * Environment overrides (all optional, for installs in unusual places):
  *   TIZEN_CLI              - Full path to tizen / tizen.bat
@@ -335,7 +335,7 @@ async function main() {
 	console.log('\n' + cyan('═'.repeat(50)));
 	console.log(cyan('  Moonfin Tizen Build'));
 	if (isLegacy) console.log(cyan('  Target: Tizen 2.4 (no Smart Hub Preview)'));
-	if (isOblong) console.log(cyan('  Icon: oblong (512x423)'));
+	if (isOblong) console.log(cyan('  Icon: oblong (1920x1080)'));
 	console.log(cyan('═'.repeat(50)) + '\n');
 	
 	// Step 1: Find Tizen CLI. It is optional, and only needed to sign a build or
@@ -555,7 +555,7 @@ async function main() {
 		const iconDest = path.join(DIST, 'icon.png');
 		if (fs.existsSync(oblongSrc)) {
 			fs.copyFileSync(oblongSrc, iconDest);
-			success('Replaced icon.png with oblong variant (512x423)');
+			success('Replaced icon.png with oblong variant (1920x1080)');
 		} else {
 			warn('icon-oblong.png not found, keeping square icon');
 		}

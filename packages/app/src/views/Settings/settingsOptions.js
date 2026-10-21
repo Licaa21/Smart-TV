@@ -233,6 +233,12 @@ export const getLibraryStyleOptions = () => [
 	{ value: 'docked', label: $L('Docked') }
 ];
 
+export const getMusicLibraryStyleOptions = () => [
+	{ value: 'classic', label: $L('Classic') },
+	{ value: 'quickAccess', label: $L('Quick Access') },
+	{ value: 'immersive', label: $L('Immersive') }
+];
+
 export const getModernCardTransitionSpeedOptions = () => [
 	{ value: 'extraSlow', label: $L('Extra Slow') },
 	{ value: 'slow', label: $L('Slow') },

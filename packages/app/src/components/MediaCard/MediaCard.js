@@ -97,7 +97,7 @@ const episodeArtwork = (item, serverUrl, imageType, useSeriesArt) => {
 	return preferred || still;
 };
 
-const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'poster', onSelect, onFocusItem, showServerBadge = false, eagerLoad = false, seerrSeasonStatus, spotlightId, onSpotlightLeft, onSpotlightRight, menuOptions}) => {
+const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'poster', onSelect, onFocusItem, showServerBadge = false, eagerLoad = false, deferImage = false, seerrSeasonStatus, spotlightId, onSpotlightLeft, onSpotlightRight, menuOptions, size}) => {
 	const {settings} = useSettings();
 	const focusTimeoutRef = useRef(null);
 
@@ -276,12 +276,14 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 
 	const sizeMultiplier = POSTER_SIZE_MULTIPLIERS[settings.homeRowsPosterSize] || 1;
 	const shapeKey = isBanner ? 'banner' : isLandscape ? 'landscape' : isSquare ? 'square' : 'portrait';
-	const {width: cardWidth, height: cardHeight} = classicCardSize(shapeKey, settings.homeRowsPosterSize);
+	// A screen laying cards out to its own measure hands over the size, and the poster size setting stays out of it.
+	const {width: cardWidth, height: cardHeight} = size || classicCardSize(shapeKey, settings.homeRowsPosterSize);
 	// The genre name grows with the card so it reads on a poster and on a
 	// focused thumbnail alike, and the seerr genre cards use the same scale.
 	const genreLabelSize = Math.min(24, Math.max(14, cardWidth * (14 / 200)));
-	const sizeStyle = sizeMultiplier !== 1 ? {width: cardWidth + 'px'} : undefined;
-	const imgSizeStyle = sizeMultiplier !== 1 ? {height: cardHeight + 'px'} : undefined;
+	const sized = size || sizeMultiplier !== 1;
+	const sizeStyle = sized ? {width: cardWidth + 'px'} : undefined;
+	const imgSizeStyle = sized ? {height: cardHeight + 'px'} : undefined;
 	// Logos and studio art have to sit inside the card whole. Everything else takes
 	// the cover the stylesheet already applies, so it stays out of the inline style.
 	const imgStyle = imageType === 'logo' || item.Type === 'Studio' || item.Type === 'Network'
@@ -295,8 +297,8 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 					<>
 						<img
 							className={css.image}
-							src={imageUrl}
-							alt={item.Name}
+							src={deferImage ? undefined : imageUrl}
+							alt={deferImage ? '' : item.Name}
 							loading={eagerLoad ? 'eager' : 'lazy'}
 							width={cardWidth}
 							height={cardHeight}

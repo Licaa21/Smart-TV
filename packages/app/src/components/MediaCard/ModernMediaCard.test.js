@@ -263,3 +263,10 @@ describe('ModernMediaCard with the media preview', () => {
 		expect(frame()).toBeNull();
 	});
 });
+
+it('holds the artwork back while its row is far from focus', () => {
+	const {rerender} = render(<ModernMediaCard item={seerrShow()} serverUrl="http://server" deferImage />);
+	expect(document.querySelector('img').hasAttribute('src')).toBe(false);
+	rerender(<ModernMediaCard item={seerrShow()} serverUrl="http://server" />);
+	expect(document.querySelector('img').getAttribute('src')).toBe(POSTER);
+});

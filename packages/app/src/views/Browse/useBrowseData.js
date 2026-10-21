@@ -18,6 +18,8 @@ import {
 	cancelPendingCacheSave, clearBrowseCache, clearMemoryCache, isCacheValid, loadBrowseCache, memoryCache, saveBrowseCache
 } from './browseCache';
 
+const LOAD_FRESH_MS = 10000;
+
 // A row that quietly loses its source looks the same as a server with nothing to offer, so the
 // failure is logged before the row carries on empty.
 const emptyRowAfter = (label, err) => {
@@ -47,6 +49,7 @@ const useBrowseData = ({
 	const cacheOwner = useMemo(() => ({serverUrl, userId}), [serverUrl, userId]);
 
 	const lastVolatileRefreshRef = useRef(0);
+	const loadFetchedVolatileRef = useRef(0);
 
 	const settingsRef = useRef(settings);
 	settingsRef.current = settings;
@@ -133,6 +136,8 @@ const useBrowseData = ({
 	}, [api, serverUrl, accessToken, unifiedMode, getItemServerUrl]);
 
 	const refreshVolatileData = useCallback(async (force = false) => {
+		// The load that just ran fetched these rows itself, so Home's first show doesn't fetch them again.
+		if (Date.now() - loadFetchedVolatileRef.current < LOAD_FRESH_MS) return;
 		if (!force && Date.now() - lastVolatileRefreshRef.current < VOLATILE_REFRESH_COOLDOWN_MS) return;
 		lastVolatileRefreshRef.current = Date.now();
 		try {
@@ -216,6 +221,12 @@ const useBrowseData = ({
 
 	useEffect(() => cancelPendingCacheSave, []);
 
+	// Only the "since you watched" rows read the Seerr state, and it settles a moment after launch,
+	// so Home only loads again for it when one of those rows is on.
+	const recommendationState = homeRowsConfig.some((row) => row.enabled && row.id.startsWith('sinceyouwatched'))
+		? `${seerrEnabled}|${seerrAuthenticated}|${recommendationsSupported}`
+		: '';
+
 	useEffect(() => {
 		let cancelled = false;
 
@@ -291,6 +302,7 @@ const useBrowseData = ({
 
 				if (!isCacheValid(persistedCache.timestamp, CACHE_TTL_VOLATILE)) {
 					refreshVolatileData(true);
+					loadFetchedVolatileRef.current = Date.now();
 				}
 				return;
 			}
@@ -340,6 +352,7 @@ const useBrowseData = ({
 				}
 
 				memoryCache.libraries = libs;
+				loadFetchedVolatileRef.current = Date.now();
 
 				const latestItemsExcludes = userConfig?.Configuration?.LatestItemsExcludes || [];
 
@@ -572,9 +585,7 @@ const useBrowseData = ({
 		settings.sinceYouWatchedSourceType,
 		settings.sinceYouWatchedIncludeWatched,
 		settings.tmdbApiKey,
-		seerrEnabled,
-		seerrAuthenticated,
-		recommendationsSupported,
+		recommendationState,
 		settings.rewatchIncludeMovies,
 		settings.rewatchIncludeShows,
 		settings.rewatchIncludeCollections,

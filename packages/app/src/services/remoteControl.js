@@ -56,6 +56,9 @@ export const setPlayerControls = (ref) => {
 const app = () => appRef?.current || null;
 const player = () => playerRef?.current || null;
 
+// The mini player's buttons drive the running player through the same controls a remote gets.
+export const runPlayerCommand = (name) => player()?.[name]?.();
+
 // Lets the running player report its stop and let go of the stream before another item takes
 // its place.
 export const releasePlayer = async () => {

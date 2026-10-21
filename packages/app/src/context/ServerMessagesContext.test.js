@@ -17,6 +17,7 @@ jest.mock('../services/seerrApi', () => ({getMoonfinMessages: jest.fn()}));
 jest.mock('../services/storage', () => ({getFromStorage: jest.fn(), saveToStorage: jest.fn()}));
 jest.mock('./AuthContext', () => ({useAuth: jest.fn()}));
 jest.mock('./SeerrContext', () => ({useSeerr: jest.fn()}));
+jest.mock('../utils/homeReady', () => ({afterHomeReady: () => Promise.resolve()}));
 
 const message = (id, over = {}) => ({id, title: `Title ${id}`, body: `Body ${id}`, ...over});
 

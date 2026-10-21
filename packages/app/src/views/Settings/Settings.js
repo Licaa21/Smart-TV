@@ -705,7 +705,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	});
 
 	const {
-		tempHomeRows, tempPluginSections, pluginSectionRenderLimit, setPluginSectionRenderLimit,
+		tempHomeRows, tempPluginSections, serverHasLiveTv, pluginSectionRenderLimit, setPluginSectionRenderLimit,
 		toggleHomeRowEnabled, toggleSeerrHomeRow, openHomeRows, commitHomeRows, resetHomeRows,
 		toggleHomeRow, moveHomeRow, togglePluginSection, movePluginSection
 	} = useHomeRowsEditor({api, settings, updateSetting, updateSettings, pushView});
@@ -1333,6 +1333,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 					settings={settings}
 					tempHomeRows={tempHomeRows}
 					tempPluginSections={tempPluginSections}
+					serverHasLiveTv={serverHasLiveTv}
 					pluginSectionRenderLimit={pluginSectionRenderLimit}
 					onShowMoreSections={showMorePluginSections}
 					onToggleHomeRow={toggleHomeRow}

@@ -228,6 +228,7 @@ const ModernMediaCard = ({
 	onFocused,
 	showServerBadge = false,
 	eagerLoad = false,
+	deferImage = false,
 	spotlightId,
 	onSpotlightLeft,
 	onSpotlightRight,
@@ -410,8 +411,8 @@ const ModernMediaCard = ({
 					<>
 						<img
 							className={css.image}
-							src={imageUrl}
-							alt={item?.Name}
+							src={deferImage ? undefined : imageUrl}
+							alt={deferImage ? '' : item?.Name}
 							loading={eagerLoad ? 'eager' : 'lazy'}
 							width={cardWidth}
 							height={imageHeight}

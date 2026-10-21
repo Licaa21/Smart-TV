@@ -73,9 +73,13 @@ const MUSIC_CONTENT_TYPES = [
 	{key: 'albums', label: $L('Albums'), itemType: 'MusicAlbum'},
 	{key: 'albumArtists', label: $L('Album Artists'), itemType: 'AlbumArtist'},
 	{key: 'artists', label: $L('Artists'), itemType: 'MusicArtist'},
+	{key: 'songs', label: $L('Songs'), itemType: 'Audio'},
 	{key: 'playlists', label: $L('Playlists'), itemType: 'Playlist'},
 	{key: 'genres', label: $L('Genres'), itemType: 'MusicGenre'}
 ];
+
+// Every favorite in a music library, whatever its type.
+const FAVORITE_ITEMS = 'favoriteItems';
 
 const FOLDER_DETAIL_TYPES = ['Series', 'BoxSet', 'Playlist', 'MusicAlbum', 'MusicArtist'];
 
@@ -206,7 +210,7 @@ const handleRowsKeyDownDocked = createRowsLeftKeyDown(HEADER_IDS.docked);
 // focus move that only changes the header would redraw the whole grid.
 const GridList = memo(VirtualGridList);
 
-const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto, onHome, backHandlerRef}) => {
+const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto, onHome, onPlay, onSearch, backHandlerRef}) => {
 	const {api, serverUrl, serverType} = useAuth();
 	const {settings, updateSetting} = useSettings();
 
@@ -368,7 +372,8 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 			case 'music':
 			{
 				const mc = MUSIC_CONTENT_TYPES.find(c => c.key === musicContentType);
-				return mc ? mc.itemType : 'MusicAlbum';
+				if (mc) return mc.itemType;
+				return musicContentType === FAVORITE_ITEMS ? '' : 'MusicAlbum';
 			}
 			case 'musicvideos':
 				return 'MusicVideo';
@@ -669,12 +674,15 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		};
 	}, [effectiveApi, library, isMusicBrowseHome, getItemTypeForLibrary]);
 
-	// Favorites is the albums grid with the filter on rather than a type of its own.
-	const handleOpenMusicGrid = useCallback((target) => {
+	// Favorites is the albums grid with the filter on rather than a type of its own, and every
+	// favorite is the same filter over every type. A genre tile opens the albums grid filtered
+	// to its genre, and every other grid opens unfiltered.
+	const handleOpenMusicGrid = useCallback((target, genre) => {
 		if (!target) return;
 		setMusicGridView(target);
 		setMusicContentType(target === 'favorites' ? 'albums' : target);
-		setFavoritesOnly(target === 'favorites');
+		setFavoritesOnly(target === 'favorites' || target === FAVORITE_ITEMS);
+		setGenreFilters(genre ? [genre] : []);
 		setAllItems([]);
 		apiFetchIndexRef.current = 0;
 		initialFocusDoneRef.current = false;
@@ -1370,6 +1378,8 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 				serverUrl={effectiveServerUrl}
 				onSelectItem={onSelectItem}
 				onOpenGrid={handleOpenMusicGrid}
+				onPlay={onPlay}
+				onSearch={onSearch}
 				onHome={onHome}
 				backHandlerRef={backHandlerRef}
 			/>
