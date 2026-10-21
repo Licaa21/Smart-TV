@@ -11,13 +11,14 @@ use. It is not a project for everyone. Three changes are proposed upstream: the 
 The rules that matter most, each explained further down:
 
 1. **Ask before every change.** Questions come first, with options and a recommendation. See "Working rules".
-2. **Never commit to `main` or `daily`**, except the README and ignore rules on `main`. Work goes on `implement`.
-3. **Build only in `daily/`**, with `bash fork-tools/build-daily-wgt.sh`.
-4. **A change is done only when** lint and tests are clean, the code review found nothing real, every string has a
+2. **Before any coding on `implement`, bring `daily` into it** (`git fetch origin` then `git merge origin/daily` in `implement/`), so the work starts on what is new, upstream's changes and earlier merge fixes included.
+3. **Never commit to `main` or `daily`**, except the README and ignore rules on `main`. Work goes on `implement`.
+4. **Build only in `daily/`**, with `bash fork-tools/build-daily-wgt.sh`.
+5. **A change is done only when** lint and tests are clean, the code review found nothing real, every string has a
    Romanian one, and this file and the README are up to date.
-5. **After every merge from upstream**, run the merge checklist, and keep what is in "Upstream changes that are not
+6. **After every merge from upstream**, run the merge checklist, and keep what is in "Upstream changes that are not
    taken".
-6. **Commits carry no AI names**: authored as Licaa21, no co-author or generated-with lines.
+7. **Commits carry no AI names**: authored as Licaa21, no co-author or generated-with lines.
 
 ## Repository layout
 
@@ -55,6 +56,7 @@ ode_modules`.
 
 ## How changes flow
 
+0. Before any coding on `implement`, bring `daily` into it: `git fetch origin`, then `git merge origin/daily` in `implement/` (a fast-forward when `implement` has nothing new, a merge when it does). `daily` holds `main` (upstream) and `implement` together and any conflict already fixed, so the work starts on what is new. Do it again at the start of each piece of work, not once.
 1. Upstream moves. `main` takes it (`git merge upstream/main`, never rewritten).
 2. The fork's changes are committed on `implement`, in `implement/`. Never on `daily`, never on `main` (apart from the
    README and ignore rules).
@@ -277,7 +279,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
   `Moonfin_Tizen_Regular_v<version>_Lica_Fork.wgt`, for example `Moonfin_Tizen_Regular_v2.10.0_Lica_Fork.wgt`.
 - They are ignored by git and never committed, and no other folder keeps any. One file, rebuilt over the old one. A
   throwaway test build gets a clearly different name and is deleted after.
-- Each build is also put on the fork's "latest" GitHub release (`build-daily-wgt.sh` deletes the release and makes it again with the new file, so the link stays the same and the history does not grow). The package itself still never goes in a branch. If `gh` is missing or signed out the build says so and keeps the file here. Link: https://github.com/Licaa21/Smart-TV/releases/tag/latest
+- Each build is also put on the fork's "latest" GitHub release (`build-daily-wgt.sh` deletes the release and makes it again with the new file, so the link stays the same and the history does not grow). The package itself still never goes in a branch. If `gh` is missing or signed out the build says so and keeps the file here (`gh` lives in `%LOCALAPPDATA%GitHubCLIin`, which the script adds to its path when a shell lacks it). Link: https://github.com/Licaa21/Smart-TV/releases/tag/latest
 - The build runs the lint and a CSS check against the old TV browsers (chrome >= 38), so `gap`, `grid-gap` and similar
   fail it. Use flex with margins.
 

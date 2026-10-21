@@ -18,6 +18,10 @@ for built in Moonfin_Tizen_Regular_*.wgt; do
   esac
 done
 # A failed upload does not undo the build, the package is still here
+# gh is installed under the user's AppData and a shell does not always have it on its path
+if ! command -v gh >/dev/null 2>&1 && [ -n "$LOCALAPPDATA" ] && [ -x "$(cygpath -u "$LOCALAPPDATA")/GitHubCLI/bin/gh.exe" ]; then
+  export PATH="$PATH:$(cygpath -u "$LOCALAPPDATA")/GitHubCLI/bin"
+fi
 RELEASE_REPO="$(git remote get-url origin | sed -E 's#^.*github\.com[:/]##; s#\.git$##')"
 for built in Moonfin_Tizen_Regular_*_Lica_Fork.wgt; do
   if command -v gh >/dev/null 2>&1 && {
