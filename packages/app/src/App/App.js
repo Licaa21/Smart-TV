@@ -324,11 +324,30 @@ const AppContent = (props) => {
 	const {updateInfo, formattedNotes, dismiss: dismissUpdate, manualCheck: showUpdate} = useVersionCheck(
 		isAuthenticated && settings.updateNotificationsEnabled !== false ? 3000 : null
 	);
-	// Settings' Check for Updates found a newer release: the panel with its changelog opens, as it does at launch
+	// Settings' Check for Updates found a newer release: Settings steps out of the way, the panel with the changelog opens over
+	// Home as it does at launch, and closing it by OK or Back brings Settings back on the Check for Updates row.
+	const reopenSettingsRef = useRef(false);
+	const reopenSettingsAtUpdates = useCallback(() => {
+		setSettingsInitialView({categoryId: 'about', subcategoryId: 'about', focus: 'check-for-updates'});
+		setShowSettingsPanel(true);
+	}, []);
 	useEffect(() => {
-		window.addEventListener('moonfin:showUpdate', showUpdate);
-		return () => window.removeEventListener('moonfin:showUpdate', showUpdate);
-	}, [showUpdate]);
+		const handleShowUpdate = async () => {
+			setShowSettingsPanel(false);
+			const info = await showUpdate();
+			if (info) reopenSettingsRef.current = true;
+			else reopenSettingsAtUpdates();
+		};
+		window.addEventListener('moonfin:showUpdate', handleShowUpdate);
+		return () => window.removeEventListener('moonfin:showUpdate', handleShowUpdate);
+	}, [showUpdate, reopenSettingsAtUpdates]);
+	const handleCloseUpdate = useCallback(async () => {
+		await dismissUpdate();
+		if (reopenSettingsRef.current) {
+			reopenSettingsRef.current = false;
+			reopenSettingsAtUpdates();
+		}
+	}, [dismissUpdate, reopenSettingsAtUpdates]);
 	// A PIN saved before this client started hashing is still stored as itself, so both are
 	// offered and the plain one is written back as a hash the first time it is entered.
 	const storedPin = useMemo(() => ({
@@ -987,7 +1006,7 @@ const AppContent = (props) => {
 				}
 
 				if (updateInfo) {
-					dismissUpdate();
+					handleCloseUpdate();
 					return;
 				}
 
@@ -1036,7 +1055,7 @@ const AppContent = (props) => {
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [panelIndex, handleBack, handleReturnToPlayer, handleReturnToEpisode, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, timesUp, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition]);
+	}, [panelIndex, handleBack, handleReturnToPlayer, handleReturnToEpisode, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, timesUp, setupWizardActive, updateInfo, handleCloseUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition]);
 
 	// The account stays saved, so it can be chosen again from the picker once its hours are back.
 	const handleTimesUpSwitchUser = useCallback(() => {
@@ -2220,7 +2239,7 @@ const AppContent = (props) => {
 			<UpdateNotification
 				updateInfo={updateInfo}
 				formattedNotes={formattedNotes}
-				onDismiss={dismissUpdate}
+				onDismiss={handleCloseUpdate}
 			/>
 			<SeerrNotificationToast
 				notification={streamNotification}

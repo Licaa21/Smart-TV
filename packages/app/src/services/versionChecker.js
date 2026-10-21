@@ -1,6 +1,6 @@
 /**
  * Version Checker Service
- * Checks GitHub releases API for newer versions with 24-hour cooldown
+ * Checks GitHub releases API for newer versions on every start
  * and version dismissal capability. Only notifies when a release contains
  * the platform-specific asset (.ipk for webOS, .wgt for Tizen).
  */
@@ -15,7 +15,8 @@ import packageJson from '../../package.json';
 const APP_VERSION = process.env.REACT_APP_FORK_VERSION || packageJson.version;
 
 const GITHUB_RELEASES_URL = 'https://api.github.com/repos/Licaa21/Smart-TV/releases';
-const CHECK_COOLDOWN_HOURS = 24;
+// The fork has few releases to ask about, so every start asks, which is what a package being tried needs to see its update
+const CHECK_COOLDOWN_HOURS = 0;
 const STORAGE_KEY_LAST_CHECK = 'version_last_check';
 const STORAGE_KEY_DISMISSED_VERSION = 'version_dismissed';
 
