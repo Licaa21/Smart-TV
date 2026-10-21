@@ -279,7 +279,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
   `Moonfin_Tizen_Regular_v<version>_Lica_Fork.wgt`, for example `Moonfin_Tizen_Regular_v2.10.0_Lica_Fork.wgt`.
 - They are ignored by git and never committed, and no other folder keeps any. One file, rebuilt over the old one. A
   throwaway test build gets a clearly different name and is deleted after.
-- Each build is also put on the fork's "latest" GitHub release (`build-daily-wgt.sh` deletes the release and makes it again with the new file, so the link stays the same and the history does not grow). The package itself still never goes in a branch. If `gh` is missing or signed out the build says so and keeps the file here (`gh` lives in `%LOCALAPPDATA%GitHubCLIin`, which the script adds to its path when a shell lacks it). Link: https://github.com/Licaa21/Smart-TV/releases/tag/latest
+- Each build is published as a GitHub release of its own by `fork-tools/publish-wgt.sh` (the build script runs it, and it can be run alone for a package already built). Releases are kept, a build never replaces another: they are named by the fork's version, `fork-v1`, `fork-v2` and so on (counted from the releases there), the title is "Lica Fork v<N> (Moonfin <version>)", the package file carries it too (`Moonfin_Tizen_Regular_v<version>_Lica_Fork_v<N>.wgt`, the one from the last build is removed locally), and the description says what was done since the last release, the fork's commits and upstream's apart, with the commit ids. The package itself still never goes in a branch. If `gh` is missing or signed out nothing is published and the file stays here (`gh` lives in `%LOCALAPPDATA%GitHubCLIin`, which the script adds to its path when a shell lacks it). The newest release is always at https://github.com/Licaa21/Smart-TV/releases/latest
 - The build runs the lint and a CSS check against the old TV browsers (chrome >= 38), so `gap`, `grid-gap` and similar
   fail it. Use flex with margins.
 
@@ -287,6 +287,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
 
 - `fork-tools/update-daily.sh`: the merge into `daily` (see "How changes flow").
 - `fork-tools/build-daily-wgt.sh`: builds the package (see "Packages").
+- `fork-tools/publish-wgt.sh`: publishes the built package as a release of its own (see "Packages").
 - `fork-tools/link-modules.ps1`: links a folder's `node_modules` to the ones in `main/`.
 - `fork-tools/check-romanian.js`: the Romanian check (see "Strings and languages").
 - `scripts/gen-accent-rules.js`: regenerates `packages/app/src/theme/accentRules.generated.js` from the stylesheets. Run
