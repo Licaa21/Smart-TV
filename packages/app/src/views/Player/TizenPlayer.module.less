@@ -318,65 +318,52 @@
 }
 
 // Each button fades its ring in over a fifth of a second, and every frame of that repaints the whole controls
-// layer, so on a slow set a focus move waited on a dozen repaints. Medium and below change at once, and the
-// layer itself fades faster.
+// layer, so a focus move waited on a dozen repaints, which Ultra felt as much as a slow set. Every level changes at
+// once, and the layer itself fades faster.
 .controlBtn {
-	:global(.perf-low) &,
-	:global(.perf-mid) & {
-		transition: none;
-	}
+	transition: none;
 }
 
 .playerControls {
-	:global(.perf-low) &,
-	:global(.perf-mid) & {
-		transition: opacity 0.12s ease;
-	}
+	transition: opacity 0.12s ease;
 }
 
-// Medium and below look the same, but a focus move no longer draws anything again. The ring and fill sit in a
-// layer of their own behind the icon and are only shown or hidden, and so is the tooltip, which the slow sets
-// otherwise painted over the video on every press. Live TV's chips and a disabled button keep their own look.
+// A focus move no longer draws anything again. The ring and fill sit in a layer of their own behind the icon and
+// are only shown or hidden, and so is the tooltip, which was otherwise painted over the video on every press. Live TV's chips and a disabled button keep their own look.
 .controlBtn:not(.liveBtn):not(.controlBtnDisabled) {
-	:global(.perf-low) &,
-	:global(.perf-mid) & {
-		position: relative;
-		z-index: 0;
+	position: relative;
+	z-index: 0;
 
-		&::before {
-			content: '';
-			position: absolute;
-			top: -3px;
-			right: -3px;
-			bottom: -3px;
-			left: -3px;
-			z-index: -1;
-			box-sizing: border-box;
-			border: 3px solid #fff;
-			border-radius: 50%;
-			background: rgba(255, 255, 255, 0.22);
-			opacity: 0;
-			will-change: opacity;
-		}
+	&::before {
+		content: '';
+		position: absolute;
+		top: -3px;
+		right: -3px;
+		bottom: -3px;
+		left: -3px;
+		z-index: -1;
+		box-sizing: border-box;
+		border: 3px solid #fff;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.22);
+		opacity: 0;
+		will-change: opacity;
+	}
 
-		&:hover,
-		&:focus {
-			background: rgba(255, 255, 255, 0);
-			border-color: transparent;
-		}
+	&:hover,
+	&:focus {
+		background: rgba(255, 255, 255, 0);
+		border-color: transparent;
+	}
 
-		&:hover::before,
-		&:focus::before {
-			opacity: 1;
-		}
+	&:hover::before,
+	&:focus::before {
+		opacity: 1;
 	}
 }
 
 .focusTooltip {
-	:global(.perf-low) &,
-	:global(.perf-mid) & {
-		will-change: opacity;
-	}
+	will-change: opacity;
 }
 
 .controlBtn:hover img,

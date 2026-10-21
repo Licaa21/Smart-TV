@@ -30,6 +30,7 @@ import {keepFocusInView} from '../../utils/focusScroll';
 import {PanelContainer} from '../../utils/spotlightContainers';
 import {KEYS} from '../../utils/keys';
 import useSortSettingsPanels from '../../hooks/useSortSettingsPanels';
+import useHeaderGridKeys from '../../hooks/useHeaderGridKeys';
 import useStartLetter from '../../hooks/useStartLetter';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import useItemMenuHold, {cardIndexOf} from '../../hooks/useItemMenuHold';
@@ -1349,6 +1350,13 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		return getImageUrl(effectiveServerUrl, backdropId, 'Backdrop', {maxWidth: 1920, quality: 80, tag: backdropTag});
 	}, [backdropsEnabled, backdropId, backdropTag, effectiveServerUrl]);
 
+	// Channel Up and Down go between the header and the cards, so a long grid is not scrolled back up to reach it
+	const handleChannelKeys = useHeaderGridKeys(
+		HEADER_IDS[libraryStyle],
+		groupedActive ? 'library-group-row-0' : 'library-grid-area',
+		!showSortPanel && !showSettingsPanel && !isMusicBrowseHome
+	);
+
 	if (!library && !genreFilter && !studioFilter) {
 		return (
 			<div className={css.page}>
@@ -1392,7 +1400,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	}
 
 	return (
-		<div className={css.page}>
+		<div className={css.page} onKeyDown={handleChannelKeys}>
 			{backdropsEnabled && (
 				<BackdropLayer targetUrl={backdropUrl} blurAmount={settings?.backdropBlurHome} />
 			)}

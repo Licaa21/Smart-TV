@@ -470,6 +470,20 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${settingsCss.toggleOn}`, `background: ${settingsMark}; border-color: ${settingsMark};`);
 	rule(`.${settingsCss.toggleThumb}`, `background: ${onSurface};`);
 	rule(`.${settingsCss.toggleOn} .${settingsCss.toggleThumb}`, `background: ${settingsMarkInk};`);
+	// A focused row fills with the theme's focused button color, white in Glass, and the switch is drawn in the page's
+	// ink and the Settings accent, either of which can be that very color: a white track and thumb on a white row, or a
+	// white accent over it. On a focused row the switch is inked against the fill it sits on, and the filled one is moved
+	// off the fill only when it would not be seen.
+	const rowFillInk = inkOn(settingsFocus.fillHex);
+	const switchMarkHex = ensureVisible(settingsMarkHex, [settingsFocus.fillHex]);
+	const switchMark = toCssColor(switchMarkHex);
+	['listItem', 'syncCard'].forEach((rowName) => {
+		const focused = `.${settingsCss[rowName]}:focus`;
+		rule(`${focused} .${settingsCss.toggleTrack}`, `background: rgba(${rowFillInk}, 0.12); border-color: ${settingsFocus.strong};`);
+		rule(`${focused} .${settingsCss.toggleThumb}`, `background: ${settingsFocus.strong};`);
+		rule(`${focused} .${settingsCss.toggleOn}`, `background: ${switchMark}; border-color: ${switchMark};`);
+		rule(`${focused} .${settingsCss.toggleOn} .${settingsCss.toggleThumb}`, `background: ${readableInk(switchMarkHex, c.onAccent)};`);
+	});
 	rule(`.${settingsCss.sliderInactive}`, `background: ${rangeTrack};`);
 	// The bars follow the Settings accent once it is picked. A slider is focused while it is being moved, so the
 	// color is nudged away from the focused row's fill as well, which a white pick over a white row would not survive

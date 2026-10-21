@@ -11,6 +11,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import {getImageUrl, getBackdropId} from '../../utils/helpers';
 import {useStorage} from '../../hooks/useStorage';
 import useSortSettingsPanels from '../../hooks/useSortSettingsPanels';
+import useHeaderGridKeys from '../../hooks/useHeaderGridKeys';
 import useItemMenuHold, {cardIndexOf} from '../../hooks/useItemMenuHold';
 import {capitalize, createGridKeyDown, createToolbarKeyDown, cycleValue, stopPropagation} from '../../utils/gridChrome';
 import {PanelContainer} from '../../utils/spotlightContainers';
@@ -348,8 +349,11 @@ const Genres = ({onSelectGenre, onHome, backHandlerRef}) => {
 		? $L("{count} genres in '{libraryName}' sorted by {sortLabel}").replace('{count}', sortedGenres.length).replace('{libraryName}', selectedLibrary.Name).replace('{sortLabel}', currentSort ? $L(currentSort.label) : '')
 		: $L('{count} genres sorted by {sortLabel}').replace('{count}', sortedGenres.length).replace('{sortLabel}', currentSort ? $L(currentSort.label) : '');
 
+	// Channel Up and Down go between the toolbar and the cards, so a long list is not scrolled back up to reach it
+	const handleChannelKeys = useHeaderGridKeys('genres-toolbar', 'genres-grid-area', !showSortPanel && !showSettingsPanel);
+
 	return (
-		<div className={css.page}>
+		<div className={css.page} onKeyDown={handleChannelKeys}>
 			<div className={css.content}>
 				<div className={css.header}>
 					<div className={css.title}>{$L('Genres')}</div>
@@ -377,7 +381,7 @@ const Genres = ({onSelectGenre, onHome, backHandlerRef}) => {
 					</SpottableButton>
 				</ToolbarContainer>
 
-				<GridContainer className={css.gridContainer} onKeyDown={handleGridKeyDown}>
+				<GridContainer className={css.gridContainer} spotlightId="genres-grid-area" onKeyDown={handleGridKeyDown}>
 					{isLoading ? (
 						<div className={css.loading}><LoadingSpinner /></div>
 					) : sortedGenres.length === 0 ? (

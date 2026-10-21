@@ -447,3 +447,46 @@ describe('per-surface accents', () => {
 	});
 });
 
+
+describe('the settings switch on a focused row', () => {
+	const linesFor = (themeId, accents) => buildThemeOverrideCss(resolveThemeById(themeId), {accents}).split('\n');
+	const find = (lines, needle) => lines.find((line) => line.includes(needle));
+	const hexOf = (rule, property) => {
+		const [, r, g, b] = rule.match(new RegExp(property + ': rgb\\((\\d+), (\\d+), (\\d+)\\)')) || [];
+		return `#${[r, g, b].map((v) => Number(v).toString(16).padStart(2, '0')).join('')}`;
+	};
+
+	it('is inked against the fill of the row, dark on the white one Glass gives it', () => {
+		const lines = linesFor('glass');
+		expect(find(lines, '.listItem:focus .toggleTrack {')).toContain('border-color: rgba(0, 0, 0');
+		expect(find(lines, '.listItem:focus .toggleThumb {')).toContain('background: rgba(0, 0, 0');
+	});
+
+	it('is inked light on a dark row, as the theme draws it', () => {
+		const lines = linesFor('moonfin');
+		const fill = find(lines, '.listItem:focus .toggleTrack {');
+		expect(fill).toBeDefined();
+		expect(fill).toContain('border-color: rgba(');
+	});
+
+	it('keeps the filled switch away from the row, whatever accent was picked', () => {
+		['#ffffff', '#f5f5f5', '#fffde7'].forEach((pick) => {
+			const lines = linesFor('glass', {settings: pick});
+			const on = find(lines, '.listItem:focus .toggleOn {');
+			expect(contrastRatio(hexOf(on, 'background'), '#ffffff')).toBeGreaterThanOrEqual(MIN_BUTTON_CONTRAST);
+			// and the thumb on it reads against the fill
+			const thumb = find(lines, '.listItem:focus .toggleOn .toggleThumb {');
+			expect(thumb).toBeDefined();
+		});
+	});
+
+	it('keeps an accent that already reads on the row as it is', () => {
+		const lines = linesFor('glass', {settings: '#2e7d32'});
+		expect(find(lines, '.listItem:focus .toggleOn {')).toContain('rgb(46, 125, 50)');
+	});
+
+	it('does the same on the sync cards, which carry a switch too', () => {
+		const lines = linesFor('glass');
+		expect(find(lines, '.syncCard:focus .toggleTrack {')).toContain('border-color: rgba(0, 0, 0');
+	});
+});

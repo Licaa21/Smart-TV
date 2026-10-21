@@ -30,7 +30,6 @@ import {episodeLine} from '../../utils/liveTvGuide';
 import {chapterMarkerPositions} from '../../utils/chapterMarkers';
 import {keepFocusInView} from '../../utils/focusScroll';
 import {focusButton, neighbourButton} from '../../utils/controlRowFocus';
-import {getPerfTier} from '../../utils/perfTier';
 import {isTizen} from '../../platform';
 import {KEYS} from '../../utils/keys';
 import {SLEEP_TIMER_MINUTES} from './useSleepTimer';
@@ -306,10 +305,10 @@ const PlayerControls = ({
 	clickRef.current = handleControlButtonClick;
 	const stableClick = useCallback((e) => clickRef.current?.(e), []);
 
-	// Left and right along the buttons go straight to the neighbour on a slow set, where Spotlight's search was
-	// what a quick run of presses waited on.
+	// Left and right along the buttons go straight to the neighbour, where Spotlight's search was what a quick run
+	// of presses waited on, on every performance level.
 	const handleButtonsKeyDown = useCallback((ev) => {
-		if ((ev.keyCode !== KEYS.LEFT && ev.keyCode !== KEYS.RIGHT) || getPerfTier() === 'high' || !isTizen()) return;
+		if ((ev.keyCode !== KEYS.LEFT && ev.keyCode !== KEYS.RIGHT) || !isTizen()) return;
 		const next = neighbourButton(ev.currentTarget, ev.target.closest('.spottable'), ev.keyCode === KEYS.LEFT ? -1 : 1);
 		// Only a press that moved focus is taken, so one Spotlight would have placed another way still is.
 		if (!next || !focusButton(next)) return;

@@ -97,7 +97,7 @@ const SortArrow = ({ascending}) => (
 	</svg>
 );
 
-const Search = ({className, value, onChange}) => (
+export const HeaderSearch = ({className, value, onChange, placeholder}) => (
 	<div className={`${css.searchWrap} ${className}`}>
 		<svg className={css.searchIcon} viewBox="0 -960 960 960">
 			<path d={SEARCH_ICON} />
@@ -105,7 +105,7 @@ const Search = ({className, value, onChange}) => (
 		<SpottableInput
 			type="text"
 			className={css.searchField}
-			placeholder={$L('Search this library...')}
+			placeholder={placeholder || $L('Search this library...')}
 			value={value}
 			onChange={onChange}
 			spotlightId="library-search"
@@ -124,12 +124,12 @@ const IconButton = ({path, small, onClick, spotlightId}) => (
 
 // One bar with every control in it, each labelled with what it is set to.
 export const ModernBar = memo(({
-	canGroup, sortLabel, sortAscending, groupLabel, showLabel, searchQuery,
+	canGroup, sortLabel, sortAscending, groupLabel, showLabel, showTitle, searchQuery, searchPlaceholder,
 	onSearchChange, onHome, onSort, onGroup, onShow, onSettings, onKeyDown
 }) => (
 	<ToolbarContainer className={css.modernBar} spotlightId="library-bar" onKeyDown={onKeyDown}>
 		{onHome && <IconButton path={HOME_ICON} small onClick={onHome} spotlightId="library-home-btn" />}
-		{onSearchChange && <Search className={css.barSearch} value={searchQuery} onChange={onSearchChange} />}
+		{onSearchChange && <HeaderSearch className={css.barSearch} value={searchQuery} onChange={onSearchChange} placeholder={searchPlaceholder} />}
 		<SpottableButton className={css.barPill} onClick={onSort} spotlightId="library-sort-btn">
 			<Icon path={SORT_ICON} />
 			<span className={css.pillLabel}>{$L('Sort')}</span>
@@ -146,7 +146,7 @@ export const ModernBar = memo(({
 		{onShow && (
 			<SpottableButton className={css.barPill} onClick={onShow} spotlightId="library-show-btn">
 				<Icon path={SHOW_ICON} small />
-				<span className={css.pillLabel}>{$L('Show')}</span>
+				<span className={css.pillLabel}>{showTitle || $L('Show')}</span>
 				<span className={css.pillValue}>{showLabel}</span>
 			</SpottableButton>
 		)}
@@ -173,7 +173,7 @@ const DockRow = ({path, small, label, value, onClick, spotlightId, children}) =>
 // was used last.
 export const LibraryDock = memo(({
 	isFolderView, folderStack, rootName, displayName, shownCount, onBreadcrumb,
-	canGroup, sortLabel, sortAscending, groupLabel, showLabel, displayLabel, searchQuery,
+	canGroup, sortLabel, sortAscending, groupLabel, showLabel, showTitle, displayLabel, searchQuery, searchPlaceholder,
 	showLetters, startLetter, onLetterSelect,
 	onSearchChange, onHome, onSort, onGroup, onShow, onSettings
 }) => (
@@ -191,13 +191,13 @@ export const LibraryDock = memo(({
 				/>
 			</div>
 		</div>
-		{onSearchChange && <Search className={css.dockSearch} value={searchQuery} onChange={onSearchChange} />}
+		{onSearchChange && <HeaderSearch className={css.dockSearch} value={searchQuery} onChange={onSearchChange} placeholder={searchPlaceholder} />}
 		<div className={css.dockRows}>
 			<DockRow path={SORT_ICON} label={$L('Sort By')} value={sortLabel} onClick={onSort} spotlightId="library-sort-btn">
 				{sortAscending !== undefined && <SortArrow ascending={sortAscending} />}
 			</DockRow>
 			{canGroup && <DockRow path={GROUP_ICON} small label={$L('Group By')} value={groupLabel} onClick={onGroup} spotlightId="library-group-btn" />}
-			{onShow && <DockRow path={SHOW_ICON} small label={$L('Show')} value={showLabel} onClick={onShow} spotlightId="library-show-btn" />}
+			{onShow && <DockRow path={SHOW_ICON} small label={showTitle || $L('Show')} value={showLabel} onClick={onShow} spotlightId="library-show-btn" />}
 			{onSettings && <DockRow path={DISPLAY_ICON} small label={$L('Display')} value={displayLabel} onClick={onSettings} spotlightId="library-settings-btn" />}
 		</div>
 		{showLetters && (

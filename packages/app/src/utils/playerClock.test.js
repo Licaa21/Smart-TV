@@ -1,33 +1,32 @@
 import {playerClockStale, playerClockWanted} from './playerClock';
 
+// The same on every performance level: Ultra felt a key press wait behind the redraws that Medium never made.
 describe('playerClockWanted', () => {
 	const hidden = {controlsVisible: false, activeModal: null, isAudioMode: false};
 
-	it('always redraws on a fast set', () => {
-		expect(playerClockWanted({...hidden, tier: 'high'})).toBe(true);
-	});
-
-	it('skips the redraw on a slow set while nothing shows the time', () => {
-		expect(playerClockWanted({...hidden, tier: 'mid'})).toBe(false);
+	it('skips the redraw while nothing shows the time', () => {
+		expect(playerClockWanted(hidden)).toBe(false);
+		// a level that is passed in changes nothing
+		expect(playerClockWanted({...hidden, tier: 'high'})).toBe(false);
 		expect(playerClockWanted({...hidden, tier: 'low'})).toBe(false);
 	});
 
 	it('redraws for the controls, a modal, or a song', () => {
-		expect(playerClockWanted({...hidden, tier: 'mid', controlsVisible: true})).toBe(true);
-		expect(playerClockWanted({...hidden, tier: 'mid', activeModal: 'chapters'})).toBe(true);
-		expect(playerClockWanted({...hidden, tier: 'low', isAudioMode: true})).toBe(true);
+		expect(playerClockWanted({...hidden, controlsVisible: true})).toBe(true);
+		expect(playerClockWanted({...hidden, activeModal: 'chapters'})).toBe(true);
+		expect(playerClockWanted({...hidden, isAudioMode: true})).toBe(true);
 	});
 });
 
 describe('playerClockStale', () => {
-	it('is always stale on a fast set', () => {
-		expect(playerClockStale({tier: 'high', time: 10.2, shownSecond: 10})).toBe(true);
+	it('waits for the next whole second', () => {
+		expect(playerClockStale({time: 10.6, shownSecond: 10})).toBe(false);
+		expect(playerClockStale({time: 11.1, shownSecond: 10})).toBe(true);
+		expect(playerClockStale({time: 3, shownSecond: -1})).toBe(true);
+		expect(playerClockStale({time: 10.2, shownSecond: 10, tier: 'high'})).toBe(false);
 	});
 
-	it('waits for the next whole second on a slow one', () => {
-		expect(playerClockStale({tier: 'mid', time: 10.6, shownSecond: 10})).toBe(false);
-		expect(playerClockStale({tier: 'low', time: 11.1, shownSecond: 10})).toBe(true);
-		expect(playerClockStale({tier: 'low', time: 3, shownSecond: -1})).toBe(true);
-		expect(playerClockStale({tier: 'low', time: 10.6, shownSecond: 10, isAudioMode: true})).toBe(true);
+	it('follows a song more closely, for its lyrics', () => {
+		expect(playerClockStale({time: 10.6, shownSecond: 10, isAudioMode: true})).toBe(true);
 	});
 });
