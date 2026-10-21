@@ -1,5 +1,4 @@
 import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
-import Spotlight from '@enact/spotlight';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import {VirtualGridList} from '@enact/sandstone/VirtualList';
@@ -20,6 +19,7 @@ import libraryCss from '../Library/Library.module.less';
 import {DOCK_WIDTH, HOME_ICON, HeaderSearch, LibraryDock, LibraryTitle, ModernBar, SETTINGS_ICON, SORT_ICON, libraryStyleOf} from '../Library/LibraryHeaders';
 import * as seerrApi from '../../services/seerrApi';
 import {buildSeerrDiscoverParams, filterSearchResults, filterTitlesByName, mergeTitles, getSeerrSortOptions, getSeerrTvStatusOptions, getSeerrMinRatingOptions, getSeerrMinVoteOptions, getSeerrRuntimeOptions, getSeerrReleaseOptions, hasSeerrDiscoverFilters} from '../../utils/seerrBrowseFilters';
+import useQuickReturnGrid from '../../hooks/useQuickReturnGrid';
 import {browseStateKey, forgetReturnPoint, takeBrowseState, writeBrowseState} from './seerrBrowseState';
 
 import css from './SeerrBrowse.module.less';
@@ -123,11 +123,9 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	shownRef.current = shownItems;
 	const totalPagesRef = useRef(1);
 	const currentPageRef = useRef(1);
-	const scrollToRef = useRef(null);
+	// Back on a grid that has been scrolled puts it on its first title instead of leaving, as the library does
+	const {getScrollTo, quickReturn, scrollTo} = useQuickReturnGrid('seerr-browse-grid');
 	const restoredRef = useRef(false);
-	const getScrollTo = useCallback((fn) => {
-		scrollToRef.current = fn;
-	}, []);
 
 	const loadItems = useCallback(async (page = 1, append = false) => {
 		if (!item || !isEnabled) return;
@@ -229,13 +227,14 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		forgetReturnPoint(stateKey);
 		// A first visit puts the focus on the first title, as the library does, so the title under the header is filled
 		if (!focusedId) {
-			const timer = setTimeout(() => Spotlight.focus('seerr-browse-grid'), 100);
+			// On the first card itself, since the list would otherwise take focus back to the place the last browse was left at
+			const timer = setTimeout(() => scrollTo({index: 0, animate: false, focus: true}), 100);
 			return () => clearTimeout(timer);
 		}
 		const index = itemsRef.current.findIndex((i) => i.id === focusedId);
-		if (index < 0 || !scrollToRef.current) return;
-		scrollToRef.current({index, animate: false, focus: true});
-	}, [initialLoadDone, stateKey]);
+		if (index < 0) return;
+		scrollTo({index, animate: false, focus: true});
+	}, [initialLoadDone, stateKey, scrollTo]);
 
 	// the card focus is on, whose backdrop shows behind the grid
 	const [backdropItem, setBackdropItem] = useState(null);
@@ -352,11 +351,11 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 				setShowFilterModal(false);
 				return true;
 			}
-			return false;
+			return quickReturn();
 		};
 		backHandlerRef.current = handler;
 		return () => { if (backHandlerRef.current === handler) backHandlerRef.current = null; };
-	}, [backHandlerRef, showFilterModal, showDisplay]);
+	}, [backHandlerRef, showFilterModal, showDisplay, quickReturn]);
 
 	// The same card sizes the library uses, so a poster is as big here as it is there.
 	const isWideImage = imageType === 'thumbnail';
