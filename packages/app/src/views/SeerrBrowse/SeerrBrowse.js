@@ -20,7 +20,7 @@ import libraryCss from '../Library/Library.module.less';
 import {DOCK_WIDTH, HOME_ICON, HeaderSearch, LibraryDock, LibraryTitle, ModernBar, SETTINGS_ICON, SORT_ICON, libraryStyleOf} from '../Library/LibraryHeaders';
 import * as seerrApi from '../../services/seerrApi';
 import {buildSeerrDiscoverParams, filterSearchResults, filterTitlesByName, mergeTitles, getSeerrSortOptions, getSeerrTvStatusOptions, getSeerrMinRatingOptions, getSeerrMinVoteOptions, getSeerrRuntimeOptions, getSeerrReleaseOptions, hasSeerrDiscoverFilters} from '../../utils/seerrBrowseFilters';
-import {browseStateKey, forgetReturnPoint, readBrowseState, writeBrowseState} from './seerrBrowseState';
+import {browseStateKey, forgetReturnPoint, takeBrowseState, writeBrowseState} from './seerrBrowseState';
 
 import css from './SeerrBrowse.module.less';
 
@@ -55,8 +55,8 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		[browseType, item, initialMediaType]
 	);
 	// Read once on mount. Later writes must not feed back into what seeded them.
-	const savedRef = useRef(readBrowseState(stateKey));
-	const saved = savedRef.current;
+	const [saved] = useState(() => takeBrowseState(stateKey));
+	const savedRef = useRef(saved);
 	const [items, setItems] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [totalCount, setTotalCount] = useState(0);

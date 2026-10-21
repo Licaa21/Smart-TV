@@ -13,6 +13,15 @@ export const browseStateKey = (browseType, item, mediaType) =>
 
 export const readBrowseState = (key) => cache.get(key) || null;
 
+// What a screen starts from when it is mounted. A browse that was left by opening a title is kept for the return, and any
+// other leave is dropped, so a fresh visit starts on the first title with the default sort and filters.
+export const takeBrowseState = (key) => {
+	const state = cache.get(key);
+	if (state?.focusedId) return state;
+	cache.delete(key);
+	return null;
+};
+
 export const writeBrowseState = (key, patch) => {
 	const existing = cache.get(key);
 	if (!existing && cache.size >= MAX_ENTRIES) {
