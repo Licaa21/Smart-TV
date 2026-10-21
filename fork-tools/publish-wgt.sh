@@ -1,9 +1,9 @@
 #!/bin/bash
 # Puts the package built in daily on GitHub as a release of its own. Releases are kept, a build never replaces another:
 # each is named by the fork's version and described by what was committed since the last one, with the commit ids.
-# The fork's version is 1.0 for the first, then BUMP says how far it moves from the last release: patch (1.0.1, 1.0.2) for a
-# single change or fixes, minor (1.1, 1.2) for medium sized changes, major (2.0, 3.0) for a whole batch of 10 to 20 changes.
-# FORK_VERSION=<x.y[.z]> sets it outright. Run by build-daily-wgt.sh, and on its own to publish a package that is already
+# The fork's version always has three numbers: 1.0.0 for the first, then BUMP says how far it moves from the last release: patch
+# (1.0.1, 1.0.2) for a single change or fixes, minor (1.1.0, 1.2.0) for medium sized changes, major (2.0.0, 3.0.0) for a whole
+# batch of 10 to 20 changes. FORK_VERSION=<x.y[.z]> sets it outright (a missing last number is made 0). Run by build-daily-wgt.sh, and on its own to publish a package that is already
 # built, for which PREV=<commit or tag> sets where the description starts and BUILT_FROM=<commit> names the commit the
 # package was built from (the commit checked out, when not given).
 set -e
@@ -26,13 +26,14 @@ tags="$(gh release list --repo "$REPO" --limit 500 --json tagName --jq '.[].tagN
 last="$(echo "$tags" | grep -E '^fork-v[0-9]+\.[0-9]+(\.[0-9]+)?$' | sed 's/^fork-v//' | sort -V | tail -1 || true)"
 if [ -n "${FORK_VERSION:-}" ]; then
   n="$FORK_VERSION"
+  [ "$(echo "$n" | tr -cd .)" = "." ] && n="$n.0"
 elif [ -z "$last" ]; then
-  n="1.0"
+  n="1.0.0"
 else
   IFS=. read -r major minor patch <<< "$last"
   case "${BUMP:-}" in
-    major) n="$((major + 1)).0" ;;
-    minor) n="$major.$((minor + 1))" ;;
+    major) n="$((major + 1)).0.0" ;;
+    minor) n="$major.$((minor + 1)).0" ;;
     patch) n="$major.$minor.$((${patch:-0} + 1))" ;;
     *) echo "Say how far the fork's version moves from $last: BUMP=patch, minor or major bash fork-tools/publish-wgt.sh"; exit 1 ;;
   esac
