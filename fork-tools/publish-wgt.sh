@@ -68,10 +68,10 @@ git log --no-merges --format='%an%x09%h%x09%s' "$prev..$from" > "$log"
 
 # The file carries the fork's version too, and the one left from the last build goes
 versioned="Moonfin_Tizen_Regular_v${version}_Lica_Fork_v${n}.wgt"
-if [ "$built" != "$versioned" ]; then
-  rm -f Moonfin_Tizen_Regular_*_Lica_Fork_v[0-9]*.wgt
-  mv -f "$built" "$versioned"
-fi
+for old in Moonfin_Tizen_Regular_*_Lica_Fork_v[0-9]*.wgt; do
+  [ "$old" = "$built" ] || [ "$old" = "$versioned" ] || rm -f "$old"
+done
+[ "$built" = "$versioned" ] || mv -f "$built" "$versioned"
 
 gh release create "fork-v$n" "$versioned" --repo "$REPO" --target "$from" \
   --title "Lica Fork $n (Moonfin $version)" --notes-file "$notes" --latest
