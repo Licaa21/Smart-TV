@@ -550,8 +550,6 @@ export const ACCENT_RULES = {
 		["views/Login/Login.module.less","",".{statusMessage}","background","rgba({rgb}, 0.18)"],
 		["views/Login/Login.module.less","",".{statusMessage}","border","3px solid rgba({rgb}, 0.4)"],
 		["views/Login/Login.module.less","",".{statusMessage}","color","{accent}"],
-		["views/SeerrBrowse/SeerrBrowse.module.less","",".{header} .{backButton}:focus","box-shadow","0 0 0 4px rgba({rgb}, 0.5)"],
-		["views/SeerrBrowse/SeerrBrowse.module.less","",".{header} .{browseTypeLabel}","color","{accent}"],
 		["views/SeerrBrowse/SeerrBrowse.module.less","",".{availability3}","border","3px solid {accent}"],
 		["views/SeerrBrowse/SeerrBrowse.module.less","","html[data-theme-id='neon_pulse'] .{header} .{title}, html[data-theme-id='neon_pulse'] .{itemName}, html[data-theme-id='neon_pulse'] .{modalTitle}","color","{accent}"],
 		["views/SeerrBrowse/SeerrBrowse.module.less","","html[data-theme-id='neon_pulse'] .{filterButton}, html[data-theme-id='neon_pulse'] .{header} .{backButton}, html[data-theme-id='neon_pulse'] .{poster}, html[data-theme-id='neon_pulse'] .{posterPlaceholder}, html[data-theme-id='neon_pulse'] .{itemCard}","border-color","rgba({rgb}, 0.55)"],

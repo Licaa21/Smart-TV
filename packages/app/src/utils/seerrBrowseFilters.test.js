@@ -1,4 +1,4 @@
-import {buildSeerrDiscoverParams, filterTitlesByName, getSeerrSortOptions, getSeerrTvStatusOptions, hasSeerrDiscoverFilters} from './seerrBrowseFilters';
+import {buildSeerrDiscoverParams, filterSearchResults, filterTitlesByName, mergeTitles, getSeerrSortOptions, getSeerrTvStatusOptions, hasSeerrDiscoverFilters} from './seerrBrowseFilters';
 
 describe('seerr browse filters', () => {
 	it('offers the sort axes seerr itself has, per media type', () => {
@@ -68,5 +68,60 @@ describe('filterTitlesByName', () => {
 
 	it('is empty when nothing matches', () => {
 		expect(filterTitlesByName(items, 'zzz')).toEqual([]);
+	});
+});
+
+describe('mergeTitles', () => {
+	const t = (id, extra) => ({id, title: `T${id}`, ...extra});
+
+	it('adds a page after what is there', () => {
+		expect(mergeTitles([t(1), t(2)], [t(3)], 'movie').map((e) => e.id)).toEqual([1, 2, 3]);
+	});
+
+	it('leaves out a title that is already there, which Seerr\'s own pages sometimes repeat', () => {
+		expect(mergeTitles([t(1), t(2)], [t(2), t(3)], 'movie').map((e) => e.id)).toEqual([1, 2, 3]);
+	});
+
+	it('leaves out a title repeated inside the page', () => {
+		expect(mergeTitles([], [t(1), t(1), t(2)], 'movie').map((e) => e.id)).toEqual([1, 2]);
+	});
+
+	it('does not take a film and a show of the same id for one title', () => {
+		const list = mergeTitles([t(7, {mediaType: 'movie'})], [t(7, {mediaType: 'tv'})], 'movie');
+		expect(list).toHaveLength(2);
+	});
+
+	it('reads a title with no type of its own as the type of the screen', () => {
+		expect(mergeTitles([t(7)], [t(7, {mediaType: 'movie'})], 'movie')).toHaveLength(1);
+	});
+});
+
+describe('filterSearchResults', () => {
+	const results = [
+		{id: 2288, mediaType: 'tv', name: 'Prison Break', genreIds: [10759, 80, 18]},
+		{id: 242693, mediaType: 'movie', title: 'Prison Break', genreIds: [80, 18, 53]},
+		{id: 5, mediaType: 'person', name: 'Wentworth Miller'},
+		{id: 303464, mediaType: 'tv', name: 'Prison Break: Black Creek', genreIds: [80, 10759]},
+		{id: 9, mediaType: 'tv', name: 'No genres listed'}
+	];
+
+	it('keeps the titles of the screen\'s type that are in its genre', () => {
+		expect(filterSearchResults(results, {mediaType: 'tv', genreId: 10759}).map((r) => r.id)).toEqual([2288, 303464]);
+	});
+
+	it('leaves out other types, and people', () => {
+		expect(filterSearchResults(results, {mediaType: 'movie', genreId: 80}).map((r) => r.id)).toEqual([242693]);
+	});
+
+	it('keeps every title of the type when the screen has no genre', () => {
+		expect(filterSearchResults(results, {mediaType: 'tv'}).map((r) => r.id)).toEqual([2288, 303464, 9]);
+	});
+
+	it('reads a genre id sent as text', () => {
+		expect(filterSearchResults(results, {mediaType: 'tv', genreId: '10759'}).map((r) => r.id)).toEqual([2288, 303464]);
+	});
+
+	it('is empty for nothing', () => {
+		expect(filterSearchResults(null, {mediaType: 'tv'})).toEqual([]);
 	});
 });

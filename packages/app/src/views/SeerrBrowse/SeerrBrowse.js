@@ -1,4 +1,5 @@
 import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
+import Spotlight from '@enact/spotlight';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import {VirtualGridList} from '@enact/sandstone/VirtualList';
@@ -14,10 +15,11 @@ import {GRID_DIRECTIONS, IMAGE_SIZES, IMAGE_TYPES, focusOverhang, horizontalCell
 import useHeaderGridKeys from '../../hooks/useHeaderGridKeys';
 import {useAuth} from '../../context/AuthContext';
 import ScreenBackdrop from '../../components/ScreenBackdrop';
+import RatingsRow from '../../components/RatingsRow';
 import libraryCss from '../Library/Library.module.less';
-import {DOCK_WIDTH, HeaderSearch, LibraryDock, LibraryTitle, ModernBar, SETTINGS_ICON, SORT_ICON, libraryStyleOf} from '../Library/LibraryHeaders';
+import {DOCK_WIDTH, HOME_ICON, HeaderSearch, LibraryDock, LibraryTitle, ModernBar, SETTINGS_ICON, SORT_ICON, libraryStyleOf} from '../Library/LibraryHeaders';
 import * as seerrApi from '../../services/seerrApi';
-import {buildSeerrDiscoverParams, filterTitlesByName, getSeerrSortOptions, getSeerrTvStatusOptions, getSeerrMinRatingOptions, getSeerrMinVoteOptions, getSeerrRuntimeOptions, getSeerrReleaseOptions, hasSeerrDiscoverFilters} from '../../utils/seerrBrowseFilters';
+import {buildSeerrDiscoverParams, filterSearchResults, filterTitlesByName, mergeTitles, getSeerrSortOptions, getSeerrTvStatusOptions, getSeerrMinRatingOptions, getSeerrMinVoteOptions, getSeerrRuntimeOptions, getSeerrReleaseOptions, hasSeerrDiscoverFilters} from '../../utils/seerrBrowseFilters';
 import {browseStateKey, readBrowseState, writeBrowseState} from './seerrBrowseState';
 
 import css from './SeerrBrowse.module.less';
@@ -27,18 +29,13 @@ const SpottableButton = Spottable('button');
 const ToolbarContainer = SpotlightContainerDecorator({enterTo: 'last-focused', restrict: 'self-first'}, 'div');
 const GridContainer = SpotlightContainerDecorator({enterTo: 'last-focused', restrict: 'self-first'}, 'div');
 
-let _filterOptions;
-const getFilterOptions = () => (_filterOptions ??= [
-	{key: 'movie', label: $L('Movies')},
-	{key: 'tv', label: $L('TV Shows')}
-]);
-
 // The room the grid leaves at its sides, and the least gap kept between rows, as in the library.
 const GRID_INSET = 174;
-// A navbar down the left side takes this much more of the width.
-const SIDEBAR_INSET = 110;
 const MIN_ROW_GAP = 6;
 const MAX_PAGES = 25;
+// A search reads this many pages of Seerr's answer, a hundred titles, and waits this long after the last key
+const SEARCH_PAGES = 5;
+const SEARCH_DELAY_MS = 400;
 
 /**
  * SeerrBrowse - Browse Seerr content by genre, studio, or keyword
@@ -50,7 +47,7 @@ const MAX_PAGES = 25;
  * @param {Function} props.onSelectItem - Callback when an item is selected
  * @param {Function} props.onBack - Callback to go back
  */
-const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectItem, backHandlerRef}) => {
+const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectItem, onHome, backHandlerRef}) => {
 	const {isEnabled} = useSeerr();
 	const {settings} = useSettings();
 	const stateKey = useMemo(
@@ -78,6 +75,12 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const [popupGroup, setPopupGroup] = useState('sort');
 	// Narrows the titles that are loaded, by name, since Seerr cannot search inside a genre or a studio
 	const [searchQuery, setSearchQuery] = useState('');
+	// A search in a genre, or in a plain Movies or TV Shows browse, asks Seerr, since the titles of a genre run to the thousands and a
+	// title can stand far down its popularity. A studio, a network or a keyword cannot be searched inside, so there the search
+	// narrows the titles that are loaded.
+	const searchesSeerr = browseType === 'genre' || browseType === 'all';
+	const [searchHits, setSearchHits] = useState(null);
+	const searchRunRef = useRef(0);
 	// The grid is laid out by the settings of the library it stands for, the movies library for movies and the shows
 	// library for shows, so a card is the same size and shape here as there.
 	const {api} = useAuth();
@@ -107,7 +110,14 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const loadingMoreRef = useRef(false);
 	const loadCooldownRef = useRef(false);
 	const itemsRef = useRef([]);
-	const shownItems = useMemo(() => filterTitlesByName(items, searchQuery), [items, searchQuery]);
+	// Each load of the list is a run of its own, and a run that has been replaced adds nothing, so two of them cannot both
+	// append the same pages
+	const runRef = useRef(0);
+	const remoteSearch = searchesSeerr && Boolean(searchQuery.trim());
+	const shownItems = useMemo(
+		() => (remoteSearch ? (searchHits || []) : filterTitlesByName(items, searchQuery)),
+		[remoteSearch, searchHits, items, searchQuery]
+	);
 	// What the cards read, the titles that are showing, which a search makes fewer than were loaded
 	const shownRef = useRef(shownItems);
 	shownRef.current = shownItems;
@@ -124,6 +134,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 
 		if (append && loadingMoreRef.current) return;
 
+		const run = runRef.current;
 		if (append) {
 			loadingMoreRef.current = true;
 		}
@@ -147,12 +158,13 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 			if (browseType === 'network') params.network = item.id;
 			if (browseType === 'keyword') params.keywords = item.id;
 			const result = await seerrApi.discoverFiltered(mediaType, params);
+			if (run !== runRef.current) return;
 
 			const newItems = result.results || [];
 			totalPagesRef.current = result.totalPages || 1;
 
 			setItems(prev => {
-				const updatedItems = append ? [...prev, ...newItems] : newItems;
+				const updatedItems = mergeTitles(append ? prev : [], newItems, mediaType);
 				itemsRef.current = updatedItems;
 				return updatedItems;
 			});
@@ -162,11 +174,13 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		} catch (err) {
 			console.error('Failed to load items:', err);
 		} finally {
-			setIsLoading(false);
-			loadingMoreRef.current = false;
-			if (append) {
-				loadCooldownRef.current = true;
-				setTimeout(() => { loadCooldownRef.current = false; }, 500);
+			if (run === runRef.current) {
+				setIsLoading(false);
+				loadingMoreRef.current = false;
+				if (append) {
+					loadCooldownRef.current = true;
+					setTimeout(() => { loadCooldownRef.current = false; }, 500);
+				}
 			}
 		}
 	}, [item, isEnabled, browseType, mediaType, sortBy, genreIds, tvStatuses, language, minRating, minVotes, runtime, released]);
@@ -179,6 +193,8 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 
 	useEffect(() => {
 		if (item && isEnabled) {
+			runRef.current += 1;
+			const run = runRef.current;
 			setIsLoading(true);
 			setItems([]);
 			itemsRef.current = [];
@@ -193,6 +209,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 			const loadInitialPages = async () => {
 				for (let page = 1; page <= lastPage; page++) {
 					await loadItems(page, page > 1);
+					if (run !== runRef.current) return;
 					if (page >= totalPagesRef.current) break;
 				}
 				setInitialLoadDone(true);
@@ -208,7 +225,11 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		if (restoredRef.current || !initialLoadDone) return;
 		restoredRef.current = true;
 		const focusedId = savedRef.current?.focusedId;
-		if (!focusedId) return;
+		// A first visit puts the focus on the first title, as the library does, so the title under the header is filled
+		if (!focusedId) {
+			const timer = setTimeout(() => Spotlight.focus('seerr-browse-grid'), 100);
+			return () => clearTimeout(timer);
+		}
 		const index = itemsRef.current.findIndex((i) => i.id === focusedId);
 		if (index < 0 || !scrollToRef.current) return;
 		scrollToRef.current({index, animate: false, focus: true});
@@ -216,12 +237,38 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 
 	// the card focus is on, whose backdrop shows behind the grid
 	const [backdropItem, setBackdropItem] = useState(null);
+	// Asks Seerr once typing has stopped, and keeps the titles of this screen's type and genre among what it answers
+	useEffect(() => {
+		searchRunRef.current += 1;
+		const run = searchRunRef.current;
+		const typed = searchQuery.trim();
+		if (!searchesSeerr || !typed) {
+			setSearchHits(null);
+			return undefined;
+		}
+		const timer = setTimeout(async () => {
+			let hits = [];
+			try {
+				for (let page = 1; page <= SEARCH_PAGES; page++) {
+					const result = await seerrApi.search(typed, page);
+					if (run !== searchRunRef.current) return;
+					hits = mergeTitles(hits, filterSearchResults(result?.results, {mediaType, genreId: browseType === 'genre' ? item?.id : null}), mediaType);
+					if (page >= (result?.totalPages || 1)) break;
+				}
+			} catch (err) {
+				hits = [];
+			}
+			if (run === searchRunRef.current) setSearchHits(hits);
+		}, SEARCH_DELAY_MS);
+		return () => clearTimeout(timer);
+	}, [searchQuery, searchesSeerr, browseType, item, mediaType]);
+
 	// A search that has too few matches in what is loaded reads on, a page at a time, until it has a screenful or the pages end
 	useEffect(() => {
-		if (!searchQuery.trim() || isLoading || shownItems.length >= 20) return;
+		if (searchesSeerr || !searchQuery.trim() || isLoading || shownItems.length >= 20) return;
 		if (currentPageRef.current >= totalPagesRef.current || currentPageRef.current >= MAX_PAGES || loadingMoreRef.current) return;
 		loadItems(currentPageRef.current + 1, true);
-	}, [searchQuery, shownItems.length, items.length, isLoading, loadItems]);
+	}, [searchesSeerr, searchQuery, shownItems.length, items.length, isLoading, loadItems]);
 
 	const handleItemFocus = useCallback((ev) => {
 		const itemIndex = ev.currentTarget?.dataset?.index;
@@ -309,14 +356,6 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		return () => { if (backHandlerRef.current === handler) backHandlerRef.current = null; };
 	}, [backHandlerRef, showFilterModal, showDisplay]);
 
-	// Genres and statuses belong to one media type, so a new one starts them over
-	useEffect(() => {
-		filterOptionsRequestedRef.current = false;
-		setFilterGenres([]);
-		setGenreIds([]);
-		setTvStatuses([]);
-	}, [mediaType]);
-
 	// The same card sizes the library uses, so a poster is as big here as it is there.
 	const isWideImage = imageType === 'thumbnail';
 	const posterHeight = isWideImage
@@ -328,7 +367,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const textHeight = showCardText ? 61 : 0;
 	const cardHeight = posterHeight + textHeight;
 	// A focused card grows past its cell, so the cell is padded by what it grows into.
-	const gridInset = GRID_INSET + (settings.navbarPosition === 'left' ? SIDEBAR_INSET : 0) + (isDocked ? DOCK_WIDTH : 0);
+	const gridInset = GRID_INSET + (isDocked ? DOCK_WIDTH : 0);
 	const cellPadX = horizontalCellPad(cardWidth, window.innerWidth - gridInset);
 	const cellPadY = Math.max(MIN_ROW_GAP, focusOverhang(cardHeight));
 	const gridItemSize = useMemo(
@@ -345,7 +384,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		const hasMorePages = currentPageRef.current < totalPagesRef.current;
 		const underMaxPages = currentPageRef.current < MAX_PAGES;
 
-		if (nearEnd && hasMorePages && underMaxPages && !loadingMoreRef.current && !loadCooldownRef.current) {
+		if (nearEnd && !remoteSearch && hasMorePages && underMaxPages && !loadingMoreRef.current && !loadCooldownRef.current) {
 			loadItems(currentPageRef.current + 1, true);
 		}
 
@@ -360,6 +399,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		const title = mediaItem.title || mediaItem.name;
 		const year = mediaItem.releaseDate?.substring(0, 4) || mediaItem.firstAirDate?.substring(0, 4);
 		const status = mediaItem.mediaInfo?.status;
+		const cardLine = [year, mediaItem.voteAverage > 0 ? '\u2605 ' + mediaItem.voteAverage.toFixed(1) : null].filter(Boolean).join(' ');
 
 		return (
 			<SpottableDiv
@@ -393,26 +433,13 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 					{showCardText && (
 						<div className={libraryCss.cardText}>
 							<div className={libraryCss.cardTitle}>{title}</div>
-							{year && <div className={libraryCss.cardSubtitle}>{year}</div>}
+							{cardLine && <div className={libraryCss.cardSubtitle}>{cardLine}</div>}
 						</div>
 					)}
 				</div>
 			</SpottableDiv>
 		);
-	}, [handleItemClick, handleItemFocus, loadItems, isWideImage, posterHeight, cellPadding, showCardText, shownItems]);
-
-	const currentFilter = getFilterOptions().find(o => o.key === mediaType);
-
-
-	const getBrowseTypeLabel = () => {
-		switch (browseType) {
-			case 'genre': return $L('Genre');
-			case 'studio': return $L('Studio');
-			case 'network': return $L('Network');
-			case 'keyword': return $L('Keyword');
-			default: return $L('Browse');
-		}
-	};
+	}, [handleItemClick, handleItemFocus, loadItems, isWideImage, posterHeight, cellPadding, showCardText, shownItems, remoteSearch]);
 
 	const handleSortSelect = useCallback((ev) => {
 		const key = ev.currentTarget?.dataset?.sortKey;
@@ -636,69 +663,52 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const sortAscending = sortBy.endsWith('.asc');
 	const filtersValue = activeFilterCount > 0 ? String(activeFilterCount) : $L('All');
 	const searchPlaceholder = $L('Search these titles...');
-	const shownCount = totalCount || items.length;
+	const shownCount = remoteSearch ? shownItems.length : (totalCount || items.length);
+	const filterLabel = activeFilterCount > 0 ? `${$L('Filters')}: ${activeFilterCount}` : $L('All items');
+	const statusText = $L("Showing {filterLabel} from '{genreFilter}' sorted by {sortLabel}")
+		.replace('{filterLabel}', filterLabel).replace('{genreFilter}', item.name).replace('{sortLabel}', sortLabelText || '');
+	// The title the focus is on, drawn under the header the way the library draws its focused title
+	// Only a title that is in the list: a search can take the one that was focused out of it
+	const focusedTitle = backdropItem && shownItems.includes(backdropItem) ? backdropItem : null;
+	const focusedYear = focusedTitle?.releaseDate?.substring(0, 4) || focusedTitle?.firstAirDate?.substring(0, 4);
+	const focusedStatus = {5: $L('Available'), 4: $L('Partially Available'), 3: $L('Processing'), 2: $L('Pending')}[focusedTitle?.mediaInfo?.status];
+	const focusedRating = {CommunityRating: focusedTitle?.voteAverage > 0 ? focusedTitle.voteAverage : null};
 
 	return (
-		<div className={`${css.page} ${settings.navbarPosition === 'left' ? css.pageLeftNav : ''}`} onKeyDown={handleChannelKeys}>
-			<ScreenBackdrop item={backdropItem} />
+		<div className={libraryCss.page} onKeyDown={handleChannelKeys}>
+			<ScreenBackdrop item={focusedTitle} />
 			{isDocked && (
-				<div className={css.dockHost}>
-					<LibraryDock
-						isFolderView={false}
-						folderStack={[]}
-						rootName={item.name}
-						displayName={item.name}
-						shownCount={shownCount}
-						sortLabel={sortLabelText}
-						sortAscending={sortAscending}
-						showTitle={$L('Filters')}
-						showLabel={filtersValue}
-						displayLabel={sizeLabels[imageSize]}
-						searchQuery={searchQuery}
-						searchPlaceholder={searchPlaceholder}
-						onSearchChange={handleSearchChange}
-						onSort={handleOpenFilterModal}
-						onShow={handleOpenFilters}
-						onSettings={handleOpenDisplay}
-					/>
-				</div>
+				<LibraryDock
+					isFolderView={false}
+					folderStack={[]}
+					rootName={item.name}
+					displayName={item.name}
+					shownCount={shownCount}
+					sortLabel={sortLabelText}
+					sortAscending={sortAscending}
+					showTitle={$L('Filters')}
+					showLabel={filtersValue}
+					displayLabel={sizeLabels[imageSize]}
+					searchQuery={searchQuery}
+					searchPlaceholder={searchPlaceholder}
+					onSearchChange={handleSearchChange}
+					onHome={onHome}
+					onSort={handleOpenFilterModal}
+					onShow={handleOpenFilters}
+					onSettings={handleOpenDisplay}
+				/>
 			)}
-			<div className={isDocked ? `${css.content} ${css.contentDocked}` : css.content}>
+			<div className={isDocked ? `${libraryCss.content} ${libraryCss.contentDocked}` : libraryCss.content}>
 				{libraryStyle === 'classic' && (
-					<>
-						<div className={css.header}>
-							<div className={css.titleSection}>
-								<div className={css.browseTypeLabel}>{getBrowseTypeLabel()}</div>
-								<div className={css.title}>{item.name}</div>
-								<div className={css.subtitle}>
-									{currentFilter?.label}
-									{totalCount > 0 && ` • ${totalCount} ${$L('items')}`}
-								</div>
-							</div>
+					<div className={libraryCss.header}>
+						<div className={libraryCss.headerSide} />
+						<div className={libraryCss.headerTitle}>
+							<LibraryTitle isFolderView={false} folderStack={[]} displayName={item.name} shownCount={shownCount} />
 						</div>
-
-						<ToolbarContainer className={css.toolbar} spotlightId="seerr-browse-toolbar">
-							<HeaderSearch className={css.toolbarSearch} value={searchQuery} onChange={handleSearchChange} placeholder={searchPlaceholder} />
-							<SpottableButton className={css.filterButton} onClick={handleOpenFilterModal} spotlightId="seerr-browse-sort-btn">
-								<svg viewBox="0 -960 960 960">
-									<path d={SORT_ICON} />
-								</svg>
-								{sortLabelText ? `${sortLabelText} ${sortAscending ? '↑' : '↓'}` : $L('Sort By')}
-							</SpottableButton>
-							<SpottableButton className={css.filterButton} onClick={handleOpenFilters} spotlightId="seerr-browse-filters-btn">
-								<svg viewBox="0 0 24 24">
-									<path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
-								</svg>
-								{`${$L('Filters')}: ${filtersValue}`}
-							</SpottableButton>
-							<SpottableButton className={css.filterButton} onClick={handleOpenDisplay} spotlightId="seerr-browse-display-btn">
-								<svg viewBox="0 -960 960 960">
-									<path d={SETTINGS_ICON} />
-								</svg>
-								{$L('Display')}
-							</SpottableButton>
-						</ToolbarContainer>
-					</>
+						<div className={libraryCss.headerSide}>
+							<HeaderSearch value={searchQuery} onChange={handleSearchChange} placeholder={searchPlaceholder} />
+						</div>
+					</div>
 				)}
 				{libraryStyle === 'modern' && (
 					<>
@@ -713,6 +723,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 							searchQuery={searchQuery}
 							searchPlaceholder={searchPlaceholder}
 							onSearchChange={handleSearchChange}
+							onHome={onHome}
 							onSort={handleOpenFilterModal}
 							onShow={handleOpenFilters}
 							onSettings={handleOpenDisplay}
@@ -720,31 +731,76 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 					</>
 				)}
 
-				<GridContainer className={css.gridContainer} spotlightId="seerr-browse-grid-area">
-					{(isLoading && items.length === 0) || !layoutLoaded ? (
+				{settings?.showMediaDetailsOnLibraryPage !== false && (
+					<div className={libraryCss.focusedInfo}>
+						{focusedTitle && (
+							<>
+								<div className={libraryCss.focusedName}>{focusedTitle.title || focusedTitle.name}</div>
+								<div className={libraryCss.focusedMeta}>
+									{focusedYear && <span className={libraryCss.metaItem}>{focusedYear}</span>}
+									{focusedStatus && <span className={`${libraryCss.metaPill} ${libraryCss.metaPillLive}`}>{focusedStatus}</span>}
+								</div>
+								<RatingsRow item={focusedRating} pluginEnabled={false} />
+							</>
+						)}
+					</div>
+				)}
+
+				{libraryStyle === 'classic' && (
+					<ToolbarContainer className={libraryCss.toolbar} spotlightId="seerr-browse-toolbar">
+						<SpottableButton className={libraryCss.toolbarBtn} onClick={onHome} spotlightId="library-home-btn">
+							<svg className={libraryCss.toolbarIcon} viewBox="0 0 24 24">
+								<path d={HOME_ICON} />
+							</svg>
+						</SpottableButton>
+						<SpottableButton className={libraryCss.toolbarBtn} onClick={handleOpenFilterModal} spotlightId="seerr-browse-sort-btn">
+							<svg className={libraryCss.toolbarIcon} viewBox="0 -960 960 960">
+								<path d={SORT_ICON} />
+							</svg>
+						</SpottableButton>
+						<SpottableButton className={libraryCss.toolbarBtn} onClick={handleOpenFilters} spotlightId="seerr-browse-filters-btn">
+							<svg className={libraryCss.toolbarIcon} viewBox="0 0 24 24">
+								<path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+							</svg>
+						</SpottableButton>
+						<SpottableButton className={libraryCss.toolbarBtn} onClick={handleOpenDisplay} spotlightId="seerr-browse-display-btn">
+							<svg className={libraryCss.toolbarIcon} viewBox="0 -960 960 960">
+								<path d={SETTINGS_ICON} />
+							</svg>
+						</SpottableButton>
+					</ToolbarContainer>
+				)}
+
+				<GridContainer className={libraryCss.gridContainer} spotlightId="seerr-browse-grid-area">
+					{(isLoading && items.length === 0) || !layoutLoaded || (remoteSearch && searchHits === null) ? (
 						<div className={css.loading}>
 							<LoadingSpinner />
 						</div>
 					) : shownItems.length === 0 ? (
 						<div className={css.empty}>{$L('No items found')}</div>
 					) : (
-						<div className={css.gridWrapper}>
-						<VirtualGridList
-							key={searchQuery.trim()}
-							className={css.grid}
-							cbScrollTo={getScrollTo}
-							dataSize={shownItems.length}
-							itemRenderer={renderItem}
-							itemSize={gridItemSize}
-							direction={gridDirection}
-							horizontalScrollbar="hidden"
-							verticalScrollbar="hidden"
-							spacing={0}
-							spotlightId="seerr-browse-grid"
-						/>
+						<div className={libraryCss.gridWrapper}>
+							<VirtualGridList
+								key={searchQuery.trim()}
+								className={libraryCss.grid}
+								cbScrollTo={getScrollTo}
+								dataSize={shownItems.length}
+								itemRenderer={renderItem}
+								itemSize={gridItemSize}
+								direction={gridDirection}
+								horizontalScrollbar="hidden"
+								verticalScrollbar="hidden"
+								spacing={0}
+								spotlightId="seerr-browse-grid"
+							/>
 						</div>
 					)}
 				</GridContainer>
+
+				<div className={libraryCss.statusBar}>
+					<div className={libraryCss.statusText}>{statusText}</div>
+					<div className={libraryCss.statusCount}>{shownItems.length} | {shownCount}</div>
+				</div>
 			</div>
 
 			{showFilterModal && (

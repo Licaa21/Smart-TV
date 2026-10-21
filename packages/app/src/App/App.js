@@ -1855,6 +1855,7 @@ const AppContent = (props) => {
 		panelIndex !== PANELS.GAME_SYSTEM &&
 		panelIndex !== PANELS.GAME_DETAILS &&
 		panelIndex !== PANELS.LIBRARY &&
+		panelIndex !== PANELS.SEERR_BROWSE &&
 		panelIndex !== PANELS.LIVETV &&
 		panelIndex !== PANELS.RECORDINGS &&
 		panelIndex !== PANELS.ADD_SERVER &&
@@ -2035,6 +2036,7 @@ const AppContent = (props) => {
 									item={seerrBrowse?.item}
 									mediaType={seerrBrowse?.mediaType}
 									onSelectItem={handleSelectSeerrItem}
+									onHome={handleHome}
 								backHandlerRef={backHandlerRef}
 							/>
 							)}

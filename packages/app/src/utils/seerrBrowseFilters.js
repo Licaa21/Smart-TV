@@ -121,3 +121,28 @@ export const filterTitlesByName = (items, query) => {
 	if (!typed) return items;
 	return items.filter((entry) => foldForSearch(entry.title || entry.name || '').indexOf(typed) >= 0);
 };
+
+// The titles of a browse as pages are added to it. Seerr's pages can overlap when popularity moves between two reads, and a
+// title must never be drawn twice, so a title that is already there is left out. A title with no type of its own is of the
+// type the screen was opened for.
+const titleKey = (entry, mediaType) => `${entry.mediaType || entry.media_type || mediaType}:${entry.id}`;
+
+export const mergeTitles = (previous, incoming, mediaType) => {
+	const seen = new Set(previous.map((entry) => titleKey(entry, mediaType)));
+	const merged = previous.slice();
+	incoming.forEach((entry) => {
+		const key = titleKey(entry, mediaType);
+		if (seen.has(key)) return;
+		seen.add(key);
+		merged.push(entry);
+	});
+	return merged;
+};
+
+// What a text search brings back is every movie, show and person Seerr knows by that name. A browse keeps the titles of its
+// own type, and of its genre when it is a genre's, so a search in a genre finds a title wherever it stands in that genre's
+// popularity, not only among the pages that were loaded.
+export const filterSearchResults = (results, {mediaType, genreId} = {}) => (results || []).filter((entry) => (
+	entry.mediaType === mediaType &&
+	(genreId === undefined || genreId === null || (entry.genreIds || []).includes(Number(genreId)))
+));
