@@ -54,6 +54,20 @@ const UpdateNotification = ({updateInfo, formattedNotes, onDismiss}) => {
 		return () => clearTimeout(timer);
 	}, [updateInfo, holdsFocus]);
 
+	// The screen behind keeps loading after the panel opens (Home's media bar takes focus when its slides arrive), and the
+	// ask above gives up after a second. So whatever takes focus outside the panel while it is up hands it straight back.
+	useEffect(() => {
+		if (!updateInfo) return;
+
+		// By where the focus landed, since Spotlight has not caught up with it yet when this runs
+		const handleFocusIn = (e) => {
+			if (!panelRef.current || !panelRef.current.contains(e.target)) Spotlight.focus(OK_BUTTON_ID);
+		};
+
+		document.addEventListener('focusin', handleFocusIn);
+		return () => document.removeEventListener('focusin', handleFocusIn);
+	}, [updateInfo]);
+
 	// Spotlight only fences off moves that start inside the panel, so focus can
 	// still be taken by the screen behind. Every press after that drives the
 	// screen instead of the panel.
