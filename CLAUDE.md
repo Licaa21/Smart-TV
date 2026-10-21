@@ -311,6 +311,15 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
    `localStorage` key `moonfin_settings`.
 4. Stop the server when done.
 
+For the user's own server and Seerr instead of the fake one, see "Testing against the real server" below.
+
+### Testing against the real server
+
+- **Claude is authorised to launch the test browser (Playwright, see "Looking at screens in a browser") against the user's own Jellyfin server and Seerr**, signed in with the account in `local/test-server.md`, whenever that tests a change better than the fake server does (a real library, real posters, a real genre or studio, real Seerr titles, the Moonfin plugin's rows). Say in the report that the real server was used, and use the fake server (`fork-tools/browser-mock.js`) when it is enough.
+- **The login is never written in this file or in anything tracked.** This file is committed and the fork is public, so the address, the user and the password live only in `local/test-server.md` (ignored by git in every folder), and are read from there when needed. They never go in a commit, a branch, a pull request, a diagnostic report, a log or a screenshot that is kept outside `local/`.
+- **The account is an administrator on a real library, so the test is read only.** Browse, search, open screens and play a few seconds at most. Do not delete or edit titles, libraries, collections, playlists or users, do not change server, plugin or Seerr settings, do not make Seerr requests (they start downloads), and do not leave favorites, watched marks or progress changed: if a test has to change one, change it back and say so. Anything beyond that is asked first.
+- Sign in through the app's own login screen or the API from the Playwright script, then seed the browser's storage as `browser-mock.js` does. Stop the dev server and close the browser when done.
+
 ## Where things are in the code
 
 - Accent colors, the skip prompt editor and the Seerr/Home row work are fork-only, in `implement`.
