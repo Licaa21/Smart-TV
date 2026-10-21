@@ -20,3 +20,8 @@ export const writeBrowseState = (key, patch) => {
 	}
 	cache.set(key, {...existing, ...patch});
 };
+
+// The card an opened title was reached from is only for the one return from its details page, so it is dropped once used
+export const forgetReturnPoint = (key) => {
+	if (cache.has(key)) writeBrowseState(key, {focusedId: null, pagesLoaded: null});
+};

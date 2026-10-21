@@ -20,7 +20,7 @@ import libraryCss from '../Library/Library.module.less';
 import {DOCK_WIDTH, HOME_ICON, HeaderSearch, LibraryDock, LibraryTitle, ModernBar, SETTINGS_ICON, SORT_ICON, libraryStyleOf} from '../Library/LibraryHeaders';
 import * as seerrApi from '../../services/seerrApi';
 import {buildSeerrDiscoverParams, filterSearchResults, filterTitlesByName, mergeTitles, getSeerrSortOptions, getSeerrTvStatusOptions, getSeerrMinRatingOptions, getSeerrMinVoteOptions, getSeerrRuntimeOptions, getSeerrReleaseOptions, hasSeerrDiscoverFilters} from '../../utils/seerrBrowseFilters';
-import {browseStateKey, readBrowseState, writeBrowseState} from './seerrBrowseState';
+import {browseStateKey, forgetReturnPoint, readBrowseState, writeBrowseState} from './seerrBrowseState';
 
 import css from './SeerrBrowse.module.less';
 
@@ -225,6 +225,8 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		if (restoredRef.current || !initialLoadDone) return;
 		restoredRef.current = true;
 		const focusedId = savedRef.current?.focusedId;
+		// Only a return from a title's details page lands on its card, a later visit starts at the first title
+		forgetReturnPoint(stateKey);
 		// A first visit puts the focus on the first title, as the library does, so the title under the header is filled
 		if (!focusedId) {
 			const timer = setTimeout(() => Spotlight.focus('seerr-browse-grid'), 100);
@@ -233,7 +235,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		const index = itemsRef.current.findIndex((i) => i.id === focusedId);
 		if (index < 0 || !scrollToRef.current) return;
 		scrollToRef.current({index, animate: false, focus: true});
-	}, [initialLoadDone]);
+	}, [initialLoadDone, stateKey]);
 
 	// the card focus is on, whose backdrop shows behind the grid
 	const [backdropItem, setBackdropItem] = useState(null);
