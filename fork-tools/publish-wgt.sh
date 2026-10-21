@@ -51,7 +51,7 @@ notes="$(mktemp)"
 log="$(mktemp)"
 git log --no-merges --format='%an%x09%h%x09%s' "$prev..$from" > "$log"
 {
-  echo "Lica Fork $n for Moonfin $version, built from commit \`$from\` on $(date '+%Y-%m-%d %H:%M')."
+  echo "Lica's Fork $n for Moonfin $version, built from commit \`$from\` on $(date '+%Y-%m-%d %H:%M')."
   echo
   echo "What was done since $(git rev-parse --short "$prev") (commit ids in brackets)."
   if awk -F'\t' '$1=="Licaa21"' "$log" | grep -q .; then
@@ -74,6 +74,6 @@ done
 [ "$built" = "$versioned" ] || mv -f "$built" "$versioned"
 
 gh release create "fork-v$n" "$versioned" --repo "$REPO" --target "$from" \
-  --title "Lica Fork $n (Moonfin $version)" --notes-file "$notes" --latest
+  --title "Lica's Fork $n (Moonfin $version)" --notes-file "$notes" --latest
 echo "Published $versioned: https://github.com/$REPO/releases/tag/fork-v$n"
 echo "The newest one is always at https://github.com/$REPO/releases/latest"
