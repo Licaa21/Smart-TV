@@ -9,6 +9,9 @@ cd "$(git rev-parse --show-toplevel)"
 [ "$(git branch --show-current)" = "daily" ] || { echo "Packages are only built on the daily branch."; exit 1; }
 # The commit the package is built from, printed in the diagnostic report so a log says which build made it
 export REACT_APP_BUILD_ID="$(git rev-parse --short HEAD)"
+# The fork's version of this build, worked out before it is compiled so the app knows it and can watch the fork's releases for a newer one
+forkversion="$(bash fork-tools/publish-wgt.sh --version)"
+[ -z "$forkversion" ] || export REACT_APP_FORK_VERSION="$forkversion" FORK_VERSION="$forkversion"
 npm run build:tizen
 for built in Moonfin_Tizen_Regular_*.wgt; do
   case "$built" in

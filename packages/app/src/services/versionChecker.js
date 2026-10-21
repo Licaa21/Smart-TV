@@ -10,9 +10,11 @@ import $L from '@enact/i18n/$L';
 import {getFromStorage, saveToStorage} from './storage';
 import {isTizen, isVega, isWebOS, isXbox} from '../platform';
 import packageJson from '../../package.json';
-const APP_VERSION = packageJson.version;
+// A package built by the fork's build script carries the fork's own version (1.1.2), and the update check watches the fork's
+// releases for a newer one. Anywhere else (the dev server, the browser) there is none, and Moonfin's own version stands in.
+const APP_VERSION = process.env.REACT_APP_FORK_VERSION || packageJson.version;
 
-const GITHUB_RELEASES_URL = 'https://api.github.com/repos/Moonfin-Client/Smart-TV/releases';
+const GITHUB_RELEASES_URL = 'https://api.github.com/repos/Licaa21/Smart-TV/releases';
 const CHECK_COOLDOWN_HOURS = 24;
 const STORAGE_KEY_LAST_CHECK = 'version_last_check';
 const STORAGE_KEY_DISMISSED_VERSION = 'version_dismissed';
@@ -23,6 +25,12 @@ const STORAGE_KEY_DISMISSED_VERSION = 'version_dismissed';
  */
 export const getCurrentVersion = () => {
 	return APP_VERSION;
+};
+
+// What Settings shows as the version: Moonfin's, with the fork's after it on a package the fork built
+export const getDisplayVersion = () => {
+	const moonfin = process.env.REACT_APP_VERSION || '0.0.0';
+	return process.env.REACT_APP_FORK_VERSION ? moonfin + " (Lica's Fork " + process.env.REACT_APP_FORK_VERSION + ')' : moonfin;
 };
 
 /**
@@ -199,7 +207,7 @@ export const checkForUpdatesDetailed = async () => {
 		const releaseInfo = await fetchLatestRelease();
 		await markChecked();
 		if (!releaseInfo || !releaseInfo.tag_name) return {status: 'error', currentVersion};
-		const latestVersion = releaseInfo.tag_name.replace(/^v/, '');
+		const latestVersion = releaseInfo.tag_name.replace(/^(fork-)?v/, '');
 		if (compareVersions(currentVersion, latestVersion) < 0) {
 			return {status: 'update', currentVersion, latestVersion};
 		}
@@ -232,11 +240,12 @@ export const checkForUpdates = async (forceCheck = false) => {
 		return null;
 	}
 
-	const latestVersion = releaseInfo.tag_name.replace(/^v/, '');
+	const latestVersion = releaseInfo.tag_name.replace(/^(fork-)?v/, '');
 
 	if (compareVersions(currentVersion, latestVersion) < 0) {
 		const dismissed = await isVersionDismissed(latestVersion);
-		if (!dismissed) {
+		// A check the viewer asked for shows the update again even when its notice was dismissed before
+		if (!dismissed || forceCheck) {
 			return {
 				currentVersion,
 				latestVersion,

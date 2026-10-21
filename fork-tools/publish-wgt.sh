@@ -13,14 +13,10 @@ if ! command -v gh >/dev/null 2>&1 && [ -n "$LOCALAPPDATA" ] && [ -x "$(cygpath 
   export PATH="$PATH:$(cygpath -u "$LOCALAPPDATA")/GitHubCLI/bin"
 fi
 if ! command -v gh >/dev/null 2>&1; then
-  echo "gh is not installed or not on the path, so nothing was published. The package is here."
+  [ "${1:-}" = "--version" ] || echo "gh is not installed or not on the path, so nothing was published. The package is here."
   exit 0
 fi
 REPO="$(git remote get-url origin | sed -E 's#^.*github\.com[:/]##; s#\.git$##')"
-built="$(ls -t Moonfin_Tizen_Regular_*_Lica_Fork*.wgt 2>/dev/null | head -1)"
-[ -n "$built" ] || { echo "No package to publish."; exit 1; }
-version="$(echo "$built" | sed -E 's/^Moonfin_Tizen_Regular_v([0-9.]+)_Lica_Fork.*$/\1/')"
-
 # The last version released, the highest of the fork-v tags that are there
 tags="$(gh release list --repo "$REPO" --limit 500 --json tagName --jq '.[].tagName')"
 last="$(echo "$tags" | grep -E '^fork-v[0-9]+\.[0-9]+(\.[0-9]+)?$' | sed 's/^fork-v//' | sort -V | tail -1 || true)"
@@ -35,9 +31,15 @@ else
     major) n="$((major + 1)).0.0" ;;
     minor) n="$major.$((minor + 1)).0" ;;
     patch) n="$major.$minor.$((${patch:-0} + 1))" ;;
-    *) echo "Say how far the fork's version moves from $last: BUMP=patch, minor or major bash fork-tools/publish-wgt.sh"; exit 1 ;;
+    *) echo "Say how far the fork's version moves from $last: BUMP=patch, minor or major bash fork-tools/publish-wgt.sh" >&2; exit 1 ;;
   esac
 fi
+# --version only says which version the next release is, so the build can stamp it into the app before it compiles
+if [ "${1:-}" = "--version" ]; then echo "$n"; exit 0; fi
+
+built="$(ls -t Moonfin_Tizen_Regular_*_Lica_Fork*.wgt 2>/dev/null | head -1)"
+[ -n "$built" ] || { echo "No package to publish."; exit 1; }
+version="$(echo "$built" | sed -E 's/^Moonfin_Tizen_Regular_v([0-9.]+)_Lica_Fork.*$/\1/')"
 from="$(git rev-parse "${BUILT_FROM:-HEAD}")"
 
 # The description starts at the last release, or where PREV says

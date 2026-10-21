@@ -321,9 +321,14 @@ const AppContent = (props) => {
 	const [photoViewerItem, setPhotoViewerItem] = useState(null);
 	const [photoViewerItems, setPhotoViewerItems] = useState([]);
 	const [comicViewerItem, setComicViewerItem] = useState(null);
-	const {updateInfo, formattedNotes, dismiss: dismissUpdate} = useVersionCheck(
+	const {updateInfo, formattedNotes, dismiss: dismissUpdate, manualCheck: showUpdate} = useVersionCheck(
 		isAuthenticated && settings.updateNotificationsEnabled !== false ? 3000 : null
 	);
+	// Settings' Check for Updates found a newer release: the panel with its changelog opens, as it does at launch
+	useEffect(() => {
+		window.addEventListener('moonfin:showUpdate', showUpdate);
+		return () => window.removeEventListener('moonfin:showUpdate', showUpdate);
+	}, [showUpdate]);
 	// A PIN saved before this client started hashing is still stored as itself, so both are
 	// offered and the plain one is written back as a hash the first time it is entered.
 	const storedPin = useMemo(() => ({

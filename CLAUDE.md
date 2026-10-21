@@ -251,6 +251,13 @@ did, what the fork keeps instead, and what to do on a merge.
 - **On a merge:** keep `FilterPopup` and its groups in `Library.js`, the `popupGroup` state, `sortButtonId` and `settingsButtonId` on `useSortSettingsPanels`, and upstream's `LibraryHeaders.js` and style code as they come. Upstream's `expandedSection`, `handleSectionExpand` and `sortFocusId` are the old panel's and stay out. Modern cards: keep the fork's `rowArtwork` (the row's artwork choice) passed into upstream's `cardImageUrl`, with the Seerr titled thumb still ahead of it.
 - **Files:** `views/Library/Library.js`, `components/FilterPopup/`, `hooks/useSortSettingsPanels.js`, `components/MediaCard/ModernMediaCard.js`.
 
+### 9. The update check
+
+- **Upstream:** `services/versionChecker.js` compares Moonfin's own version (`package.json`) with the newest release of Moonfin-Client/Smart-TV that carries a package for the platform.
+- **The fork keeps:** the same check pointed at the fork's own releases (`Licaa21/Smart-TV`, tags `fork-v<x.y.z>`), against the fork's version, which `build-daily-wgt.sh` works out before compiling (`publish-wgt.sh --version`) and stamps into the app as `REACT_APP_FORK_VERSION` (without it, in the dev server, Moonfin's version stands in and nothing is offered). Settings shows it after Moonfin's (`getDisplayVersion`), and the Check for Updates row opens the update panel with the release's description as the changelog (`moonfin:showUpdate`, handled in `App.js`; a check the viewer asked for ignores a dismissed notice).
+- **On a merge:** keep the fork's repository URL, the tag prefix and `APP_VERSION` in `versionChecker.js`, the `getDisplayVersion` use in Settings, and the event.
+- **Files:** `services/versionChecker.js` (and its test), `views/Settings/Settings.js`, `settingsSchema.js`, `App/App.js`, `fork-tools/build-daily-wgt.sh`, `fork-tools/publish-wgt.sh`.
+
 ## When the user says Moonbase (the plugin) updated
 
 The fork works around things the Moonbase plugin (Moonfin-Client/Plugin) does not do yet. When the user says a new release is
@@ -292,7 +299,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
 
 - `fork-tools/update-daily.sh`: the merge into `daily` (see "How changes flow").
 - `fork-tools/build-daily-wgt.sh`: builds the package (see "Packages").
-- `fork-tools/publish-wgt.sh`: publishes the built package as a release of its own (see "Packages").
+- `fork-tools/publish-wgt.sh`: publishes the built package as a release of its own (see "Packages"). `--version` only prints the version the next release will have, which the build stamps into the app (see entry 9).
 - `fork-tools/link-modules.ps1`: links a folder's `node_modules` to the ones in `main/`.
 - `fork-tools/check-romanian.js`: the Romanian check (see "Strings and languages").
 - `scripts/gen-accent-rules.js`: regenerates `packages/app/src/theme/accentRules.generated.js` from the stylesheets. Run

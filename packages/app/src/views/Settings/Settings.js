@@ -24,7 +24,7 @@ import {clearImageCache} from '../../services/imageProxy';
 import {clearProxiedImageCache} from '../../hooks/useProxiedImage';
 import {detectCustomSource, validateCustomRow, buildManualCustomSource, sourceKeyForRow} from '../../utils/externalHomeRows';
 import {fetchCustomRow} from '../../services/externalRowsApi';
-import {checkForUpdatesDetailed} from '../../services/versionChecker';
+import {checkForUpdatesDetailed, getDisplayVersion} from '../../services/versionChecker';
 import QrLinkView from './QrLinkView';
 import {formatPlaybackTimeSlot} from '../../utils/playbackTimeLabels';
 import {getSubtitleOverlayStyle, getSubtitleTextStyle} from '../../utils/subtitleConstants';
@@ -425,6 +425,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		const result = await checkForUpdatesDetailed();
 		if (result.status === 'update') {
 			setUpdateCheckMessage($L('Version {version} is available').replace('{version}', result.latestVersion));
+			window.dispatchEvent(new CustomEvent('moonfin:showUpdate'));
 		} else if (result.status === 'current') {
 			setUpdateCheckMessage($L('You are on the latest version'));
 		} else {
@@ -870,7 +871,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	const renderAboutHeader = () => (
 		<div className={css.aboutHeader}>
 			<div className={css.aboutLogo} role='img' aria-label='Moonfin' />
-			<div className={css.aboutVersion}>{$L('Version {version}').replace('{version}', process.env.REACT_APP_VERSION || '0.0.0')}</div>
+			<div className={css.aboutVersion}>{$L('Version {version}').replace('{version}', getDisplayVersion())}</div>
 			<div className={css.aboutDivider} />
 		</div>
 	);
