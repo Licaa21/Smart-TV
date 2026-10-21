@@ -37,7 +37,8 @@ const ModernMediaRow = ({
 	cardType,
 	rowImageType,
 	spotlightId: rowSpotlightId,
-	onLoadMore
+	onLoadMore,
+	deferImages = false
 }) => {
 	const {settings} = useSettings();
 	const scrollerRef = useRef(null);
@@ -61,7 +62,7 @@ const ModernMediaRow = ({
 		const el = document.querySelector(`[data-row-index="${rowIndex}"]`) || rowElementRef.current;
 		registerRowRef?.(rowIndex, el);
 		return () => registerRowRef?.(rowIndex, null);
-	}, [rowIndex, registerRowRef]);
+	}, [rowIndex, registerRowRef, loading]);
 
 	useEffect(() => {
 		scrollerLayoutRef.current = null;
@@ -264,6 +265,7 @@ const ModernMediaRow = ({
 								onFocused={handleFocusedChange}
 								showServerBadge={showServerBadge}
 								eagerLoad={rowIndex === 0}
+								deferImage={deferImages}
 								spotlightId={spotlightId}
 								onSpotlightLeft={isFirst ? handleWrapLeft : null}
 								onSpotlightRight={isLast ? handleWrapRight : null}
@@ -296,6 +298,7 @@ const areRowPropsEqual = (prev, next) => {
 	if (!prev.onLoadMore !== !next.onLoadMore) return false;
 	if (prev.loading !== next.loading || prev.titleWidth !== next.titleWidth || prev.cardType !== next.cardType) return false;
 	if (prev.spotlightId !== next.spotlightId) return false;
+	if (prev.deferImages !== next.deferImages) return false;
 	if (prev.items === next.items) return true;
 	if (prev.items?.length !== next.items?.length) return false;
 	for (let i = 0; i < prev.items.length; i++) {

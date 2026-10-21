@@ -5,6 +5,7 @@ import {
 	personAge,
 	personDateLines,
 	splitFilmography,
+	withPersonRoles,
 	usableCredits,
 	groupCredits,
 	knownForBackdropPath,
@@ -272,5 +273,27 @@ describe('popularity order with the backdrop title first', () => {
 		];
 		expect(rankLibraryItems(items, ranking).map((i) => i.Id)).toEqual(['c', 'a', 'b', 'd', 'e']);
 		expect(rankLibraryItems(items, null)).toEqual(items);
+	});
+});
+
+describe('withPersonRoles', () => {
+	test('the role they play becomes the subtitle and the cast is let go', () => {
+		// Someone who directed and acted in a title is listed once per credit.
+		const [item] = withPersonRoles([{Id: 'm1', People: [
+			{Id: 'p2', Role: 'Fry'},
+			{Id: 'p1', Role: '', Type: 'Director'},
+			{Id: 'p1', Role: ' Bender (voice) ', Type: 'Actor'}
+		]}], 'p1');
+
+		expect(item).toEqual({Id: 'm1', Subtitle: 'Bender (voice)'});
+	});
+
+	test('several roles read as one', () => {
+		const [item] = withPersonRoles([{Id: 'm1', People: [{Id: 'p1', Role: 'Wakka\nKimahri\n'}]}], 'p1');
+		expect(item.Subtitle).toBe('Wakka, Kimahri');
+	});
+
+	test('no role leaves the title without a subtitle', () => {
+		expect(withPersonRoles([{Id: 'm1', People: [{Id: 'p2', Role: 'Fry'}]}, {Id: 'm2'}], 'p1')).toEqual([{Id: 'm1'}, {Id: 'm2'}]);
 	});
 });

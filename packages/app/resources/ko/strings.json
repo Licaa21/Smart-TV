@@ -953,5 +953,8 @@
     "Text Fill Color": "텍스트 채우기 색상",
     "Queue is empty": "대기열이 비어 있습니다.",
     "Perfect match": "완벽한 일치",
-    "{count} downloads": "다운로드 {count}회"
+    "{count} downloads": "다운로드 {count}회",
+    "2 minutes": "2분",
+    "20 seconds": "20초",
+    "90 seconds": "90초"
 }

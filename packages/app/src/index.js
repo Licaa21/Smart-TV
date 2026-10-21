@@ -8,7 +8,7 @@ import {createRoot, hydrateRoot} from 'react-dom/client';
 
 import App, {localeStringsReady} from './App';
 import {isTizen} from './platform';
-import {registerKeys, ESSENTIAL_KEY_NAMES, dropStaleArrowRepeats, watchArrowHolds} from './utils/keys';
+import {registerKeys, ESSENTIAL_KEY_NAMES, paceArrowKeys, watchArrowHolds} from './utils/keys';
 import {registerBlockedKeys} from './utils/blockedKeys';
 import serverLogger from './services/serverLogger';
 
@@ -42,62 +42,6 @@ if (typeof Element !== 'undefined' && !Element.prototype.scrollTo) {
 	};
 }
 
-// Polyfill: Slider knob positioning for browsers without CSS custom properties
-// (e.g. Tizen 2.4 / WebKit r152340). No-op on modern browsers.
-(function () {
-	if (typeof window === 'undefined') return;
-	if (window.CSS && window.CSS.supports && window.CSS.supports('--a', '0')) return;
-
-	function patchSliderKnobs () {
-		const sliders = document.querySelectorAll('[class*="slider"]');
-		for (let i = 0; i < sliders.length; i++) {
-			const el = sliders[i];
-			const style = el.getAttribute('style');
-			if (!style) continue;
-
-			const match = style.match(/--slider-knob-pct:\s*([^;]+)/);
-			if (match) {
-				const pct = match[1].trim();
-				const knob = el.querySelector('[class*="knob"]');
-				if (knob) {
-					if (el.className.indexOf('vertical') !== -1) {
-						knob.style.bottom = pct;
-					} else {
-						knob.style.left = pct;
-					}
-				}
-			}
-		}
-	}
-
-	// A slider only moves in answer to the remote or the pointer, so it is patched after those, once
-	// per frame, and not every frame for as long as the app is open.
-	let rafId;
-	function schedulePatch () {
-		if (rafId) return;
-		rafId = window.requestAnimationFrame(function () {
-			rafId = null;
-			patchSliderKnobs();
-		});
-	}
-
-	['keydown', 'keyup', 'click', 'mouseup', 'touchend'].forEach(function (name) {
-		document.addEventListener(name, schedulePatch, true);
-	});
-	// A knob dragged with a finger or a pressed button moves with the pointer.
-	['mousemove', 'touchmove'].forEach(function (name) {
-		document.addEventListener(name, function (e) {
-			if (name === 'touchmove' || e.buttons) schedulePatch();
-		}, true);
-	});
-
-	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', schedulePatch);
-	} else {
-		schedulePatch();
-	}
-})();
-
 if (isTizen()) {
 	enforceTizenViewport();
 	registerKeys(ESSENTIAL_KEY_NAMES);
@@ -107,10 +51,9 @@ if (isTizen()) {
 const appElement = (<App />);
 
 if (typeof window !== 'undefined') {
-	// The watcher goes first: what the other one drops never reaches a listener added after it, and the report is meant to
-	// say what the set sent
+	// The watcher goes first, so the report says what the set sent and not what the pacing let through
 	watchArrowHolds(window, (hold) => serverLogger.info('Navigation', 'Arrow held', hold));
-	dropStaleArrowRepeats(window, (lost) => serverLogger.info('Navigation', 'Held arrow repeats dropped', lost));
+	paceArrowKeys();
 	// The locale strings arrive in their own chunk, so hold the first render until
 	// they land. Otherwise the app paints English and swaps a frame later.
 	localeStringsReady.then(() => {

@@ -783,6 +783,42 @@ patchFile('@enact/spotlight/Accelerator/Accelerator.js', [
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PATCH 18: core-js keeps the engine's own array, string and number methods
+//
+// core-js/stable replaces any native that misses a spec detail, so on Chrome 38
+// map, filter, slice, splice, concat and indexOf all run as JS versions just for
+// Symbol.species and -0 handling that no app code relies on. useNative keeps the
+// native method when the engine has one and still polyfills it when it doesn't.
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n[Patch 18] core-js: keep native ES5 array, string and number methods');
+
+patchFile('@enact/cli/config/corejs-proxy.js', [
+	{
+		find: "// Apply stable core-js polyfills\nrequire('core-js/stable');",
+		replace: "// Apply stable core-js polyfills\nrequire('core-js/configurator')({useNative: [\n\t'Array.prototype.concat', 'Array.prototype.filter', 'Array.prototype.indexOf', 'Array.prototype.lastIndexOf',\n\t'Array.prototype.map', 'Array.prototype.slice', 'Array.prototype.splice',\n\t'String.prototype.trim', 'String.prototype.trimLeft', 'String.prototype.trimRight',\n\t'String.prototype.trimStart', 'String.prototype.trimEnd',\n\t'Number.parseInt', 'Number.parseFloat', 'parseInt', 'parseFloat'\n]});\nrequire('core-js/stable');",
+		description: 'core-js configurator: native ES5 methods stay native'
+	}
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH 19: object spread assigns instead of defining each key
+//
+// Babel's spread helper copies every key with Object.defineProperty and reads
+// each symbol through getOwnPropertyDescriptor. On Chrome 38 both go through
+// the core-js Symbol polyfill's slow wrappers. A spread always lands on a fresh
+// object with no setters, so plain assignment gives the same result.
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n[Patch 19] babel-preset-enact: object spread assigns properties');
+
+patchFile('@enact/cli/node_modules/babel-preset-enact/index.js', [
+	{
+		find: "\treturn {\n\t\tpresets: [",
+		replace: "\treturn {\n\t\tassumptions: {setSpreadProperties: true},\n\t\tpresets: [",
+		description: 'babel-preset-enact: setSpreadProperties assumption'
+	}
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Summary
 // ─────────────────────────────────────────────────────────────────────────────
 if (failCount > 0) {

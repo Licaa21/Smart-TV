@@ -10,6 +10,7 @@
 
 import {getServerUrl, getAuthHeader, getApiKey, getUserId, getServerType, getDeviceId} from './jellyfinApi';
 import {legacyAuthHeader} from '../utils/serverRoutes';
+import {sharePending} from '../utils/sharePending';
 import {platformFetch} from './secureFetch';
 import {
 	isObject, parseBadge, parseBadgeChase, parseSummary, parseRank, parseBadges, parseQuests, parseRerolledQuests,
@@ -170,10 +171,14 @@ const rememberUnlockSettings = (json) => {
 	return unlockSettings;
 };
 
+// The unlock toast and privacy settings share one preferences object and are read together at
+// start-up, so a read still on its way serves both. Saves still read a fresh copy.
+const readPreferences = sharePending((userId) => userId, (userId) => getMap(`users/${userId}/preferences`));
+
 export const fetchUnlockToastSettings = async () => {
 	const userId = getUserId();
 	if (!userId) return null;
-	const json = await getMap(`users/${userId}/preferences`);
+	const json = await readPreferences(userId);
 	return json ? rememberUnlockSettings(json) : null;
 };
 
@@ -576,7 +581,7 @@ export const fetchAttachment = async (attachmentId) => {
 export const fetchSocialPrivacy = async () => {
 	const userId = getUserId();
 	if (!userId) return null;
-	const json = await getMap(`users/${userId}/preferences`);
+	const json = await readPreferences(userId);
 	return json ? parseSocialPrivacy(json) : null;
 };
 

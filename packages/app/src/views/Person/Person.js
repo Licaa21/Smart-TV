@@ -10,7 +10,7 @@ import * as seerrApi from '../../services/seerrApi';
 import usePersonSeerrCredits from '../../hooks/usePersonSeerrCredits';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import {getImageUrl} from '../../utils/helpers';
-import {personDateLines, rankLibraryItems, splitFilmography} from '../../utils/personCredits';
+import {personDateLines, rankLibraryItems, splitFilmography, withPersonRoles} from '../../utils/personCredits';
 import {sectionVisibility} from '../../utils/detailSectionLayout';
 
 import css from './Person.module.less';
@@ -37,7 +37,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 					api.getItemsByPerson(personId)
 				]);
 				setPerson(personData);
-				setItems(withoutBlockedItems(itemsData.Items || []));
+				setItems(withPersonRoles(withoutBlockedItems(itemsData.Items || []), personId));
 			} catch (err) {
 				console.error('Failed to load person:', err);
 			} finally {

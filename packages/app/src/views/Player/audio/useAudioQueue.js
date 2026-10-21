@@ -46,6 +46,8 @@ const useAudioQueue = (audioPlaylist, currentId) => {
 		(id) => (audioPlaylist || []).find((t) => t.Id === id) || null,
 		[audioPlaylist]
 	);
+	// Up Next lists the tracks in the order they play, so a shuffle reorders it.
+	const tracks = useMemo(() => sequence.map(trackById).filter(Boolean), [sequence, trackById]);
 
 	const hasNext = position >= 0 && (position < sequence.length - 1 || (repeatMode !== 'off' && sequence.length > 0));
 	const hasPrev = position > 0 || (repeatMode === 'all' && sequence.length > 0);
@@ -75,7 +77,7 @@ const useAudioQueue = (audioPlaylist, currentId) => {
 		return 'off';
 	}), []);
 
-	return {shuffleMode, repeatMode, toggleShuffle, cycleRepeat, setShuffleMode, setRepeatMode, getNext, getPrev, hasNext, hasPrev};
+	return {shuffleMode, repeatMode, toggleShuffle, cycleRepeat, setShuffleMode, setRepeatMode, getNext, getPrev, hasNext, hasPrev, tracks};
 };
 
 export default useAudioQueue;

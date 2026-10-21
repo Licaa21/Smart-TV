@@ -8,8 +8,9 @@ import {useSettings} from '../../context/SettingsContext';
 import * as jellyfinApi from '../../services/jellyfinApi';
 import * as embyConnect from '../../services/embyConnect';
 import {discoverLocalServers} from '../../services/serverDiscovery';
-import {generateCandidates, normalizeServerBaseUrl} from '../../utils/serverUrl';
-import {classifyError, detectServerType, getConnectionMessage, getLoginMessage, isVersionSupported, INVALID_ADDRESS, SERVER_NOT_JELLYFIN, INSECURE_CERT, MIN_SERVER_VERSION} from '../../utils/connectionErrors';
+import {generateCandidates, normalizeServerBaseUrl, quickConnectApprovalUrl} from '../../utils/serverUrl';
+import {drawQrCode} from '../../utils/qrCanvas';
+import {classifyError, detectServerType, getConnectionMessage, getSignInMessage, isSignInForbidden, isVersionSupported, supportsQuickConnectWebLink, INVALID_ADDRESS, SERVER_NOT_JELLYFIN, INSECURE_CERT, MIN_SERVER_VERSION} from '../../utils/connectionErrors';
 import {KEYS} from '../../utils/keys';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
 import {subscribeTvKeyboardVisibility} from '../../components/TVKeyboard/keyboardBus';
@@ -96,11 +97,21 @@ const Login = ({
 
 	const pageRef = useRef(null);
 	const quickConnectTimer = useRef(null);
+	const qrCanvasRef = useRef(null);
 	const bootstrapped = useRef(false);
 	const suppressClick = useRef(false);
 	const longPressTimer = useRef(null);
 
 	const supportsQuickConnect = hasQuickConnect(server);
+
+	// The QR sits beside the code and the buttons, so its room is kept while the code
+	// is still on its way instead of the card jumping when it arrives.
+	const showQuickConnectQr = supportsQuickConnect && showQuickConnect && supportsQuickConnectWebLink(server?.version);
+	const quickConnectQrUrl = showQuickConnectQr ? quickConnectApprovalUrl(server?.url, quickConnectCode) : null;
+
+	useEffect(() => {
+		drawQrCode(qrCanvasRef.current, quickConnectQrUrl);
+	}, [quickConnectQrUrl]);
 
 	// When a keyboard opens, a spacer grows under the card and the active field
 	// gets pulled toward the top so it stays visible above the keys. The scroll
@@ -424,7 +435,7 @@ const Login = ({
 			finishLogin(result);
 			return true;
 		} catch (err) {
-			setError(getLoginMessage(classifyError(err)));
+			setError(getSignInMessage(err));
 			setStatus(null);
 			return false;
 		} finally {
@@ -481,6 +492,12 @@ const Login = ({
 			finishLogin(result);
 		} catch (err) {
 			console.error('Quick Connect poll error:', err);
+			// Once approved the code is gone, so a refusal here has to be said or the screen
+			// stays on "Waiting for authorization..."
+			if (isSignInForbidden(err)) {
+				setError(getSignInMessage(err));
+				setStatus(null);
+			}
 		}
 	}, [stopQuickConnect, isAdding, loginWithToken, server, finishLogin]);
 
@@ -995,30 +1012,42 @@ const Login = ({
 	);
 
 	const renderSignIn = () => (
-		<FocusArea className={`${css.card} ${css.cardCentered}`}>
-			<h1 className={css.title}>{$L('Sign In')}</h1>
-			<p className={css.signInSubtitle}>{$L('Connecting to {serverName}').replace('{serverName}', server?.name || '')}</p>
+		<FocusArea className={`${css.card} ${css.cardCentered} ${showQuickConnectQr ? css.cardWithQr : ''}`}>
+			<div className={css.signInMain}>
+				<h1 className={css.title}>{$L('Sign In')}</h1>
+				<p className={css.signInSubtitle}>{$L('Connecting to {serverName}').replace('{serverName}', server?.name || '')}</p>
 
-			{supportsQuickConnect && (
-				<div className={css.buttonWrap}>
-					<SpottableButton
-						data-spotlight-id="qc-toggle-btn"
-						className={`${css.toggleButton} ${showQuickConnect ? css.toggleButtonSelected : ''}`}
-						onClick={selectQuickConnect}
-					>
-						{$L('Quick Connect')}
-					</SpottableButton>
-					<SpottableButton
-						data-spotlight-id="pw-toggle-btn"
-						className={`${css.toggleButton} ${showQuickConnect ? '' : css.toggleButtonSelected}`}
-						onClick={selectPassword}
-					>
-						{$L('Password')}
-					</SpottableButton>
+				{supportsQuickConnect && (
+					<div className={css.buttonWrap}>
+						<SpottableButton
+							data-spotlight-id="qc-toggle-btn"
+							className={`${css.toggleButton} ${showQuickConnect ? css.toggleButtonSelected : ''}`}
+							onClick={selectQuickConnect}
+						>
+							{$L('Quick Connect')}
+						</SpottableButton>
+						<SpottableButton
+							data-spotlight-id="pw-toggle-btn"
+							className={`${css.toggleButton} ${showQuickConnect ? '' : css.toggleButtonSelected}`}
+							onClick={selectPassword}
+						>
+							{$L('Password')}
+						</SpottableButton>
+					</div>
+				)}
+
+				{supportsQuickConnect && showQuickConnect ? renderQuickConnect() : renderCredentials()}
+			</div>
+			{showQuickConnectQr && (
+				<div className={css.qrAside}>
+					{quickConnectQrUrl && (
+						<div>
+							<canvas ref={qrCanvasRef} className={css.qrCanvas} />
+							<div className={css.qrCaption}>{$L("Or scan this with a phone that's signed in to your server")}</div>
+						</div>
+					)}
 				</div>
 			)}
-
-			{supportsQuickConnect && showQuickConnect ? renderQuickConnect() : renderCredentials()}
 		</FocusArea>
 	);
 
@@ -1184,7 +1213,7 @@ const Login = ({
 	return (
 		<div className={css.page} ref={pageRef}>
 			<div className={css.spacerTop} />
-			<div className={`${css.frame} ${isNarrow ? css.frameNarrow : ''}`}>
+			<div className={`${css.frame} ${isNarrow ? (step === 'signin' && showQuickConnectQr ? css.frameWide : css.frameNarrow) : ''}`}>
 				<div className={css.logoSection}>
 					<img
 						src="resources/banner-dark.png"

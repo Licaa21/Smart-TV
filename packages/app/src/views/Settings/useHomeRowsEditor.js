@@ -24,6 +24,18 @@ const swapOrder = (list, index, target) => {
 	return next.sort((a, b) => a.order - b.order);
 };
 
+// Switching a row on puts it after the last enabled one, so it joins the bottom of the Enabled
+// list. Switching one off leaves it where it is among the disabled rows.
+const toggleRowIn = (list, id) => {
+	const row = list.find((entry) => entry.id === id);
+	if (!row) return list;
+	if (row.enabled) return list.map((entry) => (entry.id === id ? {...entry, enabled: false} : entry));
+	const rest = list.filter((entry) => entry.id !== id);
+	const after = rest.reduce((last, entry, index) => (entry.enabled ? index + 1 : last), 0);
+	return [...rest.slice(0, after), {...row, enabled: true}, ...rest.slice(after)]
+		.map((entry, index) => ({...entry, order: index}));
+};
+
 // The home screen row order, edited against a scratch copy and written back once the screen
 // closes, and only if it ended up different. The IMDb rows are stored twice, as a row and as
 // their own setting, so both are updated.
@@ -31,6 +43,9 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 	const [tempHomeRows, setTempHomeRows] = useState([]);
 	const [tempPluginSections, setTempPluginSections] = useState([]);
 	const [pluginSectionRenderLimit, setPluginSectionRenderLimit] = useState(INITIAL_PLUGIN_SECTION_RENDER_COUNT);
+	// Turns false once the server answers with no Live TV channels, which hides the Live TV rows.
+	// A failed check keeps the last answer.
+	const [serverHasLiveTv, setServerHasLiveTv] = useState(true);
 	const openedRef = useRef({rows: '', sections: ''});
 
 	const refreshBuiltInCollectionGenreSections = useCallback(async () => {
@@ -82,6 +97,10 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 		setPluginSectionRenderLimit(INITIAL_PLUGIN_SECTION_RENDER_COUNT);
 		pushView({ view: 'homeRows', returnFocusTo: 'setting-homeRows' });
 
+		api.getLiveTvChannels(0, 1)
+			.then((result) => setServerHasLiveTv((result?.Items || []).length > 0))
+			.catch(() => {});
+
 		refreshBuiltInCollectionGenreSections()
 			.then((builtInSections) => {
 				setTempPluginSections((prev) => {
@@ -108,7 +127,7 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 				});
 			})
 			.catch(() => {});
-	}, [settings.homeRows, settings.pluginSections, pushView, refreshBuiltInCollectionGenreSections]);
+	}, [api, settings.homeRows, settings.pluginSections, pushView, refreshBuiltInCollectionGenreSections]);
 
 	const commitHomeRows = useCallback(() => {
 		const rowsChanged = editedListKey(tempHomeRows) !== openedRef.current.rows;
@@ -138,14 +157,14 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 	}, []);
 
 	const toggleHomeRow = useCallback((rowId) => {
-		setTempHomeRows((prev) => prev.map((row) => (row.id === rowId ? { ...row, enabled: !row.enabled } : row)));
+		setTempHomeRows((prev) => toggleRowIn(prev, rowId));
 	}, []);
 
-	// Reordering steps over the rows the gates are hiding, so a press moves the row past
-	// the next one the viewer can actually see.
+	// Only enabled rows move, and a press steps over the disabled rows and the ones the gates
+	// are hiding, so the row passes the next one the viewer sees in the Enabled list.
 	const moveHomeRow = useCallback((rowId, direction) => {
 		setTempHomeRows((prev) => {
-			const visibleRows = prev.filter((row) => isHomeRowVisibleByGates(row.id, settings));
+			const visibleRows = prev.filter((row) => row.enabled && isHomeRowVisibleByGates(row.id, settings, serverHasLiveTv));
 			const visibleIndex = visibleRows.findIndex((row) => row.id === rowId);
 			const neighbourIndex = visibleIndex + direction;
 			if (visibleIndex < 0 || neighbourIndex < 0 || neighbourIndex >= visibleRows.length) return prev;
@@ -155,7 +174,7 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 			if (index < 0 || targetIndex < 0) return prev;
 			return swapOrder(prev, index, targetIndex);
 		});
-	}, [settings]);
+	}, [settings, serverHasLiveTv]);
 
 	// A section touched before the discovered ones came back still counts against the list it had
 	const noteSectionsOpened = (prev) => {
@@ -165,17 +184,22 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 	const togglePluginSection = useCallback((sectionId) => {
 		setTempPluginSections((prev) => {
 			noteSectionsOpened(prev);
-			return prev.map((section) => (section.id === sectionId ? {...section, enabled: !section.enabled} : section));
+			return toggleRowIn(prev, sectionId);
 		});
 	}, []);
 
 	const movePluginSection = useCallback((sectionId, direction) => {
 		setTempPluginSections((prev) => {
 			noteSectionsOpened(prev);
-			const index = prev.findIndex((section) => section.id === sectionId);
-			const target = index + direction;
-			if (index < 0 || target < 0 || target >= prev.length) return prev;
-			return swapOrder(prev, index, target);
+			const enabled = prev.filter((section) => section.enabled);
+			const at = enabled.findIndex((section) => section.id === sectionId);
+			const neighbour = enabled[at + direction];
+			if (at < 0 || !neighbour) return prev;
+			return swapOrder(
+				prev,
+				prev.findIndex((section) => section.id === sectionId),
+				prev.findIndex((section) => section.id === neighbour.id)
+			);
 		});
 	}, []);
 
@@ -184,6 +208,7 @@ const useHomeRowsEditor = ({api, settings, updateSetting, updateSettings, pushVi
 		tempPluginSections,
 		pluginSectionRenderLimit,
 		setPluginSectionRenderLimit,
+		serverHasLiveTv,
 		toggleHomeRowEnabled,
 		toggleSeerrHomeRow,
 		openHomeRows,

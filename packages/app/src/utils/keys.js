@@ -90,6 +90,9 @@ export const isBackKey = (e) => {
 	return code === KEYS.BACK || code === 27 || code === 8;
 };
 
+// The transport keys, which music playing behind the other screens still answers.
+export const isMediaKey = (e) => [KEYS.PLAY, KEYS.PAUSE, KEYS.PLAY_PAUSE, KEYS.STOP, KEYS.FAST_FORWARD, KEYS.REWIND].includes(e.keyCode || e.which);
+
 // A remote with a menu key does with one press what the others do by holding OK.
 export const isMenuKey = (e) => KEYS.MENU !== undefined && (e.keyCode || e.which) === KEYS.MENU;
 
@@ -107,35 +110,37 @@ export const isChannelMenuKey = (e) => {
 	return TIZEN_CHANNEL_MENU_KEYS.includes(e.keyCode || e.which);
 };
 
-// A held arrow repeats at the remote's own rate, which a slow TV can't always keep up with. The repeats that pile up
-// behind a slow move reach the page in a burst once it is free, so a repeat that comes right on the heels of the last
-// arrow is dropped, which keeps focus in step with the key and stops it when the key is let go. The event's own stamp is
-// not used: the Q67A stamps every repeat 100 to 400 ms old although they arrive on the remote's beat of about 108 ms, so
-// judging by it dropped every repeat of a hold.
-const BURST_MS = 40;
-export const dropStaleArrowRepeats = (target = window, report) => {
+// A slow TV can take longer to draw a move than the remote takes to repeat a held arrow. Older engines
+// stamp events when they're handled, so a repeat's wait can't be read off the event. A repeat that
+// arrives before the last move has been drawn is dropped, so focus keeps pace with the key and stops
+// when it's let go. A separate press always goes through.
+const MAX_DRAW_WAIT_MS = 1000;
+export const paceArrowKeys = (target = window) => {
 	let held = null;
-	let lastDown = -Infinity;
-	let dropped = 0;
+	let drawing = false;
+	let acceptedAt = 0;
+	// A message posted from the next frame's callback is handled once that frame has been drawn.
+	const channel = new MessageChannel();
+	channel.port1.onmessage = () => {
+		drawing = false;
+	};
 	target.addEventListener('keydown', (e) => {
 		const code = e.keyCode;
 		if (code !== KEYS.UP && code !== KEYS.DOWN && code !== KEYS.LEFT && code !== KEYS.RIGHT) return;
 		const repeat = e.repeat || held === code;
 		held = code;
-		const at = performance.now();
-		const burst = at - lastDown < BURST_MS;
-		lastDown = at;
-		if (!repeat || !burst) return;
-		dropped += 1;
-		e.preventDefault();
-		e.stopImmediatePropagation();
+		// A page that stops drawing, hidden behind another app for one, can't hold the arrows forever.
+		if (repeat && drawing && Date.now() - acceptedAt < MAX_DRAW_WAIT_MS) {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			return;
+		}
+		drawing = true;
+		acceptedAt = Date.now();
+		window.requestAnimationFrame(() => channel.port2.postMessage(null));
 	}, true);
 	target.addEventListener('keyup', (e) => {
-		if (e.keyCode !== held) return;
-		held = null;
-		// What a held key lost is told once it is let go, for the diagnostic report
-		if (dropped && report) report({dropped});
-		dropped = 0;
+		if (e.keyCode === held) held = null;
 	}, true);
 };
 

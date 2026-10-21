@@ -37,6 +37,20 @@ export function getLoginMessage (type) {
 	return LOGIN_MESSAGES[type] ? LOGIN_MESSAGES[type]() : $L('Login failed. Please try again.');
 }
 
+// A refusal at sign in. Jellyfin only gives the reason (an access schedule that doesn't
+// allow the current time, a lockout, a disabled account) in its own log, and sends
+// "Error processing request." outside development, so the status is all there is.
+export function isSignInForbidden (err) {
+	return Boolean(err) && err.status === 403;
+}
+
+export function getSignInMessage (err) {
+	if (isSignInForbidden(err)) {
+		return $L('This account can\'t sign in right now. It may be outside its allowed hours, locked or disabled. Try again later or ask an administrator.');
+	}
+	return getLoginMessage(classifyError(err));
+}
+
 export function classifyError (err) {
 	if (!err) return null;
 	if (err.connectionType) return err.connectionType;
@@ -77,4 +91,17 @@ export function isVersionSupported (versionString) {
 		if ((parts[i] || 0) < min[i]) return false;
 	}
 	return true;
+}
+
+// Whether the web client opens its Quick Connect page from a link with the code
+// already filled in. That page arrived in Jellyfin 10.9, and older servers only
+// have the page without the prefill. A version that doesn't parse counts as
+// recent enough, since the alternative is hiding it on every server that
+// reports something unexpected.
+export function supportsQuickConnectWebLink (versionString) {
+	const parts = String(versionString || '').split('.');
+	const major = parseInt(parts[0], 10);
+	const minor = parseInt(parts[1], 10);
+	if (Number.isNaN(major) || Number.isNaN(minor)) return true;
+	return major > 10 || (major === 10 && minor >= 9);
 }

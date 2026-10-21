@@ -36,6 +36,7 @@ import {forgetRowCountsExcept} from '../../utils/rowCap';
 import useExternalRows from './useExternalRows';
 import useMediaPreview from './useMediaPreview';
 import {buildBrowseRows, sameRowList} from './buildBrowseRows';
+import {markHomeReady} from '../../utils/homeReady';
 
 import css from './Browse.module.less';
 
@@ -46,7 +47,15 @@ const FILL_ROW_DELAY_MS = 80;
 const FILL_ROW_IDLE_TIMEOUT_MS = 250;
 // A row's height when a return does not know it
 const GUESSED_ROW_HEIGHT = 330;
-const TRANSITION_DELAY_MS = 450;
+const BACKDROP_SETTLE_MS = 250;
+// Home draws its first rows and adds the rest one at a time, so a slow TV shows something to focus
+// sooner. Focus always has a couple of built rows below it.
+const FIRST_ROWS = 3;
+const ROWS_AHEAD = 2;
+const ROW_MOUNT_GAP_MS = 50;
+// Engines without lazy loading fetch every poster on the page, so rows further down wait for theirs
+// until focus comes near.
+const NATIVE_LAZY_IMAGES = typeof document === 'undefined' || 'loading' in document.createElement('img');
 
 const LOADING_ROW_TITLE_WIDTHS = skeletonTitleWidths(4, 24);
 
@@ -133,6 +142,7 @@ const Browse = ({
 	const prevFilteredRowsRef = useRef([]);
 	const filteredRowsRef = useRef([]);
 	const rowRefsMap = useRef(new Map());
+	const rowNodesRef = useRef(new Map());
 	const initialFocusSetRef = useRef(false);
 	const restoreTimerRef = useRef(null);
 	const scrollTimeoutRef = useRef(null);
@@ -140,10 +150,17 @@ const Browse = ({
 	const scrollsRef = useRef(new Map());
 	const isVisibleRef = useRef(isVisible);
 	isVisibleRef.current = isVisible;
+	// Coming back to a card means its row has to be there already.
+	const [mountedRows, setMountedRows] = useState(() => (lastFocusState ? Infinity : FIRST_ROWS));
+	const mountedRowsRef = useRef(mountedRows);
+	mountedRowsRef.current = mountedRows;
+	const pendingScrollRef = useRef(null);
+	const [imageRows, setImageRows] = useState(FIRST_ROWS);
 
 	const showFeaturedBar = (settings.featuredBarStyle !== 'off');
 
 	const registerRowRef = useCallback((rowIndex, element) => {
+		rowNodesRef.current.delete(rowIndex);
 		if (element) {
 			rowRefsMap.current.set(rowIndex, element);
 		} else {
@@ -198,6 +215,18 @@ const Browse = ({
 		homeRowsConfig,
 		reuse: returning
 	});
+
+	// The rows keep the focus callbacks they mounted with, so those read the current values here.
+	const liveRef = useRef(null);
+	liveRef.current = {
+		browseMode,
+		showTopInfoArea,
+		useModernRows,
+		navbarPosition: settings.navbarPosition,
+		onFocusItemThemeMusic,
+		onBlurItemThemeMusic,
+		onUnfocusItemThemeMusic
+	};
 
 	// Filtered here rather than where the bar loads, so slides cached before a rating was blocked
 	// drop out too.
@@ -297,18 +326,47 @@ const Browse = ({
 		if (!container) return;
 		// The ref a row hands over is the spotlight container component rather
 		// than its div, so the real node is looked up by the index stamped on it.
-		const registered = rowRefsMap.current.get(rowIndex);
-		const targetRow = registered && typeof registered.offsetTop === 'number'
-			? registered
-			: container.querySelector(`[data-row-index="${rowIndex}"]`);
-		if (!targetRow) return;
-		const topbarOffset = showTopInfoArea && settings.navbarPosition !== 'left' ? 20 : 0;
+		let targetRow = rowNodesRef.current.get(rowIndex);
+		if (!targetRow) {
+			const registered = rowRefsMap.current.get(rowIndex);
+			targetRow = registered && typeof registered.offsetTop === 'number'
+				? registered
+				: container.querySelector(`[data-row-index="${rowIndex}"]`);
+			if (!targetRow) return;
+			rowNodesRef.current.set(rowIndex, targetRow);
+		}
+		const {showTopInfoArea: overlay, navbarPosition} = liveRef.current;
+		const topbarOffset = overlay && navbarPosition !== 'left' ? 20 : 0;
 		const top = Math.max(0, targetRow.offsetTop - topbarOffset);
 		if (Math.abs(container.scrollTop - top) > 1) container.scrollTop = top;
-	}, [settings.navbarPosition, showTopInfoArea]);
+	}, []);
+
+	// Focus scrolling lands wherever the engine likes, sometimes with the row's bottom past the
+	// screen, and it lands after the focus handlers, so the row is put back at its resting spot on
+	// the frames behind it. However many moves ask, each frame settles once.
+	const settleRef = useRef({row: -1, passes: 0, frame: 0});
+	const settleRow = useCallback((rowIndex, passes) => {
+		const settle = settleRef.current;
+		settle.row = rowIndex;
+		settle.passes = Math.max(settle.passes, passes);
+		if (settle.frame) return;
+		const step = () => {
+			settle.frame = 0;
+			pinMainScroll();
+			restRowScroll(settle.row);
+			settle.passes -= 1;
+			if (settle.passes > 0) settle.frame = window.requestAnimationFrame(step);
+		};
+		settle.frame = window.requestAnimationFrame(step);
+	}, [pinMainScroll, restRowScroll]);
 
 	const scrollToRow = useCallback((rowIndex, thenFocus, cardIndex, cardId) => {
 		if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+		if (rowIndex >= mountedRowsRef.current) {
+			pendingScrollRef.current = [rowIndex, thenFocus, cardIndex, cardId];
+			setMountedRows(rowIndex + 1 + ROWS_AHEAD);
+			return;
+		}
 
 		const targetRow = rowRefsMap.current.get(rowIndex);
 		const container = contentRowsRef.current;
@@ -332,11 +390,8 @@ const Browse = ({
 		// A row is only measured once it renders, so landing on one that was still
 		// standing in at a guessed height leaves it above the screen with its cards
 		// cut off. Settling once it is real puts it where it was asked to go.
-		const settle = (passes) => {
-			restRowScroll(rowIndex);
-			if (passes > 0) window.requestAnimationFrame(() => settle(passes - 1));
-		};
-		settle(2);
+		restRowScroll(rowIndex);
+		settleRow(rowIndex, 2);
 
 		if (thenFocus) {
 			let attempts = 0;
@@ -351,7 +406,25 @@ const Browse = ({
 			};
 			scrollTimeoutRef.current = setTimeout(tryFocus, 0);
 		}
-	}, [focusRow, restRowScroll]);
+	}, [focusRow, restRowScroll, settleRow]);
+
+	// Run after the new rows have registered themselves.
+	useEffect(() => {
+		const pending = pendingScrollRef.current;
+		if (!pending) return;
+		pendingScrollRef.current = null;
+		scrollToRow(...pending);
+	}, [mountedRows, scrollToRow]);
+
+	useEffect(() => {
+		if (isLoading || mountedRows >= filteredRows.length) return undefined;
+		const timer = setTimeout(() => setMountedRows((count) => count + 1), ROW_MOUNT_GAP_MS);
+		return () => clearTimeout(timer);
+	}, [isLoading, mountedRows, filteredRows.length]);
+
+	useEffect(() => {
+		if (!isLoading && isVisible) markHomeReady();
+	}, [isLoading, isVisible]);
 
 	// A placeholder holds a loading section's place but has nothing to focus, so moving between
 	// rows steps over it.
@@ -663,12 +736,11 @@ const Browse = ({
 		external: (picked) => latestSelectRef.current.external(picked)
 	}), []);
 
+	// The banner unmounts as soon as the mode flips, so the row takes focus right away.
 	const handleNavigateDownFromFeatured = useCallback(() => {
 		setBrowseMode('rows');
 		const entry = rowEntryCardIndex(settingsRef.current);
-		setTimeout(() => {
-			scrollToRow(focusableRowFrom(0, 1), true, entry);
-		}, TRANSITION_DELAY_MS);
+		scrollToRow(focusableRowFrom(0, 1), true, entry);
 	}, [scrollToRow, setBrowseMode, focusableRowFrom]);
 
 	// Back below the top row returns the list to it rather than leaving, so the exit
@@ -703,36 +775,41 @@ const Browse = ({
 	}, [setBrowseMode]);
 
 	const handleRowFocus = useCallback((rowIndex) => {
-		pinMainScroll();
-		if (browseMode !== 'rows') {
+		if (liveRef.current.browseMode !== 'rows') {
 			setBrowseMode('rows');
 		}
-		if (typeof rowIndex === 'number') {
-			lastFocusedRowRef.current = rowIndex;
-			// A pointer hover focuses whatever it crosses, and pulling that row
-			// to its resting spot would make the screen chase the cursor, so the
-			// pin only answers key driven focus.
-			if (!Spotlight.getPointerMode()) {
-				// Focus scrolling lands wherever the engine likes, sometimes with the
-				// row's bottom past the screen, and it lands after this handler, so the
-				// focused row is put back at its resting spot on the frames behind it.
-				window.requestAnimationFrame(() => restRowScroll(rowIndex));
-				window.requestAnimationFrame(() => window.requestAnimationFrame(() => restRowScroll(rowIndex)));
-			}
+		if (typeof rowIndex !== 'number') return;
+		const rowChanged = rowIndex !== lastFocusedRowRef.current;
+		lastFocusedRowRef.current = rowIndex;
+		if (rowChanged) {
+			const wanted = rowIndex + 1 + ROWS_AHEAD;
+			setMountedRows((count) => Math.max(count, wanted));
+			if (!NATIVE_LAZY_IMAGES) setImageRows((count) => Math.max(count, wanted));
 		}
-	}, [browseMode, setBrowseMode, pinMainScroll, restRowScroll]);
+		// A pointer hover focuses whatever it crosses, and pulling that row
+		// to its resting spot would make the screen chase the cursor, so the
+		// pin only answers key driven focus.
+		if (Spotlight.getPointerMode()) {
+			pinMainScroll();
+			return;
+		}
+		settleRow(rowIndex, rowChanged ? 2 : 1);
+	}, [setBrowseMode, pinMainScroll, settleRow]);
 
+	const backdropTimerRef = useRef(null);
 	const handleFocusItem = useCallback((item) => {
-		pinMainScroll();
-		if (showTopInfoArea) {
+		const live = liveRef.current;
+		if (live.showTopInfoArea) {
 			detailSectionRef.current?.handleFocusItem(item);
-		} else if (useModernRows) {
+		} else if (live.useModernRows) {
 			focusBackdropRef.current?.setItem(item);
 		} else {
 			// The info overlay used to be the only feed into the backdrop, so
 			// turning it off silently killed backdrops with it. Classic rows hand
-			// the item over directly when the overlay is not there to do it.
-			setFocusedItemForBackdrop(item);
+			// the item over directly when the overlay isn't there to do it, once
+			// focus stops moving.
+			clearTimeout(backdropTimerRef.current);
+			backdropTimerRef.current = setTimeout(() => setFocusedItemForBackdrop(item), BACKDROP_SETTLE_MS);
 		}
 		// The theme belongs to the title. An episode or a season of a series plays the series' theme, so the
 		// Continue Watching and Next Up rows have one, and the next episode of the same show keeps it going.
@@ -744,12 +821,17 @@ const Browse = ({
 				: (item?.Type === 'Episode' || item?.Type === 'Season') ? item.SeriesId
 					: null;
 		if (themeId) {
-			onFocusItemThemeMusic?.(themeId);
+			live.onFocusItemThemeMusic?.(themeId);
 		} else {
 			// a card with no theme of its own ends the one the last card started
-			(onUnfocusItemThemeMusic || onBlurItemThemeMusic)?.();
+			(live.onUnfocusItemThemeMusic || live.onBlurItemThemeMusic)?.();
 		}
-	}, [onFocusItemThemeMusic, onBlurItemThemeMusic, onUnfocusItemThemeMusic, showTopInfoArea, useModernRows, pinMainScroll]);
+	}, []);
+
+	useEffect(() => () => {
+		clearTimeout(backdropTimerRef.current);
+		window.cancelAnimationFrame(settleRef.current.frame);
+	}, []);
 
 	// A theme plays while its card is in focus. Focus leaving the rows for the navbar, the sidebar or the featured
 	// bar ends it, and focus moving from one card to another is left to handleFocusItem.
@@ -896,7 +978,7 @@ const Browse = ({
 								/>
 							);
 						}
-						if (row.isPlaceholder) {
+						if (row.isPlaceholder || index >= mountedRows) {
 							return (
 								<RowComponent
 									key={row.id}
@@ -974,6 +1056,7 @@ const Browse = ({
 								rowSpacing={rowSpacing}
 								subtitle={row.subtitle}
 								registerRowRef={registerRowRef}
+								deferImages={!NATIVE_LAZY_IMAGES && index >= imageRows}
 							/>
 						);
 					})}

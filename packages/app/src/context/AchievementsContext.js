@@ -3,6 +3,7 @@ import {getPerfLevelIndex} from '../utils/perfTier';
 
 import * as achievementsApi from '../services/achievementsApi';
 import {sameUserId, threadHasNewFromOthers} from '../utils/achievementsModel';
+import {afterHomeReady} from '../utils/homeReady';
 import {useAuth} from './AuthContext';
 
 // Whether this server runs the Achievement Badges plugin, which is what decides whether the
@@ -63,7 +64,7 @@ export const AchievementsProvider = ({children}) => {
 		if (!isAuthenticated || !serverUrl || !accessToken) return undefined;
 
 		let cancelled = false;
-		achievementsApi.probe().then((available) => {
+		afterHomeReady().then(() => (cancelled ? false : achievementsApi.probe())).then((available) => {
 			if (cancelled) return;
 			const flags = achievementsApi.getFlags();
 			setState({

@@ -11,6 +11,7 @@ import serverLogger from '../services/serverLogger';
 import {normalizeRatingSources, ratingSourcesToServer} from '../utils/ratingSources';
 import {SEASONAL_DENSITIES, normalizeSeasonalTheme} from '../utils/seasonalEffects';
 import {normalizeSeasonalHiddenHolidays, normalizeSeasonalRowCountry} from '../utils/seasonalRow';
+import {sharePending} from '../utils/sharePending';
 import {
 	IMAGES as LOADING_IMAGES,
 	POSITIONS as LOADING_POSITIONS,
@@ -81,13 +82,15 @@ const LOCAL_TO_SERVER = Object.fromEntries(
 );
 
 // Synced values are all JSON, so comparing structure is enough to tell a genuinely new
-// value from a fresh copy of the one we already have.
-const sameSyncedValue = (left, right) => {
+// value from a fresh copy of the one we already have. Key order doesn't count, and neither does
+// the _id webOS puts on every object in a list, since its database hands settings back that way.
+export const sameSyncedValue = (left, right) => {
 	if (left === right) return true;
-	if (typeof left !== typeof right) return false;
-	if (left === null || right === null) return false;
-	if (typeof left !== 'object') return false;
-	return JSON.stringify(left) === JSON.stringify(right);
+	if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+	if (Array.isArray(left) !== Array.isArray(right)) return false;
+	const keys = Object.keys(left).filter((key) => key !== '_id');
+	if (keys.length !== Object.keys(right).filter((key) => key !== '_id').length) return false;
+	return keys.every((key) => sameSyncedValue(left[key], right[key]));
 };
 
 const normalizeHomeRowsStyle = (value) => {
@@ -183,6 +186,7 @@ const VALUE_CONVERSIONS = {
 	},
 	seasonalDensity: oneOf(SEASONAL_DENSITIES),
 	libraryStyle: oneOf(['classic', 'modern', 'docked']),
+	musicLibraryStyle: oneOf(['classic', 'quickAccess', 'immersive']),
 	seasonalRowCountry: {fromServer: normalizeSeasonalRowCountry},
 	seasonalRowHiddenHolidays: {fromServer: normalizeSeasonalHiddenHolidays},
 	screensaverContentType: {
@@ -285,7 +289,7 @@ export const SYNCABLE_KEYS = [
 	'episodePreviewEnabled', 'previewAudioEnabled',
 	'hideDetailsMediaDescription', 'detailUseSeriesThumbnails', 'hideHomeMediaDescription',
 	'personalRatingStyle', 'recentlyReleasedSeriesType', 'mergeRecentRowsByType', 'playlistsGroupByType', 'groupItemsIntoCollections',
-	'useDetailedSubHeadings', 'showMediaDetailsOnLibraryPage', 'hideBackdropsInLibraries', 'libraryStyle',
+	'useDetailedSubHeadings', 'showMediaDetailsOnLibraryPage', 'hideBackdropsInLibraries', 'libraryStyle', 'musicLibraryStyle',
 	'syncplayEnabled', 'syncplayAutoOpen',
 	'showSyncPlayButton',
 	'syncPlayAdvancedCorrectionEnabled', 'syncPlayEnableSyncCorrection',
@@ -979,7 +983,7 @@ export function SettingsProvider({children}) {
 		});
 	}, []);
 
-	const syncFromServer = useCallback(async (serverUrl, token) => {
+	const pullFromServer = useCallback(async (serverUrl, token) => {
 		try {
 			serverCredsRef.current = {serverUrl, token};
 
@@ -1124,6 +1128,9 @@ export function SettingsProvider({children}) {
 			return 'error';
 		}
 	}, []);
+
+	// More than one caller pulls at launch, so a pull already running for the same server and token is shared.
+	const syncFromServer = useMemo(() => sharePending((serverUrl, token) => `${serverUrl}|${token}`, pullFromServer), [pullFromServer]);
 
 	// Mirrors Moonfin-Core's syncOnLogin. The first time a server is seen it detects
 	// the plugin and, if it answers, turns sync on and pulls whatever profile it holds.

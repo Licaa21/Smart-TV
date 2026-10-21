@@ -6,6 +6,7 @@ import $L from '@enact/i18n/$L';
 import {useAuth} from '../../context/AuthContext';
 import {useSettings} from '../../context/SettingsContext';
 import {getUserImageUrl} from '../../services/jellyfinApi';
+import useReturnFocus from '../../hooks/useReturnFocus';
 
 import css from './AccountModal.module.less';
 
@@ -91,6 +92,8 @@ const AccountModal = ({
 	const [serverToRemove, setServerToRemove] = useState(null);
 	const [focusOnReturn, setFocusOnReturn] = useState(null);
 	const lastFocusedUserRef = useRef(0);
+
+	useReturnFocus(open);
 
 	useEffect(() => {
 		if (open && !showConfirmRemove) {

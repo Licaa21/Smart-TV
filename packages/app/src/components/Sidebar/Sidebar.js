@@ -20,6 +20,7 @@ import SidebarItem from './SidebarItem';
 import SidebarLibraries from './SidebarLibraries';
 import SidebarUserButton from './SidebarUserButton';
 import useSidebarExpansion from './useSidebarExpansion';
+import {SidebarMusicCard} from '../MiniMusicPlayer/MiniMusicPlayer';
 
 import css from './Sidebar.module.less';
 
@@ -61,7 +62,9 @@ const Sidebar = ({
 	onUserMenu,
 	onSyncPlay,
 	onMessages,
-	onFriends
+	onFriends,
+	music,
+	onOpenMusic
 }) => {
 	const {settings, activeTheme} = useSettings();
 	const {isEnabled: seerrEnabled, displayName} = useSeerr();
@@ -188,6 +191,8 @@ const Sidebar = ({
 					)}
 
 					<SidebarItem Icon={SettingsIcon} slot={nextSlot()} label={$L('Settings')} onClick={onSettings} spotlightId="navbar-settings" />
+
+					{music && <SidebarMusicCard item={music.item} paused={music.paused} expanded={expanded} onOpen={onOpenMusic} />}
 				</div>
 			</div>
 

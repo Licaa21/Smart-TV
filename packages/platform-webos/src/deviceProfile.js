@@ -177,6 +177,15 @@ export const canPlayNativeHls = () => {
 		|| video.canPlayType('application/vnd.apple.mpegURL').replace(/no/, ''));
 };
 
+// LG only lists HEVC up to Level 5.1 for 4K, but plenty of 4K remuxes are tagged 6.0 or 6.1,
+// so the set is asked whether it takes them before the server is told to transcode them.
+const canPlayHevcLevel61 = () => {
+	if (typeof document === 'undefined') return false;
+	const video = document.createElement('video');
+	return !!(video.canPlayType('video/mp4; codecs="hvc1.2.4.L183"').replace(/no/, '')
+		|| video.canPlayType('video/mp4; codecs="hev1.2.4.L183"').replace(/no/, ''));
+};
+
 // DTS support varies by webOS version AND container:
 //   webOS 4/4.5: DTS in AVI + MKV (unconditionally supported)
 //   webOS 5/6/22: DTS in MKV only
@@ -324,6 +333,7 @@ export const getDeviceCapabilities = async () => {
 		opus: webosVersion >= 6,
 
 		hevc: testHevcSupport(null, webosVersion),
+		hevcLevel61: canPlayHevcLevel61(),
 		av1: testAv1Support(null, webosVersion),
 		vp9: testVp9Support(null, webosVersion),
 
@@ -711,7 +721,7 @@ export const getJellyfinDeviceProfile = async (options = {}) => {
 	);
 
 	const h264MaxLevel = (caps.webosVersion >= 4 && (caps.uhd || caps.uhd8K)) ? '51' : '42';
-	const hevcMaxLevel = caps.uhd8K ? '186' : caps.uhd ? '153' : '123';
+	const hevcMaxLevel = caps.uhd8K ? '186' : caps.uhd ? (caps.hevcLevel61 ? '183' : '153') : '123';
 
 	const codecProfiles = [
 		{

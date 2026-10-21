@@ -26,3 +26,12 @@ export const releaseSharedVideo = (who) => {
 };
 
 export const ownsSharedVideo = (who) => owner === who;
+
+// Music the viewer backed out of keeps playing behind the screens. A trailer or card
+// preview would stop it, on webOS by taking this very element, so they hold off until
+// the music ends.
+let musicPlaying = false;
+export const setMusicPlaying = (playing) => {
+	musicPlaying = playing;
+};
+export const isMusicPlaying = () => musicPlaying;

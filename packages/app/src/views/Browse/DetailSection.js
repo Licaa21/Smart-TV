@@ -1,4 +1,4 @@
-import {useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle} from 'react';
+import {useState, useEffect, useRef, useCallback, forwardRef, memo, useImperativeHandle} from 'react';
 import {isMdblistEnabled} from '../../services/mdblistApi';
 import $L from '@enact/i18n/$L';
 import RatingsRow from '../../components/RatingsRow';
@@ -155,4 +155,4 @@ const DetailSection = forwardRef(({
 	);
 });
 
-export default DetailSection;
+export default memo(DetailSection);
