@@ -172,7 +172,7 @@ This project is licensed under the MPL 2.0 license. Some parts incorporate conte
 
 This is a personal fork of [Moonfin for Smart TVs](https://github.com/Moonfin-Client/Smart-TV), modified by me ([Licaa21](https://github.com/Licaa21)) for my own use. Moonfin itself is made by **RadicalMuffinMan** and the Moonfin contributors, and all credit for the app belongs to them. This fork follows upstream `main` and adds the changes below on top. It isn't an official build, and the changes aren't promised to ever reach upstream.
 
-**Newest build:** each build of this fork's Tizen package is on the [latest release](https://github.com/Licaa21/Smart-TV/releases/tag/latest), `Moonfin_Tizen_Regular_v*_Lica_Fork.wgt`, replaced by the next one.
+**Builds:** every build of this fork's Tizen package is a [release](https://github.com/Licaa21/Smart-TV/releases) of its own, `Lica Fork v1`, `v2` and so on, kept for good, with a description of what was done and the commit ids. The newest is always at the [latest release](https://github.com/Licaa21/Smart-TV/releases/latest), file `Moonfin_Tizen_Regular_v*_Lica_Fork_v*.wgt`.
 
 ### What I added
 
