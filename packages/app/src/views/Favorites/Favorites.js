@@ -16,6 +16,7 @@ import {getBackdropId, getImageUrl} from '../../utils/helpers';
 import {showsWatchedCheck} from '../../utils/playedState';
 import {useStorage} from '../../hooks/useStorage';
 import useSortSettingsPanels from '../../hooks/useSortSettingsPanels';
+import useHeaderGridKeys from '../../hooks/useHeaderGridKeys';
 import useStartLetter from '../../hooks/useStartLetter';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import useItemMenuHold, {cardIndexOf} from '../../hooks/useItemMenuHold';
@@ -435,8 +436,11 @@ const Favorites = ({onSelectItem, onSelectPerson, onHome, backHandlerRef}) => {
 
 	const emptyText = isHome ? $L('No favorites yet') : $L('No favorites found');
 
+	// Channel Up and Down go between the toolbar and the cards, so a long grid is not scrolled back up to reach it
+	const handleChannelKeys = useHeaderGridKeys('favorites-toolbar', 'favorites-grid-area', !showSortPanel && !showSettingsPanel);
+
 	return (
-		<div className={css.page}>
+		<div className={css.page} onKeyDown={handleChannelKeys}>
 			{isHome && (
 				<BackdropLayer
 					targetUrl={targetBackdropUrl}
@@ -510,7 +514,7 @@ const Favorites = ({onSelectItem, onSelectPerson, onHome, backHandlerRef}) => {
 					</div>
 				)}
 
-				<GridContainer className={css.gridContainer}>
+				<GridContainer className={css.gridContainer} spotlightId="favorites-grid-area">
 					{displayLoading && displayItems.length === 0 ? (
 						<div className={css.loading}>
 							<LoadingSpinner />

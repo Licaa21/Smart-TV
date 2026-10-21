@@ -1,3 +1,5 @@
+import {foldForSearch} from './accentFolding';
+
 import $L from '@enact/i18n/$L';
 
 // The sort keys seerr's own discover pages send, one entry per axis with the
@@ -111,3 +113,11 @@ export const hasSeerrDiscoverFilters = ({
 	minVotes !== '' ||
 	runtime !== '' ||
 	released !== '';
+
+// A search on the Seerr browse screen narrows the titles that are loaded, by name. Seerr cannot search inside a genre or a
+// studio, so it works on what is on screen. Accents and case do not count.
+export const filterTitlesByName = (items, query) => {
+	const typed = foldForSearch((query || '').trim());
+	if (!typed) return items;
+	return items.filter((entry) => foldForSearch(entry.title || entry.name || '').indexOf(typed) >= 0);
+};

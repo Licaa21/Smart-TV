@@ -1,4 +1,4 @@
-import {buildSeerrDiscoverParams, getSeerrSortOptions, getSeerrTvStatusOptions, hasSeerrDiscoverFilters} from './seerrBrowseFilters';
+import {buildSeerrDiscoverParams, filterTitlesByName, getSeerrSortOptions, getSeerrTvStatusOptions, hasSeerrDiscoverFilters} from './seerrBrowseFilters';
 
 describe('seerr browse filters', () => {
 	it('offers the sort axes seerr itself has, per media type', () => {
@@ -46,5 +46,27 @@ describe('seerr browse filters', () => {
 		expect(hasSeerrDiscoverFilters({minRating: '7'})).toBe(true);
 		expect(hasSeerrDiscoverFilters({genreIds: [12]})).toBe(true);
 		expect(hasSeerrDiscoverFilters({released: 'older'})).toBe(true);
+	});
+});
+
+describe('filterTitlesByName', () => {
+	const items = [{title: 'Amélie'}, {name: 'The Flash'}, {title: 'Flashdance'}, {}];
+
+	it('keeps everything for an empty search', () => {
+		expect(filterTitlesByName(items, '')).toBe(items);
+		expect(filterTitlesByName(items, '   ')).toBe(items);
+		expect(filterTitlesByName(items, null)).toBe(items);
+	});
+
+	it('reads a movie by its title and a show by its name', () => {
+		expect(filterTitlesByName(items, 'flash').map((i) => i.title || i.name)).toEqual(['The Flash', 'Flashdance']);
+	});
+
+	it('does not count case or accents', () => {
+		expect(filterTitlesByName(items, 'AMELIE')).toEqual([{title: 'Amélie'}]);
+	});
+
+	it('is empty when nothing matches', () => {
+		expect(filterTitlesByName(items, 'zzz')).toEqual([]);
 	});
 });

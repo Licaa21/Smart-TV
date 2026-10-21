@@ -35,7 +35,6 @@ import {
 } from '../../services/video';
 import {KEYS, isBackKey, isMediaKey} from '../../utils/keys';
 import {isTvKeyboardVisible} from '../../components/TVKeyboard/keyboardBus';
-import {getPerfTier} from '../../utils/perfTier';
 import {playerClockStale, playerClockWanted} from '../../utils/playerClock';
 import {useSettings} from '../../context/SettingsContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
@@ -331,9 +330,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// Read by the time update, which runs from an interval or a media event and so sees no fresh state.
 	const clockAudioRef = useRef(false);
 	clockAudioRef.current = isAudioMode;
-	clockWantedRef.current = playerClockWanted({tier: getPerfTier(), controlsVisible, activeModal, isAudioMode});
+	clockWantedRef.current = playerClockWanted({controlsVisible, activeModal, isAudioMode});
 	useEffect(() => {
-		if (getPerfTier() === 'high' || !(controlsVisible || activeModal) || !(positionRef.current > 0)) return;
+		if (!(controlsVisible || activeModal) || !(positionRef.current > 0)) return;
 		shownSecondRef.current = Math.floor(positionRef.current / 10000000);
 		setCurrentTime(positionRef.current / 10000000);
 	}, [controlsVisible, activeModal]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1981,7 +1980,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			// follows the time closely, so while it is open it gets every tick.
 			if (activeModalRef.current === 'subtitleOffset') {
 				setCurrentTime(time);
-			} else if (activeModalRef.current !== 'episodes' && clockWantedRef.current && playerClockStale({tier: getPerfTier(), time, shownSecond: shownSecondRef.current, isAudioMode: clockAudioRef.current})) {
+			} else if (activeModalRef.current !== 'episodes' && clockWantedRef.current && playerClockStale({time, shownSecond: shownSecondRef.current, isAudioMode: clockAudioRef.current})) {
 				shownSecondRef.current = Math.floor(time);
 				setCurrentTime(time);
 			}

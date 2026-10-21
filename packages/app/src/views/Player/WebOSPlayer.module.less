@@ -352,20 +352,14 @@
 }
 
 // Each button fades its ring in over a fifth of a second, and every frame of that repaints the whole controls
-// layer, so on a slow set a focus move waited on a dozen repaints. Medium and below change at once, and the
-// layer itself fades faster.
+// layer, so a focus move waited on a dozen repaints, which Ultra felt as much as a slow set. Every level changes at
+// once, and the layer itself fades faster.
 .controlBtn {
-	:global(.perf-low) &,
-	:global(.perf-mid) & {
-		transition: none;
-	}
+	transition: none;
 }
 
 .playerControls {
-	:global(.perf-low) &,
-	:global(.perf-mid) & {
-		transition: opacity 0.12s ease;
-	}
+	transition: opacity 0.12s ease;
 }
 
 .controlBtn:hover,
