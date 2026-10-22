@@ -2,7 +2,8 @@
 // English source string, so handing the string straight back is faithful enough here.
 jest.mock('@enact/i18n/$L', () => ({__esModule: true, default: (str) => str}));
 
-import {buildCollectionPluginSections, homeRowGroup, isHomeRowVisibleByGates, mergeServerPluginSections, pluginSectionsFromServer} from './homeSectionsModel';
+import {makePickedRow} from '../../utils/pickedRows';
+import {homeRowGroup, isHomeRowVisibleByGates, mergeFoundRows, pickedRowLabel} from './homeSectionsModel';
 
 const settings = (over = {}) => ({
 	displayFavoritesRows: true,
@@ -21,119 +22,107 @@ const settings = (over = {}) => ({
 
 describe('isHomeRowVisibleByGates', () => {
 	test('applies the settings that gate a whole group of rows', () => {
-		expect(isHomeRowVisibleByGates('collections', settings({displayCollectionsRows: false}))).toBe(false);
-		expect(isHomeRowVisibleByGates('favoriteMovies', settings({displayFavoritesRows: false}))).toBe(false);
-		expect(isHomeRowVisibleByGates('imdb-top250-movies', settings({imdbTop250MoviesEnabled: false}))).toBe(false);
+		expect(isHomeRowVisibleByGates({id: 'collections'}, settings({displayCollectionsRows: false}))).toBe(false);
+		expect(isHomeRowVisibleByGates({id: 'favoriteMovies'}, settings({displayFavoritesRows: false}))).toBe(false);
+		expect(isHomeRowVisibleByGates({id: 'imdb-top250-movies'}, settings({imdbTop250MoviesEnabled: false}))).toBe(false);
 	});
 
 	test('hides the plugin rows when the plugin is off', () => {
 		const off = settings({useMoonfinPlugin: false});
 
-		expect(isHomeRowVisibleByGates('seerr_trending', off)).toBe(false);
-		expect(isHomeRowVisibleByGates('tmdb_popular', off)).toBe(false);
-		expect(isHomeRowVisibleByGates('radarr_calendar', off)).toBe(false);
-		expect(isHomeRowVisibleByGates('sonarr_calendar', off)).toBe(false);
+		expect(isHomeRowVisibleByGates({id: 'seerr_trending'}, off)).toBe(false);
+		expect(isHomeRowVisibleByGates({id: 'tmdb_popular'}, off)).toBe(false);
+		expect(isHomeRowVisibleByGates({id: 'radarr_calendar'}, off)).toBe(false);
+		expect(isHomeRowVisibleByGates({id: 'sonarr_calendar'}, off)).toBe(false);
 	});
 
 	test('shows the plugin rows when it is on', () => {
-		expect(isHomeRowVisibleByGates('seerr_trending', settings())).toBe(true);
-		expect(isHomeRowVisibleByGates('radarr_calendar', settings())).toBe(true);
+		expect(isHomeRowVisibleByGates({id: 'seerr_trending'}, settings())).toBe(true);
+		expect(isHomeRowVisibleByGates({id: 'radarr_calendar'}, settings())).toBe(true);
 	});
 
 	test('leaves anything with no gate of its own alone', () => {
-		expect(isHomeRowVisibleByGates('resume', settings())).toBe(true);
-		expect(isHomeRowVisibleByGates('nextup', settings({useMoonfinPlugin: false}))).toBe(true);
+		expect(isHomeRowVisibleByGates({id: 'resume'}, settings())).toBe(true);
+		expect(isHomeRowVisibleByGates({id: 'nextup'}, settings({useMoonfinPlugin: false}))).toBe(true);
 	});
 });
 
-const serverCollection = (over = {}) => ({
-	kind: 'pluginDynamic',
-	enabled: true,
-	pluginSource: 'collections',
-	pluginSection: 'Alien Collection',
-	pluginAdditionalData: '04592f446660f58ca9498161c3b4600d',
-	pluginDisplayText: 'Alien Collection',
-	...over
+const pick = (source, itemId, name, serverUrl = 'http://server') => makePickedRow({source, serverUrl, itemId, name}, false, 0);
+
+test('a picked row shows under its list switch and its server', () => {
+	const collection = pick('collections', 'c1', 'C');
+	expect(isHomeRowVisibleByGates(collection, settings(), true, 'http://server/')).toBe(true);
+	expect(isHomeRowVisibleByGates(collection, settings({displayCollectionsRows: false}), true, 'http://server')).toBe(false);
+	expect(isHomeRowVisibleByGates(pick('collections', 'c1', 'C', 'http://other'), settings(), true, 'http://server')).toBe(false);
 });
 
-describe('pluginSectionsFromServer', () => {
-	test('a pushed collection becomes the same section the editor would have built', () => {
-		const [imported] = pluginSectionsFromServer([serverCollection()], settings());
-		const [local] = buildCollectionPluginSections([{Id: '04592f446660f58ca9498161c3b4600d', Name: 'Alien Collection'}], 'SortName', 'Ascending');
+describe('mergeFoundRows', () => {
+	const arranged = (...picks) => [{id: 'resume', enabled: true, order: 0}, ...picks.map((row) => ({...row, enabled: true}))];
 
-		expect(imported.id).toBe(local.id);
-		expect(imported.specJson).toBe(local.specJson);
-		expect(imported.enabled).toBe(true);
+	test('a pick still found keeps its place and takes the name its server gives it now', () => {
+		const rows = arranged(pick('collections', 'c1', 'Old name'));
+		const merged = mergeFoundRows(rows, [pick('collections', 'c1', 'New name'), pick('collections', 'c2', 'Bond')]);
+
+		expect(merged.rows.map((row) => [row.id, row.name, row.enabled])).toEqual([
+			['resume', undefined, true],
+			[rows[1].id, 'New name', true]
+		]);
+		expect(merged.added.map((row) => row.itemId)).toEqual(['c2']);
+		expect(merged.changed).toBe(true);
 	});
 
-	test('a pushed genre is read the same way', () => {
-		const [imported] = pluginSectionsFromServer([serverCollection({
-			pluginSource: 'genres', pluginAdditionalData: 'g1', pluginDisplayText: 'Horror'
-		})], settings());
+	test('a pick its list came back without is gone', () => {
+		const merged = mergeFoundRows(arranged(pick('collections', 'gone', 'Gone')), [pick('collections', 'c1', 'C')]);
 
-		expect(imported.id).toBe('genre:g1');
-		expect(JSON.parse(imported.specJson)).toMatchObject({kind: 'genre', genreId: 'g1', genreName: 'Horror'});
+		expect(merged.rows.map((row) => row.id)).toEqual(['resume']);
+		expect(merged.changed).toBe(true);
 	});
 
-	test('a row switched off on the server arrives switched off', () => {
-		const [imported] = pluginSectionsFromServer([serverCollection({enabled: false})], settings());
-		expect(imported.enabled).toBe(false);
+	test('a pick whose list never came back stays, since that proves nothing', () => {
+		const rows = arranged(pick('genres', 'g1', 'G'), pick('collections', 'o1', 'O', 'http://other'));
+		const merged = mergeFoundRows(rows, [pick('collections', 'c1', 'C')]);
+
+		expect(merged.rows).toEqual(rows);
+		expect(merged.changed).toBe(false);
 	});
 
-	test('a row with nothing to load, a source this screen cant draw, or a builtin row is left out', () => {
-		const imported = pluginSectionsFromServer([
-			serverCollection({pluginAdditionalData: ''}),
-			serverCollection({pluginSource: 'playlists'}),
-			{kind: 'builtin', type: 'resume', enabled: true, order: 0}
-		], settings());
-		expect(imported).toEqual([]);
+	test('a pick saved under another spelling of the server is the same row', () => {
+		const rows = arranged(pick('collections', 'c1', 'C', 'http://SERVER'));
+		const merged = mergeFoundRows(rows, [pick('collections', 'c1', 'C')]);
+
+		expect(merged.rows).toEqual(rows);
+		expect(merged.added).toEqual([]);
 	});
 });
 
-describe('mergeServerPluginSections', () => {
-	const existing = [
-		{id: 'collection:local', name: 'Mine', enabled: false, order: 0, source: 'collections', specJson: '{}'}
-	];
-
-	test('a new section from the server is added after what is already here', () => {
-		const [imported] = pluginSectionsFromServer([serverCollection()], settings());
-		const merged = mergeServerPluginSections(existing, [imported]);
-
-		expect(merged.map((section) => section.id)).toEqual(['collection:local', imported.id]);
-		expect(merged[1]).toMatchObject({name: 'Alien Collection', enabled: true, order: 1, source: 'collections'});
-	});
-
-	test('a section already here keeps the order and switch the viewer gave it', () => {
-		const [imported] = pluginSectionsFromServer([serverCollection()], settings());
-		const arranged = [{...imported, name: 'Alien Collection', enabled: false, order: 0}];
-		const merged = mergeServerPluginSections(arranged, [imported]);
-
-		expect(merged).toBe(arranged);
-	});
-
-	test('nothing new means the same list back', () => {
-		expect(mergeServerPluginSections(existing, [])).toBe(existing);
-		expect(mergeServerPluginSections(existing, undefined)).toBe(existing);
+describe('pickedRowLabel', () => {
+	test('names the list a row was picked from, and the server when it is another one', () => {
+		const servers = [{url: 'http://other/', name: 'Basement'}];
+		expect(pickedRowLabel(pick('collections', 'c1', 'C'), 'http://server', servers)).toBe('Collections row');
+		expect(pickedRowLabel(pick('genres', 'g1', 'G'), 'http://server', servers)).toBe('Genres row');
+		expect(pickedRowLabel(pick('playlists', 'p1', 'P'), 'http://server', servers)).toBe('Playlists row');
+		expect(pickedRowLabel(pick('collections', 'c1', 'C', 'http://other'), 'http://server', servers)).toBe('Collections row from Basement');
 	});
 });
 
 test('the Live TV rows are left out when the server has no Live TV', () => {
-	expect(isHomeRowVisibleByGates('livetv', settings(), false)).toBe(false);
-	expect(isHomeRowVisibleByGates('onnow', settings(), false)).toBe(false);
-	expect(isHomeRowVisibleByGates('activerecordings', settings(), false)).toBe(false);
-	expect(isHomeRowVisibleByGates('resume', settings(), false)).toBe(true);
-	expect(isHomeRowVisibleByGates('livetv', settings())).toBe(true);
+	expect(isHomeRowVisibleByGates({id: 'livetv'}, settings(), false)).toBe(false);
+	expect(isHomeRowVisibleByGates({id: 'onnow'}, settings(), false)).toBe(false);
+	expect(isHomeRowVisibleByGates({id: 'activerecordings'}, settings(), false)).toBe(false);
+	expect(isHomeRowVisibleByGates({id: 'resume'}, settings(), false)).toBe(true);
+	expect(isHomeRowVisibleByGates({id: 'livetv'}, settings())).toBe(true);
 });
 
 describe('homeRowGroup', () => {
 	test('puts each row under the kind the editor groups it by', () => {
 		expect(homeRowGroup({id: 'resume'})).toBe('general');
 		expect(homeRowGroup({id: 'collections'})).toBe('collections');
-		expect(homeRowGroup({id: 'collection:abc', source: 'collections'})).toBe('collections');
+		expect(homeRowGroup(pick('collections', 'abc', 'C'))).toBe('collections');
 		expect(homeRowGroup({id: 'favoriteMovies'})).toBe('favorites');
 		expect(homeRowGroup({id: 'studios'})).toBe('genres');
-		expect(homeRowGroup({id: 'genre:abc', source: 'genres'})).toBe('genres');
+		expect(homeRowGroup(pick('genres', 'abc', 'G'))).toBe('genres');
 		expect(homeRowGroup({id: 'playlists'})).toBe('playlists');
+		expect(homeRowGroup(pick('playlists', 'abc', 'P'))).toBe('playlists');
 		expect(homeRowGroup({id: 'seerr_trending'})).toBe('seerr');
 		expect(homeRowGroup({id: 'seerr_shortcuts'})).toBe('seerr');
 		expect(homeRowGroup({id: 'radarr_calendar'})).toBe('seerr');

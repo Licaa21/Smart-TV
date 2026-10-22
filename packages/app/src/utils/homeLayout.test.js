@@ -2,7 +2,6 @@ import {
 	DEFAULT_HOME_ROWS,
 	TV_TO_SERVER_ROW,
 	__resetHomeLayoutPassthrough,
-	serverPluginSections,
 	hasSeenServerLayout,
 	homeRowsFromProfile,
 	homeRowsFromRowOrder,
@@ -183,21 +182,41 @@ describe('write suppression before the layout is known', () => {
 	});
 });
 
-describe('serverPluginSections', () => {
-	test('nothing until a layout has been read', () => {
-		expect(serverPluginSections()).toEqual([]);
+describe('picked rows in the layout', () => {
+	const picked = {
+		kind: 'pluginDynamic',
+		type: 'none',
+		enabled: true,
+		order: 1,
+		serverId: 'http://server:8096/',
+		pluginSource: 'collections',
+		pluginSection: 'collection',
+		pluginAdditionalData: 'c1',
+		pluginDisplayText: 'Alien Collection'
+	};
+	const pickedId = 'pluginDynamic:collections:http://server:8096:collection:c1';
+
+	test('a collection picked on another client becomes a row in its place, under the id that client gave it', () => {
+		const rows = homeRowsFromProfile({
+			homeSections: [{type: 'resume', enabled: true, order: 0}, picked, {type: 'nextup', enabled: true, order: 2}]
+		});
+		expect(enabledIds(rows)).toEqual(['resume', pickedId, 'nextup']);
+		expect(rowById(rows, pickedId)).toMatchObject({name: 'Alien Collection', source: 'collections', serverUrl: 'http://server:8096', itemId: 'c1'});
 	});
 
-	test('the plugin rows of the layout that was read, and only those', () => {
-		const pluginRow = {kind: 'pluginDynamic', type: 'none', enabled: true, order: 1, pluginSource: 'collections', pluginAdditionalData: 'c1'};
-		homeRowsFromProfile({
-			homeSections: [
-				{type: 'resume', enabled: true, order: 0},
-				pluginRow,
-				{type: 'mediabar', enabled: false, order: 2}
-			]
-		});
-		expect(serverPluginSections()).toEqual([pluginRow]);
+	test('it goes back the way the other clients write it, once, and stays out of the flat order', () => {
+		const rows = homeRowsFromProfile({homeSections: [{type: 'resume', enabled: true, order: 0}, picked]});
+		const sections = homeRowsToSections(rows);
+		expect(sections).toContainEqual({...picked, serverId: 'http://server:8096'});
+		expect(sections.filter((section) => section.kind === 'pluginDynamic')).toHaveLength(1);
+		expect(homeRowsToRowOrder(rows)).toEqual(['resume']);
+	});
+
+	test('a pick with no item or server to load from is handed back untouched', () => {
+		const loose = {...picked, serverId: ''};
+		const rows = homeRowsFromProfile({homeSections: [{type: 'resume', enabled: true, order: 0}, loose]});
+		expect(rows.some((row) => row.source)).toBe(false);
+		expect(homeRowsToSections(rows)).toContainEqual(loose);
 	});
 });
 

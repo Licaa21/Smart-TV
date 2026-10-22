@@ -80,12 +80,3 @@ export const stableIndex = (seed, length) => {
 	}
 	return Math.abs(hash) % length;
 };
-
-export const parsePluginSpec = (specJson) => {
-	if (!specJson) return null;
-	try {
-		return JSON.parse(specJson);
-	} catch (e) {
-		return null;
-	}
-};

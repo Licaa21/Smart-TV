@@ -19,7 +19,8 @@ import SkipSegmentPreview from '../../components/SkipSegmentPreview';
 import TrickplaySettingsPreview from '../../components/TrickplayPreview/TrickplaySettingsPreview';
 import {LoadingAnimationPreview} from '../../components/LoadingAnimation';
 import {clearAllStorage} from '../../services/storage';
-import {clearCapabilitiesCache} from '../../services/deviceProfile';
+import {clearCapabilitiesCache, getDeviceProfile} from '../../services/deviceProfile';
+import {canTranscodeAudioCodecAway} from '../../utils/deviceProfileTuning';
 import {clearImageCache} from '../../services/imageProxy';
 import {clearProxiedImageCache} from '../../hooks/useProxiedImage';
 import {detectCustomSource, validateCustomRow, buildManualCustomSource, sourceKeyForRow} from '../../utils/externalHomeRows';
@@ -28,13 +29,12 @@ import {checkForUpdatesDetailed, getDisplayVersion} from '../../services/version
 import QrLinkView from './QrLinkView';
 import {formatPlaybackTimeSlot} from '../../utils/playbackTimeLabels';
 import {getSubtitleOverlayStyle, getSubtitleTextStyle} from '../../utils/subtitleConstants';
-import {getAccentColorOptions, getImageTypeOptions, getLabel, getSubtitleLanguageOptions} from './settingsOptions';
+import {getAccentColorOptions, getImageTypeOptions, getLabel, getSubtitleLanguageOptions, getTranscodeAudioCodecOptions} from './settingsOptions';
 import {ACCENT_ALL_KEYS} from '../../theme/accentSurfaces';
 import {toCssColor} from '../../theme/themeSpec';
 import {MAX_SUBTITLE_DOWNLOAD_LANGUAGES} from '../Player/remoteSubtitleUtils';
 import {SCHEMA_BY_KEY, SETTINGS_SCHEMA, resolve, spotlightIdOf} from './settingsSchema';
 import {MIN_QUERY_LENGTH, buildSettingsIndex, matchSettings, resultSpotlightId} from './settingsSearch';
-import {PLUGIN_SECTION_RENDER_STEP} from './homeSectionsModel';
 import useSeerrAccount from './useSeerrAccount';
 import useProfileSync from './useProfileSync';
 import useThemeStore from './useThemeStore';
@@ -55,12 +55,13 @@ import FriendsScreens, {FRIENDS_VIEWS} from './friends/FriendsScreens';
 import {isConfirmSpendOpen} from './achievements/ConfirmSpendDialog';
 import {kidsModeNeedsPin} from '../../utils/kidsMode';
 import {sortRatingsBySeverity} from '../../utils/parentalFilter';
+import {isPickedRow} from '../../utils/pickedRows';
 import {readServerRatings} from './serverRatings';
 import {getBlockedRatings, setBlockedRatings} from '../../services/parentalControls';
 import useParentalFilter from '../../hooks/useParentalFilter';
 import {SeerrHomeRowsView, ImdbListsView} from './HomeRowToggleViews';
 import {ExternalTmdbListsView, ExternalCalendarsView, ExternalCustomRowsView, SeasonalRowView} from './ExternalRowViews';
-import {RatingSourcesView, ExcludedGenresView, PinCodeView, BlockedRatingsView, RowImageTypesView, SubtitleDownloadLanguagesView} from './PickerViews';
+import {RatingSourcesView, ExcludedGenresView, PinCodeView, BlockedRatingsView, RowImageTypesView, CheckListView} from './PickerViews';
 import {KidsModeSetView, KidsModeExitView} from './KidsModeViews';
 import HomeRowsView from './HomeRowsView';
 import ButtonLayoutView from './ButtonLayoutView';
@@ -113,7 +114,7 @@ const FIRST_ROW_VIEWS = {
 const ACCENT_ALL_KEY = '__accentAll';
 
 const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, panelMode, initialView }) => {
-	const { api, serverUrl, accessToken, hasMultipleServers, logoutAll, activeServerInfo, user, serverType } = useAuth();
+	const { api, serverUrl, servers, accessToken, hasMultipleServers, logoutAll, activeServerInfo, user, serverType } = useAuth();
 	const {
 		settings, updateSetting, updateSettings, resetSettings, restoreSyncedDefaults, applyServerProfile, selectSyncProfile,
 		availableThemes, activeTheme, activeThemeId, selectThemeById, saveStoreTheme, deleteStoreTheme
@@ -277,6 +278,8 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 				Spotlight.focus('blocked-ratings-view');
 			} else if (cv.view === 'subtitleDownloadLanguages') {
 				Spotlight.focus('subtitle-download-languages-view');
+			} else if (cv.view === 'transcodeAudioCodecs') {
+				Spotlight.focus('transcode-audio-codecs-view');
 			} else if (cv.view === 'qrLink') {
 				Spotlight.focus('qr-link-close');
 			} else if (cv.view === 'rowImageTypes') {
@@ -507,6 +510,22 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		}
 	}, [settings.subtitleDownloadLanguages, updateSetting]);
 
+	// Only the codecs this device's transcode can turn into something else are offered, and
+	// the list is settled before the screen opens since it orders its rows once.
+	const [transcodeAudioOptions, setTranscodeAudioOptions] = useState([]);
+	const openTranscodeAudioCodecs = useCallback(async () => {
+		const profile = await getDeviceProfile(serverType, {}, api).catch(() => null);
+		setTranscodeAudioOptions(getTranscodeAudioCodecOptions().filter(({value}) => !profile || canTranscodeAudioCodecAway(profile, value)));
+		pushView({view: 'transcodeAudioCodecs', returnFocusTo: 'setting-transcodeAudioCodecs'});
+	}, [serverType, api, pushView]);
+
+	const toggleTranscodeAudioCodec = useCallback((codec) => {
+		const picked = settings.transcodeAudioCodecs || [];
+		updateSetting('transcodeAudioCodecs', picked.includes(codec)
+			? picked.filter((value) => value !== codec)
+			: [...picked, codec]);
+	}, [settings.transcodeAudioCodecs, updateSetting]);
+
 	const openRatingSources = useCallback(() => {
 		const sources = Array.isArray(settings.mdblistRatingSources) ? [...settings.mdblistRatingSources] : [];
 		openedRatingSourcesRef.current = sources.join(',');
@@ -734,10 +753,10 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	});
 
 	const {
-		tempHomeRows, tempPluginSections, serverHasLiveTv, pluginSectionRenderLimit, setPluginSectionRenderLimit,
+		tempHomeRows, loading: homeRowsLoading, serverHasLiveTv,
 		toggleHomeRowEnabled, toggleSeerrHomeRow, openHomeRows, commitHomeRows, resetHomeRows,
-		toggleHomeRow, moveHomeRow, togglePluginSection, movePluginSection
-	} = useHomeRowsEditor({api, settings, updateSetting, updateSettings, pushView});
+		toggleHomeRow, moveHomeRow
+	} = useHomeRowsEditor({api, serverUrl, servers, settings, updateSetting, updateSettings, pushView});
 
 	const {
 		tempButtons, buttonLayoutKind, openDetailButtons, openOsdButtons, openDetailMetadata, openAudioCodecs,
@@ -1056,6 +1075,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			openLibraryOrder,
 			openParentalControls,
 			openSubtitleDownloadLanguages,
+			openTranscodeAudioCodecs,
 			openQrLink,
 			openRatingSources,
 			openRowImageTypes,
@@ -1085,7 +1105,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		settings, capabilities, seerr, achievements, seerrLabel, isSeerr, serverUrl, ratingsResetArmed, resetRatingsSettings, toggleExperimentalTruehd, updateSetting, refreshPlugin,
 		serverVersion, availableThemes, activeTheme, activeThemeId, openAccentAll, openAudioCodecs, openThemes, openThemeStore, openHomeRows,
 		openDetailButtons, openOsdButtons, openDetailMetadata, openDetailSections, openDiagnostics,
-		openPinCode, openKidsMode, openLibraries, openLibraryOrder, openParentalControls, openSubtitleDownloadLanguages, openQrLink, openRatingSources, openRowImageTypes, openExcludedGenres, openMediaBarLibraries,
+		openPinCode, openKidsMode, openLibraries, openLibraryOrder, openParentalControls, openSubtitleDownloadLanguages, openTranscodeAudioCodecs, openQrLink, openRatingSources, openRowImageTypes, openExcludedGenres, openMediaBarLibraries,
 		openMediaBarCollections, openScreensaverLibraries, openScreensaverCollections, openScreensaverGenres,
 		openImdbLists, openSeasonalRow, openExternalTmdbLists, openExternalCalendars,
 		openExternalCustomRows, openSeerrHomeRows, openScreen, onRunSetupWizard, canProbeDevice
@@ -1135,10 +1155,6 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	const selectOptionValue = useCallback((value) => {
 		handleOptionSelect(currentView.settingKey, value);
 	}, [handleOptionSelect, currentView.settingKey]);
-
-	const showMorePluginSections = useCallback(() => {
-		setPluginSectionRenderLimit((prev) => Math.min(tempPluginSections.length, prev + PLUGIN_SECTION_RENDER_STEP));
-	}, [setPluginSectionRenderLimit, tempPluginSections.length]);
 
 	const showMoreLogs = useCallback(() => {
 		setLogRenderLimit((prev) => prev + LOG_RENDER_STEP);
@@ -1389,15 +1405,13 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			{viewName === 'homeRows' && (
 				<HomeRowsView
 					settings={settings}
+					serverUrl={serverUrl}
+					servers={servers}
 					tempHomeRows={tempHomeRows}
-					tempPluginSections={tempPluginSections}
+					loading={homeRowsLoading}
 					serverHasLiveTv={serverHasLiveTv}
-					pluginSectionRenderLimit={pluginSectionRenderLimit}
-					onShowMoreSections={showMorePluginSections}
 					onToggleHomeRow={toggleHomeRow}
 					onMoveHomeRow={moveHomeRow}
-					onTogglePluginSection={togglePluginSection}
-					onMovePluginSection={movePluginSection}
 					onReset={resetHomeRows}
 					onLeave={commitHomeRows}
 				/>
@@ -1496,7 +1510,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			)}
 			{viewName === 'rowImageTypes' && (
 				<RowImageTypesView
-					rows={(settings.homeRows || []).filter((row) => row.enabled && row.id !== 'librarybuttons')}
+					rows={(settings.homeRows || []).filter((row) => row.enabled && row.id !== 'librarybuttons' && !isPickedRow(row))}
 					overrides={settings.homeRowImageTypes || {}}
 					globalLabel={getLabel(getImageTypeOptions(), settings.homeRowsImageType, $L('Poster'))}
 					onCycleRow={cycleRowImageType}
@@ -1506,11 +1520,26 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 				<QrLinkView title={baseView.label} url={baseView.url} onClose={popView} />
 			)}
 			{viewName === 'subtitleDownloadLanguages' && (
-				<SubtitleDownloadLanguagesView
+				<CheckListView
+					spotlightId='subtitle-download-languages-view'
+					rowIdPrefix='subtitle-download-language'
+					title={$L('Subtitle Download Languages')}
+					lead={$L('Languages to search when downloading subtitles, up to {max}. With none ticked, one language is picked from the video.').replace('{max}', MAX_SUBTITLE_DOWNLOAD_LANGUAGES)}
 					options={getSubtitleLanguageOptions().filter((option) => option.value)}
 					picked={settings.subtitleDownloadLanguages || []}
 					max={MAX_SUBTITLE_DOWNLOAD_LANGUAGES}
-					onToggleLanguage={toggleSubtitleDownloadLanguage}
+					onToggle={toggleSubtitleDownloadLanguage}
+				/>
+			)}
+			{viewName === 'transcodeAudioCodecs' && (
+				<CheckListView
+					spotlightId='transcode-audio-codecs-view'
+					rowIdPrefix='transcode-audio-codec'
+					title={$L('Transcode Audio Codecs')}
+					lead={$L('The server converts audio in these formats instead of sending it as is.')}
+					options={transcodeAudioOptions}
+					picked={settings.transcodeAudioCodecs || []}
+					onToggle={toggleTranscodeAudioCodec}
 				/>
 			)}
 			{viewName === 'blockedRatings' && (

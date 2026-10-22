@@ -9,6 +9,7 @@ import {
 	needsHlsJs, noteNativeManifest, playsManifestNatively, watchManifestPlayback
 } from '../../services/youtubeTrailer';
 import serverLogger from '../../services/serverLogger';
+import {volumeLevel} from '../../utils/volumeLevel';
 
 // What the trailer's element is listened to for, and how many of them a trailer logs.
 const TRAILER_EVENTS = ['waiting', 'stalled', 'seeking', 'seeked', 'playing', 'pause', 'error', 'ended'];
@@ -19,7 +20,7 @@ const seerrTrailerCache = new Map();
 
 // Plays a title's trailer. A local one goes to the real player, and a YouTube link plays in
 // an overlay here, since the player has no way to open a stream that isn't on the server.
-const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly, backRef}) => {
+const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerVolume, seerrOnly, backRef}) => {
 	const [trailerOverlay, setTrailerOverlay] = useState(null);
 	const [trailerStreamUrl, setTrailerStreamUrl] = useState(null);
 
@@ -289,12 +290,8 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerMuted, seerrOnly,
 
 	useEffect(() => {
 		if (!trailerOverlay || !trailerVideoRef.current) return;
-		const video = trailerVideoRef.current;
-		const muted = !!trailerMuted;
-		video.muted = muted;
-		video.defaultMuted = muted;
-		video.volume = muted ? 0 : 1;
-	}, [trailerMuted, trailerOverlay, trailerStreamUrl]);
+		trailerVideoRef.current.volume = volumeLevel(trailerVolume);
+	}, [trailerVolume, trailerOverlay, trailerStreamUrl]);
 
 	return {
 		trailerOverlay,

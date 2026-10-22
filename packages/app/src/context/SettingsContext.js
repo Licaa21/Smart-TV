@@ -1,7 +1,6 @@
 import {createContext, useContext, useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import {getFromStorage, saveToStorage} from '../services/storage';
 import {getMoonfinSettings, getMoonfinThemes, saveMoonfinProfile, moonfinPing} from '../services/seerrApi';
-import {mergeServerPluginSections, pluginSectionsFromServer} from '../views/Settings/homeSectionsModel';
 import {parseThemeSpec} from '../theme/themeSpec';
 import {normalizeOverlayColorKey} from '../theme/overlayColors';
 import {noteAnsweredSettings, SETUP_QUESTION_KEYS} from '../utils/setupWizardGate';
@@ -12,6 +11,7 @@ import {normalizeRatingSources, ratingSourcesToServer} from '../utils/ratingSour
 import {SEASONAL_DENSITIES, normalizeSeasonalTheme} from '../utils/seasonalEffects';
 import {normalizeSeasonalHiddenHolidays, normalizeSeasonalRowCountry} from '../utils/seasonalRow';
 import {sharePending} from '../utils/sharePending';
+import {pickedRowsFromLegacySections} from '../utils/pickedRows';
 import {
 	IMAGES as LOADING_IMAGES,
 	POSITIONS as LOADING_POSITIONS,
@@ -27,7 +27,6 @@ import {
 	homeRowImageTypesToServer,
 	homeRowsFromProfile,
 	rowImageTypeFromServer,
-	serverPluginSections,
 	homeRowsToRowOrder,
 	homeRowsToSections,
 	mergeHomeRows
@@ -261,7 +260,7 @@ export const SYNCABLE_KEYS = [
 	'sinceYouWatchedSource', 'sinceYouWatchedSourceItem', 'sinceYouWatchedSourceType', 'sinceYouWatchedIncludeWatched',
 	'rewatchIncludeMovies', 'rewatchIncludeShows', 'rewatchIncludeCollections', 'rewatchSortBy',
 	'navbarPosition', 'featuredBarStyle', 'featuredContentType', 'featuredItemCount',
-	'featuredTrailerPreview', 'featuredTrailerMuted', 'mediaBarTrailerCaptions', 'unifiedLibraryMode', 'seasonalTheme', 'seasonalDensity',
+	'featuredTrailerPreview', 'featuredTrailerMuted', 'trailerVolume', 'mediaBarTrailerCaptions', 'unifiedLibraryMode', 'seasonalTheme', 'seasonalDensity',
 	'seasonalRowEnabled', 'seasonalRowCountry', 'seasonalRowHiddenHolidays',
 	'visualTheme', 'customThemeId',
 	'showRatingLabels',
@@ -286,7 +285,7 @@ export const SYNCABLE_KEYS = [
 	'mediaBarSourceType', 'mediaBarLibraryIds', 'mediaBarCollectionIds',
 	'mediaBarOverlayColor', 'mediaBarOverlayOpacity',
 	'homeRows', 'homeRowsStyle', 'modernCardsOnMyMediaRow', 'detailScreenStyle', 'detailExpandedTabs', 'fullScreenRows', 'homeRowsPosterSize', 'useSeriesThumbnails',
-	'episodePreviewEnabled', 'previewAudioEnabled',
+	'episodePreviewEnabled', 'previewAudioEnabled', 'previewVolume',
 	'hideDetailsMediaDescription', 'detailUseSeriesThumbnails', 'hideHomeMediaDescription',
 	'personalRatingStyle', 'recentlyReleasedSeriesType', 'mergeRecentRowsByType', 'playlistsGroupByType', 'groupItemsIntoCollections',
 	'useDetailedSubHeadings', 'showMediaDetailsOnLibraryPage', 'hideBackdropsInLibraries', 'libraryStyle', 'musicLibraryStyle',
@@ -440,10 +439,7 @@ export const resolveFromEnvelope = (envelope, adminDefaults, profile) => {
 		homeRows = homeRowsFromProfile(source, enabledById);
 		if (homeRows !== undefined) break;
 	}
-	if (homeRows !== undefined) {
-		resolved.homeRows = homeRows;
-		resolved.serverPluginSections = serverPluginSections();
-	}
+	if (homeRows !== undefined) resolved.homeRows = homeRows;
 	return resolved;
 };
 
@@ -609,7 +605,7 @@ export function SettingsProvider({children}) {
 	const syncOnLoginRef = useRef({});
 
 	useEffect(() => {
-		getFromStorage('settings').then((stored) => {
+		Promise.all([getFromStorage('settings'), getFromStorage('auth')]).then(([stored, auth]) => {
 			if (stored) {
 				// Read off the raw blob before any migration fills keys in, because a
 				// key that is present here is one somebody or some sync actually wrote.
@@ -666,8 +662,11 @@ export function SettingsProvider({children}) {
 					stored.navbarColor = navbarColorKey;
 					migrated = true;
 				}
-				if (!Array.isArray(stored.pluginSections)) {
-					stored.pluginSections = [];
+				if ('pluginSections' in stored) {
+					// Picked collections and genres were a list of their own before they joined the rows
+					const picks = auth?.serverUrl ? pickedRowsFromLegacySections(stored.pluginSections, auth.serverUrl, stored.homeRows.length) : [];
+					stored.homeRows = [...stored.homeRows, ...picks];
+					delete stored.pluginSections;
 					migrated = true;
 				}
 				if (!Array.isArray(stored.customHomeRows)) {
@@ -1076,10 +1075,6 @@ export function SettingsProvider({children}) {
 						: incoming;
 				}
 				const tmdbApiKey = resolved.tmdbApiKey !== undefined ? resolved.tmdbApiKey : prev.tmdbApiKey;
-				const pluginSections = mergeServerPluginSections(
-					prev.pluginSections,
-					pluginSectionsFromServer(resolved.serverPluginSections, {...prev, ...nextValues})
-				);
 				const homeRowsStyle = normalizeHomeRowsStyle(nextValues.homeRowsStyle);
 				const detailScreenStyle = normalizeDetailScreenStyle(nextValues.detailScreenStyle);
 
@@ -1095,7 +1090,6 @@ export function SettingsProvider({children}) {
 				// Unchanged values kept their previous reference, so comparing identity is
 				// enough here.
 				const changed = tmdbApiKey !== prev.tmdbApiKey ||
-					pluginSections !== prev.pluginSections ||
 					homeRowsStyle !== prev.homeRowsStyle ||
 					detailScreenStyle !== prev.detailScreenStyle ||
 					customThemeId !== prev.customThemeId ||
@@ -1107,7 +1101,6 @@ export function SettingsProvider({children}) {
 						...prev,
 						...nextValues,
 						tmdbApiKey,
-						pluginSections,
 						homeRowsStyle,
 						detailScreenStyle,
 						customThemeId,

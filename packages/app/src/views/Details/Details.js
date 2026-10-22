@@ -15,6 +15,7 @@ import {formatDuration, getImageUrl, getBackdropId, getLogoUrl} from '../../util
 import {KEYS} from '../../utils/keys';
 import {MATERIAL_ICON_PATHS} from '../Settings/materialIconMap';
 import {fetchPrerolls} from '../../utils/cinemaMode';
+import {bookReader} from '../../utils/books';
 import {
 	toSubtitleLanguage,
 	subtitleDownloadLanguages,
@@ -246,7 +247,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		item,
 		effectiveApi,
 		onPlay,
-		trailerMuted: settings.featuredTrailerMuted,
+		trailerVolume: settings.trailerVolume,
 		seerrOnly,
 		backRef: trailerBackRef
 	});
@@ -947,7 +948,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	const isPlaylist = item.Type === 'Playlist';
 	const isAudioTrack = item.Type === 'Audio';
 	const isBook = item.Type === 'Book';
-	const isReadableBook = isBook && item.Path?.toLowerCase().endsWith('.cbz');
+	const isReadableBook = isBook && !!bookReader(item);
 	const isRatable = isRatableItemType(item.Type);
 	const ratingStyle = normalizeRatingStyle(settings.personalRatingStyle);
 
@@ -1049,7 +1050,6 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 			videoId={trailer.trailerOverlay}
 			streamUrl={trailer.trailerStreamUrl}
 			videoRef={trailer.trailerVideoRef}
-			muted={settings.featuredTrailerMuted}
 			onClose={trailer.handleCloseTrailer}
 		/>
 	);

@@ -447,7 +447,8 @@ class CardBuilder {
 				),
 				id: `season-${season}`,
 				collapsible: true,
-				expanded: isCurrent(season, seasonEpisodes)
+				expanded: isCurrent(season, seasonEpisodes),
+				currentId: item?.Id
 			}))
 		};
 	}

@@ -166,6 +166,7 @@ const TileGrid = memo(({className, dataSize, itemSize, renderTile, spotlightId, 
 			className={`${css.grid} ${className || ''}`}
 			data-index={focusIndex}
 			data-scrolled={firstRow > 0}
+			data-pointer-steps
 			onKeyDown={handleKeyDown}
 			onKeyUp={handleKeyUp}
 			onFocus={handleFocus}

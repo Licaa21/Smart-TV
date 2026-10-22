@@ -14,6 +14,7 @@ const {execSync, spawnSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const {LINT_DIRS, runLintGate} = require('../../scripts/lint-gate');
+const {READER_ASSETS, copyReaderAssets} = require('../../scripts/reader-assets');
 
 const APP_DIR = path.resolve(__dirname, '..', 'app');
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
@@ -28,7 +29,11 @@ const WORKER_ASSETS = [
 	path.join(ROOT_DIR, 'node_modules', 'libpgs', 'dist', 'libpgs.worker.js'),
 	path.join(ROOT_DIR, 'node_modules', 'libass-wasm', 'dist', 'js', 'subtitles-octopus-worker.js'),
 	path.join(ROOT_DIR, 'node_modules', 'libass-wasm', 'dist', 'js', 'subtitles-octopus-worker.wasm'),
-	{src: path.join(ROOT_DIR, 'node_modules', '@enact', 'sandstone', 'fonts', 'MuseoSans', 'MuseoSans-Light.ttf'), name: 'ass-fallback-font.ttf'}
+	{src: path.join(ROOT_DIR, 'node_modules', '@enact', 'sandstone', 'fonts', 'MuseoSans', 'MuseoSans-Light.ttf'), name: 'ass-fallback-font.ttf'},
+	...['libarchive-worker.js', 'libarchive.wasm', 'pdf.worker.min.js'].map((name) => ({
+		src: READER_ASSETS.find((asset) => path.basename(asset.name) === name).src,
+		name
+	}))
 ];
 
 // A zip with the entries stored as they are, which is all the splash service
@@ -208,7 +213,10 @@ const buildApp = (appPkg) => {
 	fs.mkdirSync(path.join(ASSETS_DIR, 'resources'), {recursive: true});
 	fs.copyFileSync(bannerSrc, path.join(ASSETS_DIR, 'resources', 'banner-dark.png'));
 
-	console.log('\n Packing subtitle workers for file://...');
+	console.log('\n Copying book reader assets...');
+	copyReaderAssets(ASSETS_DIR, (msg) => console.log(`  ${msg}`));
+
+	console.log('\n Packing subtitle and book reader workers for file://...');
 	writeWorkerAssets(ASSETS_DIR);
 
 	console.log('\n Patching index.html...');

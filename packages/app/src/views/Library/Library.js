@@ -91,6 +91,8 @@ const FOLDER_DETAIL_TYPES = ['Series', 'BoxSet', 'Playlist', 'MusicAlbum', 'Musi
 const GRID_INSET = 174;
 // The least room a row leaves between two cards.
 const MIN_ROW_GAP = 6;
+// The header, ratings and backdrop follow focus once it rests, so a move in the grid only redraws tiles.
+const FOCUS_SETTLE_MS = 150;
 
 // Opening an item takes the library off screen and it's built again on the way back, so the item
 // that was opened is noted here to come back to.
@@ -1164,7 +1166,12 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		</div>
 	), [renderCard, cellPadding]);
 
-	const handleTileFocus = useCallback((index) => setFocusedItem(itemsRef.current[index] || null), []);
+	const tileFocusTimerRef = useRef(null);
+	const handleTileFocus = useCallback((index) => {
+		clearTimeout(tileFocusTimerRef.current);
+		tileFocusTimerRef.current = setTimeout(() => setFocusedItem(itemsRef.current[index] || null), FOCUS_SETTLE_MS);
+	}, []);
+	useEffect(() => () => clearTimeout(tileFocusTimerRef.current), []);
 	const gridKeyDown = isDocked ? handleGridKeyDownDocked
 		: showLetterNav ? handleGridKeyDown
 			: libraryStyle === 'modern' ? handleGridKeyDownNoLettersModern : handleGridKeyDownNoLetters;

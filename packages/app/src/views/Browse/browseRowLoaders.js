@@ -6,15 +6,18 @@ import {scopedGetItems} from '../../services/libraryScope';
 import {genericCollectionLabel, mergeRecentRows} from '../../utils/mergeRecentRows';
 import {latestMediaFetchLimitForCollection, normalizeLatestMediaItems} from '../../utils/latestMediaRowNormalizer';
 
-import {HOME_ROW_ITEM_FIELDS} from '../../services/jellyfinApi';
+import {HOME_ROW_ITEM_FIELDS, createApiForServer} from '../../services/jellyfinApi';
+import {getAllServersArray} from '../../services/multiServerManager';
 import {loadSinceYouWatchedRows, loadRewatchItems} from '../../services/homeRecommendations';
-import {FAVORITE_ROW_CONFIGS, getItemGenreNames, parsePluginSpec, stableIndex} from './browseFilters';
+import {FAVORITE_ROW_CONFIGS, getItemGenreNames, stableIndex} from './browseFilters';
 import {loadCollectionRowItems} from './collectionRowItems';
 import {apiSortBy, getGenresIncludeTypes, isPlaylistOrder, resolveSortOrder} from '../../utils/homeRowSorting';
+import {collapseLatestTvItems} from '../../utils/latestMediaRowNormalizer';
+import {isPickedRow, isPickedRowShown, isSameServer} from '../../utils/pickedRows';
 
 // The sort settings and enabled flags every loader reads, worked out once rather than by each
 // of them. Everything here is a plain function of the settings and the row list.
-export const buildLoaderContext = ({api, settings, homeRowsConfig, eligibleLibraries, seerrEnabled, seerrAuthenticated, recommendationsSupported, appendRows}) => {
+export const buildLoaderContext = ({api, serverUrl, settings, homeRowsConfig, eligibleLibraries, seerrEnabled, seerrAuthenticated, recommendationsSupported, appendRows}) => {
 	const rowEnabled = (id) => homeRowsConfig.some((row) => row.enabled && row.id === id);
 	// Playlist order is not a server sort field, so every row hands the server
 	// the fallback and the rows that honor the arrangement check the setting
@@ -27,6 +30,7 @@ export const buildLoaderContext = ({api, settings, homeRowsConfig, eligibleLibra
 
 	return {
 		api,
+		serverUrl,
 		settings,
 		appendRows,
 		eligibleLibraries,
@@ -52,7 +56,7 @@ export const buildLoaderContext = ({api, settings, homeRowsConfig, eligibleLibra
 		onNowEnabled: rowEnabled('onnow'),
 		rewatchEnabled: settings.displayRewatchRow !== false && rowEnabled('rewatch'),
 		studiosEnabled: settings.displayStudiosRows && rowEnabled('studios'),
-		enabledPluginSections: (settings.pluginSections || []).filter((section) => section.enabled),
+		enabledPluginSections: homeRowsConfig.filter((row) => row.enabled && isPickedRow(row) && isPickedRowShown(row, settings, serverUrl)),
 		sinceYouWatchedIndexes: homeRowsConfig
 			.filter((row) => row.enabled && row.id.startsWith('sinceyouwatched'))
 			.map((row) => parseInt(row.id.replace('sinceyouwatched', ''), 10))
@@ -447,158 +451,73 @@ const loadPlaylistsAndMusic = async (ctx) => {
 	}
 };
 
+const PICKED_ROW_LIMIT = 40;
+
+// A collection picked from another signed in server loads from that server, and its cards carry
+// the server along so they open there
+const pickedRowSource = async (ctx, row) => {
+	if (isSameServer(row.serverUrl, ctx.serverUrl)) return {api: ctx.api, server: null};
+	const server = (await getAllServersArray()).find((entry) => isSameServer(entry.url, row.serverUrl));
+	if (!server) return null;
+	return {api: createApiForServer(server.url, server.accessToken, server.userId, server.serverType || 'jellyfin'), server};
+};
+
+const loadPickedRowItems = async (ctx, api, row) => {
+	const {settings} = ctx;
+	if (row.source === 'collections') {
+		return loadCollectionRowItems(api, row.itemId, {
+			limit: PICKED_ROW_LIMIT,
+			usePlaylistOrder: isPlaylistOrder(settings.collectionsRowSortBy),
+			sortBy: ctx.collectionsSortBy,
+			sortOrder: ctx.collectionsSortOrder,
+			showEpisodes: settings.collectionsRowShowEpisodes
+		});
+	}
+	if (row.source === 'genres') {
+		const result = await api.getItems({
+			GenreIds: row.itemId,
+			IncludeItemTypes: ctx.genresIncludeTypes,
+			ExcludeItemTypes: 'Episode',
+			SortBy: ctx.genresSortBy,
+			SortOrder: ctx.genresSortOrder,
+			Recursive: true,
+			Limit: PICKED_ROW_LIMIT,
+			Fields: HOME_ROW_ITEM_FIELDS
+		});
+		return result?.Items || [];
+	}
+	const playlist = isPlaylistOrder(settings.playlistsRowSortBy)
+		? await api.getPlaylistItems(row.itemId, PICKED_ROW_LIMIT)
+		: await api.getItems({ParentId: row.itemId, SortBy: ctx.playlistsSortBy, SortOrder: ctx.playlistsSortOrder, Limit: PICKED_ROW_LIMIT, Fields: HOME_ROW_ITEM_FIELDS});
+	const items = playlist?.Items || [];
+	return settings.playlistsRowShowEpisodes ? items : collapseLatestTvItems(items);
+};
+
 const loadPluginsAndRecos = async (ctx) => {
-	const {api, appendRows, collectionsSortBy, collectionsSortOrder, enabledPluginSections, recommendationsSupported, rewatchEnabled, seerrAuthenticated, seerrEnabled, settings, sinceYouWatchedIndexes} = ctx;
-	const fetchPluginSectionRow = async (section) => {
-		if (!section?.enabled) return null;
-		const spec = parsePluginSpec(section.specJson);
-		if (!spec || typeof spec !== 'object') return null;
-		const limit = Number.isFinite(Number(spec.limit)) ? Number(spec.limit) : 20;
-		const title = section.name || section.displayText || $L('Plugin Section');
-		const fields = HOME_ROW_ITEM_FIELDS;
-
+	const {api, appendRows, enabledPluginSections, recommendationsSupported, rewatchEnabled, seerrAuthenticated, seerrEnabled, settings, sinceYouWatchedIndexes} = ctx;
+	const fetchPluginSectionRow = async (row) => {
 		try {
-			let items = [];
-			switch (spec.kind) {
-				case 'recentlyReleasedMovies': {
-					const result = await api.getItems({
-						IncludeItemTypes: 'Movie',
-						SortBy: 'PremiereDate',
-						SortOrder: 'Descending',
-						Recursive: true,
-						Limit: limit,
-						Fields: fields
-					});
-					items = result?.Items || [];
-					break;
-				}
-				case 'recentlyReleasedEpisodes': {
-					const result = await api.getItems({
-						IncludeItemTypes: 'Episode',
-						SortBy: 'PremiereDate',
-						SortOrder: 'Descending',
-						Recursive: true,
-						Limit: limit,
-						Fields: fields
-					});
-					items = result?.Items || [];
-					break;
-				}
-				case 'watchAgain': {
-					const result = await api.getItems({
-						IncludeItemTypes: 'Movie,Series',
-						Filters: 'IsPlayed',
-						SortBy: 'DatePlayed',
-						SortOrder: 'Descending',
-						Recursive: true,
-						Limit: limit,
-						Fields: fields
-					});
-					items = result?.Items || [];
-					break;
-				}
-				case 'recentlyAddedInLibrary': {
-					const libraryIds = Array.isArray(spec.libraryIds) ? spec.libraryIds : [];
-					const responses = await Promise.all(
-						libraryIds.map((libraryId) => api.getItems({
-							ParentId: libraryId,
-							IncludeItemTypes: 'Movie,Series',
-							SortBy: 'DateCreated',
-							SortOrder: 'Descending',
-							Recursive: true,
-							Limit: limit,
-							Fields: fields
-						}).catch(() => null))
-					);
-					items = responses.flatMap((response) => response?.Items || []).slice(0, limit);
-					break;
-				}
-				case 'custom': {
-					const includeItemTypes = Array.isArray(spec.includeItemTypes)
-						? spec.includeItemTypes.join(',')
-						: 'Movie,Series';
-					const sortBy = spec.sortBy || 'Random';
-					const sortOrder = spec.sortOrderDirection || 'Ascending';
-					const params = {
-						IncludeItemTypes: includeItemTypes,
-						SortBy: sortBy,
-						SortOrder: sortOrder,
-						Recursive: true,
-						Limit: limit,
-						Fields: fields
-					};
-					if (spec.type === 'genre' && spec.source) params.Genres = spec.source;
-					if (spec.type === 'person' && spec.source) params.PersonIds = spec.source;
-					if (spec.type === 'studio' && spec.source) params.StudioIds = spec.source;
-					if (spec.type === 'collection' && spec.source) params.ParentId = spec.source;
-					const result = await api.getItems(params);
-					items = result?.Items || [];
-					break;
-				}
-				case 'collection': {
-					const collectionId = spec.collectionId || null;
-					if (!collectionId) {
-						items = [];
-						break;
-					}
-					items = await loadCollectionRowItems(api, collectionId, {
-						limit,
-						usePlaylistOrder: isPlaylistOrder(settings.collectionsRowSortBy),
-						sortBy: collectionsSortBy,
-						sortOrder: collectionsSortOrder,
-						showEpisodes: settings.collectionsRowShowEpisodes
-					});
-					break;
-				}
-				case 'genre': {
-					const params = {
-						IncludeItemTypes: spec.includeItemTypes || 'Movie,Series',
-						SortBy: spec.sortBy || 'SortName',
-						SortOrder: spec.sortOrder || 'Ascending',
-						Recursive: true,
-						Limit: limit,
-						Fields: fields
-					};
-					if (spec.genreId) {
-						params.GenreIds = spec.genreId;
-					} else if (spec.genreName) {
-						params.Genres = spec.genreName;
-					}
-					const result = await api.getItems(params);
-					items = result?.Items || [];
-					break;
-				}
-				default:
-					items = [];
-			}
-
+			const source = await pickedRowSource(ctx, row);
+			if (!source) return null;
+			const items = await loadPickedRowItems(ctx, source.api, row);
 			if (items.length === 0) return null;
-			const cardTypeHint = spec.cardType || spec.section?.CardType || spec.section?.cardType || spec.section?.Layout || spec.section?.layout;
-			const normalizedCardType = typeof cardTypeHint === 'string' ? cardTypeHint.toLowerCase() : '';
-			const viewModeHint = spec.viewMode || spec.section?.ViewMode || spec.section?.viewMode || '';
-			const normalizedViewMode = typeof viewModeHint === 'string' ? viewModeHint.toLowerCase() : '';
-			let rowType = 'portrait';
-			if (normalizedViewMode.includes('portrait')) {
-				rowType = 'portrait';
-			} else if (normalizedViewMode.includes('square')) {
-				rowType = 'square';
-			} else if (
-				normalizedViewMode.includes('landscape') ||
-				normalizedViewMode.includes('small') ||
-				normalizedViewMode.includes('backdrop') ||
-				normalizedCardType.includes('landscape') ||
-				normalizedCardType.includes('thumb') ||
-				spec.kind === 'recentlyReleasedEpisodes'
-			) {
-				rowType = 'landscape';
-			}
+			const {server} = source;
 			return {
-				id: section.id,
-				title,
-				items,
-				type: rowType,
-				isPluginRow: true,
-				pluginSource: section.source
+				id: row.id,
+				title: row.name,
+				items: server
+					? items.map((item) => ({
+						...item,
+						_serverId: server.serverId,
+						_serverName: server.name,
+						_serverUrl: server.url,
+						_serverUserId: server.userId,
+						_serverAccessToken: server.accessToken,
+						_serverType: server.serverType || 'jellyfin'
+					}))
+					: items,
+				type: 'portrait',
+				isPluginRow: true
 			};
 		} catch (_error) {
 			return null;

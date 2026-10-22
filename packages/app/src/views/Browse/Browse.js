@@ -1,6 +1,7 @@
 import {useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, memo} from 'react';
 import {isKidsMode, kidsModeRows, mergesContinueWatchingNextUp} from '../../utils/kidsMode';
 import {withoutBlocked} from '../../utils/parentalFilter';
+import {isPickedRow, isPickedRowShown} from '../../utils/pickedRows';
 import useParentalFilter from '../../hooks/useParentalFilter';
 import {useUserDataRows} from '../../hooks/useUserDataSync';
 import Spotlight from '@enact/spotlight';
@@ -90,12 +91,12 @@ const Browse = ({
 		return kidsModeRows([...(settings.homeRows || [])].sort((a, b) => a.order - b.order), kidsMode);
 	}, [settings.homeRows, kidsMode]);
 
-	// Plugin rows go too. A plugin renders whatever it was handed, which is not something this
-	// mode is in any position to vouch for.
+	// The collections, genres and playlists given a row of their own. Kids Mode left them out above.
+	const {displayCollectionsRows, displayGenresRows, displayPlaylistsRows, unifiedLibraryMode} = settings;
 	const pluginSectionsConfig = useMemo(() => {
-		if (kidsMode) return [];
-		return [...(settings.pluginSections || [])].sort((a, b) => a.order - b.order);
-	}, [settings.pluginSections, kidsMode]);
+		const gates = {displayCollectionsRows, displayGenresRows, displayPlaylistsRows, unifiedLibraryMode};
+		return homeRowsConfig.filter((row) => isPickedRow(row) && isPickedRowShown(row, gates, serverUrl));
+	}, [homeRowsConfig, displayCollectionsRows, displayGenresRows, displayPlaylistsRows, unifiedLibraryMode, serverUrl]);
 	const {isEnabled: seerrEnabled, isAuthenticated: seerrAuthenticated, user: seerrUser, pluginInfo} = useSeerr();
 	const recommendationsSupported = pluginInfo?.recommendationsSupported === true;
 	const seerrUserId = seerrUser?.seerrUserId;
@@ -425,6 +426,32 @@ const Browse = ({
 	useEffect(() => {
 		if (!isLoading && isVisible) markHomeReady();
 	}, [isLoading, isVisible]);
+
+	// A pointer scrolls the rows without moving focus, so where posters wait for focus they also
+	// follow whichever rows have come on screen.
+	useEffect(() => {
+		const node = contentRowsRef.current;
+		if (NATIVE_LAZY_IMAGES || isLoading || !node) return undefined;
+		let frame = 0;
+		const reveal = () => {
+			frame = 0;
+			const bottom = node.scrollTop + node.clientHeight;
+			const rows = node.querySelectorAll('[data-row-index]');
+			let last = -1;
+			for (let i = 0; i < rows.length; i++) {
+				if (rows[i].offsetTop < bottom) last = Math.max(last, Number(rows[i].getAttribute('data-row-index')));
+			}
+			if (last >= 0) setImageRows((count) => Math.max(count, last + 1 + ROWS_AHEAD));
+		};
+		const onScroll = () => {
+			if (!frame) frame = window.requestAnimationFrame(reveal);
+		};
+		node.addEventListener('scroll', onScroll);
+		return () => {
+			node.removeEventListener('scroll', onScroll);
+			window.cancelAnimationFrame(frame);
+		};
+	}, [isLoading]);
 
 	// A placeholder holds a loading section's place but has nothing to focus, so moving between
 	// rows steps over it.
@@ -967,6 +994,7 @@ const Browse = ({
 					className={`${css.contentRows} ${browseMode === 'rows' ? css.rowsMode : ''} ${rowsClipClass}`}
 					onFocus={handleContentFocus}
 					onBlur={handleRowsBlur}
+					data-pointer-rows
 				>
 					{filteredRows.map((row, index) => {
 						if (filling && Math.abs(index - landingIndex) > fillStep + 1) {

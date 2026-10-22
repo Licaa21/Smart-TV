@@ -1,5 +1,6 @@
 import {buildQueryString} from '../utils/urlCompat';
 import {selectPreferredAudioStream} from '../utils/audioTrackSelection';
+import {getPerfTier} from '../utils/perfTier';
 import {createApiForServer, getApiKey, getServerType, getServerUrl, getTokenParam} from './jellyfinApi';
 
 // What a home row card plays when it has been focused for a moment: a short, low
@@ -7,6 +8,9 @@ import {createApiForServer, getApiKey, getServerType, getServerUrl, getTokenPara
 // be pinned by tests, the controller in views/Browse drives the element.
 
 export const PREVIEW_DWELL_MS = 1200;
+// A low tier set stutters while a preview opens, so focus has to rest there longer before one starts.
+const LOW_TIER_DWELL_MS = 2500;
+export const previewDwellMs = () => (getPerfTier() === 'low' ? LOW_TIER_DWELL_MS : PREVIEW_DWELL_MS);
 export const PREVIEW_OPEN_TIMEOUT_MS = 10000;
 export const PREVIEW_PLAY_CAP_MS = 30000;
 

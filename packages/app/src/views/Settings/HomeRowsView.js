@@ -1,9 +1,11 @@
 /* eslint-disable react/jsx-no-bind */
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import $L from '@enact/i18n/$L';
 import Spotlight from '@enact/spotlight';
 
-import {HOME_ROW_GROUPS, getPluginSectionSourceLabel, homeRowGroup, isHomeRowVisibleByGates} from './homeSectionsModel';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import {isPickedRow} from '../../utils/pickedRows';
+import {HOME_ROW_GROUPS, homeRowGroup, isHomeRowVisibleByGates, pickedRowLabel} from './homeSectionsModel';
 import {ReorderRow, SectionTitle, useCommitOnLeave} from './settingsRows';
 import {SettingsGlyph} from './settingsIcons';
 import {SpottableDiv} from './settingsSpottables';
@@ -24,13 +26,12 @@ const groupLabel = (group) => {
 	}
 };
 
-const groupSpotlightId = (group) => `homerows-group-${group}`;
+// A server can have hundreds of collections, so an open group lists this many at a time
+const ROW_RENDER_STEP = 60;
 
-// Built-in rows and the discovered plugin sections are kept in lists of their own
-const isPluginSection = (item) => Boolean(item.source);
-const rowSpotlightId = (item) => (isPluginSection(item) ? `pluginrow-${item.id}` : `homerow-${item.id}`);
-const rowTitle = (item) => (isPluginSection(item) ? item.name : $L(item.name));
-const rowSubtitle = (item) => (isPluginSection(item) ? getPluginSectionSourceLabel(item.source) : undefined);
+const groupSpotlightId = (group) => `homerows-group-${group}`;
+const rowSpotlightId = (item) => `homerow-${item.id}`;
+const rowTitle = (item) => (isPickedRow(item) ? item.name : $L(item.name));
 
 const GroupRow = ({group, count, open, onToggle}) => (
 	<SpottableDiv className={`${css.listItem} ${css.listItemClean}`} onClick={onToggle} spotlightId={groupSpotlightId(group)}>
@@ -46,32 +47,29 @@ const GroupRow = ({group, count, open, onToggle}) => (
 	</SpottableDiv>
 );
 
-// The Enabled list is what Home shows, in its order: the built-in rows, then the plugin
-// sections, each moving among its own with left and right. The disabled rows sit below in a
-// group per kind that OK opens and closes. Rows the viewer has switched off elsewhere, and the
-// Live TV rows on a server without Live TV, are left out. The arrangement is written back when
-// the screen closes.
+// The Enabled list is what Home shows, in its order, and left and right move a row through it.
+// The disabled rows sit below in a group per kind that OK opens and closes. Rows the viewer has
+// switched off elsewhere, and the Live TV rows on a server without Live TV, are left out. The
+// arrangement is written back when the screen closes.
 const HomeRowsView = ({
 	settings,
+	serverUrl,
+	servers,
 	tempHomeRows,
-	tempPluginSections,
+	loading,
 	serverHasLiveTv,
-	pluginSectionRenderLimit,
-	onShowMoreSections,
 	onToggleHomeRow,
 	onMoveHomeRow,
-	onTogglePluginSection,
-	onMovePluginSection,
 	onReset,
 	onLeave
 }) => {
 	useCommitOnLeave(onLeave);
 	const [openGroups, setOpenGroups] = useState(() => new Set(['general']));
-	const visibleRows = tempHomeRows.filter((row) => isHomeRowVisibleByGates(row.id, settings, serverHasLiveTv));
+	const [renderLimit, setRenderLimit] = useState(ROW_RENDER_STEP);
+	const visibleRows = tempHomeRows.filter((row) => isHomeRowVisibleByGates(row, settings, serverHasLiveTv, serverUrl));
 	const enabledRows = visibleRows.filter((row) => row.enabled);
-	const enabledSections = tempPluginSections.filter((section) => section.enabled);
-	const enabledIds = [...enabledRows, ...enabledSections].map(rowSpotlightId);
-	const disabled = [...visibleRows, ...tempPluginSections].filter((item) => !item.enabled);
+	const enabledIds = enabledRows.map(rowSpotlightId);
+	const disabled = visibleRows.filter((row) => !row.enabled);
 	const groups = HOME_ROW_GROUPS
 		.map((group) => ({group, items: disabled.filter((item) => homeRowGroup(item) === group)}))
 		.filter(({items}) => items.length > 0);
@@ -82,16 +80,30 @@ const HomeRowsView = ({
 		return next;
 	});
 
+	// Nothing here can take focus while the lists load
+	useEffect(() => {
+		if (!loading) Spotlight.focus('homerows-view');
+	}, [loading]);
+
+	if (loading) {
+		return (
+			<SettingsView spotlightId='homerows-view' title={$L('Rows')} clean>
+				<div className={css.viewSpinner}><LoadingSpinner /></div>
+			</SettingsView>
+		);
+	}
+
+	const rowSubtitle = (item) => (isPickedRow(item) ? pickedRowLabel(item, serverUrl, servers) : undefined);
+
 	// The row slides out of the list it was in, so the focus goes to the one taking its place
 	const toggleFrom = (ids, item, fallbackId) => {
 		const at = ids.indexOf(rowSpotlightId(item));
-		if (isPluginSection(item)) onTogglePluginSection(item.id);
-		else onToggleHomeRow(item.id);
+		onToggleHomeRow(item.id);
 		const next = ids[at + 1] || ids[at - 1] || fallbackId;
 		window.requestAnimationFrame(() => Spotlight.focus(next));
 	};
 
-	const renderEnabled = (list, onMove) => list.map((item, index) => (
+	const renderEnabled = (list) => list.map((item, index) => (
 		<ReorderRow
 			key={item.id}
 			spotlightId={rowSpotlightId(item)}
@@ -102,7 +114,7 @@ const HomeRowsView = ({
 			isFirst={index === 0}
 			isLast={index === list.length - 1}
 			onToggle={() => toggleFrom(enabledIds, item, groupSpotlightId(homeRowGroup(item)))}
-			onMove={(direction) => onMove(item.id, direction)}
+			onMove={(direction) => onMoveHomeRow(item.id, direction)}
 		/>
 	));
 
@@ -114,12 +126,11 @@ const HomeRowsView = ({
 			action={<TitleAction icon='restore' label={$L('Reset to defaults')} onClick={onReset} />}
 		>
 			<SectionTitle>{$L('Enabled')}</SectionTitle>
-			{renderEnabled(enabledRows, onMoveHomeRow)}
-			{renderEnabled(enabledSections, onMovePluginSection)}
+			{renderEnabled(enabledRows)}
 			{groups.length > 0 && <SectionTitle>{$L('Disabled')}</SectionTitle>}
 			{groups.map(({group, items}) => {
 				const open = openGroups.has(group);
-				const shown = open ? items.slice(0, pluginSectionRenderLimit) : [];
+				const shown = open ? items.slice(0, renderLimit) : [];
 				const ids = shown.map(rowSpotlightId);
 				return [
 					<GroupRow key={`group-${group}`} group={group} count={items.length} open={open} onToggle={() => toggleGroup(group)} />,
@@ -138,7 +149,7 @@ const HomeRowsView = ({
 					)),
 					open && items.length > shown.length && (
 						<div key={`more-${group}`} className={css.actionBar}>
-							<SettingsButton onClick={onShowMoreSections} spotlightId={`homerows-more-${group}`}>
+							<SettingsButton onClick={() => setRenderLimit((prev) => prev + ROW_RENDER_STEP)} spotlightId={`homerows-more-${group}`}>
 								{$L('Show More')} ({items.length - shown.length})
 							</SettingsButton>
 						</div>

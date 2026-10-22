@@ -23,6 +23,7 @@ import {driftMs, needsSeek, correctionOptions, DRIFT_CHECK_MS, GROUP_SEEK_SETTLE
 import {createReadyGate} from '../../utils/syncReady';
 import {createSkipGovernor, chooseCorrection} from '../../utils/syncCorrection';
 import {getImageUrl, getLogoUrl} from '../../utils/helpers';
+import {transcodesAudioCodec} from '../../utils/deviceProfileTuning';
 import {initPgsCanvasRenderer, disposePgsRenderer, clearPgsCanvas, pgsDrawnArea} from '../../utils/pgsRenderer';
 import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTime} from '../../utils/assRenderer';
 import {describeHlsManifest} from '../../utils/hlsManifestProbe';
@@ -1814,8 +1815,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				}
 				if (!stillCurrent()) return;
 				if (wantedAudio && !isLiveTV
-					&& ((initialAudioIndex == null && result.playMethod !== playback.PlayMethod.DirectPlay
-						&& autoAudio.index !== result.selectedAudioStreamIndex) || (audioNeedsServer && initialAudioIndex == null))) {
+					// A track in a codec the viewer has the server convert can't be switched to locally either
+					&& ((initialAudioIndex == null && (result.playMethod !== playback.PlayMethod.DirectPlay || transcodesAudioCodec(settings, wantedAudio.codec))
+						&& wantedAudio.index !== result.selectedAudioStreamIndex) || (audioNeedsServer && initialAudioIndex == null))) {
 					try {
 						playbackInfoOptions.audioStreamIndex = wantedAudio.index;
 						// a pick made on the details screen was already asked of the server by the first request
@@ -2837,7 +2839,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// track the set cant decode freezes the picture, so reload and let the
 				// server transcode instead
 				const target = (audioStreams || []).find((s) => s.index === index);
-				const playableNatively = await playback.canPlayAudioStreamNatively(target
+				const playableNatively = !transcodesAudioCodec(settings, target?.codec) && await playback.canPlayAudioStreamNatively(target
 					? {Codec: target.codec, Profile: target.profile, Title: target.title, DisplayTitle: target.displayTitle, ChannelLayout: target.channelLayout, Channels: target.channels}
 					: null);
 				if (!playableNatively) {
@@ -2872,7 +2874,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		} catch (err) {
 			console.error('[Player] Failed to change audio:', err);
 		}
-	}, [item, playMethod, closeModal, reloadAudioFromServer, verifyAudioMatchesScreen, audioStreams]);
+	}, [item, playMethod, closeModal, reloadAudioFromServer, verifyAudioMatchesScreen, audioStreams, settings]);
 
 	// Track selection - using data attributes to avoid arrow functions in JSX
 	const handleSelectAudio = useCallback((e) => {

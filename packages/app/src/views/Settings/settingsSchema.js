@@ -76,6 +76,7 @@ import {
 	getSubtitlePositionOptions,
 	getSubtitleShadowColorOptions,
 	getSubtitleSizeOptions,
+	getTranscodeAudioCodecOptions,
 	getUiLanguageOptions,
 	getUiScaleOptions,
 	getWatchedIndicatorOptions,
@@ -459,6 +460,7 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.TOGGLE, key: 'useSeriesThumbnails', label: () => $L('Display Series Thumbnails'), desc: () => $L('For TV series, use the main series artwork instead of the episode thumbnail.'), icon: 'image_aspect_ratio'},
 					{kind: KIND.TOGGLE, key: 'episodePreviewEnabled', label: () => $L('Media Preview'), desc: () => $L('Play a short clip of the focused card after a moment.'), icon: 'play_circle'},
 					{kind: KIND.TOGGLE, key: 'previewAudioEnabled', label: () => $L('Preview Audio'), desc: () => $L('Play the preview with sound.'), icon: 'volume_up', when: (ctx) => !!ctx.settings.episodePreviewEnabled},
+					{kind: KIND.SLIDER, key: 'previewVolume', label: () => $L('Preview Volume'), desc: () => $L('How loud media previews on cards play'), min: 0, max: 100, step: 5, format: percent, icon: 'volume_down', when: (ctx) => !!ctx.settings.episodePreviewEnabled},
 					{kind: KIND.TOGGLE, key: 'homeRowOverlay', label: () => $L('Home Row Info Overlay'), desc: () => $L('Show title and metadata when browsing home rows'), icon: 'info_outline', when: (ctx) => ctx.settings.homeRowsStyle === 'v1'},
 					{kind: KIND.TOGGLE, key: 'hideHomeMediaDescription', label: () => $L('Hide Media Description'), desc: () => $L('Hide the movie or episode descriptive text.'), icon: 'description_outlined'},
 					{kind: KIND.SECTION, id: 'externalSources', label: () => $L('External Sources'), when: whenPlugin},
@@ -584,7 +586,8 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.SLIDER, key: 'autoAdvanceInterval', label: () => $L('Auto Advance Interval'), min: 2, max: 20, step: 1, format: seconds, icon: 'timer', when: (ctx) => ctx.settings.autoAdvance},
 					{kind: KIND.SECTION, id: 'trailers', label: () => $L('Trailers')},
 					{kind: KIND.TOGGLE, key: 'featuredTrailerPreview', label: () => $L('Trailer Preview'), desc: () => $L('Auto-play trailers in the media bar after 3 seconds'), icon: 'movie_outlined'},
-					{kind: KIND.TOGGLE, key: 'featuredTrailerMuted', label: () => $L('Mute Trailer Audio'), desc: () => $L('Mute trailer previews in the featured media bar and details screen trailer overlay'), icon: 'volume_up', when: (ctx) => ctx.settings.featuredTrailerPreview},
+					{kind: KIND.TOGGLE, key: 'featuredTrailerMuted', label: () => $L('Mute Trailer Audio'), desc: () => $L('Mute trailer previews in the featured media bar'), icon: 'volume_up', when: (ctx) => ctx.settings.featuredTrailerPreview},
+					{kind: KIND.SLIDER, key: 'trailerVolume', label: () => $L('Trailer Volume'), desc: () => $L('How loud trailers play in the featured media bar and details screen'), min: 0, max: 100, step: 5, format: percent, icon: 'volume_down', when: (ctx) => ctx.settings.featuredTrailerPreview},
 					{kind: KIND.TOGGLE, key: 'mediaBarTrailerCaptions', label: () => $L('Trailer Captions'), desc: () => $L('Show captions on YouTube trailers in the media bar'), icon: 'closed_caption_outlined', when: (ctx) => ctx.settings.featuredTrailerPreview}
 				]
 			},
@@ -880,7 +883,20 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.TOGGLE, key: 'forceTruehdPassthrough', label: () => $L('Force TrueHD / Atmos Passthrough'), desc: () => $L('Send Dolby TrueHD and Atmos straight to your receiver. Make sure your receiver supports it.'), icon: 'graphic_eq', when: (ctx) => whenTruehdOptIn(ctx) && ctx.isWebOS},
 					{kind: KIND.TOGGLE, key: 'experimentalTruehd', label: () => $L('Experimental TrueHD Attempt'), desc: () => $L('May fall back to PCM, DD+, or AC3. Requires eARC + receiver. Not for TV speakers.'), icon: 'speaker', when: (ctx) => whenTruehdOptIn(ctx) && ctx.isTizen, onToggle: (ctx) => ctx.actions.toggleExperimentalTruehd()},
 					{kind: KIND.SECTION, id: 'audioAdvanced', label: () => $L('Advanced')},
-					{kind: KIND.OPTION, key: 'maxAudioChannels', label: () => $L('Max Audio Channels'), desc: () => $L('Configure the maximum channels of your audio setup. Multichannel streams exceeding this limit will downmix or transcode.'), options: getMaxAudioChannelsOptions, fallback: () => $L('Auto Detect'), icon: 'speaker_group', padded: true}
+					{kind: KIND.OPTION, key: 'maxAudioChannels', label: () => $L('Max Audio Channels'), desc: () => $L('Configure the maximum channels of your audio setup. Multichannel streams exceeding this limit will downmix or transcode.'), options: getMaxAudioChannelsOptions, fallback: () => $L('Auto Detect'), icon: 'speaker_group', padded: true},
+					{
+						kind: KIND.NAV,
+						id: 'transcodeAudioCodecs',
+						label: () => $L('Transcode Audio Codecs'),
+						desc: (ctx) => {
+							const picked = ctx.settings.transcodeAudioCodecs || [];
+							if (picked.length === 0) return $L('None');
+							const options = getTranscodeAudioCodecOptions();
+							return picked.map((codec) => options.find((option) => option.value === codec)?.label || codec).join(', ');
+						},
+						icon: 'transform',
+						action: (ctx) => ctx.actions.openTranscodeAudioCodecs()
+					}
 				]
 			},
 			{

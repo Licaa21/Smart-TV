@@ -29,6 +29,7 @@ beforeEach(() => {
 	jest.spyOn(window.HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => rec.ctx);
 	jest.spyOn(window.HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:baked');
 	supportsCustomProperties(true);
+	localStorage.clear();
 });
 
 afterEach(() => {
@@ -79,6 +80,18 @@ describe('scrimStyle', () => {
 		expect(rec.calls.filter((c) => c[0] === 'fill')).toHaveLength(1);
 		scrimStyle(layers, 0.6);
 		expect(rec.calls.filter((c) => c[0] === 'fill')).toHaveLength(2);
+	});
+
+	test('a scrim baked on one launch comes back on the next without drawing', () => {
+		const layers = [{to: 'right', rgb: '0, 0, 0', stops: [[0, 0.7]]}];
+		scrimStyle(layers);
+		jest.isolateModules(() => {
+			const {scrimStyle: nextLaunch} = require('./scrimImage');
+			window.HTMLCanvasElement.prototype.getContext.mockReturnValue(null);
+			expect(nextLaunch(JSON.parse(JSON.stringify(layers)))).toEqual({
+				backgroundImage: 'url(data:baked)', backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat'
+			});
+		});
 	});
 
 	test('leaves the stylesheet gradients in place without a 2D canvas', () => {

@@ -11,6 +11,7 @@ import {isTizen} from './platform';
 import {registerKeys, ESSENTIAL_KEY_NAMES, paceArrowKeys, watchArrowHolds} from './utils/keys';
 import {registerBlockedKeys} from './utils/blockedKeys';
 import serverLogger from './services/serverLogger';
+import {scrollAtPointerEdges} from './utils/pointerEdgeScroll';
 
 const enforceTizenViewport = () => {
 	if (typeof document === 'undefined' || !isTizen()) return;
@@ -54,6 +55,7 @@ if (typeof window !== 'undefined') {
 	// The watcher goes first, so the report says what the set sent and not what the pacing let through
 	watchArrowHolds(window, (hold) => serverLogger.info('Navigation', 'Arrow held', hold));
 	paceArrowKeys();
+	scrollAtPointerEdges();
 	// The locale strings arrive in their own chunk, so hold the first render until
 	// they land. Otherwise the app paints English and swaps a frame later.
 	localeStringsReady.then(() => {

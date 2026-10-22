@@ -588,6 +588,7 @@ const useBrowseData = ({
 
 				const loaderContext = buildLoaderContext({
 					api,
+					serverUrl,
 					settings,
 					homeRowsConfig,
 					eligibleLibraries,
@@ -647,8 +648,8 @@ const useBrowseData = ({
 		settings.playlistsRowSortOrder,
 		settings.audioRowsSortOrder,
 		settings.collectionsRowShowEpisodes,
+		settings.playlistsRowShowEpisodes,
 		settings.uiLanguage,
-		settings.pluginSections,
 		settings.mergeRecentRowsByType,
 		settings.mergeContinueWatchingNextUp,
 		settings.kidsModeEnabled,
