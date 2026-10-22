@@ -52,8 +52,8 @@ git rev-parse -q --verify "$prev^{commit}" >/dev/null 2>&1 || prev="$from~30"
 
 notes="$(mktemp)"
 log="$(mktemp)"
-# a commit that only changes CLAUDE.md is not part of what the build changed
-git log --no-merges --format='%an%x09%h%x09%s' "$prev..$from" | awk -F'	' '$3 !~ /^CLAUDE.md:/' > "$log"
+# a commit that only changes CLAUDE.md or the README is not part of what the build changed
+git log --no-merges --format='%an%x09%h%x09%s' "$prev..$from" | awk -F'	' '$3 !~ /^(CLAUDE.md|README):/' > "$log"
 {
   echo "Lica's Fork $n for Moonfin $version, built from commit \`$from\` on $(date '+%Y-%m-%d %H:%M')."
   echo
