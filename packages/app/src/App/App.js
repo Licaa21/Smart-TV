@@ -56,6 +56,10 @@ import NoConnection from '../components/NoConnection/NoConnection';
 import SyncPlayDialog from '../components/SyncPlayDialog';
 import PhotoViewer from '../components/PhotoViewer';
 import ComicViewer from '../components/ComicViewer';
+import EpubReader from '../components/EpubReader';
+import PdfReader from '../components/PdfReader';
+import AdminMessageDialog from '../components/AdminMessageDialog';
+import {bookReader, isBookItem, supportsNewerBookFormats} from '../utils/books';
 import SettingsPanel from '../components/SettingsPanel';
 import ShuffleOverlay from '../components/ShuffleOverlay';
 import SpottableInput from '../components/SpottableInput/SpottableInput';
@@ -102,6 +106,7 @@ import css from './App.module.less';
 
 const MAX_HISTORY_LENGTH = 10;
 const SpottableButton = Spottable('button');
+const BOOK_READERS = {comic: ComicViewer, epub: EpubReader, pdf: PdfReader};
 
 const isAudioItem = (item) => item?.MediaType === 'Audio' || item?.Type === 'Audio';
 
@@ -306,7 +311,9 @@ const AppContent = (props) => {
 	const prevUserIdRef = useRef(null);
 	const [photoViewerItem, setPhotoViewerItem] = useState(null);
 	const [photoViewerItems, setPhotoViewerItems] = useState([]);
-	const [comicViewerItem, setComicViewerItem] = useState(null);
+	const [reading, setReading] = useState(null);
+	const BookReader = reading ? BOOK_READERS[reading.reader.kind] : null;
+	const [unreadableBook, setUnreadableBook] = useState(null);
 	const {updateInfo, formattedNotes, dismiss: dismissUpdate} = useVersionCheck(
 		isAuthenticated && settings.updateNotificationsEnabled !== false ? 3000 : null
 	);
@@ -335,7 +342,7 @@ const AppContent = (props) => {
 		!showAccountModal &&
 		!showServerMessages &&
 		!photoViewerItem &&
-		!comicViewerItem
+		!reading
 	);
 	const {isInactive: showScreensaver, dismiss: dismissScreensaver, wake: wakeScreensaver} = useInactivityTimer(screensaverTimeout, screensaverEnabled);
 
@@ -790,7 +797,9 @@ const AppContent = (props) => {
 			if ((e.keyCode === KEYS.UP || e.keyCode === KEYS.DOWN || e.keyCode === KEYS.LEFT || e.keyCode === KEYS.RIGHT) && Spotlight.getPointerMode()) {
 				Spotlight.setPointerMode(false);
 			}
-			if (showShuffleOverlay) {
+			// The book readers and their dialog take Back themselves, from a listener
+			// beside this one on the window, so this one stays out of it.
+			if (showShuffleOverlay || reading || unreadableBook) {
 				return;
 			}
 			if (isTvKeyboardVisible()) {
@@ -875,7 +884,7 @@ const AppContent = (props) => {
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [panelIndex, handleBack, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, timesUp, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay]);
+	}, [panelIndex, handleBack, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, reading, unreadableBook, isPinGateActive, timesUp, setupWizardActive, updateInfo, dismissUpdate, syncPlayDialogOpen, closeSyncPlay]);
 
 	// The account stays saved, so it can be chosen again from the picker once its hours are back.
 	const handleTimesUpSwitchUser = useCallback(() => {
@@ -942,7 +951,8 @@ const AppContent = (props) => {
 			return;
 		}
 		if (panelIndex === PANELS.DETAILS && selectedItem) {
-			detailsItemStackRef.current.push(selectedItem);
+			// One episode to the next takes its place, so Back leaves the run of episodes in one press.
+			if (selectedItem.Type !== 'Episode' || item.Type !== 'Episode') detailsItemStackRef.current.push(selectedItem);
 			setSelectedItem(item);
 		} else {
 			detailsItemStackRef.current = [];
@@ -969,8 +979,23 @@ const AppContent = (props) => {
 		setPhotoViewerItems([]);
 	}, []);
 
-	const handleCloseComicViewer = useCallback(() => {
-		setComicViewerItem(null);
+	const handleCloseReader = useCallback(() => {
+		setReading(null);
+	}, []);
+
+	const handleCloseUnreadableBook = useCallback(() => {
+		const returnTo = unreadableBook?.returnTo;
+		setUnreadableBook(null);
+		if (returnTo) setTimeout(() => Spotlight.focus(returnTo), 0);
+	}, [unreadableBook]);
+
+	const openBook = useCallback((item) => {
+		const reader = bookReader(item);
+		if (reader && (!reader.newer || supportsNewerBookFormats())) {
+			setReading({item, reader});
+		} else {
+			setUnreadableBook({ext: reader ? reader.ext : null, returnTo: Spotlight.getCurrent()});
+		}
 	}, []);
 
 	const handleSelectLibrary = useCallback(async (library) => {
@@ -1036,8 +1061,8 @@ const AppContent = (props) => {
 	}, [navigateTo, backgroundMusic]);
 
 	const handlePlay = useCallback(async (item, resume, options) => {
-		if (item.MediaType === 'Book' && item.Path?.toLowerCase().endsWith('.cbz')) {
-			setComicViewerItem(item);
+		if (isBookItem(item)) {
+			openBook(item);
 			return;
 		}
 		// Music left playing behind the screens reports its stop before the new item opens.
@@ -1051,7 +1076,7 @@ const AppContent = (props) => {
 		setPlaybackOptions(options || null);
 		setIsResume(!!resume);
 		navigateTo(PANELS.PLAYER);
-	}, [navigateTo, isSyncPlayInGroup, openSyncPlay, settings.syncplayAutoOpen, settings.syncplayEnabled, syncPlaySetNewQueue, backgroundMusic]);
+	}, [navigateTo, isSyncPlayInGroup, openSyncPlay, settings.syncplayAutoOpen, settings.syncplayEnabled, syncPlaySetNewQueue, backgroundMusic, openBook]);
 
 	const playSyncPlayItem = useCallback((item) => {
 		if (panelIndex === PANELS.PLAYER && playingItem?.Id === item.Id) return;
@@ -2033,14 +2058,23 @@ const AppContent = (props) => {
 					onClose={handleClosePhotoViewer}
 				/>
 			)}
-			{comicViewerItem && (
-				<ComicViewer
-					item={comicViewerItem}
+			{BookReader && (
+				<BookReader
+					item={reading.item}
+					archive={reading.reader.archive}
 					serverUrl={serverUrl}
 					accessToken={accessToken}
-					onClose={handleCloseComicViewer}
+					onClose={handleCloseReader}
 				/>
 			)}
+			<AdminMessageDialog
+				open={!!unreadableBook}
+				title={$L('This book can\'t be read here')}
+				message={unreadableBook?.ext
+					? $L('{format} books need a newer TV. Read this one in Moonfin on a phone, tablet or computer.').replace('{format}', unreadableBook.ext.toUpperCase())
+					: $L('This TV can\'t read books in this format. Read this one in Moonfin on a phone, tablet or computer.')}
+				onDismiss={handleCloseUnreadableBook}
+			/>
 			<Screensaver
 				visible={showScreensaver}
 				backdrop={settings.screensaverBackdrop || 'library'}
@@ -2062,7 +2096,7 @@ const AppContent = (props) => {
 			{/* Home only, and unmounted under the screensaver and the full screen overlays so it
 			never keeps animating behind them. */}
 			{panelIndex === PANELS.BROWSE && !showScreensaver && !showShuffleOverlay &&
-				!photoViewerItem && !comicViewerItem && (
+				!photoViewerItem && !reading && (
 				<SeasonalTheme theme={settings.seasonalTheme} density={settings.seasonalDensity} />
 			)}
 			<NoConnection />

@@ -22,6 +22,7 @@ export const makeUserRoutes = (readType, readUserId) => {
 			: `/Items/${itemId}/${kind}?userId=${uid()}&`),
 		favorite: (itemId) => (legacy() ? `/Users/${uid()}/FavoriteItems/${itemId}?` : `/UserFavoriteItems/${itemId}?userId=${uid()}&`),
 		played: (itemId) => (legacy() ? `/Users/${uid()}/PlayedItems/${itemId}?` : `/UserPlayedItems/${itemId}?userId=${uid()}&`),
+		userData: (itemId) => (legacy() ? `/Users/${uid()}/Items/${itemId}/UserData?` : `/UserItems/${itemId}/UserData?userId=${uid()}&`),
 		views: () => (legacy() ? `/Users/${uid()}/Views?` : `/UserViews?userId=${uid()}&`),
 		configuration: () => (legacy() ? `/Users/${uid()}/Configuration?` : `/Users/Configuration?userId=${uid()}&`)
 	};

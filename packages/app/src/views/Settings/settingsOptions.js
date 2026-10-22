@@ -491,6 +491,22 @@ export const getMaxAudioChannelsOptions = () => [
 	{ value: 8, label: $L('7.1') }
 ];
 
+// Codec names stay as they are in every language.
+export const getTranscodeAudioCodecOptions = () => [
+	{ value: 'aac', label: 'AAC' },
+	{ value: 'ac3', label: 'AC3' },
+	{ value: 'eac3', label: 'EAC3' },
+	{ value: 'dts', label: 'DTS' },
+	{ value: 'truehd', label: 'TrueHD' },
+	{ value: 'flac', label: 'FLAC' },
+	{ value: 'alac', label: 'ALAC' },
+	{ value: 'mp3', label: 'MP3' },
+	{ value: 'mp2', label: 'MP2' },
+	{ value: 'opus', label: 'Opus' },
+	{ value: 'vorbis', label: 'Vorbis' },
+	{ value: 'pcm', label: 'PCM' }
+];
+
 export const getRatingSourceOptions = () => [
 	{ value: 'personal', label: $L('My Rating') },
 	{ value: 'stars', label: $L('Community Rating') },

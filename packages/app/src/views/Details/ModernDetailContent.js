@@ -465,14 +465,16 @@ const ModernDetailContent = (props) => {
 		if (tabBar && tabBar.contains(active)) {
 			if (ev.keyCode === KEYS.DOWN) {
 				// Down opens the focused tab (it may be collapsed) then drops into
-				// its content once it has rendered.
+				// its content once it has rendered. On an episode it lands on
+				// that episode's own row.
 				const id = active.closest('[data-id]')?.dataset.id;
 				if (id) {
 					ev.preventDefault();
 					ev.stopPropagation();
 					setActiveTab(id);
 					window.requestAnimationFrame(() => {
-						const first = tabContentRef.current?.querySelector('.spottable');
+						const opened = tabContentRef.current;
+						const first = opened?.querySelector(`.${css.currentEpisode}`) || opened?.querySelector('.spottable');
 						if (first) Spotlight.focus(first);
 					});
 				}
@@ -509,7 +511,7 @@ const ModernDetailContent = (props) => {
 				const epRuntime = ep.RunTimeTicks ? formatDuration(ep.RunTimeTicks) : '';
 				const progress = ep.UserData?.PlayedPercentage || 0;
 				return (
-					<SpottableDiv key={ep.Id} className={css.episodeRow} data-episode-id={ep.Id} onClick={handleEpisodeClick}>
+					<SpottableDiv key={ep.Id} className={`${css.episodeRow} ${isEpisode && ep.Id === item.Id ? css.currentEpisode : ''}`} data-episode-id={ep.Id} onClick={handleEpisodeClick}>
 						<div className={css.episodeThumb}>
 							{thumb ? <img src={thumb} alt="" /> : <div className={css.chapterThumbPlaceholder} />}
 							{ep.UserData?.Played && <div className={css.episodeWatched}><Icon path={DETAIL_ICON_PATHS.watched} /></div>}

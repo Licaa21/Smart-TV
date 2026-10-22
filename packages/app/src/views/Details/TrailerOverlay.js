@@ -9,7 +9,7 @@ import css from './Details.module.less';
 
 // Sits on document.body rather than inside the page, so the detail screen's own stacking
 // and scrolling can't end up on top of a playing trailer.
-const TrailerOverlay = ({videoId, streamUrl, videoRef, muted, onClose}) => {
+const TrailerOverlay = ({videoId, streamUrl, videoRef, onClose}) => {
 	const stopPropagation = useCallback((e) => e.stopPropagation(), []);
 
 	if (!videoId) return null;
@@ -32,7 +32,6 @@ const TrailerOverlay = ({videoId, streamUrl, videoRef, muted, onClose}) => {
 						controls
 						playsInline
 						disableRemotePlayback
-						muted={muted}
 					/>
 				) : (
 					<div className={css.trailerLoading}>

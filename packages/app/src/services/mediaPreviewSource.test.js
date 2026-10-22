@@ -5,14 +5,17 @@ jest.mock('./jellyfinApi', () => ({
 	getServerUrl: () => 'http://server',
 	getTokenParam: (type) => (type === 'emby' ? 'api_key' : 'ApiKey')
 }));
+jest.mock('../utils/perfTier', () => ({getPerfTier: jest.fn()}));
 
 import {createApiForServer} from './jellyfinApi';
+import {getPerfTier} from '../utils/perfTier';
 import {
 	buildMediaPreviewUrl,
 	mediaPreviewAllowedOnDevice,
 	newPlaySessionId,
 	pickPreviewAudioIndex,
 	previewApiFor,
+	previewDwellMs,
 	previewSegmentContainer,
 	previewServerOf,
 	previewStartSeconds,
@@ -291,4 +294,11 @@ describe('resolvePreviewTarget', () => {
 		expect(await resolvePreviewTarget(api, null)).toBeNull();
 		expect(api.getItemMediaInfo).not.toHaveBeenCalled();
 	});
+});
+
+test('a low tier set waits longer before a preview starts', () => {
+	getPerfTier.mockReturnValue('low');
+	expect(previewDwellMs()).toBe(2500);
+	getPerfTier.mockReturnValue('mid');
+	expect(previewDwellMs()).toBe(1200);
 });

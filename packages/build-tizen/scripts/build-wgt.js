@@ -25,6 +25,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const {LINT_DIRS, runLintGate} = require('../../../scripts/lint-gate');
+const {copyReaderAssets} = require('../../../scripts/reader-assets');
 
 const ROOT = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(ROOT, '..', '..');
@@ -452,6 +453,8 @@ async function main() {
 			warn(`${file} not found (ASS rendering may degrade)`);
 		}
 	}
+
+	copyReaderAssets(DIST, success);
 
 	// The renderer asks for this by name whenever a style names a font the file does not
 	// carry, and it throws the whole track away when it cant be fetched.

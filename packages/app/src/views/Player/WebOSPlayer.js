@@ -5,6 +5,7 @@ import $L from '@enact/i18n/$L';
 import Hls from 'hls.js';
 import * as playback from '../../services/playback';
 import {getImageUrl, getLogoUrl} from '../../utils/helpers';
+import {transcodesAudioCodec} from '../../utils/deviceProfileTuning';
 import {api as jellyfinApi, createApiForServer, getServerUrl} from '../../services/jellyfinApi';
 import {getApiForItem} from '../../services/connectionPool';
 import AudioMode from './audio/AudioMode';
@@ -967,11 +968,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				// whole file and switches locally. The index stays on the options so a
 				// later renegotiation keeps it.
 				let audioNegotiated = false;
+				// A track in a codec the user has the server convert can't be switched to
+				// locally either, and the server only reads the track along with its source.
 				if (initialAudioIndex == null && autoAudio && !isLiveTV
-					&& result.playMethod !== playback.PlayMethod.DirectPlay
+					&& (result.playMethod !== playback.PlayMethod.DirectPlay || transcodesAudioCodec(settings, autoAudio.codec))
 					&& autoAudio.index !== result.selectedAudioStreamIndex) {
 					try {
 						playbackInfoOptions.audioStreamIndex = autoAudio.index;
+						playbackInfoOptions.mediaSourceId = playbackInfoOptions.mediaSourceId || result.mediaSourceId;
 						result = await playback.getPlaybackInfo(item.Id, playbackInfoOptions);
 						audioNegotiated = true;
 					} catch (err) {
@@ -2619,7 +2623,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		transcodeRetryCountRef.current = 0;
 
 		try {
-			if (playMethod !== playback.PlayMethod.Transcode && videoRef.current?.audioTracks?.length > 1) {
+			const target = (audioStreams || []).find((s) => s.index === index);
+			if (playMethod !== playback.PlayMethod.Transcode && videoRef.current?.audioTracks?.length > 1
+				&& !transcodesAudioCodec(settings, target?.codec)) {
 				const audioTrackList = videoRef.current.audioTracks;
 				const matchIndex = matchAudioTrack(audioTrackList, audioStreams, index);
 
@@ -2667,7 +2673,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		} catch (err) {
 			console.error('[Player] Failed to change audio:', err);
 		}
-	}, [item, playMethod, closeModal, audioStreams]);
+	}, [item, playMethod, closeModal, audioStreams, settings]);
 
 	// Track selection - using data attributes to avoid arrow functions in JSX
 	const handleSelectAudio = useCallback((e) => {

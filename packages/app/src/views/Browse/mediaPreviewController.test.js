@@ -40,6 +40,7 @@ jest.mock('../../services/jellyfinApi', () => ({
 	getTokenParam: () => 'ApiKey'
 }));
 jest.mock('../../services/deviceProfile', () => ({getDeviceCapabilities: jest.fn()}));
+jest.mock('../../utils/perfTier', () => ({getPerfTier: () => 'high'}));
 // The platform module is reached through a dynamic import, so it's stood in for
 // with a real jsdom element and a cleanup the tests can watch.
 jest.mock('@moonfin/platform-webos/video', () => {

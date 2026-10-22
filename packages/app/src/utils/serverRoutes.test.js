@@ -16,6 +16,7 @@ describe('user scoped routes on Jellyfin', () => {
 		expect(r.resume()).toBe(`/UserItems/Resume?userId=${USER}&`);
 		expect(r.favorite('abc')).toBe(`/UserFavoriteItems/abc?userId=${USER}&`);
 		expect(r.played('abc')).toBe(`/UserPlayedItems/abc?userId=${USER}&`);
+		expect(r.userData('abc')).toBe(`/UserItems/abc/UserData?userId=${USER}&`);
 	});
 
 	test('extras hang off the item rather than the user', () => {
@@ -39,6 +40,7 @@ describe('user scoped routes on Emby', () => {
 		expect(r.resume()).toBe(`/Users/${USER}/Items/Resume?`);
 		expect(r.favorite('abc')).toBe(`/Users/${USER}/FavoriteItems/abc?`);
 		expect(r.played('abc')).toBe(`/Users/${USER}/PlayedItems/abc?`);
+		expect(r.userData('abc')).toBe(`/Users/${USER}/Items/abc/UserData?`);
 		expect(r.extras('abc', 'Intros')).toBe(`/Users/${USER}/Items/abc/Intros?`);
 		expect(r.views()).toBe(`/Users/${USER}/Views?`);
 		expect(r.configuration()).toBe(`/Users/${USER}/Configuration?`);

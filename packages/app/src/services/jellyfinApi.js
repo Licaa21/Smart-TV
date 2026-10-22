@@ -734,6 +734,11 @@ export const api = {
 		method: watched ? 'POST' : 'DELETE'
 	}).then(publishUserData(itemId, playedUserData(watched))),
 
+	setPlaybackPosition: (itemId, ticks) => request(userRoutes.userData(itemId), {
+		method: 'POST',
+		body: {PlaybackPositionTicks: ticks, LastPlayedDate: new Date().toISOString()}
+	}).then(publishUserData(itemId, {PlaybackPositionTicks: ticks})),
+
 	// A thumb rating goes through the dedicated endpoint, which stores the liked
 	// flag and a score of its own choosing.
 	setRating: (itemId, likes) => request(`/UserItems/${itemId}/Rating?Likes=${likes}`, {
@@ -1234,6 +1239,11 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		setWatched: (itemId, watched) => serverRequest(serverUserRoutes.played(itemId), {
 			method: watched ? 'POST' : 'DELETE'
 		}).then(publishUserData(itemId, playedUserData(watched))),
+
+		setPlaybackPosition: (itemId, ticks) => serverRequest(serverUserRoutes.userData(itemId), {
+			method: 'POST',
+			body: {PlaybackPositionTicks: ticks, LastPlayedDate: new Date().toISOString()}
+		}).then(publishUserData(itemId, {PlaybackPositionTicks: ticks})),
 
 		setRating: (itemId, likes) => serverRequest(`/UserItems/${itemId}/Rating?Likes=${likes}`, {
 			method: 'POST'

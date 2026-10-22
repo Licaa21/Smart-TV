@@ -49,6 +49,7 @@ const MakdBanner = memo(({
 		isVisible: isVisible && browseVisible,
 		enabled: settingsLoaded && settings.featuredTrailerPreview,
 		preferMuted: settings.featuredTrailerMuted,
+		volume: settings.trailerVolume,
 		showCaptions: settings.mediaBarTrailerCaptions,
 		captionLanguage: settings.uiLanguage,
 		api,

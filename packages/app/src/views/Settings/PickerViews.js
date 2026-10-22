@@ -106,19 +106,17 @@ export const BlockedRatingsView = ({ratings, blocked, loading, loadFailed, onTog
 	);
 };
 
-// The languages a subtitle download searches, with the ticked ones listed
-// first. Once the cap is reached the unticked rows dim.
-export const SubtitleDownloadLanguagesView = ({options, picked, max, onToggleLanguage}) => {
+// A list of ticks with the ticked ones first. With a cap, the unticked rows dim once
+// it is reached.
+export const CheckListView = ({spotlightId, rowIdPrefix, title, lead, options, picked, max = Infinity, onToggle}) => {
 	// Ordered once on open, so a press never moves the row under focus
 	const [ordered] = useState(() => [
 		...options.filter(({value}) => picked.includes(value)),
 		...options.filter(({value}) => !picked.includes(value))
 	]);
 	return (
-		<SettingsView spotlightId='subtitle-download-languages-view' title={$L('Subtitle Download Languages')} clean>
-			<div className={css.editorLead}>
-				{$L('Languages to search when downloading subtitles, up to {max}. With none ticked, one language is picked from the video.').replace('{max}', max)}
-			</div>
+		<SettingsView spotlightId={spotlightId} title={title} clean>
+			<div className={css.editorLead}>{lead}</div>
 			{ordered.map(({value, label}) => {
 				const ticked = picked.includes(value);
 				const locked = !ticked && picked.length >= max;
@@ -127,8 +125,8 @@ export const SubtitleDownloadLanguagesView = ({options, picked, max, onToggleLan
 						key={value}
 						className={css.listItem}
 						style={locked ? {opacity: 0.4} : undefined}
-						onClick={() => onToggleLanguage(value)}
-						spotlightId={`subtitle-download-language-${value}`}
+						onClick={() => onToggle(value)}
+						spotlightId={`${rowIdPrefix}-${value}`}
 					>
 						{renderSettingsIcon(ticked ? 'check_box' : 'check_box_outline_blank', false, true)}
 						<div className={css.listItemBody}>

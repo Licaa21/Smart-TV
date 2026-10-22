@@ -58,9 +58,10 @@ export default function useMediaPreview({api, settings, isVisible, browseMode, o
 		controller.setEnabled(enabled);
 	}, [controller, enabled]);
 
+	// The controller reads the volume from settings, so a new volume re-applies the audio too.
 	useEffect(() => {
 		controller.setAudioEnabled(settings.previewAudioEnabled !== false);
-	}, [controller, settings.previewAudioEnabled]);
+	}, [controller, settings.previewAudioEnabled, settings.previewVolume]);
 
 	// Older sets only fire the prefixed event, so both are watched.
 	useEffect(() => {

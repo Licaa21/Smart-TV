@@ -17,7 +17,9 @@
 	// Worker file name to the files that worker reads by relative URL.
 	const WORKERS = {
 		'libpgs.worker.js': [],
-		'subtitles-octopus-worker.js': ['subtitles-octopus-worker.wasm', 'ass-fallback-font.ttf']
+		'subtitles-octopus-worker.js': ['subtitles-octopus-worker.wasm', 'ass-fallback-font.ttf'],
+		'libarchive-worker.js': ['libarchive.wasm'],
+		'pdf.worker.min.js': []
 	};
 
 	const loaded = {};

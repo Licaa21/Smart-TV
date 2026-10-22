@@ -64,12 +64,13 @@ const MinimalistEpisodes = ({
 			title={episode.Name}
 			number={episode.IndexNumber}
 			watched={episode.UserData?.Played}
+			current={item.Type === 'Episode' && episode.Id === item.Id}
 			width={CARD_WIDTH}
 			imageHeight={CARD_IMAGE_HEIGHT}
 			selectKey={episode.Id}
 			onSelect={handleSelect}
 		/>
-	), [serverUrl, settings, handleSelect]);
+	), [serverUrl, settings, handleSelect, item.Type, item.Id]);
 
 	if (!seasonEpisodes.length) return null;
 

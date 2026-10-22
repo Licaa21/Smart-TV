@@ -13,6 +13,32 @@ const H = 135;
 const LINES = {right: [0, 0, W, 0], bottom: [0, 0, 0, H], top: [0, H, 0, 0]};
 const cache = new Map();
 
+// The first canvas a session makes costs most of a second on Tizen, and Details bakes its scrim as it
+// draws, so each baked scrim is kept between launches. The number in the key changes if painting does.
+const STORE_PREFIX = 'moonfin_scrim1_';
+
+const hashOf = (text) => {
+	let hash = 5381;
+	for (let i = 0; i < text.length; i++) hash = ((hash * 33) ^ text.charCodeAt(i)) >>> 0;
+	return hash.toString(36);
+};
+
+const readStored = (key) => {
+	try {
+		return localStorage.getItem(key);
+	} catch {
+		return null;
+	}
+};
+
+const keep = (key, url) => {
+	try {
+		localStorage.setItem(key, url);
+	} catch {
+		// A full or blocked store only means the next launch bakes it again.
+	}
+};
+
 // Engines without custom properties paint the unscaled pass in the stylesheets, so they get the
 // unscaled image to match.
 const scaleApplies = () => Boolean(window.CSS && window.CSS.supports && window.CSS.supports('--a', '0'));
@@ -52,7 +78,7 @@ const bake = (layers, scale) => {
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return null;
 		for (let i = layers.length - 1; i >= 0; i--) paint(ctx, layers[i], scale);
-		return {backgroundImage: `url(${canvas.toDataURL('image/png')})`, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat'};
+		return canvas.toDataURL('image/png');
 	} catch {
 		return null;
 	}
@@ -66,6 +92,14 @@ export const scrimStyle = (layers, scale = 1) => {
 		byScale = {};
 		cache.set(layers, byScale);
 	}
-	if (!(s in byScale)) byScale[s] = bake(layers, s);
+	if (!(s in byScale)) {
+		const key = `${STORE_PREFIX}${hashOf(JSON.stringify(layers))}_${s}`;
+		let url = readStored(key);
+		if (!url) {
+			url = bake(layers, s);
+			if (url) keep(key, url);
+		}
+		byScale[s] = url ? {backgroundImage: `url(${url})`, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat'} : null;
+	}
 	return byScale[s];
 };

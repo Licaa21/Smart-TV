@@ -21,7 +21,8 @@
 
 // The border is painted over the artwork rather than around it. Drawn around, it would make the
 // focused card wider than its neighbours and knock the rail's scrolling out of step.
-.card:focus .artwork:after {
+.card:focus .artwork:after,
+.current .artwork:after {
 	border: 3px solid #fff;
 	border-radius: 14px;
 	bottom: 0;
@@ -30,6 +31,10 @@
 	position: absolute;
 	right: 0;
 	top: 0;
+}
+
+.current .artwork:after {
+	border-color: rgba(var(--theme-accent-rgb, 0, 164, 220), 0.7);
 }
 
 // Something to count along by for anyone who cannot read the title yet, which is why it sits on the

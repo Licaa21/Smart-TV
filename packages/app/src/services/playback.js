@@ -5,7 +5,7 @@ import {getFromStorage} from './storage';
 import {selectCompatibleAlternateAudio} from '../utils/alternateAudio';
 import {serverLogger} from './serverLogger';
 import {TEXT_SUBTITLE_CODECS, isAssSubtitleCodec, isPgsSubtitleCodec, isBurnInSubtitleCodec, isInBandSubtitleTrack} from '../utils/subtitleCodecs';
-import {applyProfileTuning} from '../utils/deviceProfileTuning';
+import {applyProfileTuning, transcodesAudioCodec} from '../utils/deviceProfileTuning';
 import {findNextInSeason, findNextSeason, firstPlayableEpisode} from '../utils/nextEpisode';
 import {videoRangeTypeOf} from '../utils/videoRange';
 import {getVolumeState, lastVolumeState} from './systemVolume';
@@ -466,13 +466,14 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	const api = options.item ? getApiForItem(options.item) : jellyfinApi.api;
 	const creds = options.item ? getServerCredentials(options.item) : null;
 
+	const isLiveTV = options.isLiveTV || options.item?.Type === 'TvChannel';
+
 	let deviceProfile = applyProfileTuning(
 		options.deviceProfile || await getDeviceProfile(serverType, profileOptions, api),
 		storedSettings,
-		capabilities
+		capabilities,
+		{isLiveTV}
 	);
-
-	const isLiveTV = options.isLiveTV || options.item?.Type === 'TvChannel';
 
 	// What the first request for an item allowed holds for every later one while
 	// it plays, so a track switch, a reopen or a fallback never brings back what
@@ -628,14 +629,18 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 
 	let mediaSource = selectMediaSource(playbackInfo.MediaSources, capabilities, options, passthroughSettings);
 
-	// Auto-select a compatible audio stream to avoid unnecessary transcoding
+	// Auto-select a compatible audio stream to avoid unnecessary transcoding. A codec the user
+	// sends to the server for conversion counts as unplayable, since with no track named the
+	// server can direct play it without ever checking the audio.
 	let audioStreamIndex = options.audioStreamIndex;
+	const playableAudio = (s) => isAudioStreamPlayable(s, capabilities, passthroughSettings)
+		&& !transcodesAudioCodec(storedSettings, s?.Codec);
 	if (audioStreamIndex == null && mediaSource.DefaultAudioStreamIndex != null) {
 		const defaultAudioStream = mediaSource.MediaStreams?.find(
 			s => s.Type === 'Audio' && s.Index === mediaSource.DefaultAudioStreamIndex
 		);
 		const defaultCodec = (defaultAudioStream?.Codec || '').toLowerCase();
-		const defaultPlayable = isAudioStreamPlayable(defaultAudioStream, capabilities, passthroughSettings);
+		const defaultPlayable = playableAudio(defaultAudioStream);
 
 		if (defaultAudioStream && !defaultPlayable) {
 			// The default audio cant be played, but the file may carry a compatible
@@ -643,8 +648,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 			// Prefer that so the server keeps direct-playing the video instead of
 			// transcoding, which just hangs on Dolby Vision files on webOS.
 			const altStream = selectCompatibleAlternateAudio(
-				mediaSource.MediaStreams, defaultAudioStream,
-				(s) => isAudioStreamPlayable(s, capabilities, passthroughSettings));
+				mediaSource.MediaStreams, defaultAudioStream, playableAudio);
 
 			if (altStream) {
 				console.log(`[playback] Default audio (${defaultCodec}) unplayable \u2014 selecting compatible track ${altStream.Index} (${altStream.Codec}) to keep direct play`);

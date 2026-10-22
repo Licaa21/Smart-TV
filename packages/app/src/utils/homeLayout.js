@@ -15,6 +15,8 @@
  * one, taking every other client's disabled rows and plugin rows with it.
  */
 
+import {PICK_SOURCES, isPickedRow, makePickedRow} from './pickedRows';
+
 export const DEFAULT_HOME_ROWS = [
 	{id: 'resume', name: 'Continue Watching', enabled: true, order: 0},
 	{id: 'nextup', name: 'Next Up', enabled: true, order: 1},
@@ -211,11 +213,24 @@ const ROW_BY_ID = new Map(DEFAULT_HOME_ROWS.map((row) => [row.id, row]));
 // A server type we don't have a row for is left out rather than invented.
 const rowForServerType = (type) => ROW_BY_ID.get(SERVER_TO_TV_ROW[type] || type);
 
+// A collection, genre or playlist picked on any client, as the row this client keeps for it
+const pickedRowFromSection = (section) => {
+	const source = String(section.pluginSource || '').toLowerCase();
+	if (!PICK_SOURCES[source] || !section.pluginAdditionalData || !section.serverId) return undefined;
+	return makePickedRow({
+		source,
+		serverUrl: section.serverId,
+		itemId: String(section.pluginAdditionalData),
+		name: section.pluginDisplayText || ''
+	});
+};
+
 // The row that writes a section back, if this client has one. A section with none has
 // to be carried through untouched instead, so the type is what decides it rather than
 // the kind, which the server often leaves off entirely.
 const modelledRow = (section) => {
-	if (!section || section.kind === 'pluginDynamic') return undefined;
+	if (!section) return undefined;
+	if (section.kind === 'pluginDynamic') return pickedRowFromSection(section);
 	return rowForServerType(section.type);
 };
 
@@ -259,24 +274,30 @@ export const homeRowsFromProfile = (serverProfile, enabledById) => {
 	return undefined;
 };
 
-// The plugin rows of the layout that was read. They ride the passthrough so a save
-// hands them back, and the home screen draws them from here.
-export const serverPluginSections = () =>
-	(homeSectionsPassthrough || []).filter((section) => section && section.kind === 'pluginDynamic');
+// A picked row goes over the way the other clients write it, typed none, since its id alone
+// can't say which item it stands for
+const rowToSection = (row, order) => (isPickedRow(row)
+	? {
+		kind: 'pluginDynamic',
+		type: 'none',
+		enabled: !!row.enabled,
+		order,
+		serverId: row.serverUrl,
+		pluginSource: row.source,
+		pluginSection: PICK_SOURCES[row.source].section,
+		pluginAdditionalData: row.itemId,
+		pluginDisplayText: row.name
+	}
+	: {kind: 'builtin', type: TV_TO_SERVER_ROW[row.id] || row.id, enabled: !!row.enabled, order});
 
 export const homeRowsToSections = (rows) => [
 	...[...rows]
 		.sort((left, right) => left.order - right.order)
-		.map((row, index) => ({
-			kind: 'builtin',
-			type: TV_TO_SERVER_ROW[row.id] || row.id,
-			enabled: !!row.enabled,
-			order: index
-		})),
+		.map(rowToSection),
 	...(homeSectionsPassthrough || [])
 ];
 
 export const homeRowsToRowOrder = (rows) => [...rows]
 	.sort((left, right) => left.order - right.order)
-	.filter((row) => row.enabled)
+	.filter((row) => row.enabled && !isPickedRow(row))
 	.map((row) => TV_TO_SERVER_ROW[row.id] || row.id);

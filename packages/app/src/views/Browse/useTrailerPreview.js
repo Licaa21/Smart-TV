@@ -3,6 +3,7 @@ import {buildQueryString} from '../../utils/urlCompat';
 import {stopPlaybackForTrailer} from '../../utils/trailerPlayback';
 import {claimSharedVideo, isMusicPlaying, ownsSharedVideo, releaseSharedVideo} from '../../utils/sharedVideoOwner';
 import {coverVideoInBox} from '../../utils/videoCover';
+import {volumeLevel} from '../../utils/volumeLevel';
 import {createApiForServer, getApiKey, getServerUrl as getDefaultServerUrl} from '../../services/jellyfinApi';
 import serverLogger from '../../services/serverLogger';
 import {afterHomeReady} from '../../utils/homeReady';
@@ -21,7 +22,7 @@ const LOCAL_TRAILER_STREAM_PARAMS = {
 // Shared trailer preview engine for the home banners. Resolves a local or
 // youtube trailer for the current item, plays a muted preview into a container
 // the caller renders, and reveals it after a short delay.
-export default function useTrailerPreview({currentItem, isVisible, enabled, preferMuted, showCaptions = false, captionLanguage = '', api, getItemServerUrl, onEnded}) {
+export default function useTrailerPreview({currentItem, isVisible, enabled, preferMuted, volume, showCaptions = false, captionLanguage = '', api, getItemServerUrl, onEnded}) {
 	const [trailerActive, setTrailerActive] = useState(false);
 	// Set from the playing event, a few seconds before trailerActive reveals the video, so the
 	// banners can hold their carousel while the trailer is already audible.
@@ -193,7 +194,7 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 		video.controls = false;
 
 		video.muted = preferMuted;
-		video.volume = preferMuted ? 0 : 1;
+		video.volume = preferMuted ? 0 : volumeLevel(volume);
 		video.autoplay = true;
 		video.classList.remove(css.trailerVisible);
 
@@ -403,7 +404,7 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 		};
 
 		tryAttempt(0);
-	}, [stopTrailer, stopWatch, preferMuted, showCaptions, captionLanguage, removeCaptionTrack, releaseStream]);
+	}, [stopTrailer, stopWatch, preferMuted, volume, showCaptions, captionLanguage, removeCaptionTrack, releaseStream]);
 
 	useEffect(() => {
 		let live = true;

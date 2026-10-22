@@ -64,6 +64,17 @@ describe('row selection', () => {
 		expect(rows.map((r) => r.id)).toEqual(['plugin:a']);
 	});
 
+	test('a picked row sits where the layout puts it', () => {
+		const picked = {id: 'pluginDynamic:collections:http://server:collection:c1', name: 'Alien', enabled: true, order: 0, source: 'collections', itemId: 'c1', serverUrl: 'http://server'};
+		const rows = build({
+			allRowData: [row('collections'), row(picked.id, undefined, {isPluginRow: true})],
+			homeRowsConfig: [picked, {id: 'collections', enabled: true, order: 1}],
+			pluginSectionsConfig: [picked]
+		});
+
+		expect(rows.map((r) => r.id)).toEqual([picked.id, 'collections']);
+	});
+
 	test('an empty resume row is dropped rather than shown empty', () => {
 		const rows = build({
 			allRowData: [row('resume', [])],

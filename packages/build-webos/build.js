@@ -3,6 +3,7 @@ const {execSync, spawnSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const {LINT_DIRS, runLintGate} = require('../../scripts/lint-gate');
+const {copyReaderAssets} = require('../../scripts/reader-assets');
 
 const APP_DIR = path.resolve(__dirname, '..', 'app');
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
@@ -173,6 +174,9 @@ try {
 			console.warn(`  ${file} not found (ASS rendering may degrade)`);
 		}
 	}
+
+	console.log('\n Copying book reader assets...');
+	copyReaderAssets(DIST_DIR, (msg) => console.log(`  ${msg}`));
 
 	// Copy fallback font for SubtitlesOctopus when ASS style fonts are unavailable.
 	const fallbackFontSrc = path.join(ROOT_DIR, 'node_modules', '@enact', 'sandstone', 'fonts', 'MuseoSans', 'MuseoSans-Light.ttf');

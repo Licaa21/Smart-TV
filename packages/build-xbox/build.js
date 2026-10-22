@@ -47,6 +47,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const {LINT_DIRS, runLintGate} = require('../../scripts/lint-gate');
+const {copyReaderAssets} = require('../../scripts/reader-assets');
 
 const APP_DIR = path.resolve(__dirname, '..', 'app');
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
@@ -118,10 +119,11 @@ const SANDSTONE_FONTS = path.join('node_modules', '@enact', 'sandstone', 'fonts'
 // which is how markup out of a server or a subtitle would run one, along with frames
 // and plugins. Scripts may still be evaluated and come from anywhere, since the
 // emulator builds its workers that way and fetches its cores from the server.
+// Stylesheets may come from blob: too, where the book reader unpacks an EPUB's own.
 const CONTENT_SECURITY_POLICY = [
 	"default-src 'self'",
 	"script-src 'self' 'unsafe-eval' blob: http: https:",
-	"style-src 'self' 'unsafe-inline' http: https:",
+	"style-src 'self' 'unsafe-inline' blob: http: https:",
 	'img-src * data: blob:',
 	'media-src * data: blob:',
 	'connect-src * ws: wss: data: blob:',
@@ -189,6 +191,7 @@ const buildApp = (appPkg) => {
 
 	console.log('\n Copying the subtitle workers and banner...');
 	copyPageAssets(WWW_DIR);
+	copyReaderAssets(WWW_DIR, (msg) => console.log(`  ${msg}`));
 
 	console.log('\n Copying Sandstone fonts...');
 	copyDirRecursive(path.join(ROOT_DIR, SANDSTONE_FONTS), path.join(WWW_DIR, SANDSTONE_FONTS));

@@ -1,4 +1,4 @@
-import {applyProfileTuning} from './deviceProfileTuning';
+import {applyProfileTuning, canTranscodeAudioCodecAway, transcodesAudioCodec} from './deviceProfileTuning';
 
 const profile = () => ({
 	SubtitleProfiles: [
@@ -108,5 +108,75 @@ describe('applyProfileTuning', () => {
 		const tuned = applyProfileTuning(profile(), {downmixToStereo: true}, fhdPanel);
 		expect(tuned.TranscodingProfiles[0].Conditions).toEqual(capped(1920, 1080));
 		expect(tuned.TranscodingProfiles[0].MaxAudioChannels).toBe('2');
+	});
+});
+
+describe('transcode audio codecs', () => {
+	const audioProfile = () => ({
+		DirectPlayProfiles: [
+			{Container: 'mp4,m4v', Type: 'Video', VideoCodec: 'h264,hevc', AudioCodec: 'aac,ac3,eac3'},
+			{Container: 'mkv', Type: 'Video', VideoCodec: 'h264,hevc', AudioCodec: 'aac,dca,dts,dts-hd,dtshd,eac3,pcm_s16le,pcm_s24le'},
+			{Container: 'm4a', Type: 'Audio', AudioCodec: 'aac'}
+		],
+		TranscodingProfiles: [
+			{Container: 'ts', Type: 'Video', AudioCodec: 'aac,ac3,eac3', VideoCodec: 'h264', Protocol: 'hls'},
+			{Container: 'mp4', Type: 'Video', AudioCodec: 'aac', VideoCodec: 'h264', Context: 'Static'},
+			{Container: 'aac', Type: 'Audio', AudioCodec: 'aac'}
+		]
+	});
+
+	it('takes a picked codec out of video direct play under every name', () => {
+		const tuned = applyProfileTuning(audioProfile(), {transcodeAudioCodecs: ['aac', 'dts', 'pcm']});
+		expect(tuned.DirectPlayProfiles.map((p) => p.AudioCodec)).toEqual(['ac3,eac3', 'eac3', 'aac']);
+	});
+
+	it('takes it out of the transcode so the server converts it rather than copying it', () => {
+		const tuned = applyProfileTuning(audioProfile(), {transcodeAudioCodecs: ['aac']});
+		expect(tuned.TranscodingProfiles[0].AudioCodec).toBe('ac3,eac3');
+	});
+
+	it('never leaves a list empty, since an empty one means any codec', () => {
+		const tuned = applyProfileTuning(audioProfile(), {transcodeAudioCodecs: ['aac', 'ac3', 'eac3']});
+		expect(tuned.DirectPlayProfiles.map((p) => p.Container)).toEqual(['mkv', 'm4a']);
+		expect(tuned.TranscodingProfiles.map((p) => p.AudioCodec)).toEqual(['aac,ac3,eac3', 'aac', 'aac']);
+	});
+
+	// The Vega shape: fMP4 converts, and the live TS profile can only carry AAC.
+	const vegaProfile = () => ({
+		DirectPlayProfiles: [{Container: 'mp4', Type: 'Video', VideoCodec: 'h264', AudioCodec: 'aac,ac3'}],
+		TranscodingProfiles: [
+			{Container: 'mp4', Type: 'Video', AudioCodec: 'aac,mp2,ac3,eac3', Context: 'Streaming', Protocol: 'hls'},
+			{Container: 'ts', Type: 'Video', AudioCodec: 'aac', Context: 'Streaming', Protocol: 'hls'},
+			{Container: 'mp4', Type: 'Video', AudioCodec: 'aac', Context: 'Static'}
+		]
+	});
+
+	it('drops a streamed transcode that could only copy the pick when another converts it', () => {
+		const tuned = applyProfileTuning(vegaProfile(), {transcodeAudioCodecs: ['aac']});
+		expect(tuned.TranscodingProfiles.map((p) => `${p.Container}:${p.Context}:${p.AudioCodec}`))
+			.toEqual(['mp4:Streaming:mp2,ac3,eac3', 'mp4:Static:aac']);
+	});
+
+	it('keeps it for a live channel, which only ever takes the TS profile', () => {
+		const tuned = applyProfileTuning(vegaProfile(), {transcodeAudioCodecs: ['aac']}, undefined, {isLiveTV: true});
+		expect(tuned.TranscodingProfiles.map((p) => p.Container)).toEqual(['mp4', 'ts', 'mp4']);
+	});
+
+	it('matches a stream codec against the picks', () => {
+		const settings = {transcodeAudioCodecs: ['dts', 'pcm']};
+		expect(transcodesAudioCodec(settings, 'DCA')).toBe(true);
+		expect(transcodesAudioCodec(settings, 'pcm_s24le')).toBe(true);
+		expect(transcodesAudioCodec(settings, 'eac3')).toBe(false);
+		expect(transcodesAudioCodec({}, 'aac')).toBe(false);
+	});
+
+	// An Xbox only streams AAC out of a transcode, so an AAC pick would just be copied back.
+	it('offers a codec only where a streamed transcode can turn it into another', () => {
+		const xbox = {TranscodingProfiles: [
+			{Container: 'ts', Type: 'Video', AudioCodec: 'aac', Context: 'Streaming', Protocol: 'hls'},
+			{Container: 'mp4', Type: 'Video', AudioCodec: 'aac,ac3', Context: 'Static'}
+		]};
+		expect(canTranscodeAudioCodecAway(xbox, 'aac')).toBe(false);
+		expect(canTranscodeAudioCodecAway(xbox, 'opus')).toBe(true);
 	});
 });

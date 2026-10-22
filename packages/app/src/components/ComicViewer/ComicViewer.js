@@ -1,94 +1,87 @@
 import {useState, useEffect, useCallback, useRef} from 'react';
-import JSZip from 'jszip';
 import $L from '@enact/i18n/$L';
 import {KEYS} from '../../utils/keys';
-import {getTokenParam} from '../../services/jellyfinApi';
+import {fetchBook, startPage} from '../../utils/books';
+import {openComicPages} from '../../utils/comicPages';
+import useBookProgress from '../../hooks/useBookProgress';
 import css from './ComicViewer.module.less';
 
-const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'jpe', 'jif', 'jfif', 'png', 'avif', 'gif', 'bmp', 'tiff', 'tif', 'webp'];
+// Pages this far from the current one stay ready, the rest are let go.
+const KEEP_AROUND = 2;
 
-const ComicViewer = ({item, serverUrl, accessToken, onClose}) => {
-	const [pages, setPages] = useState([]);
+const ComicViewer = ({item, archive, serverUrl, accessToken, onClose}) => {
+	const [count, setCount] = useState(0);
 	const [currentPage, setCurrentPage] = useState(0);
+	const [urls, setUrls] = useState({});
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
 	const [imageLoaded, setImageLoaded] = useState(false);
 	const [showInfo, setShowInfo] = useState(true);
 	const infoTimerRef = useRef(null);
-	const blobUrlsRef = useRef([]);
+	const sourceRef = useRef(null);
+	const urlsRef = useRef({});
+
+	useBookProgress(item, currentPage, count);
 
 	useEffect(() => {
 		if (!item) return;
 
 		let cancelled = false;
-		const extract = async () => {
+		const open = async () => {
 			try {
-				setLoading(true);
-				setError(null);
-
-				const baseUrl = item._serverUrl || serverUrl;
-				const token = item._serverAccessToken || accessToken;
-				const downloadUrl = `${baseUrl}/Items/${item.Id}/Download?${getTokenParam(item._serverType)}=${encodeURIComponent(token)}`;
-
-				const response = await fetch(downloadUrl);
-				if (!response.ok) throw new Error($L('Download failed'));
-
-				const arrayBuffer = await response.arrayBuffer();
-				const zip = await JSZip.loadAsync(arrayBuffer);
-
-				const imageFiles = [];
-				zip.forEach((path, entry) => {
-					if (entry.dir) return;
-					const ext = path.split('.').pop().toLowerCase();
-					if (IMAGE_EXTENSIONS.includes(ext)) {
-						imageFiles.push({path, entry});
-					}
-				});
-
-				imageFiles.sort((a, b) => a.path.localeCompare(b.path, undefined, {numeric: true}));
-
-				const urls = [];
-				for (const file of imageFiles) {
-					if (cancelled) return;
-					const blob = await file.entry.async('blob');
-					urls.push(URL.createObjectURL(blob));
-				}
-
+				const buffer = await fetchBook(item, serverUrl, accessToken);
+				const source = await openComicPages(buffer, archive);
 				if (cancelled) {
-					urls.forEach(u => URL.revokeObjectURL(u));
+					source.close();
 					return;
 				}
-
-				blobUrlsRef.current = urls;
-				setPages(urls);
+				sourceRef.current = source;
+				setCount(source.names.length);
+				setCurrentPage(startPage(item, source.names.length));
 				setLoading(false);
-
-				const startPage = item.UserData?.PlaybackPositionTicks
-					? Math.floor(item.UserData.PlaybackPositionTicks / 10000)
-					: 0;
-				if (startPage > 0 && startPage < urls.length) {
-					setCurrentPage(startPage);
-				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(err.message || $L('Failed to open comic'));
+					setError($L('Failed to open comic'));
 					setLoading(false);
 				}
 			}
 		};
 
-		extract();
+		open();
 		return () => {
 			cancelled = true;
+			if (sourceRef.current) sourceRef.current.close();
+			sourceRef.current = null;
+			Object.keys(urlsRef.current).forEach((key) => {
+				if (urlsRef.current[key]) URL.revokeObjectURL(urlsRef.current[key]);
+			});
+			urlsRef.current = {};
 		};
-	}, [item, serverUrl, accessToken]);
+	}, [item, archive, serverUrl, accessToken]);
 
 	useEffect(() => {
-		return () => {
-			blobUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
-			blobUrlsRef.current = [];
-		};
-	}, []);
+		const source = sourceRef.current;
+		if (!source || count <= 0) return;
+
+		Object.keys(urlsRef.current).forEach((key) => {
+			if (Math.abs(Number(key) - currentPage) <= KEEP_AROUND) return;
+			if (urlsRef.current[key]) URL.revokeObjectURL(urlsRef.current[key]);
+			delete urlsRef.current[key];
+		});
+
+		for (let page = currentPage - 1; page <= currentPage + KEEP_AROUND; page++) {
+			if (page < 0 || page >= count || page in urlsRef.current) continue;
+			urlsRef.current[page] = null;
+			source.load(page).then((blob) => {
+				if (sourceRef.current !== source || urlsRef.current[page] !== null) return;
+				urlsRef.current[page] = URL.createObjectURL(blob);
+				setUrls({...urlsRef.current});
+			}, () => {
+				if (sourceRef.current === source) setError($L('Failed to open comic'));
+			});
+		}
+		setUrls({...urlsRef.current});
+	}, [currentPage, count]);
 
 	const resetInfoTimer = useCallback(() => {
 		setShowInfo(true);
@@ -104,18 +97,18 @@ const ComicViewer = ({item, serverUrl, accessToken, onClose}) => {
 	}, [currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const goNext = useCallback(() => {
-		if (pages.length <= 1) return;
+		if (count <= 1) return;
 		setImageLoaded(false);
-		setCurrentPage(prev => Math.min(prev + 1, pages.length - 1));
+		setCurrentPage(prev => Math.min(prev + 1, count - 1));
 		resetInfoTimer();
-	}, [pages.length, resetInfoTimer]);
+	}, [count, resetInfoTimer]);
 
 	const goPrev = useCallback(() => {
-		if (pages.length <= 1) return;
+		if (count <= 1) return;
 		setImageLoaded(false);
 		setCurrentPage(prev => Math.max(prev - 1, 0));
 		resetInfoTimer();
-	}, [pages.length, resetInfoTimer]);
+	}, [count, resetInfoTimer]);
 
 	useEffect(() => {
 		const handleKeyDown = (e) => {
@@ -168,7 +161,7 @@ const ComicViewer = ({item, serverUrl, accessToken, onClose}) => {
 		);
 	}
 
-	if (pages.length === 0) {
+	if (count === 0) {
 		return (
 			<div className={css.viewer}>
 				<div className={css.loadingContainer}>
@@ -179,17 +172,20 @@ const ComicViewer = ({item, serverUrl, accessToken, onClose}) => {
 		);
 	}
 
+	const url = urls[currentPage];
 	return (
 		<div className={css.viewer}>
 			<div className={css.imageContainer}>
-				<img
-					key={currentPage}
-					src={pages[currentPage]}
-					alt={$L('Page') + ' ' + (currentPage + 1)}
-					className={css.page + (imageLoaded ? ' ' + css.pageLoaded : '')}
-					onLoad={handleImageLoad}
-				/>
-				{!imageLoaded && (
+				{url && (
+					<img
+						key={currentPage}
+						src={url}
+						alt={$L('Page') + ' ' + (currentPage + 1)}
+						className={css.page + (imageLoaded ? ' ' + css.pageLoaded : '')}
+						onLoad={handleImageLoad}
+					/>
+				)}
+				{(!url || !imageLoaded) && (
 					<div className={css.loading}>
 						<div className={css.spinner} />
 					</div>
@@ -202,7 +198,7 @@ const ComicViewer = ({item, serverUrl, accessToken, onClose}) => {
 				</div>
 				<div className={css.bottomBar}>
 					<div className={css.pageCounter}>
-						{currentPage + 1} / {pages.length}
+						{currentPage + 1} / {count}
 					</div>
 					<div className={css.navHint}>{'◀ ▶ ' + $L('Navigate')} &nbsp; {'OK ' + $L('Toggle info')} &nbsp; {$L('Back') + ' ' + $L('Close')}</div>
 				</div>

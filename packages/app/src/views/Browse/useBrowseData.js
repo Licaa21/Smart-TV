@@ -263,8 +263,7 @@ const useBrowseData = ({
 				settings.displayGenresRows ||
 				settings.displayPlaylistsRows ||
 				hasEnabledRecommendationRow ||
-				hasEnabledMediaSectionRow ||
-				(settings.pluginSections || []).some((section) => section?.enabled);
+				hasEnabledMediaSectionRow;
 
 			// The recent rows come out per library or merged by type, and a cache of
 			// one shape must not answer for the other.
@@ -515,6 +514,7 @@ const useBrowseData = ({
 
 				const loaderContext = buildLoaderContext({
 					api,
+					serverUrl,
 					settings,
 					homeRowsConfig,
 					eligibleLibraries,
@@ -574,8 +574,8 @@ const useBrowseData = ({
 		settings.playlistsRowSortOrder,
 		settings.audioRowsSortOrder,
 		settings.collectionsRowShowEpisodes,
+		settings.playlistsRowShowEpisodes,
 		settings.uiLanguage,
-		settings.pluginSections,
 		settings.mergeRecentRowsByType,
 		settings.mergeContinueWatchingNextUp,
 		settings.kidsModeEnabled,

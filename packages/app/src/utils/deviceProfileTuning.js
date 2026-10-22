@@ -37,12 +37,33 @@ const narrower = (left, right) => {
 const ASS_FORMATS = ['ass', 'ssa'];
 const PGS_FORMATS = ['pgs', 'pgssub'];
 
+// The name a picked codec is stored under, for every label a profile or a stream gives it.
+const transcodableAudioCodecOf = (codec) => {
+	const name = String(codec || '').trim().toLowerCase();
+	if (name === 'aac_latm') return 'aac';
+	if (name === 'dca' || name === 'dtshd' || name === 'dts-hd') return 'dts';
+	if (name === 'mlp') return 'truehd';
+	if (name === 'wav' || name.startsWith('pcm')) return 'pcm';
+	return name;
+};
+
+// Whether the user has the server convert this audio codec instead of the TV playing it.
+export const transcodesAudioCodec = (settings, codec) =>
+	(settings?.transcodeAudioCodecs || []).includes(transcodableAudioCodecOf(codec));
+
+// Whether a streamed transcode has another format to convert this one into. One with nowhere
+// else to go is copied, so picking it would only cost a remux.
+export const canTranscodeAudioCodecAway = (profile, codec) =>
+	(profile?.TranscodingProfiles || []).some((transcodingProfile) =>
+		transcodingProfile.Type === 'Video' && transcodingProfile.Context === 'Streaming' &&
+		String(transcodingProfile.AudioCodec || '').split(',').some((name) => transcodableAudioCodecOf(name) !== codec));
+
 const resolutionConditions = ({width, height}) => ([
 	{Condition: 'LessThanEqual', Property: 'Width', Value: String(width), IsRequired: false},
 	{Condition: 'LessThanEqual', Property: 'Height', Value: String(height), IsRequired: false}
 ]);
 
-export const applyProfileTuning = (profile, settings = {}, capabilities) => {
+export const applyProfileTuning = (profile, settings = {}, capabilities, {isLiveTV = false} = {}) => {
 	if (!profile) return profile;
 
 	const resolution = narrower(RESOLUTIONS[settings.maxVideoResolution], panelResolution(capabilities));
@@ -53,8 +74,9 @@ export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 			: null);
 	const dropAss = settings.assDirectPlay === false;
 	const dropPgs = settings.enablePgsRendering === false;
+	const transcodeAudio = (settings.transcodeAudioCodecs || []).length > 0;
 
-	if (!resolution && !channelCap && !dropAss && !dropPgs) return profile;
+	if (!resolution && !channelCap && !dropAss && !dropPgs && !transcodeAudio) return profile;
 
 	const tuned = {...profile};
 
@@ -97,6 +119,30 @@ export const applyProfileTuning = (profile, settings = {}, capabilities) => {
 			const capped = isNaN(existing) ? channelCap : Math.min(existing, channelCap);
 			return {...transcodingProfile, MaxAudioChannels: String(capped)};
 		});
+	}
+
+	// Only video loses the picks, so music still direct plays. An empty list means any codec,
+	// so a direct play entry left empty goes. A streamed transcode left empty goes too while
+	// another can still convert, since the server prefers whichever can copy the source audio.
+	// Live TV only takes the TS profile, so there, or when nothing else can convert, it keeps
+	// its list and the server copies that audio.
+	if (transcodeAudio) {
+		const kept = (codecs) => codecs.split(',').filter((codec) => !transcodesAudioCodec(settings, codec)).join(',');
+		tuned.DirectPlayProfiles = (tuned.DirectPlayProfiles || [])
+			.map((directPlayProfile) => {
+				if (directPlayProfile.Type !== 'Video' || !directPlayProfile.AudioCodec) return directPlayProfile;
+				const codecs = kept(directPlayProfile.AudioCodec);
+				return codecs ? {...directPlayProfile, AudioCodec: codecs} : null;
+			})
+			.filter(Boolean);
+		const filtered = (tuned.TranscodingProfiles || []).map((transcodingProfile) => ({
+			transcodingProfile,
+			codecs: transcodingProfile.Type === 'Video' && transcodingProfile.AudioCodec ? kept(transcodingProfile.AudioCodec) : null
+		}));
+		const streamedCanConvert = filtered.some(({transcodingProfile, codecs}) => transcodingProfile.Context === 'Streaming' && codecs);
+		tuned.TranscodingProfiles = filtered
+			.filter(({transcodingProfile, codecs}) => codecs !== '' || isLiveTV || !streamedCanConvert || transcodingProfile.Context !== 'Streaming')
+			.map(({transcodingProfile, codecs}) => (codecs ? {...transcodingProfile, AudioCodec: codecs} : transcodingProfile));
 	}
 
 	if (dropAss || dropPgs) {
