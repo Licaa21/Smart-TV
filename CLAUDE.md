@@ -258,6 +258,13 @@ did, what the fork keeps instead, and what to do on a merge.
 - **On a merge:** keep the fork's repository URL, the tag prefix and `APP_VERSION` in `versionChecker.js`, the `getDisplayVersion` use in Settings, and the event.
 - **Files:** `services/versionChecker.js` (and its test), `views/Settings/Settings.js`, `settingsSchema.js`, `App/App.js`, `fork-tools/build-daily-wgt.sh`, `fork-tools/publish-wgt.sh`.
 
+### 10. Lazy viewers, the audio start and the episode band
+
+- **Upstream:** imports the photo viewer, the comic viewer and the settings panel directly in `App.js`, and since 9683ffdc the EPUB and PDF readers too (`BOOK_READERS`). Its Transcode Audio Codecs setting (8c6b1be9) renews the track by `transcodesAudioCodec` in `TizenPlayer.js`. The blue band around the episode being viewed in Details is 0.7 border and 0.08 fill.
+- **The fork keeps:** every one of those viewers and readers loaded only when opened (`lazy`, and the reader drawn inside a `Suspense`), its own audio start decision (`audioStartNeedsServer`, `openingAudioStream`) with the Transcode Audio Codecs test added to the same condition, so the setting acts at the start of a film too, and the stronger band (0.9 border, 0.18 fill) in `Details.module.less`. These were asked about and answered in the 2026-10-22 merge.
+- **On a merge:** keep `lazy` for any viewer or reader upstream imports directly, the fork's audio start block with upstream's codec test inside it, and the stronger band.
+- **Files:** `App/App.js`, `views/Player/TizenPlayer.js`, `views/Details/Details.module.less`.
+
 ## When the user says Moonbase (the plugin) updated
 
 The fork works around things the Moonbase plugin (Moonfin-Client/Plugin) does not do yet. When the user says a new release is
