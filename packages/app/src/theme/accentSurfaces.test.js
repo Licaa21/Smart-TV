@@ -25,8 +25,8 @@ describe('themeAccentHex', () => {
 });
 
 describe('accent surfaces', () => {
-	it('has a default setting, empty, for every surface', () => {
-		ACCENT_KEYS.forEach((key) => expect(defaultSettings[key]).toBe(''));
+	it('has a default setting for every surface, white as the fork starts', () => {
+		ACCENT_KEYS.forEach((key) => expect(defaultSettings[key]).toBe('#ffffff'));
 	});
 
 	it('gives every surface a distinct id and key', () => {
@@ -40,12 +40,14 @@ describe('accent surfaces', () => {
 	});
 
 	it('reports no picks for untouched settings', () => {
-		expect(pickedAccents(defaultSettings)).toEqual({});
-		expect(pickedAccent(defaultSettings, 'player')).toBe('');
+		const untouched = Object.fromEntries(ACCENT_KEYS.map((key) => [key, '']));
+		expect(pickedAccents(untouched)).toEqual({});
+		expect(pickedAccent(untouched, 'player')).toBe('');
 	});
 
 	it('reports only the valid picks, by surface', () => {
-		expect(pickedAccents({...defaultSettings, accentPlayer: '#ff0000', accentHome: 'nonsense'})).toEqual({player: '#ff0000'});
+		const untouched = Object.fromEntries(ACCENT_KEYS.map((key) => [key, '']));
+		expect(pickedAccents({...untouched, accentPlayer: '#ff0000', accentHome: 'nonsense'})).toEqual({player: '#ff0000'});
 	});
 
 	it('changes its signature when a pick changes and not otherwise', () => {

@@ -180,8 +180,7 @@ describe('localToProfile', () => {
 	test('says nothing about settings this app has no screen for', () => {
 		const profile = localToProfile(defaultSettings);
 
-		for (const key of ['showCastButton', 'detailShowTechnicalDetails', 'recommendationSystemSource',
-			'recommendationsApplyParentalRatingCap']) {
+		for (const key of ['showCastButton', 'detailShowTechnicalDetails', 'recommendationsApplyParentalRatingCap']) {
 			expect(profile).not.toHaveProperty(key);
 		}
 	});
@@ -244,7 +243,7 @@ describe('localToProfile', () => {
 			loadingAnimationImage: 'runner',
 			loadingAnimationSize: 'medium',
 			loadingAnimationPosition: 'middle',
-			loadingAnimationSpeed: 'fast',
+			loadingAnimationSpeed: 'moderate',
 			showLoadingAnimationText: false
 		});
 	});
@@ -317,8 +316,8 @@ describe('SYNCABLE_KEYS', () => {
 });
 
 describe('the library style', () => {
-	test('defaults to classic', () => {
-		expect(defaultSettings.libraryStyle).toBe('classic');
+	test('defaults to modern, as the fork starts', () => {
+		expect(defaultSettings.libraryStyle).toBe('modern');
 	});
 
 	test('takes and sends each style under its own name', () => {

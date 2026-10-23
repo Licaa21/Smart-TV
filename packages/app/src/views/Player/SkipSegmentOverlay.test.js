@@ -70,6 +70,7 @@ describe('SkipSegmentOverlay', () => {
 	});
 
 	it('shows the ring and timer the countdown style asks for', () => {
+		mockSettings = {...mockSettings, skipOverlayLayout: 'capsule'};
 		const {unmount} = overlay({countdownStyle: 'both', remainingSeconds: 90});
 		expect(count('svg circle')).toBe(2);
 		expect(screen.getByText('Ends in 1:30')).toBeTruthy();

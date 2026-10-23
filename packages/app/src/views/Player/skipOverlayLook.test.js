@@ -15,8 +15,9 @@ describe('resolveSkipOverlayLook', () => {
 		expect(result.accent).toBe('');
 	});
 
+	// The layout is the one the fork starts on (sweep), the rest start as the stylesheet draws them
 	it('ships defaults that match the stylesheet', () => {
-		expect(defaultSettings.skipOverlayLayout).toBe(SKIP_DEFAULTS.layout);
+		expect(defaultSettings.skipOverlayLayout).toBe('sweep');
 		expect(defaultSettings.skipOverlayPosition).toBe(SKIP_DEFAULTS.position);
 		expect(defaultSettings.skipOverlaySize).toBe(SKIP_DEFAULTS.size);
 		expect(defaultSettings.skipOverlayOpacity).toBe(SKIP_DEFAULTS.opacity);
@@ -115,7 +116,7 @@ describe('resolveSkipOverlayLook', () => {
 
 	describe('layout', () => {
 		it('is the capsule unless another is picked, and an unknown one is the capsule too', () => {
-			expect(look().layout).toBe('capsule');
+			expect(look({skipOverlayLayout: 'capsule'}).layout).toBe('capsule');
 			expect(look({skipOverlayLayout: 'nonsense'}).layout).toBe('capsule');
 			SKIP_LAYOUTS.forEach((layout) => expect(look({skipOverlayLayout: layout}).layout).toBe(layout));
 		});
@@ -159,7 +160,11 @@ describe('resolveSkipOverlayLook', () => {
 			.map((prompt) => (prompt.kind === 'nextUp' ? 'nextUp' : prompt.type));
 
 		it('offers the intro, recap, credits and next episode by default', () => {
-			expect(kinds({})).toEqual(['intro', 'recap', 'outro', 'nextUp']);
+			expect(kinds({replaceSkipOutroWithNextUp: false})).toEqual(['intro', 'recap', 'outro', 'nextUp']);
+		});
+
+		it('leaves out the credits prompt where the next episode replaces it, as the fork starts', () => {
+			expect(kinds({})).toEqual(['intro', 'recap', 'nextUp']);
 		});
 
 		it('leaves out an intro or credits that skip by themselves or are off, since no button appears', () => {
