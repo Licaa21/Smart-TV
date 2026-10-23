@@ -55,6 +55,7 @@ import ratingsCss from '../components/RatingsRow/RatingsRow.module.less';
 import itemMenuCss from '../components/ItemContextMenu/ItemContextMenu.module.less';
 import skeletonCss from '../components/Skeleton/Skeleton.module.less';
 import playlistSortFilterCss from '../components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less';
+import playbackInfoCss from '../views/Player/PlaybackInfoModal.module.less';
 
 const STYLE_ELEMENT_ID = 'moonfin-theme-overrides';
 
@@ -442,6 +443,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${itemMenuCss.panel}`, `background: ${surfaceA(0.97)}; border-color: ${os(0.12)};`);
 	rule(`.${itemMenuCss.title}, .${itemMenuCss.row}, .${itemMenuCss.button}`, `color: ${onBackground};`);
 	rule(`.${itemMenuCss.row}:focus, .${itemMenuCss.button}:focus`, `background: ${os(0.1)}; border-color: ${focusColor};`);
+	rule(`.${playbackInfoCss.panel}`, `background-color: ${surfaceA(0.9)};`);
 	rule(`.${tabBarCss.tab}`, `color: ${os(0.75)};`);
 	rule(`.${tabBarCss.tabActive}`, `background: ${accent}; color: ${onAccent};`);
 	rule(`.${tabBarCss.tab}:focus`, `border-color: ${focusColor};`);

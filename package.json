@@ -23,6 +23,9 @@
 		"postinstall": "node scripts/ensure-clis.js"
 	},
 	"//cli-tools": "@enact/cli and @webos-tools/cli are installed into the git-ignored tools/ folder by the postinstall above, not as devDependencies. See tools/package.json for why.",
+	"overrides": {
+		"@xmldom/xmldom": "0.8.15"
+	},
 	"devDependencies": {
 		"cross-env": "^7.0.3",
 		"eslint-config-enact-proxy": "^1.0.7"

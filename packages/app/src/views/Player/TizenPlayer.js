@@ -100,15 +100,6 @@ const getRootFontSizePx = () => {
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : 24;
 };
 
-// Goes to PlayerControls as a prop, so it sits out here and keeps one identity
-// instead of being rebuilt on every render.
-const renderInfoPlaybackRows = ({css: c}) => (
-	<div className={c.infoRow}>
-		<span className={c.infoLabel}>{$L('Player')}</span>
-		<span className={c.infoValue}>{$L('AVPlay (Native)')}</span>
-	</div>
-);
-
 /**
  * AVPlay-based Player component for Samsung Tizen.
  *
@@ -2165,6 +2156,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// Modal handlers
 	const openModal = useCallback((modal) => {
 	  lastFocusedElementRef.current = document.activeElement;
+		// The controls stay up under a dialog, so closing it gives focus back to the button that opened it.
+		clearTimeout(controlsTimeoutRef.current);
 		setActiveModal(modal);
 		window.requestAnimationFrame(() => {
 			const modalId = `${modal}-modal`;
@@ -3359,7 +3352,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				handleSubtitleOffsetChange={handleSubtitleOffsetChange}
 				closeModal={closeModal}
 				stopPropagation={stopPropagation}
-				renderInfoPlaybackRows={renderInfoPlaybackRows}
+				transcodeForced={settings.preferTranscode}
 			/>
 		</div>
 	);

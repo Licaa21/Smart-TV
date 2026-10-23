@@ -209,8 +209,8 @@ const NouveauDetailContent = (props) => {
 		if (episode) onSelectItem?.(episode);
 	}, [findEpisode, onSelectItem]);
 
-	// A collection has no order of its own on the server, so the plugin keeps one. Absent plugin,
-	// absent order, and the custom option is simply not offered.
+	// The plugin keeps a hand-arranged order. Without the plugin or a saved order, the custom
+	// option isn't offered.
 	const [sortOption, setSortOption] = useState(DEFAULT_SORT);
 	const [customOrder, setCustomOrder] = useState([]);
 	const [sortOpen, setSortOpen] = useState(false);

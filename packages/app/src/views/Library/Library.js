@@ -1355,7 +1355,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 				? $L("Showing {filterLabel} from '{genreFilter}' sorted by {sortLabel}").replace('{filterLabel}', filterLabel).replace('{genreFilter}', studioFilter).replace('{sortLabel}', sortLabel)
 				: $L("Showing {filterLabel} from '{libraryName}' sorted by {sortLabel}").replace('{filterLabel}', filterLabel).replace('{libraryName}', library?.Name).replace('{sortLabel}', sortLabel);
 
-	const backdropsEnabled = settings?.showHomeBackdrop !== false && !settings?.hideBackdropsInLibraries;
+	const backdropsEnabled = !settings?.hideBackdropsInLibraries;
 
 	const backdropId = focusedItem?.BackdropImageTags?.length
 		? focusedItem.Id

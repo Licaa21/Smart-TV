@@ -1,5 +1,6 @@
-import {isTizen, isWebOS, isXbox} from '../platform';
+import {isTizen, isVega, isWebOS, isXbox} from '../platform';
 import serverLogger from './serverLogger';
+import {readTrailerManifest} from './video';
 
 const INNERTUBE_URL = 'https://www.youtube.com/youtubei/v1/player';
 const RESOLVE_TIMEOUT_MS = 8000;
@@ -26,9 +27,20 @@ const MANIFEST_WATCH_MS = 500;
 // rather than making every trailer wait out the watch first. One failure can be the network, so
 // it takes two in a row.
 const NATIVE_MANIFEST_SKIP_KEY = 'moonfin:trailerNativeManifestSkipUntil';
+// Fire TV used to hand its player the whole manifest, which it never opens, so a skip from then
+// says nothing about the picture only manifest it gets now.
+const VEGA_MANIFEST_SKIP_KEY = 'moonfin:trailerVideoOnlyManifestSkipUntil';
 const NATIVE_MANIFEST_FAILURES = 2;
 const NATIVE_MANIFEST_SKIP_MS = 7 * 24 * 60 * 60 * 1000;
 let nativeManifestFailures = 0;
+// Fire TV plays YouTube's picture from a cut down manifest and the soundtrack from its own file
+// beside it. A seek takes long enough to open a gap of its own, so a small gap is closed by playing
+// the sound up to a tenth faster or slower, and only a big one is seeked across, landing ahead by
+// about what the seek takes.
+const SOUND_DRIFT_S = 0.03;
+const SOUND_SEEK_GAP_S = 0.5;
+const SOUND_SEEK_LEAD_S = 0.15;
+const SOUND_MAX_RATE_STEP = 0.1;
 
 // The Vision Pro app gets a manifest with every resolution in it, and the Android app backs it
 // up with a muxed file that stops at 360p. A client marked needsVisitor turns away a request
@@ -252,6 +264,22 @@ export function originalAudioLanguage (playerResponse) {
 	return '';
 }
 
+// The original soundtrack as a file of its own, for a player that opens a manifest's picture but
+// not its separate sound.
+export function soundtrackUrl (playerResponse) {
+	const formats = (playerResponse?.streamingData?.adaptiveFormats || []).filter(function (format) {
+		return format && format.url && /^audio\/mp4/.test(format.mimeType || '');
+	});
+	const original = formats.filter(function (format) {
+		return !format.audioTrack || format.audioTrack.audioIsDefault === true;
+	});
+	let best = null;
+	(original.length > 0 ? original : formats).forEach(function (format) {
+		if (!best || (format.bitrate || 0) > (best.bitrate || 0)) best = format;
+	});
+	return best ? best.url : '';
+}
+
 // Which of a video element's audioTracks is the original soundtrack, found by the "original" in
 // its name or failing that its language. YouTube lists every soundtrack once per audio group and
 // only 240p and below play from the first, so the last match wins.
@@ -350,22 +378,51 @@ async function tryInnertube (videoId, preferHighQuality, captionLanguage, muxedO
 
 		const captionsUrl = pickCaptionTrackUrl(data, captionLanguage);
 		const audioLanguage = originalAudioLanguage(data);
+		const soundtrack = isVega() && isManifestUrl(stream.url) ? soundtrackUrl(data) : '';
 		debugLog('innertube resolved stream', client.name, stream.quality + 'p');
 		if (!preferHighQuality || stream.quality >= HIGH_QUALITY_FLOOR) {
-			return {url: stream.url, captionsUrl, audioLanguage, client: client.name};
+			return {url: stream.url, captionsUrl, audioLanguage, soundtrack, client: client.name};
 		}
 		if (!best || stream.quality > best.quality) {
-			best = {url: stream.url, quality: stream.quality, captionsUrl, audioLanguage, client: client.name};
+			best = {url: stream.url, quality: stream.quality, captionsUrl, audioLanguage, soundtrack, client: client.name};
 		}
 	}
 
 	if (best) {
 		debugLog('innertube settled for', best.quality + 'p');
-		return {url: best.url, captionsUrl: best.captionsUrl, audioLanguage: best.audioLanguage, client: best.client};
+		return {url: best.url, captionsUrl: best.captionsUrl, audioLanguage: best.audioLanguage, soundtrack: best.soundtrack, client: best.client};
 	}
 
 	debugLog('innertube exhausted without stream');
 	return null;
+}
+
+// A manifest of its own for the best H.264 rung, with the soundtrack and caption groups left out.
+// YouTube also lists VP9 rungs, which only go past the H.264 ones above 1080p.
+export function videoOnlyManifest (master) {
+	const lines = (master || '').split('\n');
+	let best = null;
+	for (let i = 0; i < lines.length - 1; i++) {
+		if (lines[i].indexOf('#EXT-X-STREAM-INF') !== 0 || lines[i].indexOf('avc1') === -1) continue;
+		const bandwidth = Number((lines[i].match(/BANDWIDTH=(\d+)/) || [])[1]) || 0;
+		if (!best || bandwidth > best.bandwidth) best = {bandwidth, info: lines[i], uri: lines[i + 1].trim()};
+	}
+	if (!best) return null;
+	const info = best.info
+		.replace(/,(AUDIO|SUBTITLES|CLOSED-CAPTIONS)="[^"]*"/g, '')
+		.replace(/CODECS="([^",]+)[^"]*"/, 'CODECS="$1"');
+	return ['#EXTM3U', '#EXT-X-INDEPENDENT-SEGMENTS', info, best.uri].join('\n');
+}
+
+// Fire TV's player turns YouTube's manifest away for its separate soundtrack, so the picture is cut
+// out of it here, while there is still time to wait on the shell for it. A manifest that cant be
+// read or cut goes ahead whole, and the player's refusal falls back to the muxed file.
+function withVideoOnly (stream) {
+	if (!stream || !stream.soundtrack) return stream;
+	return readTrailerManifest(stream.url).then(function (master) {
+		const manifest = videoOnlyManifest(master);
+		return manifest ? {...stream, videoOnly: {manifest, soundtrack: stream.soundtrack}} : stream;
+	});
 }
 
 // muxedOnly stands in for a manifest the TV couldnt play, with the 360p file that carries its
@@ -387,6 +444,7 @@ export function fetchVideoStream (videoId, preferHighQuality = false, captionLan
 		timer = setTimeout(function () { finish(null); }, RESOLVE_TIMEOUT_MS);
 
 		tryInnertube(videoId, !!preferHighQuality, captionLanguage, !!muxedOnly)
+			.then(function (stream) { return isVega() ? withVideoOnly(stream) : stream; })
 			.then(function (stream) { finish(stream); })
 			.catch(function () { finish(null); });
 	});
@@ -404,9 +462,11 @@ export function playsManifestNatively (url) {
 	return isManifestUrl(url) && !needsHlsJs(url);
 }
 
+const nativeManifestSkipKey = () => (isVega() ? VEGA_MANIFEST_SKIP_KEY : NATIVE_MANIFEST_SKIP_KEY);
+
 export function nativeManifestSkipped (now = Date.now()) {
 	try {
-		return Number(window.localStorage.getItem(NATIVE_MANIFEST_SKIP_KEY)) > now;
+		return Number(window.localStorage.getItem(nativeManifestSkipKey())) > now;
 	} catch (e) {
 		return false;
 	}
@@ -416,13 +476,13 @@ export function noteNativeManifest (played, now = Date.now()) {
 	try {
 		if (played) {
 			nativeManifestFailures = 0;
-			window.localStorage.removeItem(NATIVE_MANIFEST_SKIP_KEY);
+			window.localStorage.removeItem(nativeManifestSkipKey());
 			return;
 		}
 		nativeManifestFailures += 1;
 		if (nativeManifestFailures < NATIVE_MANIFEST_FAILURES) return;
 		nativeManifestFailures = 0;
-		window.localStorage.setItem(NATIVE_MANIFEST_SKIP_KEY, String(now + NATIVE_MANIFEST_SKIP_MS));
+		window.localStorage.setItem(nativeManifestSkipKey(), String(now + NATIVE_MANIFEST_SKIP_MS));
 		serverLogger.warn(serverLogger.LOG_CATEGORIES.PLAYBACK, "YouTube manifests keep failing on this TV's player, so trailers use the 360p file for a week");
 	} catch (e) {
 		// Without storage the TV just doesnt remember.
@@ -495,11 +555,79 @@ function attachLgManifest (video, url, startTime, onError) {
 	};
 }
 
+// Plays a soundtrack file in step with the picture on the video element, which carries the volume
+// and the play state. The sound waits for the picture to move, since the element reports playing
+// a moment before it does.
+function followSoundtrack (video, url, onError) {
+	const sound = document.createElement('audio');
+	sound.preload = 'auto';
+	sound.src = url;
+	let lastTime = -1;
+
+	const matchVolume = function () {
+		sound.muted = video.muted;
+		sound.volume = video.volume;
+	};
+	const seek = function () {
+		sound.currentTime = video.currentTime + SOUND_SEEK_LEAD_S;
+		sound.playbackRate = 1;
+	};
+	const stop = function () {
+		sound.pause();
+	};
+	const keepPace = function () {
+		const moving = video.currentTime !== lastTime;
+		lastTime = video.currentTime;
+		if (video.paused || !moving || sound.error) return;
+		if (sound.paused) {
+			seek();
+			const started = sound.play();
+			if (started && started.catch) started.catch(function () {});
+			return;
+		}
+		const gap = video.currentTime - sound.currentTime;
+		if (Math.abs(gap) > SOUND_SEEK_GAP_S) seek();
+		else sound.playbackRate = Math.abs(gap) > SOUND_DRIFT_S ? 1 + Math.max(-SOUND_MAX_RATE_STEP, Math.min(SOUND_MAX_RATE_STEP, gap / 2)) : 1;
+	};
+	const failed = function () {
+		if (onError) onError();
+	};
+
+	const events = {timeupdate: keepPace, waiting: stop, pause: stop, seeking: stop, ended: stop, volumechange: matchVolume};
+	Object.keys(events).forEach(function (name) {
+		video.addEventListener(name, events[name]);
+	});
+	sound.addEventListener('error', failed);
+	matchVolume();
+
+	return function () {
+		Object.keys(events).forEach(function (name) {
+			video.removeEventListener(name, events[name]);
+		});
+		sound.removeEventListener('error', failed);
+		sound.pause();
+		sound.removeAttribute('src');
+		sound.load();
+	};
+}
+
+function attachVideoOnly (video, {manifest, soundtrack}, startTime, onError) {
+	const source = window.URL.createObjectURL(new window.Blob([manifest], {type: 'application/vnd.apple.mpegurl'}));
+	video.src = source;
+	if (startTime > 0) video.currentTime = startTime;
+	const releaseSound = followSoundtrack(video, soundtrack, onError);
+	return function () {
+		releaseSound();
+		window.URL.revokeObjectURL(source);
+	};
+}
+
 // Starts a trailer stream on a video element and returns what lets go of it, which has to run
 // before the element plays anything else. Hls is the hls.js class, which the caller loads when
-// needsHlsJs says so. onError hears a manifest hls.js gives up on, since that never reaches the
-// element's own error event.
-export function attachTrailerStream (video, url, {Hls = null, audioLanguage = '', startTime = 0, onError} = {}) {
+// needsHlsJs says so. onError hears a manifest hls.js gives up on, or a soundtrack that wont load
+// beside a picture only manifest, since neither reaches the element's own error event.
+export function attachTrailerStream (video, url, {Hls = null, audioLanguage = '', startTime = 0, videoOnly = null, onError} = {}) {
+	if (videoOnly) return attachVideoOnly(video, videoOnly, startTime, onError);
 	if (!Hls || !Hls.isSupported()) {
 		if (isWebOS() && isManifestUrl(url)) {
 			const releaseSource = attachLgManifest(video, url, startTime, onError);

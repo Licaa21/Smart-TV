@@ -230,6 +230,7 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 					streamUrl: stream ? stream.url : null,
 					captionsUrl: stream ? stream.captionsUrl : null,
 					audioLanguage: stream ? stream.audioLanguage : '',
+					videoOnly: stream ? stream.videoOnly : null,
 					segments: results[0],
 					startTime: getTrailerStartTime(results[0])
 				};
@@ -263,7 +264,7 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 			if (attempts[index].id && !attempts[index].muxedOnly && nativeManifestSkipped()) {
 				attempts[index].muxedOnly = true;
 			}
-			const {client, streamUrl, captionsUrl, audioLanguage, segments, startTime} = await resolveStream(attempts[index]);
+			const {client, streamUrl, captionsUrl, audioLanguage, videoOnly, segments, startTime} = await resolveStream(attempts[index]);
 			if (isStale()) return;
 			if (!streamUrl) {
 				tryAttempt(index + 1);
@@ -272,7 +273,7 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 			const isManifest = isManifestUrl(streamUrl);
 			const nativeManifest = playsManifestNatively(streamUrl);
 			let kind = 'local trailer';
-			if (attempts[index].id) kind = isManifest ? `YouTube manifest on ${nativeManifest ? "the TV's player" : 'hls.js'}` : 'YouTube 360p file';
+			if (attempts[index].id) kind = isManifest ? `YouTube ${videoOnly ? 'picture only ' : ''}manifest on ${nativeManifest ? "the TV's player" : 'hls.js'}` : 'YouTube 360p file';
 			serverLogger.playback(`Trailer preview: ${kind}${client ? ` from ${client}` : ''}`);
 			sponsorSegmentsRef.current = segments;
 			// A manifest the TV cant play gives way to YouTube's small muxed file.
@@ -381,7 +382,7 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 			releaseStream();
 			const Hls = needsHlsJs(streamUrl) ? (await import('hls.js')).default : null;
 			if (isStale()) return;
-			releaseStreamRef.current = attachTrailerStream(video, streamUrl, {Hls, audioLanguage, startTime: resumeAt > 0 ? resumeAt : startTime, onError: () => fail('failed to play')});
+			releaseStreamRef.current = attachTrailerStream(video, streamUrl, {Hls, audioLanguage, videoOnly, startTime: resumeAt > 0 ? resumeAt : startTime, onError: () => fail('failed to play')});
 			const playPromise = video.play();
 			if (playPromise) {
 				playPromise.catch(() => {

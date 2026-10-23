@@ -8,6 +8,7 @@ import {getImageUrl, getLogoUrl} from '../../utils/helpers';
 import {transcodesAudioCodec} from '../../utils/deviceProfileTuning';
 import {api as jellyfinApi, createApiForServer, getServerUrl} from '../../services/jellyfinApi';
 import {getApiForItem} from '../../services/connectionPool';
+import {isVega} from '../../platform';
 import AudioMode from './audio/AudioMode';
 import useAudioTransport from './audio/useAudioTransport';
 import useLyrics from './audio/useLyrics';
@@ -114,31 +115,6 @@ const getWebOSFullscreenRect = () => {
 // A burst of arrow presses on the seek bar becomes one group seek, since every
 // request puts the whole group through a round of buffering.
 const GROUP_SEEK_DEBOUNCE_MS = 600;
-
-// Both of these go to PlayerControls as props, so they sit out here and keep one
-// identity instead of being rebuilt on every render.
-const renderInfoPlaybackRows = ({css: c, mediaSource, playMethod}) => {
-	if (playMethod !== 'Transcode') return null;
-	const match = (mediaSource?.TranscodingUrl || '').match(/TranscodeReasons=([^&]+)/);
-	const reason = match
-		? decodeURIComponent(match[1]).split(',').map(r => r.replace(/([A-Z])/g, ' $1').trim()).join(', ')
-		: $L('Unknown');
-	return (
-		<div className={`${c.infoRow} ${c.infoWarning}`}>
-			<span className={c.infoLabel}>{$L('Transcode Reason')}</span>
-			<span className={c.infoValue}>{reason}</span>
-		</div>
-	);
-};
-
-const renderInfoVideoExtra = ({css: c, videoStream}) => (
-	videoStream?.BitDepth ? (
-		<div className={c.infoRow}>
-			<span className={c.infoLabel}>{$L('Bit Depth')}</span>
-			<span className={c.infoValue}>{videoStream.BitDepth}-bit</span>
-		</div>
-	) : null
-);
 
 const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialSubtitleIndex, initialStartPositionTicks, initialQuality, forceTranscode, onEnded, onBack, onGuide, onPlayNext, onSelectPerson, audioPlaylist, videoQueue, liveTvChannels, onPausedChange, background, onBackground}) => {
 	const {settings, updateSetting} = useSettings();
@@ -1521,8 +1497,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				console.log('[Player] Appending media fragment #t=' + resumeSec + ' for resume (' + resumeTicks + ' ticks)');
 			}
 
-			// forceHlsJsRef overrides native when HEVC decoding already failed
-			const nativeHlsOk = !forceHlsJsRef.current
+			// forceHlsJsRef overrides native when HEVC decoding already failed. The Fire TV
+			// WebView's own HLS player holds on to what it has played, so a high bitrate
+			// remux runs the device out of memory.
+			const nativeHlsOk = !forceHlsJsRef.current && !(isVega() && !isLiveTV)
 				&& !!(video.canPlayType('application/x-mpegURL').replace(/no/, ''));
 			const useHlsJs = isHls && !nativeHlsOk && Hls.isSupported();
 			console.log('[Player] Source type:', { isHls, mimeType, autoplay: video.autoplay, platformVersion: platformVersionRef.current, nativeHlsOk, useHlsJs, forceHlsJs: forceHlsJsRef.current });
@@ -1536,8 +1514,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const hls = new Hls({
 					enableWorker: false,
 					lowLatencyMode: false,
-					maxBufferLength: 30,
+					maxBufferLength: isVega() ? 10 : 30,
 					maxMaxBufferLength: 60,
+					backBufferLength: isVega() ? 10 : Infinity,
 					startFragPrefetch: true,
 					maxBufferHole: 0.5,
 					nudgeMaxRetry: 5,
@@ -2385,6 +2364,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	const openModal = useCallback((modal) => {
 	  lastFocusedElementRef.current = document.activeElement;
+		// The controls stay up under a dialog, so closing it gives focus back to the button that opened it.
+		clearTimeout(controlsTimeoutRef.current);
 		setActiveModal(modal);
 		window.requestAnimationFrame(() => {
 			const modalId = `${modal}-modal`;
@@ -3485,8 +3466,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				handleSubtitleOffsetChange={handleSubtitleOffsetChange}
 				closeModal={closeModal}
 				stopPropagation={stopPropagation}
-				renderInfoPlaybackRows={renderInfoPlaybackRows}
-				renderInfoVideoExtra={renderInfoVideoExtra}
+				transcodeForced={settings.preferTranscode}
+				videoRef={videoRef}
 			/>}
 		</div>
 	);

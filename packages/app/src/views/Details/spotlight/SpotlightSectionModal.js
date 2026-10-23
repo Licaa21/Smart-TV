@@ -51,14 +51,16 @@ const SpotlightSectionModal = ({card, serverUrl, actions, seerr, onNearEnd}) => 
 
 	// The remote lands on the first cell rather than the panel, so a press moves through the
 	// content straight away. A section that draws no focusable cell of its own leaves the id
-	// unclaimed, and the container's own entry rule picks something up instead.
+	// unclaimed, and the container's own entry rule picks something up instead. Keyed on the id, as
+	// the card is rebuilt whenever the screen renders.
+	const cardId = card?.id;
 	useEffect(() => {
-		if (!card) return undefined;
+		if (!cardId) return undefined;
 		const timer = setTimeout(() => {
 			if (!Spotlight.focus(FIRST_CELL_ID)) Spotlight.focus('spotlight-modal');
 		}, 100);
 		return () => clearTimeout(timer);
-	}, [card]);
+	}, [cardId]);
 
 	const contentRef = useRef(null);
 	const scrollToRef = useRef(null);
@@ -77,10 +79,23 @@ const SpotlightSectionModal = ({card, serverUrl, actions, seerr, onNearEnd}) => 
 		if (ev.scrollTop >= content.scrollHeight - visible * (1 + NEAR_END_SCREENFULS)) ask();
 	}, []);
 
+	// A held arrow, told apart the way dropStaleArrowRepeats does, since the oldest sets don't report repeat.
+	const heldKeyRef = useRef(null);
+	const repeatingRef = useRef(false);
+	const handleKeyDown = useCallback((ev) => {
+		repeatingRef.current = ev.repeat || heldKeyRef.current === ev.keyCode;
+		heldKeyRef.current = ev.keyCode;
+	}, []);
+	const handleKeyUp = useCallback(() => {
+		heldKeyRef.current = null;
+		repeatingRef.current = false;
+	}, []);
+
 	// Enact brings a newly focused card into view by its unfocused box and stops flush against
 	// the edge, which both hides the heading above the top row and clips the growth a focused
 	// card gains. The scroll is corrected here while Enact's own is usually still running, so the
-	// correction animates too rather than cutting it off.
+	// correction animates too rather than cutting it off. A held arrow jumps instead, since each
+	// move restarts the smooth scroll and it would fall further behind the focus with every step.
 	const handleSectionFocus = useCallback((ev) => {
 		const section = ev.currentTarget;
 		const cell = ev.target.closest('.spottable');
@@ -94,6 +109,8 @@ const SpotlightSectionModal = ({card, serverUrl, actions, seerr, onNearEnd}) => 
 		if (!viewport) return;
 		const heading = section.firstElementChild;
 		const grid = section.lastElementChild;
+		// Read now, as the key can be released before the frames below run.
+		const animate = !repeatingRef.current;
 
 		window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
 			const contentTop = content.getBoundingClientRect().top;
@@ -104,13 +121,13 @@ const SpotlightSectionModal = ({card, serverUrl, actions, seerr, onNearEnd}) => 
 			// The top row carries its heading with it, whichever way focus arrived.
 			if (heading !== grid && cellBox.top - grid.getBoundingClientRect().top <= 8) {
 				const offset = heading.getBoundingClientRect().top - contentTop;
-				scrollTo({position: {y: Math.max(0, offset - HEADING_CLEARANCE)}, animate: true});
+				scrollTo({position: {y: Math.max(0, offset - HEADING_CLEARANCE)}, animate});
 				return;
 			}
 			if (cellBox.top < view.top + CARD_CLEARANCE) {
-				scrollTo({position: {y: Math.max(0, scrolled - (view.top + CARD_CLEARANCE - cellBox.top))}, animate: true});
+				scrollTo({position: {y: Math.max(0, scrolled - (view.top + CARD_CLEARANCE - cellBox.top))}, animate});
 			} else if (cellBox.bottom > view.bottom - CARD_CLEARANCE) {
-				scrollTo({position: {y: scrolled + (cellBox.bottom - view.bottom + CARD_CLEARANCE)}, animate: true});
+				scrollTo({position: {y: scrolled + (cellBox.bottom - view.bottom + CARD_CLEARANCE)}, animate});
 			}
 		}));
 	}, []);
@@ -129,7 +146,7 @@ const SpotlightSectionModal = ({card, serverUrl, actions, seerr, onNearEnd}) => 
 
 	return (
 		<div className={css.overlay}>
-			<ModalContainer className={css.panel} spotlightId="spotlight-modal">
+			<ModalContainer className={css.panel} spotlightId="spotlight-modal" onKeyDown={handleKeyDown} onKeyUp={handleKeyUp}>
 				<div className={css.header}>
 					{card.icon && (
 						<svg className={css.headerIcon} viewBox={iconViewBox(card.icon)} fill="currentColor" aria-hidden="true">

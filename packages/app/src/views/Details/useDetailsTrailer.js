@@ -17,6 +17,7 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerVolume, seerrOnly
 
 	const trailerVideoRef = useRef(null);
 	const trailerAudioLanguageRef = useRef('');
+	const trailerVideoOnlyRef = useRef(null);
 	const trailerResumeAtRef = useRef(0);
 	const sponsorSegmentsRef = useRef([]);
 	const sponsorSkipIntervalRef = useRef(null);
@@ -128,8 +129,9 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerVolume, seerrOnly
 			if (stream) {
 				sponsorSegmentsRef.current = segments || [];
 				trailerAudioLanguageRef.current = stream.audioLanguage || '';
+				trailerVideoOnlyRef.current = stream.videoOnly || null;
 				trailerResumeAtRef.current = 0;
-				serverLogger.playback(`Trailer: ${isManifestUrl(stream.url) ? 'YouTube manifest' : 'YouTube 360p file'}${stream.client ? ` from ${stream.client}` : ''}`);
+				serverLogger.playback(`Trailer: ${isManifestUrl(stream.url) ? `YouTube ${stream.videoOnly ? 'picture only ' : ''}manifest` : 'YouTube 360p file'}${stream.client ? ` from ${stream.client}` : ''}`);
 				setTrailerStreamUrl(stream.url);
 			} else {
 				setTrailerOverlay(null);
@@ -163,6 +165,7 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerVolume, seerrOnly
 			fetchVideoStream(trailerOverlay, true, '', true).then((stream) => {
 				if (cancelled || !stream) return;
 				trailerAudioLanguageRef.current = '';
+				trailerVideoOnlyRef.current = null;
 				trailerResumeAtRef.current = at > 0 ? at : 0;
 				setTrailerStreamUrl(stream.url);
 			});
@@ -172,7 +175,7 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerVolume, seerrOnly
 		const loadHls = needsHlsJs(trailerStreamUrl) ? import('hls.js').then((m) => m.default) : Promise.resolve(null);
 		loadHls.then((Hls) => {
 			if (cancelled) return;
-			release = attachTrailerStream(video, trailerStreamUrl, {Hls, audioLanguage: trailerAudioLanguageRef.current, startTime: trailerResumeAtRef.current, onError: () => fallBack()});
+			release = attachTrailerStream(video, trailerStreamUrl, {Hls, audioLanguage: trailerAudioLanguageRef.current, videoOnly: trailerVideoOnlyRef.current, startTime: trailerResumeAtRef.current, onError: () => fallBack()});
 			if (isManifestUrl(trailerStreamUrl)) {
 				stopWatch = watchManifestPlayback(video, {
 					onStall: fallBack,

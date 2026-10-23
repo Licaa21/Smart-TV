@@ -57,7 +57,7 @@ const GameSystem = ({library, system, onSelectGame, onBack, backHandlerRef}) => 
 	const libraryId = library?.Id;
 	const systemId = system?.id;
 	const detailRequestRef = useRef(0);
-	const backdropsEnabled = settings?.showHomeBackdrop !== false && !settings?.hideBackdropsInLibraries;
+	const backdropsEnabled = !settings?.hideBackdropsInLibraries;
 
 	useEffect(() => {
 		let cancelled = false;

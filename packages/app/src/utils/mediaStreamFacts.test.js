@@ -1,6 +1,6 @@
 import {
-	formatBitrate, getAudioChannels, getAudioCodec, getBitDepth, getFrameRate, getHdrType,
-	getResolution, getVideoCodec
+	audioChannelsName, audioCodecName, channelLayout, formatBitrate, getBitDepth, getFrameRate, getHdrType,
+	getResolution, getVideoCodec, videoCodecName
 } from './mediaStreamFacts';
 
 describe('formatBitrate', () => {
@@ -40,23 +40,46 @@ describe('getHdrType', () => {
 });
 
 describe('codecs and channels', () => {
-	it('spells a video codec out and keeps its profile and level', () => {
-		expect(getVideoCodec({Codec: 'hevc', Profile: 'Main 10', Level: 150}))
-			.toBe('HEVC (H.265) Main 10@L150');
-		expect(getVideoCodec({Codec: 'h264'})).toBe('AVC (H.264)');
+	it('names a video codec with its profile', () => {
+		expect(getVideoCodec({Codec: 'hevc', Profile: 'Main 10', Level: 150})).toBe('HEVC Main 10');
+		expect(getVideoCodec({Codec: 'h264', Profile: 'High'})).toBe('H.264 High');
+		expect(getVideoCodec({Codec: 'av1', Profile: 'Main'})).toBe('AV1 Main');
+		expect(getVideoCodec({Codec: 'mpeg2video'})).toBe('MPEG-2');
+		expect(getVideoCodec({})).toBeNull();
+		expect(getVideoCodec({Codec: 'hevc', Profile: '0'})).toBe('HEVC');
+		expect(getVideoCodec({Codec: 'hevc', Profile: 0})).toBe('HEVC');
+		expect(getVideoCodec({Codec: 'hevc', Profile: ' '})).toBe('HEVC');
+		expect(videoCodecName('h265')).toBe('HEVC');
+		expect(videoCodecName('avc')).toBe('H.264');
+		expect(videoCodecName('prores')).toBe('PRORES');
 	});
 
-	it('spells an audio codec out', () => {
-		expect(getAudioCodec({Codec: 'eac3'})).toBe('E-AC3 (Dolby Digital Plus)');
-		expect(getAudioCodec({Codec: 'truehd'})).toBe('TrueHD');
+	it('names an audio codec the way a receiver does', () => {
+		expect(audioCodecName('truehd', 'Dolby TrueHD + Dolby Atmos')).toBe('Dolby TrueHD with Atmos');
+		expect(audioCodecName('eac3', 'Dolby Digital Plus + Dolby Atmos')).toBe('Dolby Digital Plus with Atmos');
+		expect(audioCodecName('ac3')).toBe('Dolby Digital');
+		expect(audioCodecName('dts', 'DTS-HD MA + DTS:X')).toBe('DTS:X');
+		expect(audioCodecName('dts', 'DTS-HD MA')).toBe('DTS-HD Master Audio');
+		expect(audioCodecName('dts', 'DTS-HD HRA')).toBe('DTS-HD High Resolution');
+		expect(audioCodecName('dts', 'DTS')).toBe('DTS');
+		expect(audioCodecName('dca')).toBe('DTS');
+		expect(audioCodecName('dca', 'DTS-HD MA')).toBe('DTS-HD Master Audio');
+		expect(audioCodecName('pcm_s24le')).toBe('PCM');
+		expect(audioCodecName('opus')).toBe('Opus');
+		expect(audioCodecName('wmapro')).toBe('WMAPRO');
+		expect(audioCodecName('')).toBeNull();
 	});
 
 	it('says channel counts the way a viewer would', () => {
-		expect(getAudioChannels({Channels: 8})).toBe('7.1');
-		expect(getAudioChannels({Channels: 6})).toBe('5.1');
-		expect(getAudioChannels({Channels: 2})).toBe('Stereo');
-		expect(getAudioChannels({Channels: 1})).toBe('Mono');
-		expect(getAudioChannels({Channels: 3})).toBe('3 channels');
+		expect(audioChannelsName(8)).toBe('7.1 surround');
+		expect(audioChannelsName(6)).toBe('5.1 surround');
+		expect(audioChannelsName(2)).toBe('Stereo');
+		expect(audioChannelsName(1)).toBe('Mono');
+		expect(audioChannelsName(3)).toBe('3 channels');
+		expect(audioChannelsName(0)).toBeNull();
+		expect(channelLayout(8)).toBe('7.1');
+		expect(channelLayout(6)).toBe('5.1');
+		expect(channelLayout(2)).toBe('Stereo');
 	});
 });
 

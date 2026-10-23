@@ -15,13 +15,6 @@ const PAGE_SIZE = 50;
 
 const PLAYABLE_TYPES = new Set(['Movie', 'Audio', 'Video', 'MusicVideo']);
 
-// Splits a collection's own members into the things that play as they are and the series that
-// have to be asked for their episodes.
-export const splitCollectionMembers = (items = []) => ({
-	playables: items.filter((item) => PLAYABLE_TYPES.has(item?.Type)),
-	series: items.filter((item) => item?.Type === 'Series')
-});
-
 // All an entry keeps: enough to sort by, and the id to fetch with.
 export const indexEntryFor = (item) => ({
 	id: item.Id,
@@ -50,8 +43,6 @@ export const compareReleaseAscending = (a, b) => {
 	return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
 };
 
-export const sortIndexEntries = (entries = []) => [...entries].sort(compareReleaseAscending);
-
 // The by-id endpoint answers in whatever order it likes, so the page is put back into the
 // order it was asked for.
 export const orderItemsByIds = (items = [], ids = []) => {
@@ -59,8 +50,9 @@ export const orderItemsByIds = (items = [], ids = []) => {
 	return [...items].sort((a, b) => (rank.get(a.Id) ?? ids.length) - (rank.get(b.Id) ?? ids.length));
 };
 
-// Walks the collection once and returns the ids of everything playable in it, in release
-// order. Only ids come back, because that is what the paging below asks the server for.
+// Walks the collection once and returns the ids of everything playable in it, in the order the
+// server lists them with each series' episodes in its place. Only ids come back, because that is
+// what the paging below asks the server for.
 //
 // Deliberately not recursive. The scan reads the collection's own members and then asks each
 // series for its episodes, so walking the tree here would spend the limit on episodes that
@@ -71,19 +63,21 @@ export const buildCollectionIndex = async (api, collectionId) => {
 		Limit: INDEX_SCAN_LIMIT,
 		Fields: 'BasicSyncInfo'
 	}).catch(() => null);
-	const {playables, series} = splitCollectionMembers(data?.Items || []);
+	const members = data?.Items || [];
+	const series = members.filter((item) => item?.Type === 'Series');
 
-	const flat = [...playables];
+	const episodes = new Map();
 	for (let i = 0; i < series.length; i += INDEX_SCAN_BATCH) {
 		const batch = series.slice(i, i + INDEX_SCAN_BATCH);
 		// eslint-disable-next-line no-await-in-loop
 		const lists = await Promise.all(batch.map((show) => api.getEpisodes(show.Id).catch(() => null)));
-		lists.forEach((list) => {
-			if (list?.Items) flat.push(...list.Items);
-		});
+		batch.forEach((show, j) => episodes.set(show.Id, lists[j]?.Items || []));
 	}
 
-	return sortIndexEntries(flat.map(indexEntryFor)).map((entry) => entry.id);
+	return members.flatMap((item) => {
+		if (item?.Type === 'Series') return episodes.get(item.Id);
+		return PLAYABLE_TYPES.has(item?.Type) ? [item] : [];
+	}).map((item) => item.Id);
 };
 
 // Reads the next run of ids. Progress is counted in index positions rather than items

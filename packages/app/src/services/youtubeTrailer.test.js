@@ -1,8 +1,10 @@
-jest.mock('../platform', () => ({isTizen: jest.fn(), isWebOS: jest.fn(), isXbox: jest.fn()}));
+jest.mock('../platform', () => ({isTizen: jest.fn(), isVega: jest.fn(), isWebOS: jest.fn(), isXbox: jest.fn()}));
 jest.mock('./serverLogger', () => ({__esModule: true, default: {warn: jest.fn(), LOG_CATEGORIES: {PLAYBACK: 'Playback'}}}));
+jest.mock('./video', () => ({readTrailerManifest: jest.fn()}));
 
-import {isTizen, isWebOS, isXbox} from '../platform';
+import {isTizen, isVega, isWebOS, isXbox} from '../platform';
 import serverLogger from './serverLogger';
+import {readTrailerManifest} from './video';
 import {
 	attachTrailerStream,
 	buildInnertubePayload,
@@ -18,6 +20,8 @@ import {
 	originalAudioLanguage,
 	pickOriginalAudioTrackIndex,
 	playsManifestNatively,
+	soundtrackUrl,
+	videoOnlyManifest,
 	watchManifestPlayback
 } from './youtubeTrailer';
 
@@ -42,9 +46,24 @@ FakeHls.Events = {ERROR: 'hlsError'};
 
 beforeEach(() => {
 	isTizen.mockReturnValue(false);
+	isVega.mockReturnValue(false);
 	isWebOS.mockReturnValue(false);
 	isXbox.mockReturnValue(false);
 });
+
+// YouTube's manifest as the Vision Pro client gets it, cut down to a dub, the original and three rungs
+const MASTER = [
+	'#EXTM3U',
+	'#EXT-X-INDEPENDENT-SEGMENTS',
+	'#EXT-X-MEDIA:URI="https://m/a-de",TYPE=AUDIO,GROUP-ID="234",LANGUAGE="de-DE",NAME="Deutsch - dubbed-auto",DEFAULT=NO,AUTOSELECT=YES',
+	'#EXT-X-MEDIA:URI="https://m/a-en",TYPE=AUDIO,GROUP-ID="234",LANGUAGE="en-US",NAME="American English - original",DEFAULT=NO,AUTOSELECT=YES',
+	'#EXT-X-STREAM-INF:BANDWIDTH=1102588,CODECS="avc1.4D401F,mp4a.40.2",RESOLUTION=1280x720,AUDIO="234",SUBTITLES="vtt"',
+	'https://m/720',
+	'#EXT-X-STREAM-INF:BANDWIDTH=3371633,CODECS="avc1.640028,mp4a.40.2",RESOLUTION=1920x1080,AUDIO="234",SUBTITLES="vtt"',
+	'https://m/1080',
+	'#EXT-X-STREAM-INF:BANDWIDTH=5031316,CODECS="vp09.00.40.08,mp4a.40.2",RESOLUTION=1920x1080,AUDIO="234"',
+	'https://m/vp9'
+].join('\n');
 
 // The shape of a Vision Pro answer for a trailer YouTube has machine dubbed
 const dubbedAnswer = () => ({
@@ -210,6 +229,21 @@ describe('fetchVideoStream', () => {
 		delete global.fetch;
 	});
 
+	test('cuts the picture out of the manifest on Fire TV, and leaves one it cant read whole', async () => {
+		isVega.mockReturnValue(true);
+		global.fetch = jest.fn(() => Promise.resolve({ok: true, json: () => Promise.resolve(dubbedAnswer())}));
+		readTrailerManifest.mockResolvedValueOnce(MASTER).mockResolvedValueOnce(null);
+
+		const cut = await fetchVideoStream('vid', true);
+		expect(readTrailerManifest).toHaveBeenCalledWith(HLS_URL);
+		expect(cut.url).toBe(HLS_URL);
+		expect(cut.videoOnly).toEqual({manifest: videoOnlyManifest(MASTER), soundtrack: 'https://v/140-en'});
+
+		const whole = await fetchVideoStream('vid', true);
+		expect(whole.url).toBe(HLS_URL);
+		expect(whole.videoOnly).toBeUndefined();
+	});
+
 	test('asks again with the visitor id it was turned away with, then keeps using it', async () => {
 		const bodies = [];
 		const answers = [turnedAway('visitor-2'), dubbedAnswer(), dubbedAnswer()];
@@ -221,7 +255,7 @@ describe('fetchVideoStream', () => {
 		const first = await fetchVideoStream('vid', true);
 		const second = await fetchVideoStream('vid', true);
 
-		expect(first).toEqual({url: HLS_URL, captionsUrl: null, audioLanguage: 'en-US', client: 'VISIONOS'});
+		expect(first).toEqual({url: HLS_URL, captionsUrl: null, audioLanguage: 'en-US', soundtrack: '', client: 'VISIONOS'});
 		expect(second.url).toBe(HLS_URL);
 		expect(bodies.map((b) => [b.context.client.clientName, b.context.client.visitorData])).toEqual([
 			['VISIONOS', undefined],
@@ -254,6 +288,38 @@ describe('fetchVideoStream', () => {
 			['VISIONOS', undefined],
 			['VISIONOS', 'visitor-4']
 		]);
+	});
+});
+
+describe('videoOnlyManifest', () => {
+	test('keeps the best H.264 rung without its sound or captions', () => {
+		expect(videoOnlyManifest(MASTER)).toBe([
+			'#EXTM3U',
+			'#EXT-X-INDEPENDENT-SEGMENTS',
+			'#EXT-X-STREAM-INF:BANDWIDTH=3371633,CODECS="avc1.640028",RESOLUTION=1920x1080',
+			'https://m/1080'
+		].join('\n'));
+	});
+
+	test('has nothing to offer without an H.264 rung', () => {
+		expect(videoOnlyManifest(MASTER.split('\n').filter((line) => line.indexOf('avc1') === -1).join('\n'))).toBeNull();
+		expect(videoOnlyManifest(null)).toBeNull();
+	});
+});
+
+describe('soundtrackUrl', () => {
+	test('takes the original soundtrack over a dub', () => {
+		expect(soundtrackUrl(dubbedAnswer())).toBe('https://v/140-en');
+	});
+
+	test('takes the fuller file where there are no dubs, and nothing where there is no sound', () => {
+		const formats = [
+			{itag: 139, bitrate: 49000, mimeType: 'audio/mp4; codecs="mp4a.40.5"', url: 'https://v/139'},
+			{itag: 140, bitrate: 130000, mimeType: 'audio/mp4; codecs="mp4a.40.2"', url: 'https://v/140'},
+			{itag: 251, bitrate: 140000, mimeType: 'audio/webm; codecs="opus"', url: 'https://v/251'}
+		];
+		expect(soundtrackUrl({streamingData: {adaptiveFormats: formats}})).toBe('https://v/140');
+		expect(soundtrackUrl({streamingData: {adaptiveFormats: [formats[2]]}})).toBe('');
 	});
 });
 
@@ -307,6 +373,84 @@ describe('attachTrailerStream', () => {
 		expect(hls.destroyed).toBe(true);
 		hls.handlers.hlsError('hlsError', {fatal: true});
 		expect(onError).toHaveBeenCalledTimes(1);
+	});
+
+	describe('with the picture cut out of the manifest', () => {
+		// jsdom plays nothing, so each element's clock and state are set by hand
+		const clock = (element, currentTime, paused) => {
+			Object.defineProperty(element, 'currentTime', {value: currentTime, writable: true, configurable: true});
+			Object.defineProperty(element, 'paused', {value: paused, configurable: true});
+		};
+		let sound;
+		let play;
+		let pause;
+
+		beforeEach(() => {
+			window.URL.createObjectURL = jest.fn(() => 'blob:picture');
+			window.URL.revokeObjectURL = jest.fn();
+			play = jest.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
+			pause = jest.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+			jest.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+			const create = document.createElement.bind(document);
+			jest.spyOn(document, 'createElement').mockImplementation((tag) => {
+				const element = create(tag);
+				if (tag === 'audio') sound = element;
+				return element;
+			});
+		});
+
+		afterEach(() => {
+			jest.restoreAllMocks();
+		});
+
+		test('plays the picture from a blob and starts the sound once the picture moves', () => {
+			const video = document.createElement('video');
+			video.muted = true;
+			const release = attachTrailerStream(video, HLS_URL, {videoOnly: {manifest: '#EXTM3U', soundtrack: 'https://v/140'}});
+			expect(video.src).toBe('blob:picture');
+			expect(sound.src).toBe('https://v/140');
+			expect(sound.muted).toBe(true);
+
+			clock(video, 0, false);
+			clock(sound, 0, true);
+			video.dispatchEvent(new Event('timeupdate'));
+			expect(play).toHaveBeenCalledTimes(1);
+			expect(sound.currentTime).toBeCloseTo(0.15);
+
+			release();
+			expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:picture');
+			expect(sound.getAttribute('src')).toBeNull();
+		});
+
+		test('closes a small gap by rate and a big one by seeking, and stops with the picture', () => {
+			const video = document.createElement('video');
+			attachTrailerStream(video, HLS_URL, {videoOnly: {manifest: '#EXTM3U', soundtrack: 'https://v/140'}});
+
+			clock(video, 10.3, false);
+			clock(sound, 10, false);
+			video.dispatchEvent(new Event('timeupdate'));
+			expect(sound.playbackRate).toBeCloseTo(1.1);
+
+			clock(video, 10.31, false);
+			clock(sound, 10.3, false);
+			video.dispatchEvent(new Event('timeupdate'));
+			expect(sound.playbackRate).toBe(1);
+
+			clock(video, 20, false);
+			video.dispatchEvent(new Event('timeupdate'));
+			expect(sound.currentTime).toBeCloseTo(20.15);
+
+			video.dispatchEvent(new Event('waiting'));
+			expect(pause).toHaveBeenCalled();
+			expect(play).not.toHaveBeenCalled();
+		});
+
+		test('hands a soundtrack that wont load to onError', () => {
+			const onError = jest.fn();
+			attachTrailerStream(document.createElement('video'), HLS_URL, {videoOnly: {manifest: '#EXTM3U', soundtrack: 'https://v/140'}, onError});
+			sound.dispatchEvent(new Event('error'));
+			expect(onError).toHaveBeenCalledTimes(1);
+		});
 	});
 });
 

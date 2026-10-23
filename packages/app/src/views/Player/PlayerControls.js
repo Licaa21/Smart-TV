@@ -1,7 +1,5 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import $L from '@enact/i18n/$L';
-import Scroller from '@enact/sandstone/Scroller';
-import * as playback from '../../services/playback';
 import {getImageUrl} from '../../utils/helpers';
 import {autocropLogoUrl} from '../../utils/logoAutocrop';
 import {getServerUrl} from '../../services/jellyfinApi';
@@ -9,13 +7,12 @@ import TrickplayPreview from '../../components/TrickplayPreview';
 import {isTrickplayOn} from '../../utils/trickplayLayout';
 import SubtitleOffsetOverlay from './SubtitleOffsetOverlay';
 import SubtitleSettingsOverlay from './SubtitleSettingsOverlay';
-import {formatBitrate, getAudioChannels, getAudioCodec, getHdrType, getVideoCodec} from '../../utils/mediaStreamFacts';
 import {getPlatform} from '../../platform';
-import {getHostAudioOutput} from '../../services/video';
 import {ModalContainer} from '../../utils/spotlightContainers';
 import {numberedTrackName, sortSubtitleStreams, subtitleTrackDetail, audioTrackDetail} from '../../utils/trackLabels';
 import TrackOptionRow, {TrackDivider} from '../../components/TrackOptionRow';
 import EpisodeBrowser from './EpisodeBrowser';
+import PlaybackInfoModal from './PlaybackInfoModal';
 import {
 	SpottableButton, SpottableDiv,
 	formatTime, getQualityPresets,
@@ -207,27 +204,14 @@ const PlayerControls = ({
 	handleSubtitleOffsetChange,
 	closeModal,
 	stopPropagation,
-	renderInfoPlaybackRows,
-	renderInfoVideoExtra
+	transcodeForced,
+	videoRef
 }) => {
 	const { settings } = useSettings();
 	const isTizenPlatform = getPlatform() === 'tizen';
 	const [logoLoadFailed, setLogoLoadFailed] = useState(false);
 	const [croppedLogoUrl, setCroppedLogoUrl] = useState(null);
 	const [logoAspectRatio, setLogoAspectRatio] = useState(null);
-	const [audioOutput, setAudioOutput] = useState(null);
-
-	// Read each time the panel opens, since a track change can change it
-	useEffect(() => {
-		if (activeModal !== 'info') return undefined;
-		let current = true;
-		getHostAudioOutput().then((output) => {
-			if (current) setAudioOutput(output);
-		});
-		return () => {
-			current = false;
-		};
-	}, [activeModal]);
 
 	// A tag that resolved but whose image 404s (stale cache, server hiccup) should
 	// still fall back to text instead of leaving a broken image in the corner.
@@ -742,168 +726,21 @@ const PlayerControls = ({
 				</div>
 			)}
 
-			{activeModal === 'info' && (() => {
-				const session = playback.getCurrentSession();
-				const mediaSource = session?.mediaSource;
-				const truehdCodecProbe = session?.capabilities?.truehdCodecSupported;
-				const truehdCodecProbeStatus = truehdCodecProbe === true
-					? $L('Supported')
-					: truehdCodecProbe === false
-						? $L('Not Supported')
-						: $L('Unknown');
-				const videoStream = mediaSource?.MediaStreams?.find(s => s.Type === 'Video');
-				const audioStream = mediaSource?.MediaStreams?.find(s => s.Index === selectedAudioIndex) ||
-					mediaSource?.MediaStreams?.find(s => s.Type === 'Audio');
-				const subtitleStream = selectedSubtitleIndex >= 0
-					? mediaSource?.MediaStreams?.find(s => s.Index === selectedSubtitleIndex)
-					: null;
-
-				return (
-					<div className={css.trackModal} onClick={closeModal}>
-						<ModalContainer className={`${css.modalContent} ${css.videoInfoModal}`} onClick={stopPropagation} data-modal="info" spotlightId="info-modal">
-							<h2 className={css.modalTitle}>{$L('Playback Information')}</h2>
-							<Scroller
-								className={css.videoInfoContent}
-								direction="vertical"
-								horizontalScrollbar="hidden"
-								verticalScrollbar="hidden"
-							>
-								<SpottableDiv className={css.infoSection} spotlightId="info-playback">
-									<h3 className={css.infoHeader}>{$L('Playback')}</h3>
-									<div className={`${css.infoRow} ${css.infoHighlight}`}>
-										<span className={css.infoLabel}>{$L('Play Method')}</span>
-										<span className={css.infoValue}>{playMethod || $L('Unknown')}</span>
-									</div>
-									{renderInfoPlaybackRows && renderInfoPlaybackRows({css, mediaSource, playMethod})}
-									<div className={css.infoRow}>
-										<span className={css.infoLabel}>{$L('Container')}</span>
-										<span className={css.infoValue}>
-											{(mediaSource?.Container || $L('Unknown')).toUpperCase()}
-										</span>
-									</div>
-									<div className={css.infoRow}>
-										<span className={css.infoLabel}>{$L('Bitrate')}</span>
-										<span className={css.infoValue}>
-											{formatBitrate(mediaSource?.Bitrate)}
-										</span>
-									</div>
-									{isTizenPlatform && (
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('Experimental TrueHD')}</span>
-											<span className={css.infoValue}>
-												{settings.experimentalTruehd ? $L('Enabled') : $L('Disabled')}
-											</span>
-										</div>
-									)}
-									{isTizenPlatform && (
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('TrueHD Codec Probe')}</span>
-											<span className={css.infoValue}>{truehdCodecProbeStatus}</span>
-										</div>
-									)}
-								</SpottableDiv>
-
-								{videoStream && (
-									<SpottableDiv className={css.infoSection} spotlightId="info-video">
-										<h3 className={css.infoHeader}>{$L('Video')}</h3>
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('Resolution')}</span>
-											<span className={css.infoValue}>
-												{videoStream.Width}×{videoStream.Height}
-												{videoStream.RealFrameRate && ` @ ${Math.round(videoStream.RealFrameRate)}fps`}
-											</span>
-										</div>
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('HDR')}</span>
-											<span className={css.infoValue}>{getHdrType(videoStream, session?.capabilities?.dolbyVision !== false)}</span>
-										</div>
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('Codec')}</span>
-											<span className={css.infoValue}>{getVideoCodec(videoStream)}</span>
-										</div>
-										{renderInfoVideoExtra && renderInfoVideoExtra({css, videoStream})}
-										{videoStream.BitRate && (
-											<div className={css.infoRow}>
-												<span className={css.infoLabel}>{$L('Video Bitrate')}</span>
-												<span className={css.infoValue}>{formatBitrate(videoStream.BitRate)}</span>
-											</div>
-										)}
-									</SpottableDiv>
-								)}
-
-								{audioStream && (
-									<SpottableDiv className={css.infoSection} spotlightId="info-audio">
-										<h3 className={css.infoHeader}>{$L('Audio')}</h3>
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('Track')}</span>
-											<span className={css.infoValue}>
-												{audioStream.DisplayTitle || audioStream.Language || $L('Unknown')}
-											</span>
-										</div>
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('Codec')}</span>
-											<span className={css.infoValue}>{getAudioCodec(audioStream)}</span>
-										</div>
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('Channels')}</span>
-											<span className={css.infoValue}>{getAudioChannels(audioStream)}</span>
-										</div>
-										{audioOutput?.decoder && (
-											<div className={css.infoRow}>
-												<span className={css.infoLabel}>{$L('Decoder')}</span>
-												<span className={css.infoValue}>{audioOutput.decoder}</span>
-											</div>
-										)}
-										{audioOutput?.format && (
-											<div className={css.infoRow}>
-												<span className={css.infoLabel}>{$L('Sent to Console')}</span>
-												<span className={css.infoValue}>{audioOutput.format}</span>
-											</div>
-										)}
-										{audioStream.BitRate && (
-											<div className={css.infoRow}>
-												<span className={css.infoLabel}>{$L('Audio Bitrate')}</span>
-												<span className={css.infoValue}>{formatBitrate(audioStream.BitRate)}</span>
-											</div>
-										)}
-										{audioStream.SampleRate && (
-											<div className={css.infoRow}>
-												<span className={css.infoLabel}>{$L('Sample Rate')}</span>
-												<span className={css.infoValue}>{(audioStream.SampleRate / 1000).toFixed(1)} kHz</span>
-											</div>
-										)}
-									</SpottableDiv>
-								)}
-
-								{subtitleStream && (
-									<SpottableDiv className={css.infoSection} spotlightId="info-subtitles">
-										<h3 className={css.infoHeader}>{$L('Subtitles')}</h3>
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('Track')}</span>
-											<span className={css.infoValue}>
-												{subtitleStream.DisplayTitle || subtitleStream.Language || $L('Unknown')}
-											</span>
-										</div>
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('Format')}</span>
-											<span className={css.infoValue}>
-												{(subtitleStream.Codec || $L('Unknown')).toUpperCase()}
-											</span>
-										</div>
-										<div className={css.infoRow}>
-											<span className={css.infoLabel}>{$L('Type')}</span>
-											<span className={css.infoValue}>
-												{subtitleStream.IsExternal ? $L('External') : $L('Embedded')}
-											</span>
-										</div>
-									</SpottableDiv>
-								)}
-							</Scroller>
-							<p className={css.modalFooter}>{$L('Press BACK to close')}</p>
-						</ModalContainer>
-					</div>
-				);
-			})()}
+			{activeModal === 'info' && (
+				<PlaybackInfoModal
+					playMethod={playMethod}
+					selectedAudioIndex={selectedAudioIndex}
+					selectedSubtitleIndex={selectedSubtitleIndex}
+					maxBitrate={selectedQuality || settings.maxBitrate}
+					transcodeForced={transcodeForced}
+					isLiveTV={isLiveTV}
+					item={item}
+					liveProgram={liveProgram}
+					isTizen={isTizenPlatform}
+					videoRef={videoRef}
+					onClose={closeModal}
+				/>
+			)}
 
 			{activeModal === 'subtitleOffset' && (
 				<SubtitleOffsetOverlay

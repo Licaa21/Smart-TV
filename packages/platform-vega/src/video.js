@@ -7,6 +7,7 @@
 import {videoRangeTypeOf} from '@moonfin/app/src/utils/videoRange';
 import {getSharedVideoElement as sharedVideoElement} from '@moonfin/platform-webos/video';
 import {onShellMessage} from './bridge';
+import {MAX_BITRATE} from './deviceProfile';
 
 export {
 	getMimeType,
@@ -15,6 +16,7 @@ export {
 	waitForDecoderRelease,
 	setupVisibilityHandler
 } from '@moonfin/platform-webos/video';
+export {readTrailerManifest} from './youtubeManifest';
 
 export const getSharedVideoElement = () => {
 	const video = sharedVideoElement();
@@ -79,11 +81,12 @@ export const isAudioStreamPlayable = (stream, capabilities) => {
 const VIDEO_CONTAINERS = ['mp4', 'm4v', 'mov', 'mkv', 'matroska', 'webm'];
 
 // The decoder limits Amazon lists per stick. The 4K Select takes more H.264
-// than the newer sticks and the HD stick takes less VP9.
+// than the newer sticks and the HD stick takes less VP9. HEVC remuxes play far
+// past the 35 Mbps Amazon gives, so HEVC goes up to what Auto asks the server for.
 const BITRATE_CAPS = {
-	AFTCA002: {h264: 30_000_000, hevc: 35_000_000, vp9: 30_000_000},
-	AFTCL001: {h264: 20_000_000, hevc: 35_000_000, vp9: 20_000_000, av1: 25_000_000},
-	default: {h264: 20_000_000, hevc: 35_000_000, vp9: 30_000_000, av1: 25_000_000}
+	AFTCA002: {h264: 30_000_000, hevc: MAX_BITRATE, vp9: 30_000_000},
+	AFTCL001: {h264: 20_000_000, hevc: MAX_BITRATE, vp9: 20_000_000, av1: 25_000_000},
+	default: {h264: 20_000_000, hevc: MAX_BITRATE, vp9: 30_000_000, av1: 25_000_000}
 };
 const CODEC_FAMILY = {h264: 'h264', avc: 'h264', hevc: 'hevc', h265: 'hevc', hev1: 'hevc', hvc1: 'hevc', dvh1: 'hevc', vp9: 'vp9', av1: 'av1', av01: 'av1'};
 

@@ -316,6 +316,15 @@ describe('SYNCABLE_KEYS', () => {
 	});
 });
 
+describe('the backdrop toggles', () => {
+	test('take and send the home and details backdrops under the server names', () => {
+		expect(profileToLocal({homeBackdropEnabled: false, detailsBackdropEnabled: false}))
+			.toEqual({showHomeBackdrop: false, detailsBackdropEnabled: false});
+		expect(localToProfile({...defaultSettings, showHomeBackdrop: false}, ['showHomeBackdrop']))
+			.toEqual({homeBackdropEnabled: false});
+	});
+});
+
 describe('the library style', () => {
 	test('defaults to classic', () => {
 		expect(defaultSettings.libraryStyle).toBe('classic');

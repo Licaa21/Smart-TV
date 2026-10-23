@@ -8,7 +8,7 @@ import {useSettings} from '../../context/SettingsContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import {formatClockTime, formatDayLabel} from '../../utils/clock';
 import {KEYS} from '../../utils/keys';
-import {pointerHover} from '../../utils/focusScroll';
+import {animateScrollTop, pointerHover, stopScrollAnimation} from '../../utils/focusScroll';
 import {rem, rootScale} from '../../utils/rootScale';
 import {createLiveTvGuideStore} from '../../services/liveTvGuideStore';
 import {getLiveTvLastChannelId, loadLiveTvLastChannel} from '../../services/liveTvLastChannel';
@@ -107,30 +107,6 @@ const focusWhenMounted = (spotlightId, {attempts = 12, defer = false} = {}) => {
 	};
 	if (defer) window.requestAnimationFrame(() => tryFocus(attempts));
 	else tryFocus(attempts);
-};
-
-// One animation per scroller. A held key would otherwise stack loops that all write the offset
-// each frame, and a leftover one would undo a jump set straight after it.
-const scrollFrames = new WeakMap();
-
-const stopScrollAnimation = (node) => {
-	window.cancelAnimationFrame(scrollFrames.get(node));
-	scrollFrames.delete(node);
-};
-
-const animateScrollTop = (node, target, duration) => {
-	stopScrollAnimation(node);
-	const from = node.scrollTop;
-	const distance = target - from;
-	if (!distance) return;
-	const started = Date.now();
-	const step = () => {
-		const t = Math.min(1, (Date.now() - started) / duration);
-		node.scrollTop = from + distance * (1 - Math.pow(1 - t, 3));
-		if (t < 1) scrollFrames.set(node, window.requestAnimationFrame(step));
-		else scrollFrames.delete(node);
-	};
-	scrollFrames.set(node, window.requestAnimationFrame(step));
 };
 
 // The same span the other clients' date picker offers, a week back through two weeks out.
