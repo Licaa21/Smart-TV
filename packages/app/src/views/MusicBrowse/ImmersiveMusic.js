@@ -243,7 +243,7 @@ const ImmersiveMusic = ({library, api, serverUrl, onSelectItem, onOpenGrid, onPl
 
 	const heroItem = album || featured;
 	const artUrl = musicArtUrl(heroItem, serverUrl, 600);
-	const backdropUrl = artUrl && settings.showHomeBackdrop !== false && !settings.hideBackdropsInLibraries
+	const backdropUrl = artUrl && !settings.hideBackdropsInLibraries
 		? serverBlurredUrl(artUrl, 40) : null;
 	const heroTitle = album?.Name || (featured?.Type === 'Audio' ? featured.Album || featured.Name : featured?.Name);
 	const heroMeta = [

@@ -65,6 +65,7 @@ import favoritesCss from '../views/Favorites/Favorites.module.less';
 import genreBrowseCss from '../views/GenreBrowse/GenreBrowse.module.less';
 import episodeBrowserCss from '../views/Player/EpisodeBrowser.module.less';
 import minimalistCardsCss from '../views/Details/minimalist/MinimalistCards.module.less';
+import playbackInfoCss from '../views/Player/PlaybackInfoModal.module.less';
 
 const STYLE_ELEMENT_ID = 'moonfin-theme-overrides';
 
@@ -673,6 +674,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${itemMenuCss.panel}`, `background: ${surfaceA(0.97)}; border-color: ${os(0.12)};`);
 	rule(`.${itemMenuCss.title}, .${itemMenuCss.row}, .${itemMenuCss.button}`, `color: ${onBackground};`);
 	rule(`.${itemMenuCss.row}:focus, .${itemMenuCss.button}:focus`, `background: ${os(0.1)}; border-color: ${focusColor};`);
+	rule(`.${playbackInfoCss.panel}`, `background-color: ${surfaceA(0.9)};`);
 	rule(`.${tabBarCss.tab}`, `color: ${os(0.75)};`);
 	rule(`.${tabBarCss.tabActive}`, `background: ${detailsAccent.css}; color: ${detailsAccent.on};`);
 	rule(`.${tabBarCss.tab}:focus`, `border-color: ${focusColor};`);

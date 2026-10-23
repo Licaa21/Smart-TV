@@ -427,13 +427,24 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		onPlay?.(item, true, buildPlaybackOptions());
 	}, [item, onPlay, buildPlaybackOptions]);
 
+	// Plays the item on screen the way a card's Play does, carrying on from where it was left.
+	const playItemOnScreen = useCallback(() => {
+		if (item?.UserData?.PlaybackPositionTicks > 0) handleResume();
+		else handlePlay();
+	}, [item, handleResume, handlePlay]);
+
+	// The episode on screen plays when picked from its own list rather than opening again.
+	const openOrPlay = useCallback((target) => {
+		if (item?.Type === 'Episode' && target?.Id === item.Id) playItemOnScreen();
+		else onSelectItem?.(target);
+	}, [item, playItemOnScreen, onSelectItem]);
+
 	// Play from a card's menu lands here and starts the way the Play button would, once the record
 	// and the lists it picks from are in, which keeps the next episode pick and the track choices.
 	useEffect(() => {
 		if (!autoPlay || isSeed || !playListsLoaded || !item) return;
 		onAutoPlayed?.();
-		if (item.UserData?.PlaybackPositionTicks > 0) handleResume();
-		else handlePlay();
+		playItemOnScreen();
 	}, [autoPlay, isSeed, playListsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const handleShuffle = useCallback(async () => {
@@ -681,9 +692,9 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		const episodeId = ev.currentTarget.dataset.episodeId;
 		const episode = episodes.find(ep => ep.Id === episodeId);
 		if (episode) {
-			onSelectItem?.(episode);
+			openOrPlay(episode);
 		}
-	}, [episodes, onSelectItem]);
+	}, [episodes, openOrPlay]);
 
 	// Nouveau's episode cards play from the artwork and open from the block beneath it, so playing
 	// one needs its own way in rather than the Play button, which belongs to the item on screen.
@@ -1042,7 +1053,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	const birthPlace = isPerson && showsSection('birthplace') && item.ProductionLocations?.length > 0 ? item.ProductionLocations[0] : '';
 
 	const backdrop = (
-		<DetailBackdrop backdropUrl={backdropUrl} isPerson={isPerson} blur={settings.backdropBlurDetail} />
+		<DetailBackdrop backdropUrl={settings.detailsBackdropEnabled !== false ? backdropUrl : null} isPerson={isPerson} blur={settings.backdropBlurDetail} />
 	);
 
 	const trailerLayer = (
@@ -1199,7 +1210,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 					handleExtraSelect={handleExtraSelect}
 					playTrack={playTrack}
 					playlistMenu={playlistMenu}
-					onSelectItem={onSelectItem}
+					onSelectItem={openOrPlay}
 					onSelectPerson={openPerson}
 					onSelectStudio={onSelectStudio}
 					similarSource={similarSource}
@@ -1448,7 +1459,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				onChapterSelect={handleChapterSelect}
 				onExtraSelect={handleExtraSelect}
 				onCastSelect={handleCastSelect}
-				onSelectItem={onSelectItem}
+				onSelectItem={openOrPlay}
 			/>
 		</DetailScrollPage>
 	);

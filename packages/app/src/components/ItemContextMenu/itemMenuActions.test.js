@@ -71,4 +71,18 @@ describe('itemMenuActions', () => {
 		expect(ids({Id: 'c1', Type: 'TvChannel'})).toEqual([]);
 		expect(ids(null)).toEqual([]);
 	});
+
+	test('flips the top action to Go to Details when Continue Watching and Next Up play on select', () => {
+		const options = {isContinueWatchingOrNextUp: true, playImmediately: true};
+		expect(ids(movie(), options)).toEqual(['viewDetails', 'watched', 'favorite', 'addToPlaylist']);
+		expect(labelOf(movie(), 'viewDetails', options)).toBe('Go to Details');
+		expect(ids(episode(), options)).toEqual(['viewDetails', 'watched', 'hideNextUp', 'favorite', 'addToPlaylist', 'goToSeries']);
+		expect(labelOf(episode(), 'viewDetails', options)).toBe('Go to Details');
+	});
+
+	test('keeps Play first on Continue Watching and Next Up when they open Details on select', () => {
+		const options = {isContinueWatchingOrNextUp: true, playImmediately: false};
+		expect(ids(movie(), options)).toEqual(['play', 'watched', 'favorite', 'addToPlaylist']);
+		expect(labelOf(movie(), 'play', options)).toBe('Play');
+	});
 });

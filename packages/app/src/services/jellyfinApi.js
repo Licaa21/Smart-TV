@@ -141,6 +141,8 @@ const PLAYBACK_TIMEOUT_MS = 120000;
 // Some servers answer a people search far slower than everything else, so it
 // gets a limit of its own rather than holding the other results back.
 const PEOPLE_SEARCH_TIMEOUT_MS = 10000;
+// The playback information dialog waits on this, so it gives up quickly and goes without.
+const OWN_SESSION_TIMEOUT_MS = 1500;
 export const HOME_ROW_ITEM_FIELDS = 'DateCreated,PremiereDate,PrimaryImageAspectRatio,OfficialRating,Overview,Genres,GenreItems,ProductionYear,RunTimeTicks,CommunityRating,CriticRating,ProviderIds,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,ParentThumbItemId,ParentLogoItemId,ParentLogoImageTag,SeriesPrimaryImageTag,ParentPrimaryImageTag,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,UserData,AlbumArtist,AlbumId,AlbumPrimaryImageTag';
 
 // The home Next Up row asks the server for a window instead of the whole watch
@@ -641,6 +643,8 @@ export const api = {
 		body: data
 	}),
 
+	getOwnSessions: () => request(`/Sessions?DeviceId=${encodeURIComponent(deviceId)}`, {timeoutMs: OWN_SESSION_TIMEOUT_MS}),
+
 	closeLiveStream: (liveStreamId) => request(`/LiveStreams/Close?LiveStreamId=${encodeURIComponent(liveStreamId)}`, {
 		method: 'POST'
 	}),
@@ -682,8 +686,8 @@ export const api = {
 	getStudioCompanies: (tmdbId, mediaType) =>
 		request(`/Moonfin/Tmdb/ProductionCompanies?tmdbId=${encodeURIComponent(tmdbId)}&type=${mediaType === 'tv' ? 'tv' : 'movie'}`),
 
-	// A collection has no order of its own on the server, so the plugin keeps one: a plain list of
-	// item ids. Absent plugin, absent order, and the caller falls back to release order.
+	// The plugin keeps a collection's hand-arranged order as a plain list of item ids. Without the
+	// plugin or a saved order, the caller falls back to the server's order.
 	getCollectionOrder: (collectionId) =>
 		request(`/Moonfin/Collections/${collectionId}/Order`),
 
@@ -1253,6 +1257,8 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 			serverRequest(`/Videos/ActiveEncodings?deviceId=${encodeURIComponent(deviceId)}&playSessionId=${encodeURIComponent(playSessionId)}`, {
 				method: 'DELETE'
 			}),
+
+		getOwnSessions: () => serverRequest(`/Sessions?DeviceId=${encodeURIComponent(deviceId)}`, {timeoutMs: OWN_SESSION_TIMEOUT_MS}),
 
 		closeLiveStream: (liveStreamId) => serverRequest(`/LiveStreams/Close?LiveStreamId=${encodeURIComponent(liveStreamId)}`, {
 			method: 'POST'

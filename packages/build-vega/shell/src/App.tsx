@@ -2,8 +2,9 @@
 //
 // The app itself is the Enact build under assets/, loaded into the Vega WebView.
 // This shell only does what a page cant: it reports the device and its address,
-// forwards app state and the keys the WebView swallows, sends the playback stop
-// report once page scripts are frozen in the background, and exits the app.
+// forwards app state and the keys the WebView swallows, reads the YouTube trailer
+// manifests the page isnt allowed to, sends the playback stop report once page
+// scripts are frozen in the background, and exits the app.
 import {WebView} from '@amazon-devices/webview';
 import type {OnSslErrorCallback, SslErrorData, WebViewErrorEvent, WebViewMessageEvent} from '@amazon-devices/webview/dist/types/WebViewTypes';
 import {useNetInfo} from '@amazon-devices/keplerscript-netmgr-lib';
@@ -20,6 +21,7 @@ import {
 import {bootScript, parsePageMessage, toPageScript, ShellMessage} from './bridge';
 import {BootData, collectBootData} from './bootData';
 import {sendStopReport, setPlaybackSession} from './playbackSession';
+import {readManifest} from './youtubeManifest';
 
 // The WebView handles the back key itself and passes no menu key to the page.
 const FORWARDED_KEYS: Record<string, string> = {menu: 'Menu'};
@@ -83,8 +85,11 @@ export const App = () => {
 			case 'PLAYBACK_SESSION':
 				setPlaybackSession(message.payload);
 				break;
+			case 'READ_MANIFEST':
+				readManifest(message.payload).then((answer) => send({type: 'MANIFEST', payload: answer}));
+				break;
 		}
-	}, []);
+	}, [send]);
 
 	// Self signed servers are the user's call, made in the app's settings.
 	const onSslError = useCallback((error: SslErrorData, callback: OnSslErrorCallback) => {

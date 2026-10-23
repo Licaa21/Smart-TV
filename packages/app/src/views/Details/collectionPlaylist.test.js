@@ -1,30 +1,12 @@
 import {
-	splitCollectionMembers,
 	indexEntryFor,
 	compareReleaseAscending,
-	sortIndexEntries,
 	orderItemsByIds,
 	buildCollectionIndex,
 	fetchCollectionPage
 } from './collectionPlaylist';
 
 const entry = (over) => ({id: 'x', name: '', premiereDate: null, productionYear: null, ...over});
-
-describe('splitCollectionMembers', () => {
-	it('keeps what plays as it is apart from the series that need expanding', () => {
-		const members = [
-			{Id: '1', Type: 'Movie'}, {Id: '2', Type: 'Series'}, {Id: '3', Type: 'MusicVideo'},
-			{Id: '4', Type: 'BoxSet'}, {Id: '5', Type: 'Audio'}, {Id: '6', Type: 'Video'}
-		];
-		const {playables, series} = splitCollectionMembers(members);
-		expect(playables.map((i) => i.Id)).toEqual(['1', '3', '5', '6']);
-		expect(series.map((i) => i.Id)).toEqual(['2']);
-	});
-
-	it('has nothing to split when the collection came back empty', () => {
-		expect(splitCollectionMembers()).toEqual({playables: [], series: []});
-	});
-});
 
 describe('indexEntryFor', () => {
 	it('keeps only the id and what it takes to sort', () => {
@@ -57,14 +39,6 @@ describe('compareReleaseAscending', () => {
 	});
 });
 
-describe('sortIndexEntries', () => {
-	it('orders a mixed list without touching the one it was given', () => {
-		const entries = [entry({id: 'c', name: 'C'}), entry({id: 'a', premiereDate: '1986-01-01'}), entry({id: 'b', productionYear: 1979})];
-		expect(sortIndexEntries(entries).map((e) => e.id)).toEqual(['b', 'a', 'c']);
-		expect(entries.map((e) => e.id)).toEqual(['c', 'a', 'b']);
-	});
-});
-
 describe('orderItemsByIds', () => {
 	it('puts a page back into the order it was asked for', () => {
 		const items = [{Id: 'c'}, {Id: 'a'}, {Id: 'b'}];
@@ -77,17 +51,20 @@ describe('orderItemsByIds', () => {
 });
 
 describe('buildCollectionIndex', () => {
-	it('expands the series and folds their episodes in with the movies', async () => {
+	it('keeps the server order and puts each series\' episodes in its place', async () => {
 		const api = {
 			getItems: jest.fn().mockResolvedValue({Items: [
 				{Id: 'm1', Type: 'Movie', Name: 'Movie', PremiereDate: '1990-01-01'},
-				{Id: 's1', Type: 'Series', Name: 'Show'}
+				{Id: 's1', Type: 'Series', Name: 'Show'},
+				{Id: 'b1', Type: 'BoxSet', Name: 'Nested'},
+				{Id: 'm2', Type: 'Movie', Name: 'Older', PremiereDate: '1980-01-01'}
 			]}),
 			getEpisodes: jest.fn().mockResolvedValue({Items: [
-				{Id: 'e1', Type: 'Episode', Name: 'Ep 1', PremiereDate: '1985-01-01'}
+				{Id: 'e1', Type: 'Episode', Name: 'Ep 1', PremiereDate: '1985-01-01'},
+				{Id: 'e2', Type: 'Episode', Name: 'Ep 2', PremiereDate: '1985-01-08'}
 			]})
 		};
-		expect(await buildCollectionIndex(api, 'box')).toEqual(['e1', 'm1']);
+		expect(await buildCollectionIndex(api, 'box')).toEqual(['m1', 'e1', 'e2', 'm2']);
 		expect(api.getItems).toHaveBeenCalledWith(expect.objectContaining({ParentId: 'box', Limit: 2000}));
 		expect(api.getEpisodes).toHaveBeenCalledWith('s1');
 	});

@@ -81,6 +81,14 @@ describe('the automatic bitrate', () => {
 		}
 	});
 
+	test("is the platform's own where it names one", async () => {
+		getDeviceCapabilities.mockResolvedValue({uhd: true, autoMaxBitrate: 120000000});
+
+		await playback.getPlaybackInfo(movie.Id, {item: movie});
+
+		expect(askedFor()).toBe(120000000);
+	});
+
 	test('gives way to a limit the user set', async () => {
 		getDeviceCapabilities.mockResolvedValue({fitsBitrateToLink: true});
 

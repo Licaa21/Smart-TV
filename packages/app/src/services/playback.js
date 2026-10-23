@@ -458,9 +458,10 @@ const extractChapters = (mediaSource) => {
 	}));
 };
 
-// Derive max streaming bitrate from device capabilities.
+// Derive max streaming bitrate from device capabilities, unless the platform names its own.
 // Per LG AV format docs: 8K=100Mbps, UHD=50Mbps on webOS 3, UHD=60Mbps on webOS 4+.
 const getAutoMaxBitrate = (capabilities) => {
+	if (capabilities.autoMaxBitrate) return capabilities.autoMaxBitrate;
 	if (capabilities.uhd8K) return 100_000_000;
 	if (capabilities.webosVersion === 3 && capabilities.uhd) return 50_000_000;
 	if (capabilities.uhd) return 60_000_000;
@@ -1827,6 +1828,17 @@ export const updateCurrentSession = (updates) => {
 };
 
 export const isDirectPlay = () => currentSession?.playMethod === PlayMethod.DirectPlay;
+
+// What the server says it's doing with a running transcode, or nothing when it doesn't answer in time.
+export const getTranscodingInfo = async () => {
+	if (currentSession?.playMethod !== PlayMethod.Transcode) return null;
+	try {
+		const sessions = await apiForSession(currentSession).getOwnSessions();
+		return (Array.isArray(sessions) && sessions[0]?.TranscodingInfo) || null;
+	} catch {
+		return null;
+	}
+};
 
 
 

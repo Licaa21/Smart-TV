@@ -20,44 +20,65 @@ export const getHdrType = (videoStream, showsDolbyVision = true) => {
 	return baseLayerLabel(videoStream) || label;
 };
 
+const VIDEO_CODEC_NAMES = {
+	hevc: 'HEVC', h265: 'HEVC', h264: 'H.264', avc: 'H.264', av1: 'AV1', vp9: 'VP9', vp8: 'VP8',
+	mpeg2video: 'MPEG-2', mpeg4: 'MPEG-4', vc1: 'VC-1'
+};
+
+const AUDIO_CODEC_NAMES = {aac: 'AAC', flac: 'FLAC', opus: 'Opus', mp3: 'MP3', vorbis: 'Vorbis', alac: 'ALAC'};
+
+const DOLBY_NAMES = {truehd: 'Dolby TrueHD', eac3: 'Dolby Digital Plus', ac3: 'Dolby Digital'};
+
+const lower = (value) => (value == null ? '' : String(value)).trim().toLowerCase();
+
+export const videoCodecName = (codec) => {
+	const key = lower(codec);
+	return key ? (VIDEO_CODEC_NAMES[key] || key.toUpperCase()) : null;
+};
+
+// A profile or level the server wrote as 0 is one it didn't read.
+export const present = (value) => {
+	const text = value == null ? '' : String(value).trim();
+	return text && text !== '0' ? text : null;
+};
+
 export const getVideoCodec = (videoStream) => {
-	if (!videoStream) return $L('Unknown');
-	let codec = (videoStream.Codec || '').toUpperCase();
-	if (codec === 'HEVC') codec = 'HEVC (H.265)';
-	else if (codec === 'H264' || codec === 'AVC') codec = 'AVC (H.264)';
-	else if (codec === 'AV1') codec = 'AV1';
-	else if (codec === 'VP9') codec = 'VP9';
-
-	if (videoStream.Profile) {
-		codec += ` ${videoStream.Profile}`;
-	}
-	if (videoStream.Level) {
-		codec += `@L${videoStream.Level}`;
-	}
-	return codec;
+	const name = videoCodecName(videoStream?.Codec);
+	if (!name) return null;
+	const profile = present(videoStream.Profile);
+	return profile ? `${name} ${profile}` : name;
 };
 
-export const getAudioCodec = (audioStream) => {
-	if (!audioStream) return $L('Unknown');
-	let codec = (audioStream.Codec || '').toUpperCase();
-	if (codec === 'EAC3') codec = 'E-AC3 (Dolby Digital Plus)';
-	else if (codec === 'AC3') codec = 'AC3 (Dolby Digital)';
-	else if (codec === 'TRUEHD') codec = 'TrueHD';
-	else if (codec === 'DTS') codec = 'DTS';
-	else if (codec === 'AAC') codec = 'AAC';
-	else if (codec === 'FLAC') codec = 'FLAC';
-	return codec;
+// The server writes Atmos and the DTS extensions into the profile, as in "Dolby TrueHD + Dolby Atmos".
+export const audioCodecName = (codec, profile) => {
+	const key = lower(codec);
+	if (!key) return null;
+	const detail = lower(profile);
+	if (DOLBY_NAMES[key]) return detail.indexOf('atmos') !== -1 ? `${DOLBY_NAMES[key]} with Atmos` : DOLBY_NAMES[key];
+	if (key === 'dts' || key === 'dca') {
+		if (/dts[:\- ]?x\b/.test(detail)) return 'DTS:X';
+		if (/\bma\b/.test(detail)) return 'DTS-HD Master Audio';
+		if (/\bhra\b/.test(detail)) return 'DTS-HD High Resolution';
+		return 'DTS';
+	}
+	if (key.indexOf('pcm_') === 0) return 'PCM';
+	return AUDIO_CODEC_NAMES[key] || key.toUpperCase();
 };
 
-export const getAudioChannels = (audioStream) => {
-	if (!audioStream) return $L('Unknown');
-	const channels = audioStream.Channels;
-	if (!channels) return $L('Unknown');
-	if (channels === 8) return '7.1';
-	if (channels === 6) return '5.1';
-	if (channels === 2) return $L('Stereo');
+export const audioChannelsName = (channels) => {
+	if (!(channels > 0)) return null;
 	if (channels === 1) return $L('Mono');
-	return `${channels} ${$L('channels')}`;
+	if (channels === 2) return $L('Stereo');
+	if (channels === 6) return $L('5.1 surround');
+	if (channels === 8) return $L('7.1 surround');
+	return $L('{count} channels').replace('{count}', channels);
+};
+
+// How a converted count names what it came from, without the word surround.
+export const channelLayout = (channels) => {
+	if (channels === 6) return $L('5.1');
+	if (channels === 8) return $L('7.1');
+	return audioChannelsName(channels);
 };
 
 // The three below are only read by the details footer. Each gives back nothing rather than a

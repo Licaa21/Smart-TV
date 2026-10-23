@@ -1,5 +1,5 @@
 import {
-	SORT_ALPHABETICAL, SORT_CUSTOM, SORT_RELEASE_DESCENDING, applyCollectionSort,
+	SORT_ALPHABETICAL, SORT_CUSTOM, SORT_RELEASE_ASCENDING, SORT_RELEASE_DESCENDING, applyCollectionSort,
 	collectionSortOptions, sortLabel
 } from './nouveauCollectionSort';
 
@@ -14,8 +14,12 @@ const library = [
 ];
 
 describe('applyCollectionSort', () => {
-	it('puts a collection in release order by default', () => {
-		expect(ids(applyCollectionSort(library))).toEqual(['a', 'c', 'b']);
+	it('keeps the order the server sent by default', () => {
+		expect(ids(applyCollectionSort(library))).toEqual(['c', 'a', 'b']);
+	});
+
+	it('puts a collection in release order on request', () => {
+		expect(ids(applyCollectionSort(library, SORT_RELEASE_ASCENDING))).toEqual(['a', 'c', 'b']);
 	});
 
 	it('reverses it on request', () => {
@@ -30,10 +34,8 @@ describe('applyCollectionSort', () => {
 		expect(ids(applyCollectionSort(library, SORT_CUSTOM, ['b', 'a', 'c']))).toEqual(['b', 'a', 'c']);
 	});
 
-	// A saved order from a collection that has since changed would leave everything unplaced, so
-	// something sensible has to stand in rather than an arbitrary order.
-	it('falls back to release order when the saved one is empty', () => {
-		expect(ids(applyCollectionSort(library, SORT_CUSTOM, []))).toEqual(['a', 'c', 'b']);
+	it('falls back to the server order when the saved one is empty', () => {
+		expect(ids(applyCollectionSort(library, SORT_CUSTOM, []))).toEqual(['c', 'a', 'b']);
 	});
 
 	it('leaves the list it was given alone', () => {

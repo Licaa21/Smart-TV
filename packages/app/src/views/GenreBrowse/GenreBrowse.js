@@ -397,7 +397,7 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 
 	return (
 		<div className={css.page}>
-			{settings.showHomeBackdrop !== false && (
+			{!settings.hideBackdropsInLibraries && (
 				<div className={css.backdrop}>
 					{backdropUrl && (
 						<img
