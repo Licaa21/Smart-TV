@@ -265,6 +265,13 @@ did, what the fork keeps instead, and what to do on a merge.
 - **On a merge:** keep `lazy` for any viewer or reader upstream imports directly, the fork's audio start block with upstream's codec test inside it, and the stronger band.
 - **Files:** `App/App.js`, `views/Player/TizenPlayer.js`, `views/Details/Details.module.less`.
 
+### 11. Trailer quality, the Player signature and the Settings rows
+
+- **Upstream:** `youtubeTrailer.js` follows a Fire TV trailer's separate soundtrack (`followSoundtrack`, `attachVideoOnly`) and leaves hls.js to its own quality choice. The WebOS player has no `startPaused`. Settings shows the three backdrop switches (Home Screen, Details Screen, Library Backdrops, since e97f2450) in place of the one.
+- **The fork keeps:** `pickTrailerLevel` (one quality per trailer, so the sound stays with the picture) next to upstream's soundtrack follower, the `startPaused` prop and the Back-from-player pause it serves, the Settings Size row beside the three switches, and Seerr cards opening through `seerrCardTarget` before upstream's Default Action (`autoPlay`) is applied in `handleSelectItem` (`App.js`, `Browse.js`). Upstream's rebuilt playback information dialog (`PlaybackInfoModal`) is taken whole, and the old info styles and helpers in the players are gone with it.
+- **On a merge:** keep those, and keep the fork's own screens that read `showHomeBackdrop` through `ScreenBackdrop` (Seerr Discover and the Seerr browse screens follow the Home Screen switch, not the Library one).
+- **Files:** `services/youtubeTrailer.js`, `views/Player/WebOSPlayer.js`, `views/Settings/settingsSchema.js`, `App/App.js`, `views/Browse/Browse.js`.
+
 ## When the user says Moonbase (the plugin) updated
 
 The fork works around things the Moonbase plugin (Moonfin-Client/Plugin) does not do yet. When the user says a new release is
