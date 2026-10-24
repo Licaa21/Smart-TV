@@ -19,6 +19,7 @@ The rules that matter most, each explained further down:
 6. **After every merge from upstream**, run the merge checklist, and keep what is in "Upstream changes that are not
    taken".
 7. **Commits carry no AI names**: authored as Licaa21, no co-author or generated-with lines.
+8. **The code review is never skipped.** Every change to code, settings, defaults or scripts is reviewed before it is reported as done, at least two passes, and a merge from upstream is reviewed too (the conflict resolutions especially). Small changes are not exempt, and neither is a change that passed its tests. Only a change to CLAUDE.md, the README or other prose alone is. The report names the passes and what each found, and a report without them is not finished. Do not write "I did not run the code review" as a way out: run it. This rule was added after a session skipped it for most of its work.
 
 ## Repository layout
 
@@ -100,9 +101,9 @@ ode_modules`.
 - From `packages/app`: `CI=true npx enact test --watchAll=false` and `npx enact lint .`. Both must be clean. One test,
   `src/services/xboxNativeVideo.test.js`, already fails on the fork's branches and is not caused by a change. A test run
   in a folder without `node_modules` fails with "enact is not installed": link the modules first.
-- After every fix, feature or addition, run the code review (`/code-review`, or a read-only review agent given the diff
+- After every fix, feature or addition, and after every merge from upstream, run the code review (`/code-review`, or a read-only review agent given the diff
   and the context) on the change, and run it more than once: fix what it finds, then review again, until a pass finds
-  nothing real. Do this before reporting the work as done.
+  nothing real. Do this before reporting the work as done, before committing when the commit is what gets built, and before a build. It is part of the work, not an extra to offer afterwards: if it was not run, the work is not done. The order before every report: lint, tests, code review (two passes or more), `verification-before-completion`.
 - Every change ships with a test for what can be tested (rules, ranking, timing with fake timers, a hook with Spotlight mocked), added in the same commit. What needs a real TV (focus feel, timing on the set) is said so in the report instead.
 - Look at screens in a browser, not just in tests (see "Tools"). TV behaviour itself is only known from a real TV.
 - Do not run the tests while the dev server is up: the server stalls rebuilding. Stop it first.
