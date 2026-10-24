@@ -272,6 +272,17 @@ did, what the fork keeps instead, and what to do on a merge.
 - **On a merge:** keep those, and keep the fork's own screens that read `showHomeBackdrop` through `ScreenBackdrop` (Seerr Discover and the Seerr browse screens follow the Home Screen switch, not the Library one).
 - **Files:** `services/youtubeTrailer.js`, `views/Player/WebOSPlayer.js`, `views/Settings/settingsSchema.js`, `App/App.js`, `views/Browse/Browse.js`.
 
+## The plugin fork, and the TMDB key still to be removed from the client
+
+The Moonbase plugin has a fork of its own, Licaa21/Plugin, in `E:VSCode ProjectsMoonfin Plugin Fork` (`main/`, `implement/`, `local/`, with its own CLAUDE.md in `implement/`; another chat works there). The user installs its releases on the Jellyfin server from the fork's manifest, `https://raw.githubusercontent.com/Licaa21/Plugin/refs/heads/main/manifest.json`. Its CLAUDE.md, section "What the TV client expects", is the contract for the routes this app will call: `Moonfin/Tmdb/Details`, `Season` and `Recommendations` (and the existing `NextEpisode`), which answer in TMDB's own shapes and use the plugin's server-wide key.
+
+**When the user says the fork plugin with those routes is installed**, do this, asking first on anything that is a choice:
+
+1. Check the routes on the real server as the Claude user, read only (see "Testing against the real server"), and compare their answers with the contract. If they differ, stop and tell the user.
+2. Make the app call them instead of TMDB: `utils/tmdbText.js` (`tmdbGet` becomes a call to the plugin, `seasonFromTmdb` and `withTmdbText` keep working on the same shapes), `utils/seerrTitle.js`, `utils/seerrSeasons.js`, `services/homeRecommendations.js` (`fetchTmdbRecommendations`) and `utils/upcomingEpisode.js` (the air date through `Moonfin/Tmdb/NextEpisode`). Any answer but 200 means Seerr's own text, as the app does today without a key.
+3. Remove the client's own key: the `tmdbApiKey` setting (`defaultSettings.js`, the sync in `SettingsContext.js`, the `tmdbPanel` row in `settingsSchema.js` and `TmdbKeyPanel.js`), its strings (English and Romanian) and tests, and the places that pass `settings.tmdbApiKey` along (`useBrowseData.js`, `browseRowLoaders.js`).
+4. Tests for the calls and the fallback, lint, the Romanian check, the code review, a look at a Seerr title and season in the browser on the real server, then a build when the user wants one. Update item 3 of "When the user says Moonbase (the plugin) updated" and the README line about the TMDB key.
+
 ## When the user says Moonbase (the plugin) updated
 
 The fork works around things the Moonbase plugin (Moonfin-Client/Plugin) does not do yet. When the user says a new release is
