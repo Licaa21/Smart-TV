@@ -2,9 +2,9 @@ import {useCallback} from 'react';
 import $L from '@enact/i18n/$L';
 
 import {SpottableDiv} from '../../detailsSpottables';
-import {SeerrChips, SeerrFacts} from '../../../../components/seerr/SeerrSections';
+import {SeerrChips, SeerrFacts, SeerrStreaming} from '../../../../components/seerr/SeerrSections';
 import NouveauDirectPlay from './NouveauDirectPlay';
-import {fileName, fileSizeLine, trackRows, videoLines} from '../nouveauFooterFields';
+import {bookFileName, bookFormatLine, fileName, fileSizeLine, trackRows, videoLines} from '../nouveauFooterFields';
 
 import css from './NouveauDetailsFooter.module.less';
 
@@ -37,7 +37,9 @@ const NouveauDetailsFooter = ({
 	item, showsSection, mediaSource, effectiveApi, selectedAudioIndex, selectedSubtitleIndex,
 	seerr, seerrNav, onSelectStudio
 }) => {
-	const fileSource = showsSection('mediaInfo') ? mediaSource : null;
+	// A book's file is read off the item, with no tracks and nothing to direct play.
+	const bookFile = item.Type === 'Book' && showsSection('mediaInfo');
+	const fileSource = showsSection('mediaInfo') && !bookFile ? mediaSource : null;
 	const streams = fileSource?.MediaStreams || [];
 	const video = streams.find((stream) => stream.Type === 'Video');
 	const audio = streams.filter((stream) => stream.Type === 'Audio');
@@ -49,18 +51,19 @@ const NouveauDetailsFooter = ({
 	const activeSubtitle = selectedSubtitleIndex >= 0 ? subtitles[selectedSubtitleIndex]?.Index : undefined;
 
 	const studios = showsSection('studios') ? (item.Studios || []).map((studio) => studio?.Name).filter(Boolean) : [];
-	const name = fileName(fileSource);
-	const sizeLine = fileSizeLine(fileSource);
+	const name = bookFile ? bookFileName(item) : fileName(fileSource);
+	const sizeLine = bookFile ? bookFormatLine(item) : fileSizeLine(fileSource);
 	const videoDetails = videoLines(video);
 	const showsChips = Boolean(seerr?.pieces?.chips);
 	const showsFacts = Boolean(seerr?.pieces?.facts);
+	const showsStreaming = Boolean(seerr?.pieces?.streaming);
 
 	const openStudio = useCallback((ev) => {
 		const studio = ev.currentTarget.dataset.studioName;
 		if (studio) onSelectStudio?.(studio);
 	}, [onSelectStudio]);
 
-	if (!studios.length && !showsChips && !showsFacts && !fileSource) return null;
+	if (!studios.length && !showsChips && !showsFacts && !showsStreaming && !fileSource && !bookFile) return null;
 
 	return (
 		<div className={css.footer}>
@@ -82,23 +85,26 @@ const NouveauDetailsFooter = ({
 						</div>
 					</Group>
 				)}
-				{/* Both carry their own label, so neither is wrapped in a titled group. A library
-				    item can have this as readily as a Seerr only one. */}
+				{/* These carry their own label, so none is wrapped in a titled group. A library
+				    item can have them as readily as a Seerr only one. */}
 				{showsChips && <SeerrChips details={seerr.details} mediaType={seerr.mediaType} seerrNav={seerrNav} />}
 				{showsFacts && <SeerrFacts details={seerr.details} mediaType={seerr.mediaType} />}
-				{fileSource && (
+				{showsStreaming && <SeerrStreaming providers={seerr.streamingProviders} />}
+				{(fileSource || bookFile) && (
 					<Group title={$L('File Information')}>
 						{name && <div className={css.fileName}>{name}</div>}
 						{sizeLine && <div className={css.fileMeta}>{sizeLine}</div>}
-						<NouveauDirectPlay
-							api={effectiveApi}
-							item={item}
-							itemId={item.Id}
-							serverType={item._serverType}
-							mediaSourceId={fileSource.Id}
-							audioStreamIndex={activeAudio}
-							subtitleStreamIndex={activeSubtitle}
-						/>
+						{fileSource && (
+							<NouveauDirectPlay
+								api={effectiveApi}
+								item={item}
+								itemId={item.Id}
+								serverType={item._serverType}
+								mediaSourceId={fileSource.Id}
+								audioStreamIndex={activeAudio}
+								subtitleStreamIndex={activeSubtitle}
+							/>
+						)}
 					</Group>
 				)}
 				{videoDetails.length > 0 && (

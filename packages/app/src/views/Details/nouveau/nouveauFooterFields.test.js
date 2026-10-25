@@ -1,4 +1,4 @@
-import {fileName, fileSizeLine, trackRows, videoLines} from './nouveauFooterFields';
+import {bookFileName, bookFormatLine, fileName, fileSizeLine, trackRows, videoLines} from './nouveauFooterFields';
 
 const MB = 1024 * 1024;
 
@@ -53,6 +53,24 @@ describe('fileName', () => {
 		expect(fileName({Path: '/media/films/Thing (1982).mkv'})).toBe('Thing (1982).mkv');
 		expect(fileName({Path: 'C:\\media\\Thing.mkv'})).toBe('Thing.mkv');
 		expect(fileName({})).toBeNull();
+	});
+});
+
+describe('book file', () => {
+	it('names the file and its format from the path', () => {
+		const book = {Type: 'Book', Name: 'Dune', Path: '/books/Dune.epub'};
+		expect(bookFileName(book)).toBe('Dune.epub');
+		expect(bookFormatLine(book)).toBe('Format: .epub');
+	});
+
+	it('leaves the format out when the file has no extension', () => {
+		const book = {Type: 'Book', Name: 'Dune', Path: '/books/Dune'};
+		expect(bookFileName(book)).toBe('Dune');
+		expect(bookFormatLine(book)).toBeNull();
+	});
+
+	it('falls back to the title without a path', () => {
+		expect(bookFileName({Type: 'Book', Name: 'Dune'})).toBe('Dune');
 	});
 });
 

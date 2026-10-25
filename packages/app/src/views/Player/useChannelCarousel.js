@@ -8,6 +8,12 @@ import {channelComparator} from '../../utils/liveTvGuide';
 
 const normalizeServer = (url) => (url || '').replace(/\/+$/, '').toLowerCase();
 
+// The guide data and recordings only come from the signed in server, so a channel from another
+// server gets no api here.
+export const liveTvApiFor = (serverUrl) => (
+	!serverUrl || normalizeServer(serverUrl) === normalizeServer(getServerUrl()) ? jellyfinApi : null
+);
+
 // A switch that hasn't started playing by then counts as failed.
 const TUNE_TIMEOUT_MS = 35000;
 const NOTICE_MS = 4000;
@@ -41,12 +47,8 @@ const useChannelCarousel = ({item, isLiveTV, liveTvChannels, sortBy, error, cont
 	controlsVisibleRef.current = controlsVisible;
 	const restoreFocusRef = useRef(null);
 
-	// The guide data only comes from the signed in server. A channel from another server still
-	// gets its card, without a schedule.
-	const carouselApi = useMemo(() => {
-		if (!item?._serverUrl) return jellyfinApi;
-		return normalizeServer(item._serverUrl) === normalizeServer(getServerUrl()) ? jellyfinApi : null;
-	}, [item?._serverUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+	// A channel from another server still gets its card, without a schedule.
+	const carouselApi = useMemo(() => liveTvApiFor(item?._serverUrl), [item?._serverUrl]);
 
 	useEffect(() => {
 		if (!isLiveTV || !item?.Id) return undefined;
@@ -217,7 +219,10 @@ const useChannelCarousel = ({item, isLiveTV, liveTvChannels, sortBy, error, cont
 		onShowControls: handleShowControls
 	} : null;
 
-	return {carouselOpenRef: openRef, openCarousel, stepChannel, markChannelPlaying, carouselProps};
+	// A recording made from the player marks its card without waiting on the hourly refresh.
+	const refreshRecordings = useCallback(() => prewarmRef.current?.refresh(), []);
+
+	return {carouselOpenRef: openRef, openCarousel, stepChannel, markChannelPlaying, refreshRecordings, carouselProps};
 };
 
 export default useChannelCarousel;

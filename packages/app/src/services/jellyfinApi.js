@@ -452,6 +452,15 @@ const collectionItemsVia = (send, method) => async (collectionId, itemIds) => {
 	return send(path, {method, body: {Ids: itemIds}});
 };
 
+// Jellyfin makes a new playlist public unless told otherwise, and Emby fails on
+// Ids sent as an array, so it gets them as a comma list.
+const createPlaylistVia = (send, type, userId) => (name, itemIds = []) => send('/Playlists', {
+	method: 'POST',
+	body: type() === 'emby'
+		? {Name: name, Ids: itemIds.join(','), UserId: userId()}
+		: {Name: name, Ids: itemIds, UserId: userId(), IsPublic: false}
+});
+
 // The casing the remote search endpoint wants in its path.
 const REMOTE_SEARCH_TYPES = {
 	movie: 'Movie',
@@ -686,6 +695,9 @@ export const api = {
 	getStudioCompanies: (tmdbId, mediaType) =>
 		request(`/Moonfin/Tmdb/ProductionCompanies?tmdbId=${encodeURIComponent(tmdbId)}&type=${mediaType === 'tv' ? 'tv' : 'movie'}`),
 
+	getTmdbReviews: (tmdbId, mediaType, language) =>
+		request(`/Moonfin/Tmdb/Reviews?tmdbId=${encodeURIComponent(tmdbId)}&type=${mediaType === 'tv' ? 'tv' : 'movie'}&language=${encodeURIComponent(language || 'en-US')}`),
+
 	// The plugin keeps a collection's hand-arranged order as a plain list of item ids. Without the
 	// plugin or a saved order, the caller falls back to the server's order.
 	getCollectionOrder: (collectionId) =>
@@ -757,6 +769,8 @@ export const api = {
 	setWatched: (itemId, watched) => request(userRoutes.played(itemId), {
 		method: watched ? 'POST' : 'DELETE'
 	}).then(publishUserData(itemId, playedUserData(watched))),
+
+	hideFromResume: (itemId) => request(`${userRoutes.hideFromResume(itemId)}Hide=true`, {method: 'POST'}),
 
 	setPlaybackPosition: (itemId, ticks) => request(userRoutes.userData(itemId), {
 		method: 'POST',
@@ -890,11 +904,18 @@ export const api = {
 
 	// No bare id fallback here, a series timer is only valid as a fully
 	// populated dto and the defaults call is the only thing that produces one.
-	createLiveTvSeriesTimer: async (programId) => {
-		const payload = {...(await api.getLiveTvTimerDefaults(programId))};
+	// The flags pick which episodes it records on top of those defaults.
+	createLiveTvSeriesTimer: async (programId, flags) => {
+		const payload = {...(await api.getLiveTvTimerDefaults(programId)), ...flags};
 		if (payload.ProgramId == null) payload.ProgramId = programId;
 		return request(`/LiveTv/SeriesTimers`, {method: 'POST', body: payload});
 	},
+
+	getLiveTvSeriesTimer: (seriesTimerId) =>
+		request(`/LiveTv/SeriesTimers/${seriesTimerId}`),
+
+	updateLiveTvSeriesTimer: (seriesTimerId, rule) =>
+		request(`/LiveTv/SeriesTimers/${seriesTimerId}`, {method: 'POST', body: rule}),
 
 	cancelLiveTvSeriesTimer: (seriesTimerId) =>
 		request(`/LiveTv/SeriesTimers/${seriesTimerId}`, {
@@ -975,15 +996,7 @@ export const api = {
 	getPlaylists: (sortBy = 'SortName', sortOrder = 'Ascending') =>
 		request(`${userRoutes.items()}IncludeItemTypes=Playlist&Recursive=true&SortBy=${sortBy}&SortOrder=${sortOrder}`),
 
-	createPlaylist: (name, itemIds = []) =>
-		request('/Playlists', {
-			method: 'POST',
-			body: {
-				Name: name,
-				Ids: itemIds,
-				UserId: currentUser
-			}
-		}).then(homeRowsChanged),
+	createPlaylist: (name, itemIds = []) => createPlaylistVia(request, () => serverType, () => currentUser)(name, itemIds).then(homeRowsChanged),
 
 	addToPlaylist: (playlistId, itemIds) =>
 		request(`/Playlists/${playlistId}/Items?Ids=${itemIds.join(',')}`, {
@@ -1221,6 +1234,9 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		getStudioCompanies: (tmdbId, mediaType) =>
 			serverRequest(`/Moonfin/Tmdb/ProductionCompanies?tmdbId=${encodeURIComponent(tmdbId)}&type=${mediaType === 'tv' ? 'tv' : 'movie'}`),
 
+		getTmdbReviews: (tmdbId, mediaType, language) =>
+			serverRequest(`/Moonfin/Tmdb/Reviews?tmdbId=${encodeURIComponent(tmdbId)}&type=${mediaType === 'tv' ? 'tv' : 'movie'}&language=${encodeURIComponent(language || 'en-US')}`),
+
 		getCollectionOrder: (collectionId) =>
 			serverRequest(`/Moonfin/Collections/${collectionId}/Order`),
 
@@ -1271,6 +1287,8 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		setWatched: (itemId, watched) => serverRequest(serverUserRoutes.played(itemId), {
 			method: watched ? 'POST' : 'DELETE'
 		}).then(publishUserData(itemId, playedUserData(watched))),
+
+		hideFromResume: (itemId) => serverRequest(`${serverUserRoutes.hideFromResume(itemId)}Hide=true`, {method: 'POST'}),
 
 		setPlaybackPosition: (itemId, ticks) => serverRequest(serverUserRoutes.userData(itemId), {
 			method: 'POST',
@@ -1331,15 +1349,7 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		getPlaylists: (sortBy = 'SortName', sortOrder = 'Ascending') =>
 			serverRequest(`${serverUserRoutes.items()}IncludeItemTypes=Playlist&Recursive=true&SortBy=${sortBy}&SortOrder=${sortOrder}`),
 
-		createPlaylist: (name, itemIds = []) =>
-			serverRequest('/Playlists', {
-				method: 'POST',
-				body: {
-					Name: name,
-					Ids: itemIds,
-					UserId: userId
-				}
-			}).then(homeRowsChanged),
+		createPlaylist: (name, itemIds = []) => createPlaylistVia(serverRequest, () => serverTypeOverride, () => userId)(name, itemIds).then(homeRowsChanged),
 
 		addToPlaylist: (playlistId, itemIds) =>
 			serverRequest(`/Playlists/${playlistId}/Items?Ids=${itemIds.join(',')}`, {
@@ -1357,6 +1367,9 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 
 		getSpecialFeatures: (itemId) =>
 			serverRequest(serverUserRoutes.extras(itemId, 'SpecialFeatures')),
+
+		getAdditionalParts: (itemId) =>
+			serverRequest(`/Videos/${itemId}/AdditionalParts?UserId=${userId}`),
 
 		getAncestors: (itemId) =>
 			serverRequest(`/Items/${itemId}/Ancestors?UserId=${userId}`),

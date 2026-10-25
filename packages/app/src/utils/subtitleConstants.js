@@ -92,13 +92,16 @@ export const subtitleBottomPercent = (settings) => (settings.subtitlePosition ==
 	: POSITION_MAP[settings.subtitlePosition] || 10);
 
 // `lift` is how far the controls or the pause description push the subtitles up, and the transition on the
-// overlay's class makes that a slide
-export const getSubtitleOverlayStyle = (settings, lift = 0) => ({
-	bottom: `${subtitleBottomPercent(settings)}%`,
+// overlay's class makes that a slide. A second track on screen moves the first by shiftPercent, never past the
+// bottom edge.
+export const getSubtitleOverlayStyle = (settings, lift = 0, shiftPercent = 0) => ({
+	bottom: `${Math.max(0, subtitleBottomPercent(settings) + shiftPercent)}%`,
 	opacity: (settings.subtitleOpacity || 100) / 100,
 	transform: `translateY(${-lift}px)`,
 	WebkitTransform: `translateY(${-lift}px)`
 });
+
+export const getSubtitleFontPx = (settings) => SIZE_MAP[settings?.subtitleSize] || 44;
 
 // What a picture subtitle (PGS) can be given: it scales about the bottom edge, goes up by the percent of the screen the
 // position adds to where the file puts it, and fades or dims.
@@ -176,7 +179,7 @@ export const getSubtitleTextStyle = (settings) => {
 	const blur = `${settings.subtitleShadowBlur || 0.1}em`;
 
 	return {
-		fontSize: `${SIZE_MAP[settings.subtitleSize] || 44}px`,
+		fontSize: `${getSubtitleFontPx(settings)}px`,
 		backgroundColor: toCssColor(settings.subtitleBackgroundColor || '#000000', settings.subtitleBackground !== undefined ? settings.subtitleBackground : 0),
 		color: toCssColor(settings.subtitleColor || '#ffffff', 100),
 		// The font joins f and i into one glyph that takes the dot of the i, so the i of "fii" read as a dotless one. The

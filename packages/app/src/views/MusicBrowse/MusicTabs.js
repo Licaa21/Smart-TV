@@ -30,7 +30,6 @@ const MusicTabs = ({onOpenGrid}) => {
 	return (
 		<div className={css.tabs} onBlur={handleBlur}>
 			<DetailsTabBar
-				className={css.tabBar}
 				tabs={TAB_LIST}
 				activeId={highlight}
 				onSelect={setHighlight}

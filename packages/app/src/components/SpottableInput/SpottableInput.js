@@ -29,7 +29,7 @@ const SpottableInput = forwardRef(({
 	const kbActiveRef = useRef(false);
 	const [cursorPos, setCursorPos] = useState(0);
 	const {settings} = useSettings();
-	const preferSystemIme = settings.preferSystemImeKeyboard === true;
+	const nativeKeyboard = settings.keyboardStyle === 'native';
 
 	const valueRef = useRef(inputProps.value);
 	valueRef.current = inputProps.value;
@@ -78,6 +78,7 @@ const SpottableInput = forwardRef(({
 		const opened = openTvKeyboard({
 			value: valueRef.current == null ? '' : String(valueRef.current),
 			purpose,
+			password: inputProps.type === 'password',
 			maxLength: inputProps.maxLength,
 			anchor: inputRef.current?.parentElement || null,
 			recents,
@@ -135,12 +136,12 @@ const SpottableInput = forwardRef(({
 				// Same engines as above
 			}
 		});
-	}, [disabled, spotlightId, dataSpotlightId, purpose, recents, suggestionsBuilder, inputProps.maxLength, activateInput]);
+	}, [disabled, spotlightId, dataSpotlightId, purpose, recents, suggestionsBuilder, inputProps.maxLength, inputProps.type, activateInput]);
 
 	const handleActivate = useCallback(() => {
-		if (preferSystemIme) activateInput();
+		if (nativeKeyboard) activateInput();
 		else openKeyboard();
-	}, [preferSystemIme, activateInput, openKeyboard]);
+	}, [nativeKeyboard, activateInput, openKeyboard]);
 
 	const handleFocus = useCallback(() => setInputFocused(true), []);
 

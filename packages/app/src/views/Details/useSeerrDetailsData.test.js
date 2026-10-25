@@ -77,8 +77,8 @@ afterEach(() => jest.useRealTimers());
 
 describe('the refresh interval', () => {
 	test('a download refreshes every 15s, anything else on its way every 30s', () => {
-		expect(statusPollInterval({status: MEDIA_STATUS.PROCESSING, downloadStatus: [{size: 100, sizeLeft: 40}]})).toBe(15000);
-		expect(statusPollInterval({status: MEDIA_STATUS.UNKNOWN, status4k: MEDIA_STATUS.PROCESSING, downloadStatus4k: [{size: 100, sizeLeft: 40}]})).toBe(15000);
+		expect(statusPollInterval({status: MEDIA_STATUS.PROCESSING, downloadStatus: [{downloadId: 'dl', size: 100, sizeLeft: 40}]})).toBe(15000);
+		expect(statusPollInterval({status: MEDIA_STATUS.UNKNOWN, status4k: MEDIA_STATUS.PROCESSING, downloadStatus4k: [{downloadId: 'dl', size: 100, sizeLeft: 40}]})).toBe(15000);
 		expect(statusPollInterval({status: MEDIA_STATUS.PENDING})).toBe(30000);
 		expect(statusPollInterval({status: MEDIA_STATUS.AVAILABLE})).toBe(null);
 		expect(statusPollInterval(undefined)).toBe(null);
@@ -111,7 +111,7 @@ describe('the open Seerr details page', () => {
 		act(() => result.current.setDetails(movie()));
 		expect(result.current.hdDownload).toBe(null);
 
-		mediaInfo = {status: MEDIA_STATUS.PROCESSING, downloadStatus: [{size: 100, sizeLeft: 40}]};
+		mediaInfo = {status: MEDIA_STATUS.PROCESSING, downloadStatus: [{downloadId: 'dl', size: 100, sizeLeft: 40}]};
 		await elapse(30000);
 		expect(result.current.hdDownload.fraction).toBe(0.6);
 
@@ -131,7 +131,7 @@ describe('the open Seerr details page', () => {
 	});
 
 	test('a download refreshes on the 15s beat', async () => {
-		mediaInfo = {status: MEDIA_STATUS.PROCESSING, downloadStatus: [{size: 100, sizeLeft: 40}]};
+		mediaInfo = {status: MEDIA_STATUS.PROCESSING, downloadStatus: [{downloadId: 'dl', size: 100, sizeLeft: 40}]};
 		await open();
 		await elapse(14999);
 		expect(refreshes()).toBe(0);
@@ -157,6 +157,18 @@ describe('the open Seerr details page', () => {
 		expect(refreshes()).toBe(0);
 	});
 
+	test('picks the streaming region the way Seerr does', async () => {
+		seerrApi.getPublicSettings.mockResolvedValue({streamingRegion: 'GB'});
+		expect((await open()).result.current.streamingRegion).toBe('GB');
+
+		seerrApi.getUser.mockResolvedValue({id: 1, settings: {streamingRegion: 'CA'}});
+		expect((await open()).result.current.streamingRegion).toBe('CA');
+
+		seerrApi.getUser.mockRejectedValue(new Error('offline'));
+		seerrApi.getPublicSettings.mockResolvedValue({streamingRegion: ''});
+		expect((await open()).result.current.streamingRegion).toBe('US');
+	});
+
 	test('a refresh that lands after the page closes starts nothing', async () => {
 		mediaInfo = {status: MEDIA_STATUS.PROCESSING};
 		const {unmount} = await open();
@@ -164,7 +176,7 @@ describe('the open Seerr details page', () => {
 		seerrApi.getMovie.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
 		await elapse(30000);
 		unmount();
-		finish({...movie(), mediaInfo: {status: MEDIA_STATUS.PROCESSING, downloadStatus: [{size: 100, sizeLeft: 40}]}});
+		finish({...movie(), mediaInfo: {status: MEDIA_STATUS.PROCESSING, downloadStatus: [{downloadId: 'dl', size: 100, sizeLeft: 40}]}});
 		const refreshesAtClose = refreshes();
 		await elapse(2 * 60000);
 		expect(refreshes()).toBe(refreshesAtClose);

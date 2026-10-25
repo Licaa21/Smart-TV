@@ -19,6 +19,7 @@ import {
 } from '../../services/mediaPreviewSource';
 import {claimSharedVideo, isMusicPlaying, releaseSharedVideo} from '../../utils/sharedVideoOwner';
 import {coverVideoInBox, resetVideoBox} from '../../utils/videoCover';
+import {isStreamlessStaticSource} from '../../utils/placeholderSource';
 
 const noop = () => {};
 
@@ -223,7 +224,7 @@ export const createMediaPreviewController = ({getSettings, api, onThemeMusicHold
 				deviceId: getDeviceId(),
 				playSessionId: entry.playSessionId,
 				itemId: target.Id,
-				mediaSourceId: source.Id,
+				mediaSourceId: isStreamlessStaticSource(target, source.Id) ? undefined : source.Id,
 				audioStreamIndex: pickPreviewAudioIndex(source, getSettings() || {}),
 				segmentContainer: previewSegmentContainer(platform, caps)
 			});

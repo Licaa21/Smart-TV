@@ -4,12 +4,14 @@
 import $L from '@enact/i18n/$L';
 
 import {FAVORITE_ROW_IDS, isPluginSourcedRow, isRowEnabledBySetting} from '../../utils/homeRowGates';
-import {isPickedRow, isPickedRowShown, isSameServer} from '../../utils/pickedRows';
+import {isPickedRow, isPickedRowShown, isSameServer, isSeerrSliderRow} from '../../utils/pickedRows';
+import {isSliderRowLive} from '../../utils/seerrSliders';
 
 const LIVE_TV_ROW_IDS = ['livetv', 'onnow', 'activerecordings'];
 
 export const isHomeRowVisibleByGates = (row, settings, serverHasLiveTv = true, serverUrl) => {
 	if (isPickedRow(row)) return isPickedRowShown(row, settings, serverUrl);
+	if (isSeerrSliderRow(row)) return Boolean(settings.useMoonfinPlugin) && isSameServer(row.serverUrl, serverUrl) && isSliderRowLive(row);
 	if (!serverHasLiveTv && LIVE_TV_ROW_IDS.includes(row.id)) return false;
 	if (isPluginSourcedRow(row.id)) return Boolean(settings.useMoonfinPlugin) && isRowEnabledBySetting(row.id, settings);
 	return isRowEnabledBySetting(row.id, settings);
@@ -23,7 +25,7 @@ export const homeRowGroup = (row) => {
 	if (row.source === 'genres' || row.id === 'genres' || row.id === 'studios') return 'genres';
 	if (FAVORITE_ROW_IDS.includes(row.id)) return 'favorites';
 	if (row.source === 'playlists' || row.id === 'playlists') return 'playlists';
-	if (row.id.startsWith('seerr_') || row.id === 'radarr_calendar' || row.id === 'sonarr_calendar') return 'seerr';
+	if (row.source === 'seerr' || row.id.startsWith('seerr_') || row.id === 'radarr_calendar' || row.id === 'sonarr_calendar') return 'seerr';
 	if (row.id.startsWith('tmdb_') || row.id.startsWith('imdb-')) return 'external';
 	return 'general';
 };

@@ -1,4 +1,4 @@
-import {itemMenuActions} from './itemMenuActions';
+import {hideFromResume, itemMenuActions} from './itemMenuActions';
 
 jest.mock('@enact/i18n/$L', () => ({__esModule: true, default: (str) => str}));
 
@@ -84,5 +84,32 @@ describe('itemMenuActions', () => {
 		const options = {isContinueWatchingOrNextUp: true, playImmediately: false};
 		expect(ids(movie(), options)).toEqual(['play', 'watched', 'favorite', 'addToPlaylist']);
 		expect(labelOf(movie(), 'play', options)).toBe('Play');
+	});
+});
+
+describe('hideFromResume', () => {
+	const fakeApi = () => ({hideFromResume: jest.fn(() => Promise.resolve()), setWatched: jest.fn(() => Promise.resolve())});
+
+	test('keeps the progress on Emby and clears the play state on Jellyfin', async () => {
+		const emby = fakeApi();
+		await hideFromResume(emby, movie({PlaybackPositionTicks: 50}), 'emby');
+		expect(emby.hideFromResume).toHaveBeenCalledWith('m1');
+		expect(emby.setWatched).not.toHaveBeenCalled();
+
+		const jellyfin = fakeApi();
+		await hideFromResume(jellyfin, movie({PlaybackPositionTicks: 50}), 'jellyfin');
+		expect(jellyfin.hideFromResume).not.toHaveBeenCalled();
+		expect(jellyfin.setWatched).toHaveBeenCalledWith('m1', false);
+	});
+
+	test('always clears audio, and resets nothing when Emby refuses', async () => {
+		const audio = fakeApi();
+		await hideFromResume(audio, {Id: 'a1', Type: 'AudioBook'}, 'emby');
+		expect(audio.setWatched).toHaveBeenCalledWith('a1', false);
+
+		const refused = fakeApi();
+		refused.hideFromResume.mockReturnValue(Promise.reject(new Error('API Error: 500')));
+		await hideFromResume(refused, movie(), 'emby');
+		expect(refused.setWatched).not.toHaveBeenCalled();
 	});
 });

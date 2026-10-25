@@ -1,16 +1,30 @@
 import {memo, useState, useCallback} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 
-import {gameDisplayTitle, gameFallbackColor} from '../../utils/gameArt';
+import {PORTRAIT_HEIGHT, boxArtCell, boxArtNeedsFill, gameDisplayTitle, gameFallbackColor, hideBrokenArt} from '../../utils/gameArt';
 
 import css from './GameCard.module.less';
 
 const SpottableDiv = Spottable('div');
 
-// A box-art card for one game (cover image via artUrl, seeded-color fallback).
-const GameCard = ({game, artUrl, width = 200, spotlightId, onSelect}) => {
+// Art that doesn't fit its card shows whole over a darkened, blurred copy of itself.
+export const GameBoxArt = ({url, contain, lazy, onError = hideBrokenArt}) => {
+	const loading = lazy ? 'lazy' : undefined;
+	if (!contain) return <img className={css.image} src={url} alt="" loading={loading} onError={onError} />;
+	return (
+		<>
+			<img className={`${css.image} ${css.fill}`} src={url} alt="" loading={loading} onError={hideBrokenArt} />
+			<img className={`${css.image} ${css.contain}`} src={url} alt="" loading={loading} onError={onError} />
+		</>
+	);
+};
+
+// A box-art card for one game (cover image via artUrl, seeded-color fallback). With the art's
+// aspect it takes the art's shape, and cards of different shapes in a row share a bottom edge.
+const GameCard = ({game, artUrl, aspect, width = 200, spotlightId, onSelect}) => {
 	const [failed, setFailed] = useState(!artUrl);
 	const title = gameDisplayTitle(game.title, game.fileName);
+	const cell = boxArtCell(aspect);
 
 	const handleSelect = useCallback(() => onSelect && onSelect(game), [onSelect, game]);
 	const handleError = useCallback(() => setFailed(true), []);
@@ -19,10 +33,10 @@ const GameCard = ({game, artUrl, width = 200, spotlightId, onSelect}) => {
 		<SpottableDiv
 			className={css.card}
 			spotlightId={spotlightId}
-			style={{width}}
+			style={{width: width * cell.width}}
 			onClick={handleSelect}
 		>
-			<div className={css.poster} style={{height: width * 1.34}}>
+			<div className={css.poster} style={{height: width * cell.height, marginTop: width * (PORTRAIT_HEIGHT - cell.height)}}>
 				{failed || !artUrl ? (
 					<div className={css.fallback} style={{background: gameFallbackColor(game.id)}}>
 						<svg className={css.glyph} viewBox="0 0 24 24" aria-hidden="true">
@@ -30,7 +44,7 @@ const GameCard = ({game, artUrl, width = 200, spotlightId, onSelect}) => {
 						</svg>
 					</div>
 				) : (
-					<img className={css.image} src={artUrl} alt="" onError={handleError} />
+					<GameBoxArt url={artUrl} contain={aspect != null && boxArtNeedsFill(aspect, cell.width / cell.height)} onError={handleError} />
 				)}
 			</div>
 			<div className={css.title}>{title}</div>

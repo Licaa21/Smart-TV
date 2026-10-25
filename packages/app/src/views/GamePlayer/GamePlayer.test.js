@@ -3,7 +3,7 @@ import Spotlight from '@enact/spotlight';
 import * as gamesApi from '../../services/gamesApi';
 import {controllerIsOnlyRemote, giveControllerToGame} from '../../services/video';
 import * as ejs from '../../utils/emulatorjs';
-import {loadGameStateWithMigration} from '../../utils/gameSaves';
+import {loadGameStateWithMigration, loadSram, saveSram} from '../../utils/gameSaves';
 import GamePlayer from './GamePlayer';
 
 jest.mock('react/jsx-dev-runtime', () => {
@@ -54,7 +54,9 @@ jest.mock('../../services/gamesApi', () => ({
 }));
 jest.mock('../../utils/gameSaves', () => ({
 	gameStateKey: (id, core) => `ejs-${core}-${id}`,
-	loadGameStateWithMigration: jest.fn()
+	loadGameStateWithMigration: jest.fn(),
+	loadSram: jest.fn(),
+	saveSram: jest.fn()
 }));
 jest.mock('../../utils/emulatorjs', () => ({
 	isSupported: () => true,
@@ -63,6 +65,8 @@ jest.mock('../../utils/emulatorjs', () => ({
 	destroyEmulator: jest.fn(),
 	getState: jest.fn(),
 	loadState: jest.fn(),
+	getSram: jest.fn(),
+	applySram: jest.fn(),
 	restart: jest.fn(),
 	setPaused: jest.fn(),
 	toggleFastForward: jest.fn(),
@@ -95,6 +99,8 @@ beforeEach(() => {
 	gamesApi.putStateBytes.mockResolvedValue(undefined);
 	gamesApi.getEmulatorDataPath.mockResolvedValue(null);
 	loadGameStateWithMigration.mockResolvedValue(null);
+	loadSram.mockResolvedValue(null);
+	saveSram.mockResolvedValue(undefined);
 	ejs.startEmulator.mockResolvedValue(undefined);
 	ejs.getState.mockReturnValue(new Uint8Array([1]));
 	ejs.getOptions.mockReturnValue([]);
@@ -485,4 +491,34 @@ test('a game that fails to start takes EmulatorJS down and says so', async () =>
 	expect(await screen.findByText('Could not start this game on this device.')).toBeTruthy();
 	expect(ejs.destroyEmulator).toHaveBeenCalled();
 	expect(giveControllerToGame).not.toHaveBeenCalledWith(true);
+});
+
+test('a fresh boot takes the battery save from the server', async () => {
+	const sram = new Uint8Array([7]);
+	loadSram.mockResolvedValue(sram);
+
+	await startGame();
+
+	expect(loadSram).toHaveBeenCalledWith('g1');
+	expect(ejs.applySram).toHaveBeenCalledWith(sram);
+});
+
+test('a Continue keeps the battery save inside its save state', async () => {
+	loadGameStateWithMigration.mockResolvedValue(new Uint8Array([1]));
+	loadSram.mockResolvedValue(new Uint8Array([7]));
+
+	await startGame();
+
+	expect(ejs.applySram).not.toHaveBeenCalled();
+});
+
+test('Exit uploads the battery save', async () => {
+	const sram = new Uint8Array([9]);
+	ejs.getSram.mockReturnValue(sram);
+	await openMenu();
+	fireEvent.click(screen.getByText('Exit'));
+	fireEvent.click(screen.getByText('Exit'));
+
+	await waitFor(() => expect(onBack).toHaveBeenCalled());
+	expect(saveSram).toHaveBeenCalledWith('g1', sram);
 });

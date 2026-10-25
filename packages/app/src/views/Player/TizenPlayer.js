@@ -6,7 +6,7 @@ import * as playback from '../../services/playback';
 import {
 	initTizenAPI, registerAppStateObserver, keepScreenOn, getTizenVersion,
 	avplayOpen, avplayPrepare, avplayPlay, avplayPause,
-	avplaySeek, avplaySeekIdle, avplaySetPostSeekHook, avplayGetCurrentTime, avplayGetDuration, avplayGetState,
+	avplaySeek, avplaySeekIdle, avplaySetPostSeekHook, avplayGetCurrentTime, avplayGetDuration, avplayGetLiveRange, avplayGetState,
 	avplaySetListener, avplaySelectTrack, avplaySetSilentSubtitle,
 	avplayGetTracks, avplayGetCurrentTracks, avplaySetDisplayMethod, avplaySetStreamingProperty, setDisplayWindow, cleanupAVPlay,
 	avplaySetBufferingParams, avplaySuspend, avplayRestore, waitForHlsManifest
@@ -27,11 +27,16 @@ import {transcodesAudioCodec} from '../../utils/deviceProfileTuning';
 import {initPgsCanvasRenderer, disposePgsRenderer, clearPgsCanvas, pgsDrawnArea} from '../../utils/pgsRenderer';
 import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTime} from '../../utils/assRenderer';
 import {describeHlsManifest} from '../../utils/hlsManifestProbe';
-import {canvasLiftFor, canvasRestingPercent, getPgsBackgroundStyle, getPgsPictureStyle, getSubtitleCanvasStyle, getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
+import {canvasLiftFor, canvasRestingPercent, getPgsBackgroundStyle, getPgsPictureStyle, getSubtitleCanvasStyle, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
+import SubtitleTextOverlay from './SubtitleTextOverlay';
+import useSecondarySubtitle from './useSecondarySubtitle';
+import useSubtitleFetch from './useSubtitleFetch';
+import useCinemaSkip from './useCinemaSkip';
 import {isHdrOutput, findVideoStream} from '../../utils/videoRange';
 import {selectPreferredAudioStream} from '../../utils/audioTrackSelection';
 import {audioStartNeedsServer, openingAudioStream} from '../../utils/audioStartPlan';
 import {applyResumeRewind, skipBackSeconds, skipForwardSeconds, zoomInternalFromSetting, zoomSettingFromInternal} from '../../utils/playbackTuning';
+import {getZoomModeOptions} from '../Settings/settingsOptions';
 import {saveAudioPref, saveSubtitlePref} from '../../services/subtitlePrefs';
 import {resolveSeriesAudio} from './initialAudio';
 import {resolveInitialSubtitle} from './initialSubtitle';
@@ -40,10 +45,12 @@ import {getApiForItem} from '../../services/connectionPool';
 import PlayerControls, {usePlayerButtons} from './PlayerControls';
 import {canBrowseEpisodes} from '../../utils/episodeBrowser';
 import useLiveProgram from './useLiveProgram';
+import {isAtLive, liveWindowFor, nextLiveWindow} from './liveWindow';
+import useLiveRecording from './useLiveRecording';
 import useHeldSeekStep from './useHeldSeekStep';
 import {hasTrickplayPreview} from '../../components/TrickplayPreview';
 import {isTrickplayOn} from '../../utils/trickplayLayout';
-import useChannelCarousel from './useChannelCarousel';
+import useChannelCarousel, {liveTvApiFor} from './useChannelCarousel';
 import ChannelCarousel from './ChannelCarousel';
 import useSleepTimer from './useSleepTimer';
 import {useSubtitleLift} from './useSubtitleLift';
@@ -56,7 +63,8 @@ import {handleAudioFocusKey, exitAudioPanel, nextAudioFocusRow, focusAudioRow, f
 import useSegmentPopups, {isSkipPromptFocused} from './useSegmentPopups';
 import useChannelKeys from './useChannelKeys';
 import {focusTiming} from '../../utils/controlRowFocus';
-import {NextEpisodeContainer, CONTROLS_HIDE_DELAY, withTimeout, SEGMENT_FETCH_TIMEOUT, SKIP_LANDING_CHECK_MS, SKIP_LANDING_TOLERANCE_TICKS, SKIP_LANDING_SNAP_TICKS, SLOW_KEY_MS, SLOW_KEYS_LOGGED} from './PlayerConstants';
+import {NextEpisodeContainer, CONTROLS_HIDE_DELAY, withTimeout, SEGMENT_FETCH_TIMEOUT, SKIP_LANDING_CHECK_MS, SKIP_LANDING_TOLERANCE_TICKS, SKIP_LANDING_SNAP_TICKS, SLOW_KEY_MS, SLOW_KEYS_LOGGED, ASS_FETCH_INDICATOR_LIMIT} from './PlayerConstants';
+import {waitForAssReady} from '../../utils/assRendererReady';
 import NextUpOverlay from './NextUpOverlay';
 import SkipSegmentOverlay from './SkipSegmentOverlay';
 import StillWatchingDialog from './StillWatchingDialog';
@@ -124,6 +132,7 @@ const RELOAD_STILL_RUNNING_MS = 45000;
 // How soon a retry that found a reload still running looks again.
 const RELOAD_RECHECK_MS = 3000;
 const reloadRetryDelay = (attempt) => RELOAD_RETRY_DELAYS[attempt] ?? RELOAD_RETRY_MAX_DELAY_MS;
+const LIVE_RANGE_READ_MS = 2000;
 
 const getRootFontSizePx = () => {
 	if (typeof window === 'undefined' || typeof document === 'undefined') return 24;
@@ -214,6 +223,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const [subtitleTrackEvents, setSubtitleTrackEvents] = useState(null);
 	const [subtitleOffset, setSubtitleOffset] = useState(0);
 	const [currentSubtitleText, setCurrentSubtitleText] = useState(null);
+	const {loading: subtitleFetching, track: trackSubtitleFetch, clear: clearSubtitleFetch} = useSubtitleFetch();
 	const [controlsVisible, setControlsVisible] = useState(false);
 	const [activeModal, setActiveModal] = useState(null);
 	// Read by the time update, which runs from an interval or a media event and so sees no fresh state.
@@ -242,6 +252,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const [focusRow, setFocusRow] = useState('bottom');
 	const isLiveTV = item.Type === 'TvChannel';
 	const liveProgram = useLiveProgram(item, isLiveTV);
+	const [liveWindow, setLiveWindow] = useState(null);
+	const liveWindowRef = useRef(null);
+	liveWindowRef.current = liveWindow;
+	// How far behind the end of the live range playback started, in seconds.
+	const liveLagRef = useRef(null);
+	const liveRangeReadAtRef = useRef(0);
 	const [isAudioMode, setIsAudioMode] = useState(false);
 	const [isFavorite, setIsFavorite] = useState(false);
 	const [zoomMode, setZoomMode] = useState(() => zoomInternalFromSetting(settings.playerZoomMode));
@@ -462,11 +478,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}
 	}, []);
 
-	const zoomModeLabel = useMemo(() => {
-		if (zoomMode === 'fill') return $L('Crop');
-		if (zoomMode === 'stretch') return $L('Stretch');
-		return $L('Fit');
-	}, [zoomMode]);
+	const zoomModeLabel = useMemo(
+		() => getZoomModeOptions().find((option) => option.value === zoomSettingFromInternal(zoomMode))?.label,
+		[zoomMode]
+	);
 
 	const subtitleStyleSettings = useMemo(
 		() => resolveSubtitleStyleSettings(settings, isHdrContent),
@@ -505,15 +520,40 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		ticking: activeModal === 'sleep'
 	});
 
+	const secondary = useSecondarySubtitle({
+		subtitleStreams,
+		primaryIndex: selectedSubtitleIndex,
+		preferExternal: settings.preferExternalSubtitles === true,
+		preferredLanguage: settings.preferredSecondarySubtitleLanguage,
+		available: !isLiveTV && !isAudioMode
+	});
+	const {
+		prepareForItem: prepareSecondaryForItem, restore: restoreSecondary, update: updateSecondary,
+		select: selectSecondary, releaseIfPrimary: releaseSecondaryIfPrimary, offered: offersSecondarySubtitles
+	} = secondary;
+
+	const liveTvApi = useMemo(() => (isLiveTV ? liveTvApiFor(item?._serverUrl) : null), [isLiveTV, item?._serverUrl]);
+	// The carousel is set up further down, after the controls it opens over.
+	const refreshCarouselRecordingsRef = useRef(null);
+	const liveRecording = useLiveRecording({
+		api: liveTvApi,
+		program: liveProgram,
+		controlsVisible,
+		onChanged: () => refreshCarouselRecordingsRef.current?.()
+	});
+
+	const displayTime = isSeeking ? (seekPosition / 10000000) : currentTime;
 	const {topButtons, bottomButtons} = usePlayerButtons({
 		isPaused, audioStreams, subtitleStreams, chapters,
-		nextEpisode, isAudioMode, isLiveTV, hasNextTrack, hasPrevTrack,
+		nextEpisode, isAudioMode, isLiveTV, liveRewind: Boolean(liveWindow), atLive: isAtLive(liveWindow, displayTime), hasNextTrack, hasPrevTrack,
 		shuffleMode, repeatMode, selectedQuality,
 		selectedSubtitleIndex, canDownloadRemoteSubtitles: !isAudioMode && Boolean(item?.Id), hasCastMembers, zoomModeLabel, zoomModeKey: zoomMode,
 		sleepMinutes,
 		canBrowseEpisodes: canBrowseEpisodes({item, isLiveTV, isAudioMode}),
-		isFavorite, hasLyrics: lyrics.lines.length > 0, audioPanel
+		isFavorite, hasLyrics: lyrics.lines.length > 0, audioPanel,
+		recordable: liveRecording.available, recordMark: liveRecording.mark
 	});
+	const prepareRecording = liveRecording.prepare;
 
 	useEffect(() => {
 		zoomModeRef.current = zoomMode;
@@ -578,6 +618,17 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			}
 		}
 
+		// The range only grows a segment at a time, and AVPlay logs every read of it.
+		if (isLiveTV && Date.now() - liveRangeReadAtRef.current >= LIVE_RANGE_READ_MS) {
+			liveRangeReadAtRef.current = Date.now();
+			const range = avplayGetLiveRange();
+			if (range && liveLagRef.current == null && playbackMovingRef.current) {
+				liveLagRef.current = Math.max(0, range.end - ms) / 1000;
+			}
+			const next = liveWindowFor(range && {start: range.start / 1000, end: range.end / 1000}, liveLagRef.current);
+			setLiveWindow((prev) => nextLiveWindow(prev, next));
+		}
+
 		if (healthMonitorRef.current && state === 'PLAYING') {
 			healthMonitorRef.current.recordProgress();
 		}
@@ -602,8 +653,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			const assTime = time - (subtitleOffset || 0);
 			setAssTime(assRendererRef.current, Math.max(0, assTime));
 		}
+		updateSecondary(ticks);
+		updateCinemaSkip(ticks); // eslint-disable-line no-use-before-define
 
-		checkSegments(ticks); // eslint-disable-line no-use-before-define
+		// A pre-roll with the Skip button runs no segment prompts of its own.
+		if (!cinemaSkipActive) checkSegments(ticks); // eslint-disable-line no-use-before-define
 	};
 
 	const startTimeUpdatePolling = useCallback(() => {
@@ -1574,7 +1628,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				assRendererRef.current = null;
 				// the text events that take over are styled as text again
 				if (isCurrent()) setCanvasSubtitle(null);
-				playback.fetchSubtitleData(stream).then(data => {
+				trackSubtitleFetch(playback.fetchSubtitleData(stream)).then(data => {
 					if (isCurrent()) setSubtitleTrackEvents(data?.TrackEvents || null);
 				}).catch(() => isCurrent() && setSubtitleTrackEvents(null));
 			};
@@ -1590,11 +1644,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				assRendererRef.current = renderer;
 				setCanvasSubtitle('ass');
 				setSubtitleTrackEvents(null);
+				trackSubtitleFetch(waitForAssReady(renderer, ASS_FETCH_INDICATOR_LIMIT, () => assRendererRef.current === renderer));
 				serverLogger.playback('Subtitle: ass renderer started', {
 					stream: describeSubtitleStream(stream)
 				});
 			} else {
-				const data = await playback.fetchSubtitleData(stream);
+				const data = await trackSubtitleFetch(playback.fetchSubtitleData(stream));
 				if (isCurrent()) setSubtitleTrackEvents(data?.TrackEvents || null);
 				serverLogger.playback('Subtitle: ass renderer unavailable, using text events', {
 					stream: describeSubtitleStream(stream),
@@ -1608,13 +1663,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				error: err?.message || String(err)
 			});
 			try {
-				const data = await playback.fetchSubtitleData(stream);
+				const data = await trackSubtitleFetch(playback.fetchSubtitleData(stream));
 				if (isCurrent()) setSubtitleTrackEvents(data?.TrackEvents || null);
 			} catch (_e) {
 				if (isCurrent()) setSubtitleTrackEvents(null);
 			}
 		}
-	}, [waitForSubtitleCanvas]);
+	}, [waitForSubtitleCanvas, trackSubtitleFetch]);
 
 	const [tuneRevision, setTuneRevision] = useState(0);
 	const directAllowed = !forceTranscode && !settings.preferTranscode;
@@ -1671,10 +1726,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			setSubtitleTrackEvents(null);
 			setCurrentSubtitleText(null);
 			setSelectedSubtitleIndex(-1);
+			clearSubtitleFetch();
+			prepareSecondaryForItem(item.Id);
 			setMediaSegments(null);
 			setPreviousEpisode(null);
 			previousLookupRef.current = null;
 			setVideoAspectRatio(null);
+			setLiveWindow(null);
+			liveLagRef.current = null;
 			resetPopups(); // eslint-disable-line no-use-before-define
 
 			// Stop any previous playback
@@ -1938,7 +1997,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 							// Timed so a slow first load can be told from a slow client: the server
 							// converts a track on first request, and that wait is all in this fetch.
 							const fetchStartedAt = Date.now();
-							const data = await playback.fetchSubtitleData(sub);
+							const data = await trackSubtitleFetch(playback.fetchSubtitleData(sub));
 							const fetchMs = Date.now() - fetchStartedAt;
 							if (stillCurrent()) setSubtitleTrackEvents(data?.TrackEvents || null);
 							serverLogger.playback('Subtitle: fetched text track from server', {
@@ -1993,6 +2052,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const initialSubtitleChoice = await resolveInitialSubtitle(result, item, initialSubtitleIndex, settings, startingAudio);
 				if (initialSubtitleChoice === null) turnSubtitlesOff();
 				else selectInitialSubtitle(initialSubtitleChoice);
+				if (!isLiveTV && !result.isAudio) {
+					restoreSecondary(item, result.subtitleStreams || [], initialSubtitleChoice ? initialSubtitleChoice.index : -1);
+				}
 
 				// Without this the track reads as selected and nothing ever renders,
 				// because the server was never asked to bake it in.
@@ -2333,11 +2395,19 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		handlePrevTrack();
 	}, [isAudioMode, previousEpisode, item, onPlayNextWithCleanup, handlePrevTrack]);
 
-	const {carouselOpenRef, openCarousel, stepChannel, markChannelPlaying, carouselProps} = useChannelCarousel({
+	const cinemaSkip = useCinemaSkip({
+		item, videoQueue, duration, controlsVisible, activeModal,
+		enabled: settings.cinemaModeSkipEnabled === true,
+		onSkip: onPlayNextWithCleanup
+	});
+	const {active: cinemaSkipActive, update: updateCinemaSkip} = cinemaSkip;
+
+	const {carouselOpenRef, openCarousel, stepChannel, markChannelPlaying, refreshRecordings, carouselProps} = useChannelCarousel({
 		item, isLiveTV, liveTvChannels, sortBy: settings.liveTvChannelSortBy,
 		error, controlsVisible, showControls, hideControls, setFocusRow,
 		onSwitchChannel: onPlayNextWithCleanup
 	});
+	refreshCarouselRecordingsRef.current = refreshRecordings;
 
 	// AVPlay has buffered and started by the time a load finishes without an error.
 	useEffect(() => {
@@ -2601,6 +2671,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		}, RESUME_CHECK_MS);
 	}, []);
 
+	// A live stream has no duration, so its rewind window bounds a seek instead.
+	const seekBoundsMs = useCallback(() => {
+		const live = liveWindowRef.current;
+		return live ? [live.start * 1000, live.edge * 1000] : [0, avplayGetDuration()];
+	}, []);
+
 	// AVPlay keeps reporting the old spot until a seek lands, so skip prompts are held until it has.
 	const seekAsViewer = useCallback((ms) => {
 		const seek = avplaySeek(ms);
@@ -2729,9 +2805,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const step = skipBackSeconds(settings);
 		if (groupSeekTo(positionRef.current - step * 10000000)) return;
 		const ms = avplayGetCurrentTime();
-		const newMs = Math.max(0, ms - step * 1000);
+		const newMs = Math.max(seekBoundsMs()[0], ms - step * 1000);
 		seekAsViewer(newMs).catch(e => console.warn('[Player] Seek failed:', e));
-	}, [settings, groupSeekTo, noteViewerActivity, dropScrub, noteSeek, suppressSeekPrompts, seekAsViewer]);
+	}, [settings, groupSeekTo, noteViewerActivity, dropScrub, noteSeek, suppressSeekPrompts, seekAsViewer, seekBoundsMs]);
 
 	const handleForward = useCallback(() => {
 		if (!avplayReadyRef.current) return;
@@ -2742,14 +2818,28 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		const step = skipForwardSeconds(settings);
 		if (groupSeekTo(positionRef.current + step * 10000000)) return;
 		const ms = avplayGetCurrentTime();
-		const durationMs = avplayGetDuration();
-		const newMs = Math.min(durationMs, ms + step * 1000);
+		const newMs = Math.min(seekBoundsMs()[1], ms + step * 1000);
 		seekAsViewer(newMs).catch(e => console.warn('[Player] Seek failed:', e));
-	}, [settings, groupSeekTo, noteViewerActivity, dropScrub, noteSeek, suppressSeekPrompts, seekAsViewer]);
+	}, [settings, groupSeekTo, noteViewerActivity, dropScrub, noteSeek, suppressSeekPrompts, seekAsViewer, seekBoundsMs]);
+
+	const handleJumpToLive = useCallback(() => {
+		const live = liveWindowRef.current;
+		if (!live || !avplayReadyRef.current) return;
+		noteViewerActivity();
+		dropScrub();
+		// Not through handlePlayPause, whose unpause rewind would seek back again after the jump.
+		if (avplayGetState() === 'PAUSED') {
+			avplayPlay();
+			setIsPaused(false);
+			healthMonitorRef.current?.setPaused(false);
+			playback.reportProgress(positionRef.current, {isPaused: false, eventName: 'unpause'});
+		}
+		seekAsViewer(live.edge * 1000).catch(e => console.warn('[Player] Seek failed:', e));
+	}, [noteViewerActivity, dropScrub, seekAsViewer]);
 
 	// Modal handlers
-	const openModal = useCallback((modal) => {
-	  lastFocusedElementRef.current = document.activeElement;
+	const openModal = useCallback((modal, keepReturnFocus = false) => {
+		if (!keepReturnFocus) lastFocusedElementRef.current = document.activeElement;
 		// The controls stay up under a dialog, so closing it gives focus back to the button that opened it.
 		clearTimeout(controlsTimeoutRef.current);
 		setActiveModal(modal);
@@ -2876,6 +2966,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	}, [applyAudioSelection]);
 
 	const applySubtitleSelection = useCallback(async (index, streamList = subtitleStreams, shouldClose = true) => {
+		clearSubtitleFetch();
 		if (pgsRendererRef.current) {
 			disposePgsRenderer(pgsRendererRef.current);
 			pgsRendererRef.current = null;
@@ -2973,7 +3064,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				useNativeSubtitleRef.current = false;
 				avplaySetSilentSubtitle(true);
 				try {
-					const data = await playback.fetchSubtitleData(stream);
+					const data = await trackSubtitleFetch(playback.fetchSubtitleData(stream));
 					if (data && data.TrackEvents) {
 						setSubtitleTrackEvents(data.TrackEvents);
 					} else {
@@ -3003,10 +3094,11 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 		playback.updateCurrentSession({subtitleStreamIndex: index});
 		saveSubtitlePref(item, index, streamList || []);
+		releaseSecondaryIfPrimary(item, streamList || [], index);
 		if (shouldClose) {
 			closeModal();
 		}
-	}, [item, subtitleStreams, closeModal, settings.enablePgsRendering, applyNativeSubtitleTrack, reloadWithSubtitleIndex, startAssRenderer, startPgsRenderer]);
+	}, [item, subtitleStreams, closeModal, settings.enablePgsRendering, applyNativeSubtitleTrack, reloadWithSubtitleIndex, startAssRenderer, startPgsRenderer, releaseSecondaryIfPrimary, clearSubtitleFetch, trackSubtitleFetch]);
 
 	const handleSelectSubtitle = useCallback(async (e) => {
 		const index = parseInt(e.currentTarget.dataset.index, 10);
@@ -3125,11 +3217,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		beginScrub();
 		setIsSeeking(true);
 		const baseMs = pendingSeekMsRef.current != null ? pendingSeekMsRef.current : avplayGetCurrentTime();
-		const newMs = Math.min(avplayGetDuration(), Math.max(0, baseMs + deltaSeconds * 1000));
+		const [minMs, maxMs] = seekBoundsMs();
+		const newMs = Math.min(maxMs, Math.max(minMs, baseMs + deltaSeconds * 1000));
 		setSeekPosition(Math.floor(newMs * 10000));
 		if (scrubHoldRef.current.active) pendingSeekMsRef.current = newMs;
 		else scheduleDeferredSeek(newMs);
-	}, [noteViewerActivity, suppressSeekPrompts, beginScrub, scheduleDeferredSeek]);
+	}, [noteViewerActivity, suppressSeekPrompts, beginScrub, scheduleDeferredSeek, seekBoundsMs]);
 
 	// Leaving the bar. A held scrub is only landed by OK or Play, so anything else leaves it forgotten and playback as it
 	// was, and a scrub that does not hold lands where it is.
@@ -3236,8 +3329,10 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			case 'playPause': handlePlayPause(); break;
 			case 'rewind': handleRewind(); break;
 			case 'forward': handleForward(); break;
+			case 'jumpToLive': handleJumpToLive(); break;
+			case 'record': prepareRecording().then((ready) => ready && openModal('record')); break;
 			case 'audio': openModal('audio'); break;
-			case 'subtitle': openModal('subtitle'); break;
+			case 'subtitle': openModal(offersSecondarySubtitles ? 'subtitleSlot' : 'subtitle'); break;
 			case 'quality': openModal('quality'); break;
 			case 'chapter': openModal('chapter'); break;
 			case 'episodes': openModal('episodes'); break;
@@ -3258,7 +3353,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			case 'queue': handleSelectAudioPanel(action); break;
 			default: break;
 		}
-	}, [showControls, handlePlayPause, handleRewind, handleForward, openModal, handleOpenCast, handleToggleZoom, handleOpenGuide, openCarousel, handlePlayNextNow, handleNextTrack, handlePrevious, handleToggleShuffle, handleToggleRepeat, handleToggleFavorite, handleSelectAudioPanel]);
+	}, [showControls, handlePlayPause, handleRewind, handleForward, handleOpenCast, handleToggleZoom, handleJumpToLive, prepareRecording, openModal, offersSecondarySubtitles, handleOpenGuide, openCarousel, handlePlayNextNow, handleNextTrack, handlePrevious, handleToggleShuffle, handleToggleRepeat, handleToggleFavorite, handleSelectAudioPanel]);
 
 	const handleControlButtonClick = useCallback((e) => {
 		const action = e.currentTarget.dataset.action;
@@ -3290,6 +3385,20 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 	const handleOpenSubtitleOffset = useCallback(() => openModal('subtitleOffset'), [openModal]);
 	const handleOpenSubtitleSettings = useCallback(() => openModal('subtitleSettings'), [openModal]);
+
+	const handleChooseSubtitleSlot = useCallback((e) => {
+		openModal(e.currentTarget.dataset.slot === 'secondary' ? 'secondarySubtitle' : 'subtitle', true);
+	}, [openModal]);
+
+	const handleSelectSecondarySubtitle = useCallback((e) => {
+		const index = parseInt(e.currentTarget.dataset.index, 10);
+		if (isNaN(index)) return;
+		selectSecondary(item, subtitleStreams, index);
+		closeModal();
+	}, [item, subtitleStreams, selectSecondary, closeModal]);
+
+	const handleOpenSecondarySubtitleOffset = useCallback(() => openModal('secondarySubtitleOffset', true), [openModal]);
+	const handleOpenSecondarySubtitleSettings = useCallback(() => openModal('secondarySubtitleSettings', true), [openModal]);
 
 	const handleOpenRemoteSubtitleSearch = useCallback(async () => {
 		if (!item?.Id) return;
@@ -3639,14 +3748,14 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			if (e.keyCode === KEYS.FAST_FORWARD) {
 				e.preventDefault();
 				e.stopPropagation();
-				if (!isLiveTV) handleForward();
+				if (!isLiveTV || liveWindow) handleForward();
 				showControls();
 				return;
 			}
 			if (e.keyCode === KEYS.REWIND) {
 				e.preventDefault();
 				e.stopPropagation();
-				if (!isLiveTV) handleRewind();
+				if (!isLiveTV || liveWindow) handleRewind();
 				showControls();
 				return;
 			}
@@ -3664,6 +3773,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				return;
 			}
 
+			if (cinemaSkip.handleKeyDown(e)) return;
 			if (handlePopupKeyDown(e)) return;
 
 			// Up during live playback opens the channel carousel, over the OSD or not.
@@ -3731,7 +3841,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					e.preventDefault();
 					// Same as Enter, or the focused progress bar adds a second step.
 					e.stopPropagation();
-					if (isLiveTV) { showControls(); return; }
+					if (isLiveTV && !liveWindow) { showControls(); return; }
 					showControls();
 					setFocusRow('progress');
 					scrubBy(heldSeekStep(key === 'ArrowLeft' || e.keyCode === 37 ? -1 : 1));
@@ -3807,8 +3917,6 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		return () => window.removeEventListener('keydown', onKeyDown, true);
 	}, []);
 
-	// Calculate progress - use seekPosition when actively seeking for smooth scrubbing
-	const displayTime = isSeeking ? (seekPosition / 10000000) : currentTime;
 	const progressPercent = duration > 0 ? (displayTime / duration) * 100 : 0;
 	// AVPlay reports no buffered ranges, so there is nothing real to draw and the bar
 	// would only trace the fill sitting under it.
@@ -3923,20 +4031,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			)}
 
 			{/* Custom Subtitle Overlay - rendered on web layer above AVPlay video */}
-			{currentSubtitleText && !isAudioMode && (
-				<div
-					className={css.subtitleOverlay}
-					style={getSubtitleOverlayStyle(subtitleStyleSettings, subtitleLift)}
-				>
-				{/* eslint-disable react/no-danger */}
-					<div
-						className={css.subtitleText}
-						data-subtitle-text="true"
-						style={getSubtitleTextStyle(subtitleStyleSettings)}
-						dangerouslySetInnerHTML={{__html: sanitizeSubtitleHtml(currentSubtitleText)}}
-					/>
-					{/* eslint-enable react/no-danger */}
-				</div>
+			{!isAudioMode && (
+				<SubtitleTextOverlay
+					css={css}
+					settings={subtitleStyleSettings}
+					lift={subtitleLift}
+					primaryText={currentSubtitleText}
+					secondaryText={secondary.text}
+					secondaryLoaded={secondary.loaded}
+				/>
 			)}
 
 			{!isAudioMode && (
@@ -4013,6 +4116,19 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				/>
 			)}
 
+			{!isLoading && cinemaSkip.shown && !activeModal && (
+				<SkipSegmentOverlay
+					key={item.Id}
+					label={$L('Skip')}
+					remainingSeconds={Math.max(0, Math.round(duration - currentTime))}
+					progress={Math.max(0, (duration - currentTime) / duration)}
+					countdownStyle={settings.nextUpCountdownStyle ?? 'both'}
+					onSkip={cinemaSkip.skip}
+					spotlightId="skip-segment-btn"
+					controlsVisible={controlsVisible}
+				/>
+			)}
+
 			<PlayerControls
 				isHdrContent={isHdrContent}
 				subtitleKind={canvasSubtitle || 'text'}
@@ -4021,6 +4137,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				activeModal={activeModal}
 				isAudioMode={isAudioMode}
 				isLiveTV={isLiveTV}
+				liveWindow={liveWindow}
+				liveRecording={liveRecording}
 				liveProgram={liveProgram}
 				focusRow={focusRow}
 				title={title}
@@ -4072,6 +4190,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				castMembers={castMembers}
 				isLoadingCastMembers={isLoadingCastMembers}
 				handleSubtitleOffsetChange={handleSubtitleOffsetChange}
+				secondarySubtitleIndex={secondary.index}
+				secondarySubtitleStreams={secondary.streams}
+				secondarySubtitleOffset={secondary.delay}
+				secondarySubtitleTrackEvents={secondary.events}
+				handleChooseSubtitleSlot={handleChooseSubtitleSlot}
+				handleSelectSecondarySubtitle={handleSelectSecondarySubtitle}
+				handleOpenSecondarySubtitleOffset={handleOpenSecondarySubtitleOffset}
+				handleOpenSecondarySubtitleSettings={handleOpenSecondarySubtitleSettings}
+				handleSecondarySubtitleOffsetChange={secondary.setDelay}
+				subtitleFetching={subtitleFetching || secondary.loading}
 				closeModal={closeModal}
 				stopPropagation={stopPropagation}
 				transcodeForced={settings.preferTranscode}

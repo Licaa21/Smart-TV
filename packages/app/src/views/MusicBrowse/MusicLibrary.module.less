@@ -49,16 +49,16 @@
 	align-items: center;
 	-webkit-justify-content: center;
 	justify-content: center;
-	width: 44px;
-	height: 44px;
+	width: 60px;
+	height: 60px;
 	border-radius: 50%;
 	background: rgba(0, 0, 0, 0.35);
 	color: #fff;
 	cursor: pointer;
 
 	svg {
-		width: 22px;
-		height: 22px;
+		width: 30px;
+		height: 30px;
 		fill: currentColor;
 	}
 
@@ -84,19 +84,6 @@
 	-webkit-flex: 1;
 	flex: 1;
 	min-width: 0;
-}
-
-// The pill tabs at a 5px pane with 34px segments and 13px labels. The doubled class wins over
-// the tab bar's own sizes.
-.tabBar.tabBar {
-	padding: 5px;
-
-	> * {
-		height: 34px;
-		padding: 0 13px;
-		border-width: 2px;
-		font-size: 13px;
-	}
 }
 
 .headerActions {
@@ -233,7 +220,7 @@
 .albumTracks {
 	-webkit-flex: 0 0 auto;
 	flex: 0 0 auto;
-	width: 420px;
+	width: 480px;
 	margin-left: 40px;
 	padding: 12px;
 	box-sizing: border-box;
@@ -243,39 +230,39 @@
 
 .panelLabel {
 	padding: 4px 8px 6px;
-	font-size: 12px;
+	font-size: 16px;
 	font-weight: 700;
 	letter-spacing: 1px;
 	color: rgba(255, 255, 255, 0.7);
 }
 
-// A song row. The 2px focus border sits inside its 8 by 6 padding.
+// A song row, sized like the album track list.
 .track {
 	display: -webkit-flex;
 	display: flex;
 	-webkit-align-items: center;
 	align-items: center;
-	padding: 4px 6px;
+	padding: 8px 12px;
 	border: 2px solid transparent;
 	border-radius: 10px;
 	cursor: pointer;
 }
 
 .trackNumber {
-	-webkit-flex: 0 0 28px;
-	flex: 0 0 28px;
-	width: 28px;
+	-webkit-flex: 0 0 36px;
+	flex: 0 0 36px;
+	width: 36px;
 	text-align: right;
-	font-size: 14px;
+	font-size: 20px;
 	color: rgba(255, 255, 255, 0.65);
 }
 
 .trackArt {
-	-webkit-flex: 0 0 44px;
-	flex: 0 0 44px;
-	width: 44px;
-	height: 44px;
-	border-radius: 6px;
+	-webkit-flex: 0 0 56px;
+	flex: 0 0 56px;
+	width: 56px;
+	height: 56px;
+	border-radius: 8px;
 	object-fit: cover;
 	background: rgba(255, 255, 255, 0.06);
 }
@@ -284,7 +271,7 @@
 	-webkit-flex: 1;
 	flex: 1;
 	min-width: 0;
-	margin-left: 14px;
+	margin-left: 20px;
 	display: -webkit-flex;
 	display: flex;
 	-webkit-flex-direction: column;
@@ -299,14 +286,14 @@
 }
 
 .trackTitle {
-	font-size: 15px;
+	font-size: 22px;
 	font-weight: 600;
 	color: #fff;
 }
 
 .trackSubtitle,
 .trackLength {
-	font-size: 13px;
+	font-size: 18px;
 	color: rgba(255, 255, 255, 0.65);
 }
 
@@ -355,7 +342,7 @@
 	display: flex;
 	-webkit-align-items: center;
 	align-items: center;
-	height: 44px;
+	height: 56px;
 	margin-bottom: 8px;
 }
 
@@ -369,7 +356,7 @@
 	flex: 1;
 	min-width: 0;
 	margin: 0;
-	font-size: 22px;
+	font-size: 28px;
 	font-weight: 800;
 	color: #fff;
 	white-space: nowrap;
@@ -382,7 +369,7 @@
 	flex: 0 0 auto;
 	padding: 8px 12px;
 	border-radius: 16px;
-	font-size: 13px;
+	font-size: 18px;
 	color: rgba(255, 255, 255, 0.7);
 	cursor: pointer;
 

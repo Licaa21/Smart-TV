@@ -357,6 +357,41 @@ export const setPaused = (paused) => { const g = gm(); if (g && g.toggleMainLoop
 export const getState = () => { const g = gm(); return g && g.getState ? g.getState() : null; };
 export const loadState = (bytes) => { const g = gm(); if (g && g.loadState && bytes) g.loadState(bytes); };
 
+export const getSram = () => {
+	try {
+		const g = gm();
+		const data = g && g.getSaveFile ? g.getSaveFile(true) : null;
+		return data && data.byteLength ? data : null;
+	} catch (e) {
+		return null;
+	}
+};
+
+const sameBytes = (a, b) => a.byteLength === b.byteLength && a.every((value, i) => value === b[i]);
+
+// The core reads its battery save only at boot, so a different one is written to the
+// emulator's file system and the game restarted.
+export const applySram = (bytes) => {
+	try {
+		const g = gm();
+		if (!g || !g.getSaveFilePath || !g.FS || !bytes || !bytes.byteLength) return;
+		const current = g.getSaveFile(true);
+		if (current && sameBytes(current, bytes)) return;
+		const path = g.getSaveFilePath();
+		const parts = path.split('/');
+		let dir = '';
+		for (let i = 1; i < parts.length - 1; i++) {
+			dir += '/' + parts[i];
+			if (!g.FS.analyzePath(dir).exists) g.FS.mkdir(dir);
+		}
+		g.FS.writeFile(path, bytes);
+		g.loadSaveFiles();
+		g.restart();
+	} catch (e) {
+		logGamesError('could not load the battery save', {message: e.message || String(e)});
+	}
+};
+
 export const getSettingsJson = () => {
 	try { return window.localStorage.getItem('ejs-settings'); } catch (e) { return null; }
 };

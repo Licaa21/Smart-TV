@@ -6,6 +6,7 @@ import {genreGlowRgb} from './galleryGlow';
 import {KEYS} from '../../utils/keys';
 import css from './Browse.module.less';
 import {carouselIntervalMs} from '../../utils/carouselTiming';
+import {useScreensaverActive} from '../../hooks/useScreensaverActive';
 
 const SPINES_PER_SIDE = 7;
 const POSTER_OPTS = {maxWidth: 500, quality: 85};
@@ -49,6 +50,7 @@ const BookshelfBar = memo(({
 }) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [featuredFocused, setFeaturedFocused] = useState(false);
+	const screensaverActive = useScreensaverActive();
 
 	const preloadedImagesRef = useRef(new Set());
 	const carouselIntervalRef = useRef(null);
@@ -90,12 +92,12 @@ const BookshelfBar = memo(({
 			settings.autoAdvanceInterval,
 			settings.carouselSpeed
 		);
-		if (!isVisible || featuredItems.length <= 1 || !featuredFocused || carouselSpeed <= 0) return;
+		if (!isVisible || screensaverActive || featuredItems.length <= 1 || !featuredFocused || carouselSpeed <= 0) return;
 
 		carouselIntervalRef.current = setInterval(() => {
 			setCurrentIndex((prev) => (prev + 1) % featuredItems.length);
 		}, carouselSpeed);
-	}, [isVisible, featuredItems.length, featuredFocused, settings.autoAdvance, settings.autoAdvanceInterval, settings.carouselSpeed]);
+	}, [isVisible, screensaverActive, featuredItems.length, featuredFocused, settings.autoAdvance, settings.autoAdvanceInterval, settings.carouselSpeed]);
 
 	useEffect(() => {
 		startCarouselTimer();

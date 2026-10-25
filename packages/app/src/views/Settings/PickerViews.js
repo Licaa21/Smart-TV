@@ -198,10 +198,11 @@ export const ExcludedGenresView = ({text, onTextChange, onCancel, onSave}) => (
 	</SettingsView>
 );
 
-export const PinCodeView = ({pin, error, onPinChange, onCancel, onSave}) => (
-	<SettingsView spotlightId='pin-code-view' title={$L('Set PIN Code')} clean>
+// Sets a new PIN, or with `verify` asks for the current one before it's changed or removed.
+export const PinCodeView = ({pin, error, verify, onPinChange, onCancel, onSave}) => (
+	<SettingsView spotlightId='pin-code-view' title={verify ? $L('Enter PIN') : $L('Set PIN Code')} clean>
 		<div className={css.viewDescription}>
-			{$L('Enter a 4-digit PIN used to unlock the app when PIN protection is enabled.')}
+			{verify ? $L('Enter your 4-digit PIN') : $L('Enter a 4-digit PIN used to unlock the app when PIN protection is enabled.')}
 		</div>
 		<div className={css.inputGroup}>
 			<label>{$L('PIN')}</label>
@@ -222,7 +223,7 @@ export const PinCodeView = ({pin, error, onPinChange, onCancel, onSave}) => (
 				{$L('Cancel')}
 			</SettingsButton>
 			<SettingsButton primary onClick={onSave} spotlightId='pin-code-save'>
-				{$L('Save')}
+				{verify ? $L('Continue') : $L('Save')}
 			</SettingsButton>
 		</div>
 	</SettingsView>

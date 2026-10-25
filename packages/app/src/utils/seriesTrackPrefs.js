@@ -1,4 +1,5 @@
 import {languageMatches, normalizeLanguageCode} from './audioLanguage';
+import {isForcedTrack, titleSaysForced} from './streamTitle';
 
 // A track remembered for a whole series. Episodes list their tracks in different
 // orders and tag them differently, so the pick is kept as what it was rather than
@@ -57,9 +58,11 @@ export const createSeriesTrackPref = (streams, selectedIndex) => {
 	if (!selected) return null;
 
 	const language = realLanguage(selected.language);
+	const selectedForced = titleSaysForced(streamTitle(selected));
 	let relativeIndex = 0;
 	for (const stream of streams) {
 		if (stream.index === selectedIndex) break;
+		if (isForcedTrack(stream) !== selectedForced) continue;
 		if (language && languageMatches(stream.language, language)) relativeIndex += 1;
 	}
 
@@ -109,13 +112,19 @@ export const matchSeriesTrackIndex = (streams, pref) => {
 	const named = titleMatches(matching, target, false);
 	if (named.length === 1) return named[0].index;
 
-	if (pref.relativeIndex >= 0 && pref.relativeIndex < matching.length) {
-		return matching[pref.relativeIndex].index;
+	// Position only counts tracks of the same kind as the remembered one, so a
+	// forced track listed first can't stand in for the full one.
+	const prefForced = titleSaysForced(target);
+	const sameKind = matching.filter((stream) => isForcedTrack(stream) === prefForced);
+	const positional = sameKind.length ? sameKind : matching;
+
+	if (pref.relativeIndex >= 0 && pref.relativeIndex < positional.length) {
+		return positional[pref.relativeIndex].index;
 	}
 	if (named.length > 1) return named[0].index;
 
-	const loose = firstIndex(titleMatches(matching, target, true));
-	return loose !== null ? loose : matching[0].index;
+	const loose = firstIndex(titleMatches(positional, target, true));
+	return loose !== null ? loose : positional[0].index;
 };
 
 // The player and the details screen hold streams in different shapes, so the raw

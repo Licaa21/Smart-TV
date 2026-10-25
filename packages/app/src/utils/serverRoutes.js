@@ -23,6 +23,8 @@ export const makeUserRoutes = (readType, readUserId) => {
 		favorite: (itemId) => (legacy() ? `/Users/${uid()}/FavoriteItems/${itemId}?` : `/UserFavoriteItems/${itemId}?userId=${uid()}&`),
 		played: (itemId) => (legacy() ? `/Users/${uid()}/PlayedItems/${itemId}?` : `/UserPlayedItems/${itemId}?userId=${uid()}&`),
 		userData: (itemId) => (legacy() ? `/Users/${uid()}/Items/${itemId}/UserData?` : `/UserItems/${itemId}/UserData?userId=${uid()}&`),
+		// Only Emby has this one.
+		hideFromResume: (itemId) => `/Users/${uid()}/Items/${itemId}/HideFromResume?`,
 		views: () => (legacy() ? `/Users/${uid()}/Views?` : `/UserViews?userId=${uid()}&`),
 		configuration: () => (legacy() ? `/Users/${uid()}/Configuration?` : `/Users/Configuration?userId=${uid()}&`)
 	};

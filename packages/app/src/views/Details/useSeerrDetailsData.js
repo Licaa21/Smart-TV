@@ -11,6 +11,7 @@ import {resolveMetadataLanguage} from '../../utils/metadataLanguage';
 import {fetchSeerrTitle} from '../../utils/seerrTitle';
 import {keepingText} from '../../utils/tmdbText';
 import {getMediaDownloadSummary, isMediaInFlight} from '../../utils/seerrStatus';
+import {streamingRegion} from '../../utils/seerrStreaming';
 
 const DOWNLOAD_POLL_MS = 15000;
 const WAITING_POLL_MS = 30000;
@@ -40,6 +41,7 @@ const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 	// Taken as offered until it says otherwise.
 	const [is4kEnabled, setIs4kEnabled] = useState(true);
 	const [servers, setServers] = useState([]);
+	const [region, setRegion] = useState(null);
 
 	useEffect(() => {
 		if (!mediaId || !mediaType) {
@@ -106,6 +108,7 @@ const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 					? publicSettings?.movie4kEnabled
 					: publicSettings?.series4kEnabled;
 				setIs4kEnabled(offers4k !== false);
+				setRegion(streamingRegion(userData, publicSettings));
 
 				const loadMultiplePages = async (fetcher) => {
 					const allResults = [];
@@ -195,6 +198,7 @@ const useSeerrDetailsData = ({mediaId, mediaType, contextUser}) => {
 		currentUserId,
 		servers,
 		is4kEnabled,
+		streamingRegion: region,
 		hdStatus,
 		status4k,
 		hdDownload,

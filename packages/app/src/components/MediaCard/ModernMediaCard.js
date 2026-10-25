@@ -12,6 +12,7 @@ import {requestedArtwork, episodeArtwork} from './MediaCard';
 import {externalArtwork} from '../../utils/externalArtwork';
 import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
+import IncompleteBadge from '../IncompleteBadge';
 import {isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
@@ -504,6 +505,7 @@ const ModernMediaCard = ({
 					</div>
 				)}
 
+				<IncompleteBadge itemId={item.Id} belowFavorite={item.UserData?.IsFavorite} />
 				<AnimeCardPill item={item} serverUrl={itemServerUrl} hasProgressBar={showIndicators && progress > 0} />
 			</div>
 

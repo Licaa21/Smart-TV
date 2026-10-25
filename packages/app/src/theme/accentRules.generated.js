@@ -41,50 +41,56 @@ import m34 from '../components/UpdateNotification/UpdateNotification.module.less
 import m35 from '../components/seerr/SeerrPopups.module.less';
 import m36 from '../components/seerr/SeerrSections.module.less';
 import m37 from '../components/seerr/SeerrStatusBadge.module.less';
-import m38 from '../views/Browse/Browse.module.less';
-import m39 from '../views/Details/Details.module.less';
-import m40 from '../views/Details/ExpandableOverview.module.less';
-import m41 from '../views/Details/ModernDetailContent.module.less';
-import m42 from '../views/Details/ModernFileInformation.module.less';
-import m43 from '../views/Details/SeerrEpisodes.module.less';
-import m44 from '../views/Details/minimalist/MinimalistCards.module.less';
-import m45 from '../views/Details/nouveau/cards/NouveauCards.module.less';
-import m46 from '../views/Details/nouveau/footer/NouveauDetailsFooter.module.less';
-import m47 from '../views/Details/nouveau/hero/NouveauHero.module.less';
-import m48 from '../views/Details/spotlight/SpotlightDetailContent.module.less';
-import m49 from '../views/Favorites/Favorites.module.less';
-import m50 from '../views/GamePlayer/GamePlayer.module.less';
-import m51 from '../views/GameSystem/GameSystem.module.less';
-import m52 from '../views/GenreBrowse/GenreBrowse.module.less';
-import m53 from '../views/Genres/Genres.module.less';
-import m54 from '../views/Library/Library.module.less';
-import m55 from '../views/LiveTV/LiveTV.module.less';
-import m56 from '../views/Login/Login.module.less';
-import m57 from '../views/MusicBrowse/MusicBrowse.module.less';
-import m58 from '../views/MusicBrowse/MusicChips.module.less';
-import m59 from '../views/MusicBrowse/MusicHero.module.less';
-import m60 from '../views/Player/ChannelCarousel.module.less';
-import m61 from '../views/Player/EpisodeBrowser.module.less';
-import m62 from '../views/Player/NextUpOverlay.module.less';
-import m63 from '../views/Player/Player.module.less';
-import m64 from '../views/Player/SkipSegmentOverlay.module.less';
-import m65 from '../views/Player/StillWatchingDialog.module.less';
-import m66 from '../views/Player/TizenPlayer.module.less';
-import m67 from '../views/Player/WebOSPlayer.module.less';
-import m68 from '../views/Player/audio/AudioMode.module.less';
-import m69 from '../views/Player/audio/AudioQualityBadge.module.less';
-import m70 from '../views/Player/audio/LyricsPanel.module.less';
-import m71 from '../views/Player/audio/QueuePanel.module.less';
-import m72 from '../views/Recordings/Recordings.module.less';
-import m73 from '../views/Search/Search.module.less';
-import m74 from '../views/SeerrBrowse/SeerrBrowse.module.less';
-import m75 from '../views/SeerrCollection/SeerrCollection.module.less';
-import m76 from '../views/SeerrDiscover/SeerrDiscover.module.less';
-import m77 from '../views/SeerrPerson/SeerrPerson.module.less';
-import m78 from '../views/SeerrRequests/SeerrRequests.module.less';
-import m79 from '../views/Settings/Settings.module.less';
-import m80 from '../views/Settings/achievements/Achievements.module.less';
-import m81 from '../views/Settings/friends/Friends.module.less';
+import m38 from '../views/BookBrowse/BookCard.module.less';
+import m39 from '../views/BookBrowse/BookstoreBooks.module.less';
+import m40 from '../views/BookBrowse/ClassicBooks.module.less';
+import m41 from '../views/BookBrowse/ReadingRoomBooks.module.less';
+import m42 from '../views/Browse/Browse.module.less';
+import m43 from '../views/Details/Details.module.less';
+import m44 from '../views/Details/ExpandableOverview.module.less';
+import m45 from '../views/Details/ModernDetailContent.module.less';
+import m46 from '../views/Details/ModernFileInformation.module.less';
+import m47 from '../views/Details/Reviews.module.less';
+import m48 from '../views/Details/SeerrEpisodes.module.less';
+import m49 from '../views/Details/minimalist/MinimalistCards.module.less';
+import m50 from '../views/Details/nouveau/cards/NouveauCards.module.less';
+import m51 from '../views/Details/nouveau/footer/NouveauDetailsFooter.module.less';
+import m52 from '../views/Details/nouveau/hero/NouveauHero.module.less';
+import m53 from '../views/Details/spotlight/SpotlightDetailContent.module.less';
+import m54 from '../views/Favorites/Favorites.module.less';
+import m55 from '../views/GameDetails/GameDetails.module.less';
+import m56 from '../views/GamePlayer/GamePlayer.module.less';
+import m57 from '../views/GameSystem/GameSystem.module.less';
+import m58 from '../views/GenreBrowse/GenreBrowse.module.less';
+import m59 from '../views/Genres/Genres.module.less';
+import m60 from '../views/Library/Library.module.less';
+import m61 from '../views/LiveTV/LiveTV.module.less';
+import m62 from '../views/Login/Login.module.less';
+import m63 from '../views/MusicBrowse/MusicBrowse.module.less';
+import m64 from '../views/MusicBrowse/MusicChips.module.less';
+import m65 from '../views/MusicBrowse/MusicHero.module.less';
+import m66 from '../views/Player/ChannelCarousel.module.less';
+import m67 from '../views/Player/EpisodeBrowser.module.less';
+import m68 from '../views/Player/NextUpOverlay.module.less';
+import m69 from '../views/Player/Player.module.less';
+import m70 from '../views/Player/SkipSegmentOverlay.module.less';
+import m71 from '../views/Player/StillWatchingDialog.module.less';
+import m72 from '../views/Player/TizenPlayer.module.less';
+import m73 from '../views/Player/WebOSPlayer.module.less';
+import m74 from '../views/Player/audio/AudioMode.module.less';
+import m75 from '../views/Player/audio/AudioQualityBadge.module.less';
+import m76 from '../views/Player/audio/LyricsPanel.module.less';
+import m77 from '../views/Player/audio/QueuePanel.module.less';
+import m78 from '../views/Recordings/Recordings.module.less';
+import m79 from '../views/Search/Search.module.less';
+import m80 from '../views/SeerrBrowse/SeerrBrowse.module.less';
+import m81 from '../views/SeerrCollection/SeerrCollection.module.less';
+import m82 from '../views/SeerrDiscover/SeerrDiscover.module.less';
+import m83 from '../views/SeerrPerson/SeerrPerson.module.less';
+import m84 from '../views/SeerrRequests/SeerrRequests.module.less';
+import m85 from '../views/Settings/Settings.module.less';
+import m86 from '../views/Settings/achievements/Achievements.module.less';
+import m87 from '../views/Settings/friends/Friends.module.less';
 
 export const MODULES = {
 	'components/AccountModal/AccountModal.module.less': m0,
@@ -125,50 +131,56 @@ export const MODULES = {
 	'components/seerr/SeerrPopups.module.less': m35,
 	'components/seerr/SeerrSections.module.less': m36,
 	'components/seerr/SeerrStatusBadge.module.less': m37,
-	'views/Browse/Browse.module.less': m38,
-	'views/Details/Details.module.less': m39,
-	'views/Details/ExpandableOverview.module.less': m40,
-	'views/Details/ModernDetailContent.module.less': m41,
-	'views/Details/ModernFileInformation.module.less': m42,
-	'views/Details/SeerrEpisodes.module.less': m43,
-	'views/Details/minimalist/MinimalistCards.module.less': m44,
-	'views/Details/nouveau/cards/NouveauCards.module.less': m45,
-	'views/Details/nouveau/footer/NouveauDetailsFooter.module.less': m46,
-	'views/Details/nouveau/hero/NouveauHero.module.less': m47,
-	'views/Details/spotlight/SpotlightDetailContent.module.less': m48,
-	'views/Favorites/Favorites.module.less': m49,
-	'views/GamePlayer/GamePlayer.module.less': m50,
-	'views/GameSystem/GameSystem.module.less': m51,
-	'views/GenreBrowse/GenreBrowse.module.less': m52,
-	'views/Genres/Genres.module.less': m53,
-	'views/Library/Library.module.less': m54,
-	'views/LiveTV/LiveTV.module.less': m55,
-	'views/Login/Login.module.less': m56,
-	'views/MusicBrowse/MusicBrowse.module.less': m57,
-	'views/MusicBrowse/MusicChips.module.less': m58,
-	'views/MusicBrowse/MusicHero.module.less': m59,
-	'views/Player/ChannelCarousel.module.less': m60,
-	'views/Player/EpisodeBrowser.module.less': m61,
-	'views/Player/NextUpOverlay.module.less': m62,
-	'views/Player/Player.module.less': m63,
-	'views/Player/SkipSegmentOverlay.module.less': m64,
-	'views/Player/StillWatchingDialog.module.less': m65,
-	'views/Player/TizenPlayer.module.less': m66,
-	'views/Player/WebOSPlayer.module.less': m67,
-	'views/Player/audio/AudioMode.module.less': m68,
-	'views/Player/audio/AudioQualityBadge.module.less': m69,
-	'views/Player/audio/LyricsPanel.module.less': m70,
-	'views/Player/audio/QueuePanel.module.less': m71,
-	'views/Recordings/Recordings.module.less': m72,
-	'views/Search/Search.module.less': m73,
-	'views/SeerrBrowse/SeerrBrowse.module.less': m74,
-	'views/SeerrCollection/SeerrCollection.module.less': m75,
-	'views/SeerrDiscover/SeerrDiscover.module.less': m76,
-	'views/SeerrPerson/SeerrPerson.module.less': m77,
-	'views/SeerrRequests/SeerrRequests.module.less': m78,
-	'views/Settings/Settings.module.less': m79,
-	'views/Settings/achievements/Achievements.module.less': m80,
-	'views/Settings/friends/Friends.module.less': m81
+	'views/BookBrowse/BookCard.module.less': m38,
+	'views/BookBrowse/BookstoreBooks.module.less': m39,
+	'views/BookBrowse/ClassicBooks.module.less': m40,
+	'views/BookBrowse/ReadingRoomBooks.module.less': m41,
+	'views/Browse/Browse.module.less': m42,
+	'views/Details/Details.module.less': m43,
+	'views/Details/ExpandableOverview.module.less': m44,
+	'views/Details/ModernDetailContent.module.less': m45,
+	'views/Details/ModernFileInformation.module.less': m46,
+	'views/Details/Reviews.module.less': m47,
+	'views/Details/SeerrEpisodes.module.less': m48,
+	'views/Details/minimalist/MinimalistCards.module.less': m49,
+	'views/Details/nouveau/cards/NouveauCards.module.less': m50,
+	'views/Details/nouveau/footer/NouveauDetailsFooter.module.less': m51,
+	'views/Details/nouveau/hero/NouveauHero.module.less': m52,
+	'views/Details/spotlight/SpotlightDetailContent.module.less': m53,
+	'views/Favorites/Favorites.module.less': m54,
+	'views/GameDetails/GameDetails.module.less': m55,
+	'views/GamePlayer/GamePlayer.module.less': m56,
+	'views/GameSystem/GameSystem.module.less': m57,
+	'views/GenreBrowse/GenreBrowse.module.less': m58,
+	'views/Genres/Genres.module.less': m59,
+	'views/Library/Library.module.less': m60,
+	'views/LiveTV/LiveTV.module.less': m61,
+	'views/Login/Login.module.less': m62,
+	'views/MusicBrowse/MusicBrowse.module.less': m63,
+	'views/MusicBrowse/MusicChips.module.less': m64,
+	'views/MusicBrowse/MusicHero.module.less': m65,
+	'views/Player/ChannelCarousel.module.less': m66,
+	'views/Player/EpisodeBrowser.module.less': m67,
+	'views/Player/NextUpOverlay.module.less': m68,
+	'views/Player/Player.module.less': m69,
+	'views/Player/SkipSegmentOverlay.module.less': m70,
+	'views/Player/StillWatchingDialog.module.less': m71,
+	'views/Player/TizenPlayer.module.less': m72,
+	'views/Player/WebOSPlayer.module.less': m73,
+	'views/Player/audio/AudioMode.module.less': m74,
+	'views/Player/audio/AudioQualityBadge.module.less': m75,
+	'views/Player/audio/LyricsPanel.module.less': m76,
+	'views/Player/audio/QueuePanel.module.less': m77,
+	'views/Recordings/Recordings.module.less': m78,
+	'views/Search/Search.module.less': m79,
+	'views/SeerrBrowse/SeerrBrowse.module.less': m80,
+	'views/SeerrCollection/SeerrCollection.module.less': m81,
+	'views/SeerrDiscover/SeerrDiscover.module.less': m82,
+	'views/SeerrPerson/SeerrPerson.module.less': m83,
+	'views/SeerrRequests/SeerrRequests.module.less': m84,
+	'views/Settings/Settings.module.less': m85,
+	'views/Settings/achievements/Achievements.module.less': m86,
+	'views/Settings/friends/Friends.module.less': m87
 };
 
 export const ACCENT_RULES = {
@@ -229,6 +241,7 @@ export const ACCENT_RULES = {
 		["views/Details/ModernFileInformation.module.less","",".{showAll}","color","{accent}"],
 		["views/Details/ModernFileInformation.module.less","",".{retry}","color","{accent}"],
 		["views/Details/ModernFileInformation.module.less","",".{reasonHint}","color","{accent}"],
+		["views/Details/Reviews.module.less","",".{card}:focus","border-color","{accent}"],
 		["views/Details/SeerrEpisodes.module.less","",".{card}:focus","background","rgba({rgb}, 0.25)"],
 		["views/Details/SeerrEpisodes.module.less","",".{dialogPanel}","border","2px solid rgba({rgb}, 0.55)"],
 		["views/Details/SeerrEpisodes.module.less","",".{dialogPanel}","box-shadow","0 24px 80px rgba(0, 0, 0, 0.7), 0 0 60px rgba({rgb}, 0.22)"],
@@ -528,6 +541,22 @@ export const ACCENT_RULES = {
 		["components/seerr/SeerrPopups.module.less","","html[data-theme-id='neon_pulse'] .{seasonCheckItem}, html[data-theme-id='neon_pulse'] .{qualityButton}, html[data-theme-id='neon_pulse'] .{cancelConfirmButton}, html[data-theme-id='neon_pulse'] .{cancelKeepButton}, html[data-theme-id='neon_pulse'] .{advancedConfirmButton}","box-shadow","0 0 10px rgba({rgb}, 0.2)"],
 		["components/seerr/SeerrSections.module.less","",".{collectionBannerCta}","color","{accent}"],
 		["components/seerr/SeerrStatusBadge.module.less","",".{dotProcessing}","border","3px solid {accent}"],
+		["views/BookBrowse/BookCard.module.less","",".{progress}","background","{accent}"],
+		["views/BookBrowse/BookstoreBooks.module.less","",".{railSelected}","background","rgba({rgb}, 0.16)"],
+		["views/BookBrowse/BookstoreBooks.module.less","",".{railSelected} svg","fill","{accent}"],
+		["views/BookBrowse/BookstoreBooks.module.less","",".{railSelected} .{railCount}","color","{accent}"],
+		["views/BookBrowse/BookstoreBooks.module.less","",".{continueProgress} div, .{listProgress} div","background","{accent}"],
+		["views/BookBrowse/BookstoreBooks.module.less","",".{continuePlay}","background","{accent}"],
+		["views/BookBrowse/BookstoreBooks.module.less","",".{placeholder}","background","linear-gradient(135deg, rgba({rgb}, 0.25) 0%, rgba({rgb}, 0.05) 50%, transparent 100%), #2a2a4e"],
+		["views/BookBrowse/BookstoreBooks.module.less","",".{progress}","background","{accent}"],
+		["views/BookBrowse/ClassicBooks.module.less","",".{eyebrow}","color","{accent}"],
+		["views/BookBrowse/ClassicBooks.module.less","",".{cta}","background","{accent}"],
+		["views/BookBrowse/ClassicBooks.module.less","",".{heroProgress} div","background","{accent}"],
+		["views/BookBrowse/ClassicBooks.module.less","",".{scopeThumb}","background","{accent}"],
+		["views/BookBrowse/ReadingRoomBooks.module.less","",".{trackFill}","background","{accent}"],
+		["views/BookBrowse/ReadingRoomBooks.module.less","",".{readButton}","background","{accent}"],
+		["views/GameDetails/GameDetails.module.less","",".{kicker}","color","{accent}"],
+		["views/GameDetails/GameDetails.module.less","",".{actions} > .{actionButton}.{primaryButton} .{primaryBg}","background-color","{accent}"],
 		["views/GamePlayer/GamePlayer.module.less","",".{headerButton}.{spottable}:focus","background","{accent}"],
 		["views/GamePlayer/GamePlayer.module.less","",".{row}.{spottable}:focus","background","{accent}"],
 		["views/GamePlayer/GamePlayer.module.less","",".{settingRow}.{spottable}:focus","background","rgba({rgb}, 0.2)"],

@@ -37,7 +37,7 @@ jest.mock('../../utils/spotlightContainers', () => {
 	const React = require('react');
 	return {ModalContainer: ({className, children, onClick}) => React.createElement('div', {className, onClick}, children)};
 });
-jest.mock('../../services/gamesApi', () => ({getGame: jest.fn(), getGames: jest.fn(), gameThumbUrl: () => null, setGameCoreOverride: jest.fn()}));
+jest.mock('../../services/gamesApi', () => ({getGame: jest.fn(), getGames: jest.fn(), getBoxArtAspects: () => Promise.resolve(null), gameThumbUrl: () => null, setGameCoreOverride: jest.fn()}));
 jest.mock('../../utils/gameSaves', () => ({loadGameStateWithMigration: jest.fn()}));
 jest.mock('../../utils/emulatorjs', () => ({isSupported: () => true, needsThreads: (core) => core === 'psp', unsupportedMessage: () => ''}));
 jest.mock('../../utils/scrimImage', () => ({scrimStyle: () => null}));
@@ -72,14 +72,41 @@ test('holds Play while the save check is running', async () => {
 	expect(onPlay).toHaveBeenCalledWith(library, game, {fresh: false});
 });
 
-test('offers Continue and Restart once a save is found', async () => {
+test('offers Continue and Start fresh once a save is found', async () => {
 	loadGameStateWithMigration.mockResolvedValue(new Uint8Array([1]));
 
 	renderDetails();
-	fireEvent.click(await screen.findByText('Restart'));
+	fireEvent.click(await screen.findByText('Start fresh'));
 
-	expect(labels()).toEqual(['Continue', 'Restart']);
+	expect(labels()).toEqual(['Continue', 'Start fresh']);
+	expect(screen.getByText('Save found. Continue picks up from it.')).toBeTruthy();
 	expect(onPlay).toHaveBeenCalledWith(library, game, {fresh: true});
+});
+
+test('drops No-Intro tags from the title and lists the region with the other facts', async () => {
+	const smw = {
+		...game,
+		title: 'Super Mario World (USA)',
+		system: 'SNES',
+		year: 1990,
+		genre: 'Platform',
+		players: 2,
+		developer: 'Nintendo EAD',
+		region: 'USA',
+		rating: 4.73,
+		sizeBytes: 524288
+	};
+	gamesApi.getGame.mockResolvedValue(smw);
+	loadGameStateWithMigration.mockResolvedValue(null);
+
+	render(<GameDetails library={library} gameId="g1" initialGame={smw} onPlay={onPlay} />);
+	await screen.findByText('No save on this server yet');
+
+	expect(screen.getByRole('heading').textContent).toBe('Super Mario World');
+	expect(screen.getByText('1990 · Platform · 2 players')).toBeTruthy();
+	expect(screen.getByText('USA')).toBeTruthy();
+	expect(screen.getByText('4.7 / 5')).toBeTruthy();
+	expect(screen.getByText('512.0 KB')).toBeTruthy();
 });
 
 test('a failed save check blocks play until a retry gets an answer', async () => {
@@ -93,7 +120,7 @@ test('a failed save check blocks play until a retry gets an answer', async () =>
 
 	expect(onPlay).not.toHaveBeenCalled();
 	expect(loadGameStateWithMigration).toHaveBeenCalledTimes(2);
-	expect(labels()).toEqual(['Continue', 'Restart']);
+	expect(labels()).toEqual(['Continue', 'Start fresh']);
 });
 
 test('checks the save from the summary when the detail request fails', async () => {

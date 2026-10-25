@@ -13,7 +13,7 @@ import * as gamesApi from '../../services/gamesApi';
 import serverLogger from '../../services/serverLogger';
 import {controllerIsOnlyRemote, giveControllerToGame, initVideo, keepScreenOn, setupVisibilityHandler} from '../../services/video';
 import * as ejs from '../../utils/emulatorjs';
-import {gameStateKey, loadGameStateWithMigration} from '../../utils/gameSaves';
+import {gameStateKey, loadGameStateWithMigration, loadSram, saveSram} from '../../utils/gameSaves';
 import {KEYS, isBackKey} from '../../utils/keys';
 import {DETAIL_ICON_PATHS} from '../Details/detailIcons';
 
@@ -171,8 +171,9 @@ const GamePlayer = ({library, game, startFresh, onBack, backHandlerRef}) => {
 		return () => clearTimeout(timer);
 	}, [toast]);
 
-	// Fire-and-forget state upload for paths that can't await, like unmount and backgrounding.
+	// Fire-and-forget save upload for paths that can't await, like unmount and backgrounding.
 	const flushState = useCallback(() => {
+		saveSram(game.id, ejs.getSram());
 		try {
 			const bytes = ejs.getState();
 			if (bytes && bytes.length) gamesApi.putStateBytes(gameStateKey(game.id, game.core), bytes).catch(() => {});
@@ -191,13 +192,14 @@ const GamePlayer = ({library, game, startFresh, onBack, backHandlerRef}) => {
 		const arcadeFileName = game.core === 'mame' || game.core === 'arcade' ? game.fileName : null;
 		(async () => {
 			try {
-				const [rom, settingsJson, existing, dataPath] = await Promise.all([
+				const [rom, settingsJson, existing, dataPath, sram] = await Promise.all([
 					gamesApi.getRomUrl(libraryId, game.id, arcadeFileName),
 					gamesApi.getSettingsBlob(),
 					// Read on Restart too so Load state is still offered. A failed read counts as
 					// no save instead of stopping the game.
 					loadGameStateWithMigration(game.id, game.core).catch(() => null),
-					gamesApi.getEmulatorDataPath()
+					gamesApi.getEmulatorDataPath(),
+					loadSram(game.id)
 				]);
 				if (cancelled) return;
 				const {url: romUrl, isBlob} = rom;
@@ -220,6 +222,8 @@ const GamePlayer = ({library, game, startFresh, onBack, backHandlerRef}) => {
 					dataPath
 				});
 				if (cancelled) return;
+				// A save state already holds the battery save, so only a fresh boot takes one.
+				if (sram && (startFresh || !existing)) ejs.applySram(sram);
 				setReady(true);
 			} catch (e) {
 				// Backing out mid-load lands here too, and that is not worth reporting.
@@ -265,8 +269,10 @@ const GamePlayer = ({library, game, startFresh, onBack, backHandlerRef}) => {
 		if (exiting.current) return;
 		exiting.current = true;
 		const persist = async () => {
+			const sram = saveSram(game.id, ejs.getSram());
 			if (!stateSaved) await saveState();
 			await gamesApi.putSettingsBlob(ejs.getSettingsJson());
+			await sram;
 		};
 		let timer;
 		const cap = new Promise((resolve) => { timer = setTimeout(resolve, EXIT_SAVE_TIMEOUT); });
@@ -275,7 +281,7 @@ const GamePlayer = ({library, game, startFresh, onBack, backHandlerRef}) => {
 		} catch (e) { /* leaving either way */ }
 		clearTimeout(timer);
 		if (onBack) onBack();
-	}, [saveState, onBack]);
+	}, [game, saveState, onBack]);
 
 	// While playing, Spotlight is paused so the arrow/OK keys reach EmulatorJS instead of moving
 	// focus; it resumes only while the overlay is open.

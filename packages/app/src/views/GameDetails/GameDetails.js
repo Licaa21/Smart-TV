@@ -11,8 +11,9 @@ import {GAME_ICON_PATHS} from '../../components/icons/gameIcons';
 import {iconViewBox} from '../../components/icons/iconViewBox';
 import * as gamesApi from '../../services/gamesApi';
 import {isSupported, needsThreads, unsupportedMessage} from '../../utils/emulatorjs';
-import {gameDisplayTitle, gameFallbackColor} from '../../utils/gameArt';
+import {gameFallbackColor, gameHeadline, hideBrokenArt} from '../../utils/gameArt';
 import {loadGameStateWithMigration} from '../../utils/gameSaves';
+import {formatBytes} from '../../utils/seerrStatus';
 import {ModalContainer} from '../../utils/spotlightContainers';
 import {DETAIL_ICON_PATHS} from '../Details/detailIcons';
 import {coreChoices, coreLabel} from './coreChoices';
@@ -22,21 +23,33 @@ import css from './GameDetails.module.less';
 
 // Adds a class to the Sandstone button's background layer, which is where its fill is drawn.
 const CORE_BUTTON_CSS = {bg: css.coreBg};
+const PRIMARY_BUTTON_CSS = {bg: css.primaryBg};
 
-// Same stops as .scrim in the stylesheet.
+// Same stops as .scrim in the stylesheet. The snapshot fills the right 64% of the screen, so the
+// text column stays on solid background and the fade starts at the snapshot's left edge.
 const SCRIM = [
-	{to: 'right', rgb: '11, 15, 20', stops: [[0.3, 1], [0.65, 0.4], [0.95, 0]]},
-	{to: 'top', rgb: '11, 15, 20', stops: [[0.08, 1], [0.6, 0]]}
+	{to: 'right', rgb: '11, 15, 20', stops: [[0.36, 1], [0.46, 0.8], [0.64, 0]]},
+	{to: 'top', rgb: '11, 15, 20', stops: [[0.08, 1], [0.2, 0.85], [0.38, 0]]},
+	{to: 'bottom', rgb: '11, 15, 20', stops: [[0, 0.9], [0.16, 0]]}
 ];
 
 const focusCoreButton = () => setTimeout(() => Spotlight.focus('game-core-btn'), 0);
 
 const metaLine = (game) => [
-	game.system,
 	game.year,
 	game.genre,
 	game.players ? (game.players === 1 ? $L('1 player') : $L('{count} players').replace('{count}', game.players)) : null
 ].filter(Boolean).join('  ·  ');
+
+// The metadata the hero doesn't already show.
+const facts = (game) => [
+	[$L('Developer'), game.developer],
+	[$L('Publisher'), game.publisher],
+	[$L('Franchise'), game.franchise],
+	[$L('Region'), game.region],
+	[$L('Rating'), game.rating ? `${Number(game.rating).toFixed(1)} / 5` : null],
+	[$L('Size'), game.sizeBytes > 0 ? formatBytes(game.sizeBytes) : null]
+].filter(([, value]) => value);
 
 const ButtonIcon = ({path}) => (
 	<svg className={css.buttonIcon} viewBox={iconViewBox(path)} fill="currentColor">
@@ -58,6 +71,7 @@ const GameDetails = ({library, gameId, initialGame, onPlay, onSelectGame, backHa
 	const [saveReadiness, setSaveReadiness] = useState('checking');
 	const saveCheck = useRef(0);
 	const [related, setRelated] = useState([]);
+	const [relatedAspects, setRelatedAspects] = useState(null);
 	// Why this game can't run here, shown in place of starting it.
 	const [unsupported, setUnsupported] = useState(null);
 	const [corePickerOpen, setCorePickerOpen] = useState(false);
@@ -99,6 +113,9 @@ const GameDetails = ({library, gameId, initialGame, onPlay, onSelectGame, backHa
 				gamesApi.getGames(libraryId, g.system).then((all) => {
 					if (cancelled) return;
 					setRelated((all || []).filter((x) => x.id !== g.id).slice(0, 20));
+				});
+				gamesApi.getBoxArtAspects(libraryId, g.system).then((found) => {
+					if (!cancelled) setRelatedAspects(found);
 				});
 			}
 		}).catch(() => {
@@ -180,8 +197,10 @@ const GameDetails = ({library, gameId, initialGame, onPlay, onSelectGame, backHa
 
 	const backdrop = gamesApi.gameThumbUrl(libraryId, game.id, 'snap');
 	const poster = gamesApi.gameThumbUrl(libraryId, game.id);
-	const title = gameDisplayTitle(game.title, game.fileName);
+	const title = gameHeadline(game.title, game.fileName);
 	const primary = primaryAction(saveReadiness);
+	const gameFacts = facts(game);
+	const saveFound = saveReadiness === 'available';
 
 	return (
 		<div className={css.root}>
@@ -191,50 +210,63 @@ const GameDetails = ({library, gameId, initialGame, onPlay, onSelectGame, backHa
 			/>
 			<div className={css.scrim} style={scrimStyle(SCRIM)} />
 			<div className={css.content}>
-				<div
-					className={css.poster}
-					style={poster ? {backgroundImage: `url(${poster})`} : {background: gameFallbackColor(game.id)}}
-				/>
-				<div className={css.info}>
-					<h1 className={css.title}>{title}</h1>
-					<div className={css.meta}>{metaLine(game)}</div>
-					{game.overview ? <div className={css.overview}>{game.overview}</div> : null}
-					<div className={css.actions}>
-						<Button
-							spotlightId="game-play-btn"
-							className={css.actionButton}
-							disabled={saveReadiness === 'checking'}
-							onClick={handlePrimary}
-						>
-							<ButtonIcon path={primary.icon} />
-							{primary.label}
+				{poster ? <img className={css.poster} src={poster} alt="" onError={hideBrokenArt} /> : null}
+				<div className={css.kicker}>{game.system}</div>
+				<h1 className={css.title}>{title}</h1>
+				<div className={css.meta}>{metaLine(game)}</div>
+				{game.overview ? <div className={css.overview}>{game.overview}</div> : null}
+				<div className={css.actions}>
+					<Button
+						spotlightId="game-play-btn"
+						className={`${css.actionButton} ${css.primaryButton}`}
+						css={PRIMARY_BUTTON_CSS}
+						disabled={saveReadiness === 'checking'}
+						onClick={handlePrimary}
+					>
+						<ButtonIcon path={primary.icon} />
+						{primary.label}
+					</Button>
+					{saveFound ? (
+						<Button className={css.actionButton} onClick={handleRestart}>
+							<ButtonIcon path={GAME_ICON_PATHS.refresh} />
+							{$L('Start fresh')}
 						</Button>
-						{saveReadiness === 'available' ? (
-							<Button className={css.actionButton} onClick={handleRestart}>
-								<ButtonIcon path={GAME_ICON_PATHS.refresh} />
-								{$L('Restart')}
-							</Button>
-						) : null}
-						{choices.length > 1 ? (
-							<Button
-								spotlightId="game-core-btn"
-								className={`${css.actionButton} ${css.coreButton}`}
-								css={CORE_BUTTON_CSS}
-								onClick={openCorePicker}
-							>
-								<ButtonIcon path={GAME_ICON_PATHS.memory} />
-								{coreLabel(game.core)}
-							</Button>
-						) : null}
-					</div>
+					) : null}
+					{choices.length > 1 ? (
+						<Button
+							spotlightId="game-core-btn"
+							className={`${css.actionButton} ${css.coreButton}`}
+							css={CORE_BUTTON_CSS}
+							onClick={openCorePicker}
+						>
+							<ButtonIcon path={GAME_ICON_PATHS.memory} />
+							{coreLabel(game.core)}
+						</Button>
+					) : null}
 				</div>
+				{saveFound || saveReadiness === 'absent' ? (
+					<div className={css.saveStatus}>
+						<span className={saveFound ? css.saveDot : css.noSaveDot} />
+						{saveFound ? $L('Save found. Continue picks up from it.') : $L('No save on this server yet')}
+					</div>
+				) : null}
+				{gameFacts.length ? (
+					<div className={css.facts}>
+						{gameFacts.map(([label, value]) => (
+							<div key={label} className={css.fact}>
+								<div className={css.factLabel}>{label}</div>
+								<div className={css.factValue}>{value}</div>
+							</div>
+						))}
+					</div>
+				) : null}
 			</div>
 			{related.length ? (
 				<div className={css.related}>
 					<div className={css.relatedTitle}>{$L('More in {system}').replace('{system}', game.system)}</div>
 					<div className={css.relatedRow}>
 						{related.map((g) => (
-							<GameCard key={g.id} game={g} artUrl={gamesApi.gameThumbUrl(libraryId, g.id)} width={150} onSelect={openRelated} />
+							<GameCard key={g.id} game={g} artUrl={gamesApi.gameThumbUrl(libraryId, g.id)} aspect={relatedAspects?.get(g.id)} width={150} onSelect={openRelated} />
 						))}
 					</div>
 				</div>

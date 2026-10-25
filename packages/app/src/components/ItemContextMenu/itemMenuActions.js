@@ -119,3 +119,11 @@ export const itemMenuActions = (item, {
 
 	return actions;
 };
+
+// Emby takes an item off resume and keeps its progress. Jellyfin can only clear the play state, and
+// the audiobook Continue row ignores Emby's flag, so audio is always cleared.
+export const hideFromResume = (api, item, serverType) => {
+	const audio = item.Type === 'Audio' || item.Type === 'AudioBook' || item.MediaType === 'Audio';
+	if (serverType === 'emby' && !audio) return api.hideFromResume(item.Id).catch(() => {});
+	return api.setWatched(item.Id, false).catch(() => {});
+};

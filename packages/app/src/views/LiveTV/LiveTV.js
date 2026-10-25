@@ -7,17 +7,19 @@ import {useAuth} from '../../context/AuthContext';
 import {useSettings} from '../../context/SettingsContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import {formatClockTime, formatDayLabel} from '../../utils/clock';
-import {KEYS} from '../../utils/keys';
+import {KEYS, pageDirection} from '../../utils/keys';
 import {animateScrollTop, pointerHover, stopScrollAnimation} from '../../utils/focusScroll';
 import {rem, rootScale} from '../../utils/rootScale';
 import {createLiveTvGuideStore} from '../../services/liveTvGuideStore';
 import {getLiveTvLastChannelId, loadLiveTvLastChannel} from '../../services/liveTvLastChannel';
 import {
-	CELL_KINDS, CHANNEL_SORTS, GUIDE_FILTERS, TV_CANVAS_SCALE, artworkSource, buildRowCells, categoryTags,
-	clampAnchorInto, episodeLine, episodeTitleOf, filterLabel, floorToHalfHour, genreFor, guideWindowFor,
-	guideLeftEdge, hasSeriesTimer, hasTimer, isLiveAt, programAiringAt, programEnd, programStart, progressAt,
-	reanchorSelection, resolveCellIndexAt, seasonEpisodeLabel
+	CELL_KINDS, CHANNEL_SORTS, DEFAULT_SERIES_CHOICE, GUIDE_FILTERS, TV_CANVAS_SCALE, artworkSource, buildRowCells,
+	clampAnchorInto, episodeLine, episodeTitleOf, floorToHalfHour, genreFor, guideWindowFor, guideLeftEdge, hasSeriesTimer,
+	hasTimer, isLiveAt, programAiringAt, programEnd, programStart, progressAt, reanchorSelection,
+	recordingMark, resolveCellIndexAt, seasonEpisodeLabel, seriesChoiceFlags, seriesChoiceOf
 } from '../../utils/liveTvGuide';
+import SeriesEpisodeChoices from '../../components/SeriesEpisodeChoices';
+import {offersLaterShowing, requestLaterShowing} from '../../services/incompleteRecordings';
 import {ChannelCell, ProgramCell} from './GuideCells';
 import {GUIDE_ICONS, GuideIcon} from './GuideIcons';
 import GuideHero from './GuideHero';
@@ -74,15 +76,6 @@ const REANCHOR_INPUT_QUIET_MS = 1000;
 const WINDOW_BAR_PREVIOUS = 0;
 const WINDOW_BAR_LAST = 5;
 
-// Fast forward and rewind, and the track and page keys a remote may carry, page the rows.
-const PAGE_FORWARD_KEYS = [KEYS.FAST_FORWARD || 417, 425, 10233, 34];
-const PAGE_BACK_KEYS = [KEYS.REWIND || 412, 424, 10232, 33];
-const pageDirection = (keyCode) => {
-	if (PAGE_FORWARD_KEYS.indexOf(keyCode) >= 0) return 1;
-	if (PAGE_BACK_KEYS.indexOf(keyCode) >= 0) return -1;
-	return 0;
-};
-
 const SORT_LABELS = {number: 'Channel Number', name: 'Name', favoritesFirst: 'Favorites First'};
 const normalizeSort = (value) => (CHANNEL_SORTS.indexOf(value) >= 0 ? value : 'number');
 
@@ -135,10 +128,6 @@ const GuideRow = memo(({channel, rowIndex, cells, windowStart, now, layout, logo
 	const handleFocusCell = useCallback((cell) => onFocusCell(rowIndex, channel.Id, cell), [rowIndex, channel.Id, onFocusCell]);
 	const handleKeyDownCell = useCallback((e, cell) => onKeyDownCell(e, rowIndex, channel.Id, cell, cells), [rowIndex, channel.Id, cells, onKeyDownCell]);
 	const handleSelectCell = useCallback((cell) => onSelectCell(rowIndex, channel.Id, cell), [rowIndex, channel.Id, onSelectCell]);
-	const cellTags = useMemo(
-		() => cells.map((cell) => (cell.program ? categoryTags(cell.program).map((key) => $L(filterLabel(key))) : [])),
-		[cells]
-	);
 
 	return (
 		<div className={css.guideRow} data-channel-id={channel.Id}>
@@ -164,12 +153,11 @@ const GuideRow = memo(({channel, rowIndex, cells, windowStart, now, layout, logo
 							width={(cell.end - cell.start) * layout.pxPerMs}
 							spotlightId={cellSpotlightId(channel.Id, index)}
 							genre={program ? genreFor(program) : null}
-							rating={program?.OfficialRating || null}
-							tags={cellTags[index]}
+							episode={program ? episodeLine(program) : ''}
+							mark={program ? recordingMark(program) : null}
 							isLive={live}
 							isPast={program ? programEnd(program) < now : false}
 							progress={live ? progressAt(program, now) : 0}
-							hasTimer={program ? hasTimer(program) : false}
 							startsBeforeWindow={program ? programStart(program) < windowStart : false}
 							noProgramLabel={$L('No program data')}
 							onFocusCell={handleFocusCell}
@@ -237,7 +225,8 @@ const GuideHeroHost = ({store, emitter, focusRef, serverUrl, clockDisplay, versi
 			communityRating: preview?.CommunityRating ?? null,
 			badgeLabel,
 			synopsis: preview?.Overview || null,
-			isLive: preview ? isLiveAt(preview, now) : false
+			isLive: preview ? isLiveAt(preview, now) : false,
+			mark: preview ? recordingMark(preview) : null
 		};
 	}, [tick, version, clockDisplay, serverUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -784,15 +773,67 @@ const LiveTV = ({onPlayChannel, onRecordings, backHandlerRef}) => {
 		if (actionBusyRef.current) return;
 		actionBusyRef.current = true;
 		try {
-			await action();
+			const message = await action();
 			setDialog(null);
-			showToast(success);
+			showToast(typeof message === 'string' ? message : success);
 			setTimeout(restoreGridFocus, 0);
 		} catch {
 			actionBusyRef.current = false;
 			showToast(failure);
 		}
 	}, [restoreGridFocus, showToast]);
+
+	// The answer to the later showing prompt. A failed request still leaves the recording running.
+	const handleRecordNow = useCallback((alsoLater) => {
+		const target = dialogRef.current.program;
+		runDialogAction(async () => {
+			await store.toggleProgramRecording(target);
+			if (!alsoLater) return null;
+			try {
+				await requestLaterShowing(target.Id);
+			} catch {
+				return $L("Recording started, but couldn't request a later showing.");
+			}
+			store.refreshRecordings().catch(() => {});
+			return $L('Recording started. A later showing will be recorded too.');
+		}, $L('Program set to record'), $L('Unable to create recording'));
+	}, [runDialogAction, store]);
+
+	const openSeriesChoice = useCallback((target, rule = null) => {
+		setDialog({type: 'series', program: target, rule});
+		setTimeout(() => Spotlight.focus('livetv-series'), 100);
+	}, []);
+
+	const openSeriesSettings = useCallback(async (target) => {
+		if (actionBusyRef.current) return;
+		actionBusyRef.current = true;
+		try {
+			const rule = await api.getLiveTvSeriesTimer(target.SeriesTimerId);
+			actionBusyRef.current = false;
+			openSeriesChoice(target, rule);
+		} catch {
+			actionBusyRef.current = false;
+			showToast($L('Unable to update series recording'));
+		}
+	}, [api, openSeriesChoice, showToast]);
+
+	const handleSeriesChoice = useCallback((key) => {
+		const {program: target, rule} = dialogRef.current;
+		if (!rule) {
+			runDialogAction(
+				() => store.toggleSeriesRecording(target, seriesChoiceFlags(key)),
+				$L('Series set to record'),
+				$L('Unable to create series recording')
+			);
+		} else if (seriesChoiceOf(rule) === key) {
+			closeDialog();
+		} else {
+			runDialogAction(async () => {
+				await api.updateLiveTvSeriesTimer(rule.Id, {...rule, ...seriesChoiceFlags(key)});
+				await store.refreshRecordings();
+			}, $L('Series recording updated'), $L('Unable to update series recording'));
+		}
+	}, [api, closeDialog, runDialogAction, store]);
 
 	const openSort = useCallback(() => {
 		pendingMoveRef.current = null;
@@ -877,10 +918,11 @@ const LiveTV = ({onPlayChannel, onRecordings, backHandlerRef}) => {
 		if (!backHandlerRef) return undefined;
 		const handler = () => {
 			if (dialogRef.current) {
-				if (dialogRef.current.type === 'program') closeDialog();
-				else {
+				if (dialogRef.current.type === 'sort' || dialogRef.current.type === 'date') {
 					setDialog(null);
 					setTimeout(() => focusWindowBar(lastWindowBarIndexRef.current), 0);
+				} else {
+					closeDialog();
 				}
 				return true;
 			}
@@ -1236,6 +1278,9 @@ const LiveTV = ({onPlayChannel, onRecordings, backHandlerRef}) => {
 								{`${formatClockTime(new Date(programStart(program)), clockDisplay)} – ${formatClockTime(new Date(programEnd(program)), clockDisplay)}`}
 							</div>
 							{programEpisodeLine && <div className={css.dialogEpisode}>{programEpisodeLine}</div>}
+							{programHasSeriesTimer && !programHasTimer && !programEnded && (
+								<div className={css.dialogNote}>{$L('The series recording will skip this showing')}</div>
+							)}
 							{program.Overview && <div className={css.dialogOverview}>{program.Overview}</div>}
 							<div className={css.dialogChips}>
 								{program.IsMovie && <span className={css.genreChip}>{$L('Movie')}</span>}
@@ -1250,23 +1295,40 @@ const LiveTV = ({onPlayChannel, onRecordings, backHandlerRef}) => {
 							{!programEnded && (
 								<SpottableButton
 									className={`${css.dialogBtn} ${programHasTimer ? css.danger : ''} ${recordingNow ? 'spottable-default' : ''}`}
-									onClick={() => runDialogAction( // eslint-disable-line react/jsx-no-bind
-										() => store.toggleProgramRecording(program),
-										programHasTimer ? $L('Recording cancelled') : $L('Program set to record'),
-										programHasTimer ? $L('Failed to cancel recording') : $L('Unable to create recording')
-									)}
+									onClick={() => { // eslint-disable-line react/jsx-no-bind
+										if (!programHasTimer && offersLaterShowing(program, Date.now())) {
+											setDialog({type: 'later', program});
+											setTimeout(() => Spotlight.focus('livetv-later'), 100);
+											return;
+										}
+										runDialogAction(
+											() => store.toggleProgramRecording(program),
+											programHasTimer ? $L('Recording cancelled') : $L('Program set to record'),
+											programHasTimer ? $L('Failed to cancel recording') : $L('Unable to create recording')
+										);
+									}}
 								>
 									{programHasTimer ? $L('Cancel Recording') : $L('Record')}
 								</SpottableButton>
 							)}
-							{program.IsSeries && (
+							{programHasSeriesTimer && (
+								<SpottableButton
+									className={css.dialogBtn}
+									onClick={() => openSeriesSettings(program)} // eslint-disable-line react/jsx-no-bind
+								>
+									{$L('Series Settings')}
+								</SpottableButton>
+							)}
+							{(program.IsSeries || programHasSeriesTimer) && (
 								<SpottableButton
 									className={`${css.dialogBtn} ${programHasSeriesTimer ? css.danger : ''}`}
-									onClick={() => runDialogAction( // eslint-disable-line react/jsx-no-bind
-										() => store.toggleSeriesRecording(program),
-										programHasSeriesTimer ? $L('Series recording cancelled') : $L('Series set to record'),
-										programHasSeriesTimer ? $L('Failed to cancel series recording') : $L('Unable to create series recording')
-									)}
+									onClick={() => (programHasSeriesTimer // eslint-disable-line react/jsx-no-bind
+										? runDialogAction(
+											() => store.toggleSeriesRecording(program),
+											$L('Series recording cancelled'),
+											$L('Failed to cancel series recording')
+										)
+										: openSeriesChoice(program))}
 								>
 									{programHasSeriesTimer ? $L('Cancel Series Recording') : $L('Record Series')}
 								</SpottableButton>
@@ -1295,6 +1357,45 @@ const LiveTV = ({onPlayChannel, onRecordings, backHandlerRef}) => {
 							</SpottableButton>
 							<SpottableButton className={css.dialogBtn} onClick={closeDialog}>
 								{$L('Close')}
+							</SpottableButton>
+						</div>
+					</PopupContainer>
+				</div>
+			)}
+
+			{dialog?.type === 'series' && (
+				<div className={css.dialogScrim}>
+					<PopupContainer className={css.dialog} spotlightId="livetv-series">
+						<div className={css.dialogTitle}>{$L('Which episodes should be recorded?')}</div>
+						<div className={css.dialogBody}>
+							<SeriesEpisodeChoices
+								selected={dialog.rule ? seriesChoiceOf(dialog.rule) : DEFAULT_SERIES_CHOICE}
+								onPick={handleSeriesChoice}
+							/>
+						</div>
+					</PopupContainer>
+				</div>
+			)}
+
+			{dialog?.type === 'later' && (
+				<div className={css.dialogScrim}>
+					<PopupContainer className={css.dialog} spotlightId="livetv-later">
+						<div className={css.dialogTitle}>{dialog.program.Name}</div>
+						<div className={css.dialogBody}>
+							<div className={css.dialogTime}>{$L('This program has already started. Also record a later showing?')}</div>
+						</div>
+						<div className={css.dialogActions}>
+							<SpottableButton
+								className={`${css.dialogBtn} spottable-default`}
+								onClick={() => handleRecordNow(true)} // eslint-disable-line react/jsx-no-bind
+							>
+								{$L('Also Record a Later Showing')}
+							</SpottableButton>
+							<SpottableButton
+								className={css.dialogBtn}
+								onClick={() => handleRecordNow(false)} // eslint-disable-line react/jsx-no-bind
+							>
+								{$L('Just Record Now')}
 							</SpottableButton>
 						</div>
 					</PopupContainer>

@@ -1,9 +1,6 @@
 import {useState, useCallback, useEffect, useLayoutEffect, useMemo, lazy, Suspense, useRef} from 'react';
 import {isKidsMode, blockedPanels, allowedPanel} from '../utils/kidsMode';
-import {
-	hashPin, pinMatches, lockoutRemaining, registerFailedAttempt, clearedLockout, tooManyAttempts,
-	SIGN_IN_PIN
-} from '../utils/pinLockout';
+import {PIN_ACCEPTED, isSignInPinEnabled, refreshSignInPin, signInPinMessage, verifySignInPin} from '../utils/signInPin';
 import ThemeDecorator from '@enact/sandstone/ThemeDecorator';
 import {Panels, Panel} from '@enact/sandstone/Panels';
 import Spottable from '@enact/spotlight/Spottable';
@@ -20,6 +17,7 @@ import * as jellyfinApi from '../services/jellyfinApi';
 import {adoptLegacyBlockedRatings, loadParentalControls, parentalScopeKey, setParentalScope} from '../services/parentalControls';
 import {libraryIdOf, seerrCardTarget, seerrDetailStub} from '../utils/seerrTarget';
 import {setTmdbThumbsAvailable} from '../utils/tmdbThumb';
+import {configureIncompleteRecordings} from '../services/incompleteRecordings';
 import serverLogger from '../services/serverLogger';
 import * as remoteControl from '../services/remoteControl';
 import * as serverSocket from '../services/serverSocket';
@@ -63,6 +61,7 @@ import SpottableInput from '../components/SpottableInput/SpottableInput';
 import TVKeyboard from '../components/TVKeyboard/TVKeyboard';
 import {isTvKeyboardVisible, closeTvKeyboard} from '../components/TVKeyboard/keyboardBus';
 import useInactivityTimer from '../hooks/useInactivityTimer';
+import useSignInPin from '../hooks/useSignInPin';
 import {useThemeMusic} from '../hooks/useThemeMusic';
 import {useAccessSchedule} from '../hooks/useAccessSchedule';
 import {shiftedNow} from '../utils/clock';
@@ -312,7 +311,12 @@ const AppContent = (props) => {
 	const [shuffleOriginSpotlightId, setShuffleOriginSpotlightId] = useState('navbar-shuffle');
 	const [pinCodeInput, setPinCodeInput] = useState('');
 	const [pinCodeError, setPinCodeError] = useState('');
-	const [isPinUnlocked, setIsPinUnlocked] = useState(false);
+	// Each sign in, switch of account and return to the app is a new check, and the gate stays up
+	// until that check has passed.
+	const [pinCheckCount, setPinCheckCount] = useState(0);
+	const [pinPassed, setPinPassed] = useState(null);
+	const [pinChecked, setPinChecked] = useState(null);
+	const [pinVerifying, setPinVerifying] = useState(false);
 	const [setupWizardActive, setSetupWizardActive] = useState(false);
 	const setupWizardBackRef = useRef(null);
 	const cleanupHandlersRef = useRef(null);
@@ -355,15 +359,12 @@ const AppContent = (props) => {
 			reopenSettingsAtUpdates();
 		}
 	}, [dismissUpdate, reopenSettingsAtUpdates]);
-	// A PIN saved before this client started hashing is still stored as itself, so both are
-	// offered and the plain one is written back as a hash the first time it is entered.
-	const storedPin = useMemo(() => ({
-		hash: settings.pinCodeHash,
-		plain: typeof settings.pinCode === 'string' && /^\d{4}$/.test(settings.pinCode)
-			? settings.pinCode
-			: '0000'
-	}), [settings.pinCodeHash, settings.pinCode]);
-	const isPinGateActive = isAuthenticated && settings.pinCodeProtection === true && !isPinUnlocked;
+	const {userId, record: signInPin, account: pinAccount, latest: latestSignInPin, save: saveSignInPin} = useSignInPin();
+	const pinSession = isAuthenticated && userId ? `${userId}:${pinCheckCount}` : null;
+	const pinPending = Boolean(pinSession) && pinPassed !== pinSession;
+	const isPinGateActive = pinPending && isSignInPinEnabled(signInPin);
+	// Until the server has said whether the account has a PIN, nothing behind the gate shows.
+	const isPinChecking = pinPending && !isPinGateActive && pinChecked !== pinSession;
 	const screensaverTimeout = Number(settings.screensaverTimeout || 90);
 	const screensaverEnabled = Boolean(
 		settings.screensaverEnabled &&
@@ -429,6 +430,13 @@ const AppContent = (props) => {
 		serverLogger.setClientLogSupported(pluginInfo?.clientLogSupported === true);
 	}, [pluginInfo]);
 
+	useEffect(() => {
+		configureIncompleteRecordings({
+			supported: !!settings.useMoonfinPlugin && pluginInfo?.incompleteRecordingsSupported === true,
+			canManage: user?.Policy?.EnableLiveTvManagement === true
+		});
+	}, [pluginInfo, settings.useMoonfinPlugin, user]);
+
 	// The cards read this without the Seerr context, so a title the server doesn't hold
 	// can grow into the plugin's titled thumb.
 	useEffect(() => {
@@ -450,23 +458,22 @@ const AppContent = (props) => {
 		}
 	}, [settings.diagnosticLoggingEnabled]);
 
+	// A TV that never saw the account's PIN learns of it here, and one an administrator removed stops
+	// being asked for.
 	useEffect(() => {
-		if (!isAuthenticated) {
-			setIsPinUnlocked(false);
-			setPinCodeInput('');
-			setPinCodeError('');
-			return;
-		}
-		if (settings.pinCodeProtection === true) {
-			setIsPinUnlocked(false);
-			setPinCodeInput('');
-			setPinCodeError('');
-			return;
-		}
-		setIsPinUnlocked(true);
 		setPinCodeInput('');
 		setPinCodeError('');
-	}, [isAuthenticated, settings.pinCodeProtection, user?.Id]);
+		if (!pinSession) return undefined;
+		let cancelled = false;
+		const before = latestSignInPin();
+		refreshSignInPin(before, pinAccount).then((next) => {
+			if (cancelled) return;
+			if (next !== before) saveSignInPin(next);
+			if (!isSignInPinEnabled(next)) setPinPassed(pinSession);
+			setPinChecked(pinSession);
+		});
+		return () => { cancelled = true; };
+	}, [pinSession, pinAccount, latestSignInPin, saveSignInPin]);
 
 	useEffect(() => {
 		if (isAuthenticated && serverUrl && accessToken) {
@@ -775,11 +782,7 @@ const AppContent = (props) => {
 				releaseVideoElements();
 				setPlayingItem(null);
 				setPanelHistory([]);
-				if (isAuthenticated && settings.pinCodeProtection === true) {
-					setIsPinUnlocked(false);
-					setPinCodeInput('');
-					setPinCodeError('');
-				}
+				setPinCheckCount((count) => count + 1);
 				if (isAuthenticated) {
 					setPanelIndex(PANELS.BROWSE);
 				}
@@ -820,7 +823,7 @@ const AppContent = (props) => {
 				cleanupHandlersRef.current();
 			}
 		};
-	}, [isAuthenticated, performAppCleanup, releaseVideoElements, revalidateSession, settings.pinCodeProtection]);
+	}, [isAuthenticated, performAppCleanup, releaseVideoElements, revalidateSession]);
 
 	useEffect(() => {
 		if (!isAuthenticated || !user?.Id) {
@@ -992,7 +995,7 @@ const AppContent = (props) => {
 				e.preventDefault();
 				e.stopPropagation();
 
-				if (isPinGateActive || timesUp) {
+				if (isPinGateActive || isPinChecking || timesUp) {
 					return;
 				}
 
@@ -1064,7 +1067,7 @@ const AppContent = (props) => {
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [panelIndex, handleBack, handleReturnToPlayer, handleReturnToEpisode, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, timesUp, setupWizardActive, updateInfo, handleCloseUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition, reading, unreadableBook]);
+	}, [panelIndex, handleBack, handleReturnToPlayer, handleReturnToEpisode, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, isPinGateActive, isPinChecking, timesUp, setupWizardActive, updateInfo, handleCloseUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition, reading, unreadableBook]);
 
 	// The account stays saved, so it can be chosen again from the picker once its hours are back.
 	const handleTimesUpSwitchUser = useCallback(() => {
@@ -1549,6 +1552,15 @@ const AppContent = (props) => {
 		setPanelIndex(PANELS.BROWSE);
 	}, []);
 
+	// Home pressed in the navigation while Home is showing draws a new media bar set.
+	const handleNavHome = useCallback(() => {
+		if (panelIndex === PANELS.BROWSE) {
+			window.dispatchEvent(new CustomEvent('moonfin:browseRefresh', {detail: {newMediaBar: true}}));
+			return;
+		}
+		handleHome();
+	}, [panelIndex, handleHome]);
+
 	const showRemoteMessage = useCallback((text, header) => {
 		setRemoteMessage({key: Date.now(), title: header?.trim() || $L('Remote message'), body: text});
 	}, []);
@@ -1759,39 +1771,23 @@ const AppContent = (props) => {
 		}
 	}, [pinCodeError]);
 
-	const handlePinSubmit = useCallback(() => {
-		const refocus = () => Spotlight.focus('[data-spotlight-id="app-pin-input"]');
-
-		// Asked before the guess is looked at, so waiting is the only way through and reopening
-		// the gate hands back no fresh guesses.
-		const waiting = lockoutRemaining(settings, SIGN_IN_PIN);
-		if (waiting > 0) {
-			setPinCodeInput('');
-			setPinCodeError(tooManyAttempts(waiting));
-			refocus();
-			return;
-		}
-
-		if (pinMatches(pinCodeInput, storedPin)) {
-			setIsPinUnlocked(true);
-			setPinCodeInput('');
-			setPinCodeError('');
-			// Store it as a hash from here on, and let a correct PIN clear the count. There is no
-			// way to reset a forgotten one on a television, so a lockout that outlived the right
-			// PIN would be a trap.
-			updateSettings({
-				pinCodeHash: settings.pinCodeHash || hashPin(pinCodeInput),
-				...clearedLockout(SIGN_IN_PIN)
-			});
-			return;
-		}
-
-		const {wait, changes} = registerFailedAttempt(settings, SIGN_IN_PIN);
-		updateSettings(changes);
+	const handlePinSubmit = useCallback(async () => {
+		if (pinVerifying || !pinSession) return;
+		const session = pinSession;
+		const before = latestSignInPin();
+		setPinVerifying(true);
+		const result = await verifySignInPin(before, pinCodeInput, pinAccount);
+		setPinVerifying(false);
+		if (result.record !== before) saveSignInPin(result.record);
 		setPinCodeInput('');
-		setPinCodeError(wait > 0 ? tooManyAttempts(wait) : $L('Incorrect PIN'));
-		refocus();
-	}, [pinCodeInput, storedPin, settings, updateSettings]);
+		if (result.outcome === PIN_ACCEPTED) {
+			setPinCodeError('');
+			setPinPassed(session);
+			return;
+		}
+		setPinCodeError(signInPinMessage(result));
+		Spotlight.focus('[data-spotlight-id="app-pin-input"]');
+	}, [pinVerifying, pinSession, pinCodeInput, pinAccount, latestSignInPin, saveSignInPin]);
 
 	const handlePinInputKeyDown = useCallback((e) => {
 		const code = e.keyCode || e.which;
@@ -1821,6 +1817,14 @@ const AppContent = (props) => {
 					clockDisplay={settings.clockDisplay}
 					onSwitchUser={handleTimesUpSwitchUser}
 				/>
+			</div>
+		);
+	}
+
+	if (isPinChecking) {
+		return (
+			<div className={css.loading}>
+				<LoadingSpinner />
 			</div>
 		);
 	}
@@ -1923,7 +1927,7 @@ const AppContent = (props) => {
 				<Sidebar
 					libraries={libraries}
 					hasLiveTv={hasLiveTv}
-					onHome={handleHome}
+					onHome={handleNavHome}
 					onSearch={handleOpenSearch}
 					onShuffle={handleShuffle}
 					onGenres={handleOpenGenres}
@@ -1944,7 +1948,7 @@ const AppContent = (props) => {
 					activeView={getActiveView()}
 					libraries={libraries}
 					hasLiveTv={hasLiveTv}
-					onHome={handleHome}
+					onHome={handleNavHome}
 					onSearch={handleOpenSearch}
 					onShuffle={handleShuffle}
 					onGenres={handleOpenGenres}
@@ -2005,7 +2009,7 @@ const AppContent = (props) => {
 						</Panel>
 						<Panel>
 							{panelIndex === PANELS.SEARCH && (
-								<Search remoteSearch={remoteSearch} onSelectItem={handleSelectItem} onSelectSeerrItem={handleSelectSeerrItem} onSelectPerson={handleSelectPerson} onSelectGame={handleSelectGame} onPlayChannel={handlePlayChannel} />
+								<Search remoteSearch={remoteSearch} musicBar={backgroundMusic} onSelectItem={handleSelectItem} onSelectSeerrItem={handleSelectSeerrItem} onSelectPerson={handleSelectPerson} onSelectGame={handleSelectGame} onPlayChannel={handlePlayChannel} />
 							)}
 						</Panel>
 						<Panel>

@@ -125,6 +125,10 @@ export const createChannelCarouselPrewarm = (api, {sortBy} = {}) => {
 			if (!disposed) store.scheduleBoundaryRefresh();
 		},
 
+		refresh: () => {
+			if (!disposed && isWarm()) refreshHourly();
+		},
+
 		ensureReady: async () => {
 			if (disposed) return;
 			if (isWarm()) {

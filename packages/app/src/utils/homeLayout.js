@@ -15,7 +15,7 @@
  * one, taking every other client's disabled rows and plugin rows with it.
  */
 
-import {PICK_SOURCES, isPickedRow, makePickedRow} from './pickedRows';
+import {PICK_SOURCES, isPickedRow, isSeerrSliderRow, makePickedRow, makeSeerrSliderRow} from './pickedRows';
 
 export const DEFAULT_HOME_ROWS = [
 	{id: 'resume', name: 'Continue Watching', enabled: true, order: 0},
@@ -213,9 +213,18 @@ const ROW_BY_ID = new Map(DEFAULT_HOME_ROWS.map((row) => [row.id, row]));
 // A server type we don't have a row for is left out rather than invented.
 const rowForServerType = (type) => ROW_BY_ID.get(SERVER_TO_TV_ROW[type] || type);
 
-// A collection, genre or playlist picked on any client, as the row this client keeps for it
+// A collection, genre or playlist picked on any client, or a Seerr slider put on Home, as the row
+// this client keeps for it
 const pickedRowFromSection = (section) => {
 	const source = String(section.pluginSource || '').toLowerCase();
+	if (source === 'seerr' && section.pluginSection && section.pluginAdditionalData && section.serverId) {
+		return makeSeerrSliderRow({
+			serverUrl: section.serverId,
+			sliderId: section.pluginSection,
+			sliderType: section.pluginAdditionalData,
+			name: section.pluginDisplayText || ''
+		});
+	}
 	if (!PICK_SOURCES[source] || !section.pluginAdditionalData || !section.serverId) return undefined;
 	return makePickedRow({
 		source,
@@ -274,21 +283,18 @@ export const homeRowsFromProfile = (serverProfile, enabledById) => {
 	return undefined;
 };
 
-// A picked row goes over the way the other clients write it, typed none, since its id alone
-// can't say which item it stands for
-const rowToSection = (row, order) => (isPickedRow(row)
-	? {
-		kind: 'pluginDynamic',
-		type: 'none',
-		enabled: !!row.enabled,
-		order,
-		serverId: row.serverUrl,
-		pluginSource: row.source,
-		pluginSection: PICK_SOURCES[row.source].section,
-		pluginAdditionalData: row.itemId,
-		pluginDisplayText: row.name
+// A picked row or a slider goes over the way the other clients write it, typed none, since its
+// id alone can't say which item it stands for
+const rowToSection = (row, order) => {
+	const plugin = {kind: 'pluginDynamic', type: 'none', enabled: !!row.enabled, order, serverId: row.serverUrl, pluginDisplayText: row.name};
+	if (isSeerrSliderRow(row)) {
+		return {...plugin, pluginSource: 'seerr', pluginSection: row.sliderId, pluginAdditionalData: row.sliderType};
 	}
-	: {kind: 'builtin', type: TV_TO_SERVER_ROW[row.id] || row.id, enabled: !!row.enabled, order});
+	if (isPickedRow(row)) {
+		return {...plugin, pluginSource: row.source, pluginSection: PICK_SOURCES[row.source].section, pluginAdditionalData: row.itemId};
+	}
+	return {kind: 'builtin', type: TV_TO_SERVER_ROW[row.id] || row.id, enabled: !!row.enabled, order};
+};
 
 export const homeRowsToSections = (rows) => [
 	...[...rows]
@@ -299,5 +305,5 @@ export const homeRowsToSections = (rows) => [
 
 export const homeRowsToRowOrder = (rows) => [...rows]
 	.sort((left, right) => left.order - right.order)
-	.filter((row) => row.enabled && !isPickedRow(row))
+	.filter((row) => row.enabled && !isPickedRow(row) && !isSeerrSliderRow(row))
 	.map((row) => TV_TO_SERVER_ROW[row.id] || row.id);

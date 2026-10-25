@@ -8,3 +8,6 @@ export const HorizontalContainer = SpotlightContainerDecorator({restrict: 'self-
 export const RowContainer = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'div');
 // A row that has a card of its own to open on, such as the episode being looked at among its season
 export const CurrentRowContainer = SpotlightContainerDecorator({enterTo: 'last-focused', defaultElement: '[data-current="true"]'}, 'div');
+// A row that can stop short of the right edge. Right off its last card would otherwise land on
+// whatever Spotlight finds nearest, which on a long page can be the action row far above.
+export const ShortRowContainer = SpotlightContainerDecorator({enterTo: 'last-focused', leaveFor: {right: ''}}, 'div');

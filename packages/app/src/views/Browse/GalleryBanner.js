@@ -11,6 +11,7 @@ import {genreGlowRgb} from './galleryGlow';
 import useTrailerPreview from './useTrailerPreview';
 import css from './Browse.module.less';
 import {carouselIntervalMs} from '../../utils/carouselTiming';
+import {useScreensaverActive} from '../../hooks/useScreensaverActive';
 
 const GALLERY_GENRES_LIMIT = 3;
 const GALLERY_CAST_LIMIT = 5;
@@ -38,6 +39,7 @@ const GalleryBanner = memo(({
 }) => {
 	const [activeIndex, setActiveIndex] = useState(0);
 	const [featuredFocused, setFeaturedFocused] = useState(false);
+	const screensaverActive = useScreensaverActive();
 	const [activeDetail, setActiveDetail] = useState(null);
 
 	const carouselIntervalRef = useRef(null);
@@ -135,12 +137,12 @@ const GalleryBanner = memo(({
 			settings.autoAdvanceInterval,
 			settings.carouselSpeed
 		);
-		if (!isVisible || featuredItems.length <= 1 || !featuredFocused || carouselSpeed <= 0 || trailerHolding) return;
+		if (!isVisible || screensaverActive || featuredItems.length <= 1 || !featuredFocused || carouselSpeed <= 0 || trailerHolding) return;
 
 		carouselIntervalRef.current = setInterval(() => {
 			setActiveIndex((prev) => (prev + 1) % featuredItems.length);
 		}, carouselSpeed);
-	}, [isVisible, featuredItems.length, featuredFocused, settings.autoAdvance, settings.autoAdvanceInterval, settings.carouselSpeed, trailerHolding]);
+	}, [isVisible, screensaverActive, featuredItems.length, featuredFocused, settings.autoAdvance, settings.autoAdvanceInterval, settings.carouselSpeed, trailerHolding]);
 
 	useEffect(() => {
 		startCarouselTimer();

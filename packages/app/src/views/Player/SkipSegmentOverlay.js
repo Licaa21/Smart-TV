@@ -50,7 +50,7 @@ const LAYOUT_CLASS = {
  * bar along the bottom edge of the light rectangle, or a fill sweeping across. `preview` draws the same thing inert, inside the settings screen, in place
  * of over the video.
  */
-const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, onSkip, spotlightId, preview = false, controlsVisible = false, measureKey}) => {
+const SkipSegmentOverlay = ({type, label, remainingSeconds, progress, countdownStyle, onSkip, spotlightId, preview = false, controlsVisible = false, measureKey}) => {
 	const {settings} = useSettings();
 	const look = resolveSkipOverlayLook(settings);
 	const [focused, setFocused] = useState(false);
@@ -115,7 +115,7 @@ const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, o
 				)}
 				{layout !== 'sweep' && <SkipGlyph className={css.icon} style={look.icon} />}
 				<span className={css.label}>
-					{$L('Skip {segment}').replace('{segment}', $L(SEGMENT_LABELS[type] || SEGMENT_LABELS.intro))}
+					{label || $L('Skip {segment}').replace('{segment}', $L(SEGMENT_LABELS[type] || SEGMENT_LABELS.intro))}
 				</span>
 				{showTimer && !numberInRing && (
 					<span className={css.timer} style={look.timer}>

@@ -961,6 +961,18 @@ export const avplaySelectTrack = (type, index) => {
 	}
 };
 
+// The rewindable range of a live stream in milliseconds, which AVPlay reports as "start|end" for
+// live HLS. Null for anything else, including a live TS stream, which keeps no range.
+export const avplayGetLiveRange = () => {
+	if (!isAVPlayAvailable) return null;
+	try {
+		const [start, end] = String(webapis.avplay.getStreamingProperty('GET_LIVE_DURATION')).split('|').map(Number);
+		return end > start ? {start, end} : null;
+	} catch (e) {
+		return null;
+	}
+};
+
 export const avplaySetStreamingProperty = (property, value) => {
 	if (!isAVPlayAvailable) return;
 	try {
@@ -1144,6 +1156,7 @@ export default {
 	waitForHlsManifest,
 	avplayGetCurrentTime,
 	avplayGetDuration,
+	avplayGetLiveRange,
 	avplayGetState,
 	avplaySetListener,
 	avplaySetSpeed,

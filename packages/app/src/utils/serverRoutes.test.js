@@ -41,6 +41,7 @@ describe('user scoped routes on Emby', () => {
 		expect(r.favorite('abc')).toBe(`/Users/${USER}/FavoriteItems/abc?`);
 		expect(r.played('abc')).toBe(`/Users/${USER}/PlayedItems/abc?`);
 		expect(r.userData('abc')).toBe(`/Users/${USER}/Items/abc/UserData?`);
+		expect(r.hideFromResume('abc')).toBe(`/Users/${USER}/Items/abc/HideFromResume?`);
 		expect(r.extras('abc', 'Intros')).toBe(`/Users/${USER}/Items/abc/Intros?`);
 		expect(r.views()).toBe(`/Users/${USER}/Views?`);
 		expect(r.configuration()).toBe(`/Users/${USER}/Configuration?`);

@@ -9,6 +9,7 @@ import {KEYS} from '../../utils/keys';
 import useTrailerPreview from './useTrailerPreview';
 import css from './Browse.module.less';
 import {carouselIntervalMs} from '../../utils/carouselTiming';
+import {useScreensaverActive} from '../../hooks/useScreensaverActive';
 
 const FEATURED_GENRES_LIMIT = 3;
 const PRELOAD_ADJACENT_SLIDES = 2;
@@ -32,6 +33,7 @@ const MakdBanner = memo(({
 }) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
 	const [featuredFocused, setFeaturedFocused] = useState(false);
+	const screensaverActive = useScreensaverActive();
 
 	const preloadedImagesRef = useRef(new Set());
 	const carouselIntervalRef = useRef(null);
@@ -104,12 +106,12 @@ const MakdBanner = memo(({
 			settings.autoAdvanceInterval,
 			settings.carouselSpeed
 		);
-		if (!isVisible || featuredItems.length <= 1 || !featuredFocused || carouselSpeed <= 0 || trailerHolding) return;
+		if (!isVisible || screensaverActive || featuredItems.length <= 1 || !featuredFocused || carouselSpeed <= 0 || trailerHolding) return;
 
 		carouselIntervalRef.current = setInterval(() => {
 			setCurrentIndex((prev) => (prev + 1) % featuredItems.length);
 		}, carouselSpeed);
-	}, [isVisible, featuredItems.length, featuredFocused, settings.autoAdvance, settings.autoAdvanceInterval, settings.carouselSpeed, trailerHolding]);
+	}, [isVisible, screensaverActive, featuredItems.length, featuredFocused, settings.autoAdvance, settings.autoAdvanceInterval, settings.carouselSpeed, trailerHolding]);
 
 	useEffect(() => {
 		const carouselSpeed = carouselIntervalMs(
@@ -117,7 +119,7 @@ const MakdBanner = memo(({
 			settings.autoAdvanceInterval,
 			settings.carouselSpeed
 		);
-		if (!isVisible || featuredItems.length <= 1 || !featuredFocused || carouselSpeed <= 0 || trailerHolding) return;
+		if (!isVisible || screensaverActive || featuredItems.length <= 1 || !featuredFocused || carouselSpeed <= 0 || trailerHolding) return;
 		startCarouselTimer();
 		return () => {
 			if (carouselIntervalRef.current) {
@@ -125,7 +127,7 @@ const MakdBanner = memo(({
 				carouselIntervalRef.current = null;
 			}
 		};
-	}, [isVisible, featuredItems.length, featuredFocused, settings.autoAdvance, settings.autoAdvanceInterval, settings.carouselSpeed, trailerHolding, startCarouselTimer]);
+	}, [isVisible, screensaverActive, featuredItems.length, featuredFocused, settings.autoAdvance, settings.autoAdvanceInterval, settings.carouselSpeed, trailerHolding, startCarouselTimer]);
 
 	useEffect(() => {
 		return () => {

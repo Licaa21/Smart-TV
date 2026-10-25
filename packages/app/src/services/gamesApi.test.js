@@ -1,4 +1,4 @@
-import {getRomUrl, getStateBytes, putStateBytes} from './gamesApi';
+import {getRomUrl, getStateBytes, putStateBytes, getSram, putSram} from './gamesApi';
 import {fetchWithTimeout} from '../utils/fetchTimeout';
 
 let mockToken = 'key';
@@ -244,5 +244,76 @@ describe('setGameCoreOverride', () => {
 		expect(url).toBe('https://server/Moonfin/Games/lib/Games/g1/Core');
 		expect(options.method).toBe('PUT');
 		expect(JSON.parse(options.body)).toEqual({core: 'mame'});
+	});
+});
+
+describe('battery saves', () => {
+	beforeEach(() => {
+		fetchWithTimeout.mockReset();
+	});
+
+	test('read and write under the bare game id', async () => {
+		fetchWithTimeout.mockResolvedValueOnce({status: 404, ok: false});
+		fetchWithTimeout.mockResolvedValueOnce({status: 204, ok: true});
+
+		await expect(getSram('romm-12')).resolves.toBeNull();
+		await putSram('romm-12', new Uint8Array([1]));
+
+		expect(fetchWithTimeout.mock.calls[0][0]).toBe('https://server/Moonfin/Games/Saves/romm-12?kind=sram');
+		expect(fetchWithTimeout.mock.calls[1][0]).toBe('https://server/Moonfin/Games/Saves/romm-12?kind=sram');
+		expect(fetchWithTimeout.mock.calls[1][1].method).toBe('PUT');
+	});
+});
+
+describe('getRommAccount', () => {
+	test('reads a server without RomM support as no RomM', async () => {
+		const {platformFetch} = require('./secureFetch');
+		const {getRommAccount} = require('./gamesApi');
+		platformFetch.mockResolvedValueOnce({status: 404, ok: false});
+
+		await expect(getRommAccount()).resolves.toEqual({available: false, linked: false});
+	});
+
+	test('passes the account through', async () => {
+		const {platformFetch} = require('./secureFetch');
+		const {getRommAccount} = require('./gamesApi');
+		const account = {available: true, linked: true, username: 'test', pending: null, error: null};
+		platformFetch.mockResolvedValueOnce({status: 200, ok: true, text: () => Promise.resolve(JSON.stringify(account))});
+
+		await expect(getRommAccount()).resolves.toEqual(account);
+		expect(platformFetch.mock.calls[platformFetch.mock.calls.length - 1][0]).toBe('https://server/Moonfin/Games/Romm/Account');
+	});
+});
+
+describe('getBoxArtAspects', () => {
+	// Each test signs in with its own token, since the server's answer is kept per sign-in.
+	const json = (body) => ({ok: true, status: 200, text: () => Promise.resolve(JSON.stringify(body))});
+	const caps = {protocolVersion: 3, manifest: true, versionedAssets: true, dimensions: true};
+
+	test('reads each box art size from the system manifest', async () => {
+		const {platformFetch} = require('./secureFetch');
+		const {getBoxArtAspects} = require('./gamesApi');
+		mockToken = 'sizes';
+		platformFetch.mockResolvedValueOnce(json(caps)).mockResolvedValueOnce(json({entries: [
+			{gameId: 'smb3', artwork: {boxart: {state: 'thumbnailReady', width: 512, height: 731}}},
+			{gameId: 'pending', artwork: {boxart: {state: 'pending'}}}
+		]}));
+
+		const aspects = await getBoxArtAspects('lib', 'NES');
+
+		expect(platformFetch.mock.calls[platformFetch.mock.calls.length - 1][0]).toBe('https://server/Moonfin/Games/lib/ArtworkManifest?system=NES');
+		expect(aspects.get('smb3')).toBeCloseTo(512 / 731);
+		expect(aspects.has('pending')).toBe(false);
+	});
+
+	test('a server that sends no sizes gets no manifest request', async () => {
+		const {platformFetch} = require('./secureFetch');
+		const {getBoxArtAspects} = require('./gamesApi');
+		mockToken = 'no-sizes';
+		platformFetch.mockClear();
+		platformFetch.mockResolvedValueOnce(json({...caps, protocolVersion: 2, dimensions: false}));
+
+		await expect(getBoxArtAspects('lib', 'NES')).resolves.toBeNull();
+		expect(platformFetch).toHaveBeenCalledTimes(1);
 	});
 });

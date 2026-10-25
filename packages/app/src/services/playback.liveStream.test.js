@@ -230,3 +230,43 @@ describe('transcode preferences', () => {
 		expect(lastRequest()).toMatchObject({EnableDirectPlay: false, EnableDirectStream: true});
 	});
 });
+
+describe('the source id PlaybackInfo is pinned to', () => {
+	const sentIds = () => api.getPlaybackInfo.mock.calls.map(([, body]) => body.MediaSourceId);
+	const probed = {Id: 'real', SupportsDirectPlay: true, Container: 'mkv', MediaStreams: [{Type: 'Audio', Index: 1}]};
+
+	test("an Emby channel item's placeholder is left off so the server probes the file", async () => {
+		const item = {Id: 'ch-item', Type: 'Movie', MediaSources: [{Id: 'ph', MediaStreams: []}]};
+		api.getPlaybackInfo.mockResolvedValue({PlaySessionId: 'session', MediaSources: [probed]});
+		await playback.getPlaybackInfo(item.Id, {item, serverType: 'emby', mediaSourceId: 'ph'});
+		await playback.getPlaybackInfo(item.Id, {item, serverType: 'jellyfin', mediaSourceId: 'ph'});
+		expect(sentIds()).toEqual([undefined, 'ph']);
+	});
+
+	test('Emby is asked again without the id when the placeholder comes back unprobed', async () => {
+		api.getPlaybackInfo
+			.mockResolvedValueOnce({PlaySessionId: 'first', MediaSources: [{Id: 'ph', MediaStreams: [], SupportsDirectPlay: false, SupportsDirectStream: false, TranscodingUrl: '/x'}]})
+			.mockResolvedValueOnce({PlaySessionId: 'probed', MediaSources: [{Id: 'ph', MediaStreams: []}, probed]});
+		const result = await playback.getPlaybackInfo('ch-item', {item: {Id: 'ch-item', Type: 'Movie'}, serverType: 'emby', mediaSourceId: 'ph'});
+		expect(sentIds()).toEqual(['ph', undefined]);
+		expect(result.playSessionId).toBe('probed');
+		expect(result.mediaSourceId).toBe('real');
+	});
+
+	test('an in-progress recording that has no compatible stream for its pinned id plays the one the server picks', async () => {
+		const recording = {Id: 'rec', Type: 'Recording', MediaSources: [{Id: 'rec1'}]};
+		api.getPlaybackInfo
+			.mockResolvedValueOnce({MediaSources: [], ErrorCode: 'NoCompatibleStream'})
+			.mockResolvedValueOnce({PlaySessionId: 'active', MediaSources: [{Id: 'active', SupportsDirectPlay: true, IsInfiniteStream: true, Container: 'ts', MediaStreams: []}]});
+		const result = await playback.getPlaybackInfo(recording.Id, {item: recording, mediaSourceId: 'rec1'});
+		expect(sentIds()).toEqual(['rec1', undefined]);
+		expect(result.mediaSourceId).toBe('active');
+	});
+
+	test('a picked version that fails is not swapped for another', async () => {
+		const item = {Id: 'two', Type: 'Movie', MediaSources: [{Id: 'a'}, {Id: 'b'}]};
+		api.getPlaybackInfo.mockResolvedValueOnce({MediaSources: [], ErrorCode: 'NoCompatibleStream'});
+		await expect(playback.getPlaybackInfo(item.Id, {item, mediaSourceId: 'b'})).rejects.toThrow('NoCompatibleStream');
+		expect(sentIds()).toEqual(['b']);
+	});
+});

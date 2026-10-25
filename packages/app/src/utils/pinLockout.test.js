@@ -2,10 +2,13 @@ jest.mock('@enact/i18n/$L', () => ({__esModule: true, default: (str) => str}));
 
 import {
 	hashPin, isPinShaped, lockoutRemaining, registerFailedAttempt, clearedLockout, formatWait,
-	pinMatches, SIGN_IN_PIN, KIDS_PIN, PIN_MAX_LOCKOUT_MS
+	pinMatches, KIDS_PIN, PIN_MAX_LOCKOUT_MS
 } from './pinLockout';
 
 const NOW = 1_700_000_000_000;
+
+// The counters a sign in PIN record keeps.
+const SIGN_IN_PIN = {failed: 'failed', until: 'lockedUntil'};
 
 // Walks the given number of wrong guesses, carrying the settings along the way.
 const guessWrong = (times, keys, now = NOW) => {

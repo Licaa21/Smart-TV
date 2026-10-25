@@ -1,5 +1,6 @@
 import $L from '@enact/i18n/$L';
 
+import {bookExtension} from '../../../utils/books';
 import {formatFileSize} from '../../../utils/formatFileSize';
 import {languageName} from '../../../utils/languageNames';
 import {getBitDepth, getFrameRate, getResolution} from '../../../utils/mediaStreamFacts';
@@ -56,6 +57,18 @@ export const fileName = (mediaSource) => {
 	if (!path) return null;
 
 	return path.split(/[\\/]/).pop() || null;
+};
+
+// A book has no media source, so its file is read off the item: the name from its path, or its
+// title where the server gave no path, and the format from the file's extension.
+export const bookFileName = (item) => {
+	const path = String(item?.Path || '').trim();
+	return (path && path.split(/[\\/]/).pop()) || item?.Name || null;
+};
+
+export const bookFormatLine = (item) => {
+	const extension = bookExtension(item);
+	return extension ? $L('Format: .{extension}').replace('{extension}', extension) : null;
 };
 
 export const trackRows = (streams = [], activeIndex, {includeForced = false} = {}) =>

@@ -41,6 +41,7 @@ import useSeerrEpisodes from './useSeerrEpisodes';
 import {isSeerrPseudo} from '../../utils/seerrSeasons';
 import useDetailsModals from './useDetailsModals';
 import useDetailsTrailer from './useDetailsTrailer';
+import useDetailsReviews from './useDetailsReviews';
 import useSeerrOverlay from './useSeerrOverlay';
 import DetailScrollPage from './DetailScrollPage';
 import DetailBackdrop from './DetailBackdrop';
@@ -49,6 +50,8 @@ import DetailTrackModals from './DetailTrackModals';
 import DetailDialogs from './DetailDialogs';
 import SeerrDialogs from './SeerrDialogs';
 import TrailerOverlay from './TrailerOverlay';
+import TrailerPicker from './TrailerPicker';
+import ReviewDialog from './ReviewDialog';
 import PersonalRatingDialog from '../../components/PersonalRatingDialog';
 import {clampRating, clearedRatingPatch, isRatableItemType, normalizeRatingStyle, numericRatingPatch, thumbRatingPatch} from '../../utils/personalRating';
 import {personDateLines, splitFilmography} from '../../utils/personCredits';
@@ -219,7 +222,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	const overviewBackRef = useRef(null);
 	const spotlightBackRef = useRef(null);
 	const trailerBackRef = useRef(null);
-	const modals = useDetailsModals({backHandlerRef, onArtworkClosed: refreshItem, seerrBackRef, overviewBackRef, spotlightBackRef, trailerBackRef});
+	const reviewBackRef = useRef(null);
+	const modals = useDetailsModals({backHandlerRef, onArtworkClosed: refreshItem, seerrBackRef, overviewBackRef, spotlightBackRef, trailerBackRef, reviewBackRef});
 	const {activeModal, openModal, closeModal, advancedResumeRef} = modals;
 
 	// A note of the Playback Info popup that sent the viewer to Settings. When Settings closes, the popup is opened
@@ -248,8 +252,18 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		effectiveApi,
 		onPlay,
 		trailerVolume: settings.trailerVolume,
+		showCaptions: settings.mediaBarTrailerCaptions,
+		captionLanguage: settings.uiLanguage,
 		seerrOnly,
 		backRef: trailerBackRef
+	});
+
+	// An older plugin has no reviews route, and its ping says so.
+	const reviews = useDetailsReviews({
+		item,
+		effectiveApi,
+		enabled: settings.useMoonfinPlugin === true && pluginInfo?.tmdbReviewsSupported === true && showsSection('reviews'),
+		backRef: reviewBackRef
 	});
 
 	const canChangeArtwork = useMemo(() => {
@@ -358,6 +372,14 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		};
 	}, [item, supportsStreamSelection, selectedVersionIndex, selectedAudioIndex, selectedSubtitleIndex]);
 
+	// A movie split across files plays its other parts after it. A picked alternate version has
+	// parts of its own, so they're asked for by the version that plays.
+	const fetchAdditionalParts = useCallback(async (mediaSourceId) => {
+		if (!(item.PartCount > 1)) return [];
+		const result = await effectiveApi.getAdditionalParts(mediaSourceId || item.Id).catch(() => null);
+		return tagWithServerInfo(result?.Items || []);
+	}, [item, effectiveApi, tagWithServerInfo]);
+
 	// A list plays on from the pressed row. Songs and videos go to different players, so the
 	// queue only carries the rows the same player can take.
 	const playListFrom = useCallback((list, entry) => {
@@ -408,24 +430,29 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 			const first = matched || tracks[0];
 			if (tracks.length > 0 && first) playListFrom(tracks, first);
 		} else {
-			// A SyncPlay group queues the pressed item for everyone, so intros stay out of it.
-			const prerolls = isSyncPlayInGroup
-				? []
-				: tagWithServerInfo(await fetchPrerolls(effectiveApi, item, settings));
+			// A SyncPlay group queues the pressed item for everyone, so intros and parts stay out of it.
+			const [prerolls, parts] = isSyncPlayInGroup
+				? [[], []]
+				: await Promise.all([
+					fetchPrerolls(effectiveApi, item, settings).then(tagWithServerInfo),
+					fetchAdditionalParts(playbackOptions.mediaSourceId)
+				]);
 			if (prerolls.length > 0) {
 				// The version, audio and subtitle picks belong to the movie, and the queue
 				// starts on an intro, so applying them here would target the wrong file.
-				onPlay?.(prerolls[0], false, {videoQueue: [...prerolls, item]});
+				onPlay?.(prerolls[0], false, {videoQueue: [...prerolls, item, ...parts]});
 			} else {
-				onPlay?.(item, false, playbackOptions);
+				onPlay?.(item, false, parts.length ? {...playbackOptions, videoQueue: [item, ...parts]} : playbackOptions);
 			}
 		}
-	}, [item, seerrOnly, episodes, nextUp, seasons, collectionItems, albumTracks, playlistItems, onPlay, onSelectItem, buildPlaybackOptions, effectiveApi, settings, tagWithServerInfo, isSyncPlayInGroup, playListFrom]);
+	}, [item, seerrOnly, episodes, nextUp, seasons, collectionItems, albumTracks, playlistItems, onPlay, onSelectItem, buildPlaybackOptions, effectiveApi, settings, tagWithServerInfo, isSyncPlayInGroup, playListFrom, fetchAdditionalParts]);
 
-	const handleResume = useCallback(() => {
+	const handleResume = useCallback(async () => {
 		if (!item) return;
-		onPlay?.(item, true, buildPlaybackOptions());
-	}, [item, onPlay, buildPlaybackOptions]);
+		const playbackOptions = buildPlaybackOptions();
+		const parts = isSyncPlayInGroup ? [] : await fetchAdditionalParts(playbackOptions.mediaSourceId);
+		onPlay?.(item, true, parts.length ? {...playbackOptions, videoQueue: [item, ...parts]} : playbackOptions);
+	}, [item, onPlay, buildPlaybackOptions, isSyncPlayInGroup, fetchAdditionalParts]);
 
 	// Plays the item on screen the way a card's Play does, carrying on from where it was left.
 	const playItemOnScreen = useCallback(() => {
@@ -502,7 +529,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 			...prev,
 			UserData: {...prev.UserData, IsFavorite: newState}
 		}));
-		window.requestAnimationFrame(() => Spotlight.focus('details-favorite-btn') || Spotlight.focus('season-favorite-btn'));
+		window.requestAnimationFrame(() => Spotlight.focus('details-favorite-btn'));
 	}, [effectiveApi, item, setItem]);
 
 	const handleToggleWatched = useCallback(async () => {
@@ -514,7 +541,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 			UserData: {...prev.UserData, Played: newState, PlayedPercentage: newState ? 100 : 0}
 		}));
 		window.dispatchEvent(new CustomEvent('moonfin:browseRefresh'));
-		window.requestAnimationFrame(() => Spotlight.focus('details-watched-btn') || Spotlight.focus('season-watched-btn'));
+		window.requestAnimationFrame(() => Spotlight.focus('details-watched-btn'));
 	}, [effectiveApi, item, setItem]);
 
 	// A rating shows on the screen before the server answers, and goes back to
@@ -1057,12 +1084,21 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	);
 
 	const trailerLayer = (
-		<TrailerOverlay
-			videoId={trailer.trailerOverlay}
-			streamUrl={trailer.trailerStreamUrl}
-			videoRef={trailer.trailerVideoRef}
-			onClose={trailer.handleCloseTrailer}
-		/>
+		<>
+			<TrailerPicker
+				choices={trailer.trailerChoices}
+				item={item}
+				serverUrl={effectiveServerUrl}
+				onPick={trailer.pickTrailer}
+				onClose={trailer.closeTrailerChoices}
+			/>
+			<TrailerOverlay
+				videoId={trailer.trailerOverlay}
+				streamUrl={trailer.trailerStreamUrl}
+				videoRef={trailer.trailerVideoRef}
+				onClose={trailer.handleCloseTrailer}
+			/>
+		</>
 	);
 
 	const overlays = (
@@ -1113,6 +1149,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				onClose={modals.handleCloseRatingDialog}
 			/>
 			<SeerrDialogs seerr={seerr} title={item.Name} />
+			<ReviewDialog review={reviews.openReview} onClose={reviews.handleCloseReview} />
 		</>
 	);
 
@@ -1215,6 +1252,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 					onSelectStudio={onSelectStudio}
 					similarSource={similarSource}
 					similarLoaded={shownSimilarLoaded}
+					reviews={reviews.reviews}
+					onSelectReview={reviews.handleSelectReview}
 					missingCollectionItems={missingCollectionItems}
 					parentCollections={shownParentCollections}
 					loadMoreCollectionItems={loadMoreCollectionItems}
@@ -1243,28 +1282,6 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 					birthPlace={birthPlace}
 					onSelectItem={onSelectItem}
 					onSelectSeerrItem={seerrNav?.onSelectItem}
-				/>
-			</DetailScrollPage>
-		);
-	}
-
-	if (isSeason) {
-		return (
-			<DetailScrollPage backdrop={backdrop} scrollerRef={pageScrollerRef} onScrollTo={handlePageScrollTo} sidebarDocked={sidebarDocked}>
-				<SeasonScreen
-					item={item}
-					serverUrl={effectiveServerUrl}
-					settings={settings}
-					showsSection={showsSection}
-					posterUrl={posterUrl}
-					episodes={episodes}
-					episodeRatings={episodeRatings}
-					onPlay={handlePlay}
-					onShuffle={handleShuffle}
-					onToggleWatched={handleToggleWatched}
-					onToggleFavorite={handleToggleFavorite}
-					onEpisodeSelect={handleEpisodeSelect}
-					onFocusRow={handleButtonRowFocus}
 				/>
 			</DetailScrollPage>
 		);
@@ -1411,6 +1428,24 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		/>
 	);
 
+	if (isSeason) {
+		return (
+			<DetailScrollPage backdrop={backdrop} scrollerRef={pageScrollerRef} onScrollTo={handlePageScrollTo} sidebarDocked={sidebarDocked} footer={overlays}>
+				<SeasonScreen
+					item={item}
+					serverUrl={effectiveServerUrl}
+					settings={settings}
+					showsSection={showsSection}
+					posterUrl={posterUrl}
+					episodes={episodes}
+					episodeRatings={episodeRatings}
+					actionButtons={actionButtons}
+					onEpisodeSelect={handleEpisodeSelect}
+				/>
+			</DetailScrollPage>
+		);
+	}
+
 	return (
 		<DetailScrollPage backdrop={backdrop} scrollerRef={pageScrollerRef} onScrollTo={handlePageScrollTo} sidebarDocked={sidebarDocked} footer={overlays}>
 			<ClassicDetailScreen
@@ -1454,6 +1489,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				crew={detailCrew}
 				collectionSections={collectionSections}
 				similar={shownSimilar}
+				reviews={reviews.reviews}
+				onSelectReview={reviews.handleSelectReview}
 				onSeasonSelect={handleSeasonSelect}
 				onEpisodeSelect={handleEpisodeSelect}
 				onChapterSelect={handleChapterSelect}

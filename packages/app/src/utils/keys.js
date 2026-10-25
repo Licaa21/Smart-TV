@@ -85,6 +85,16 @@ export const KEYS = {
 	...(PLATFORM_KEYS[getPlatform()] || WEBOS_KEYS),
 };
 
+// Fast forward and rewind, and the track and page keys a remote may carry, page a list. 1 is a
+// page forward, -1 a page back and 0 any other key.
+const PAGE_FORWARD_KEYS = [KEYS.FAST_FORWARD || 417, 425, 10233, 34];
+const PAGE_BACK_KEYS = [KEYS.REWIND || 412, 424, 10232, 33];
+export const pageDirection = (keyCode) => {
+	if (PAGE_FORWARD_KEYS.indexOf(keyCode) >= 0) return 1;
+	if (PAGE_BACK_KEYS.indexOf(keyCode) >= 0) return -1;
+	return 0;
+};
+
 export const isBackKey = (e) => {
 	const code = e.keyCode || e.which;
 	return code === KEYS.BACK || code === 27 || code === 8;

@@ -11,7 +11,7 @@ import {buildSettingsIndex, matchSettings, resultSpotlightId} from './settingsSe
 // a key that does not exist writes junk into settings, and a repeated spotlight id makes
 // a deep linked search result focus the wrong row.
 
-const CUSTOM_RENDERERS = ['moonbasePlugin', 'seerrPanel', 'aboutHeader', 'aboutDataActions', 'subtitlePreview', 'imageCacheActions', 'checkForUpdates', 'playbackTimePreview', 'screensaverPreview', 'loadingAnimationPreview', 'trickplayPreview', 'skipSegmentPreview'];
+const CUSTOM_RENDERERS = ['moonbasePlugin', 'seerrPanel', 'rommPanel', 'aboutHeader', 'aboutDataActions', 'subtitlePreview', 'imageCacheActions', 'checkForUpdates', 'playbackTimePreview', 'screensaverPreview', 'loadingAnimationPreview', 'trickplayPreview', 'skipSegmentPreview'];
 const KEYED = [KIND.TOGGLE, KIND.OPTION, KIND.SLIDER];
 
 // Enough of a context that every label, value and condition can be called.
@@ -20,6 +20,7 @@ const ctx = {
 	capabilities: {tizenVersionDisplay: '7.0', firmwareVersion: '1.0'},
 	seerr: {isEnabled: true, pluginInfo: {version: '1', settingsSyncEnabled: true, seerrEnabled: true}},
 	achievements: {available: true, leaderboardEnabled: true, questsEnabled: true, socialAvailable: true},
+	romm: {available: true},
 	seerrLabel: 'Seerr',
 	isSeerr: true,
 	hasMultipleServers: false,
@@ -30,6 +31,7 @@ const ctx = {
 	serverVersion: '10.9',
 	availableThemes: [{id: 'default', displayName: 'Default'}],
 	activeThemeId: 'default',
+	signInPin: {enabled: false, hash: '', failed: 0, lockedUntil: 0, server: false},
 	actions: {}
 };
 

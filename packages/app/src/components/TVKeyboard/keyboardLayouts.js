@@ -64,6 +64,66 @@ export const upperFor = (variant) => {
 	return upperCache[name];
 };
 
+// The docked style is 12 cells a row, the mode rail, ten characters and an action.
+// A key repeated in neighboring cells is one key spanning them.
+const DOCKED_BOTTOM_ROW = ['IME', 'SPACE', 'SPACE', 'SPACE', 'SPACE', 'SPACE', 'SPACE', 'SPACE', 'CURSORL', 'CURSORR', 'PASTE', 'DONE'];
+
+const dockedRows = (rows) => [
+	['MODE_LOWER', ...rows[0], 'BACKSPACE'],
+	['MODE_UPPER', ...rows[1], 'BACKSPACE'],
+	['MODE_NUM', ...rows[2].slice(1, -1), '.', '@', 'DONE'],
+	DOCKED_BOTTOM_ROW
+];
+
+// The semicolon is left out to fit, and stays one hold away on the colon and comma.
+export const DOCKED_NUMERIC_LAYOUT = [
+	['MODE_LOWER', ...NUMERIC_LAYOUT[0], 'BACKSPACE'],
+	['MODE_UPPER', ...NUMERIC_LAYOUT[1], 'BACKSPACE'],
+	['MODE_NUM', '-', '_', '=', '+', ':', "'", '?', '/', ',', '.', 'DONE'],
+	DOCKED_BOTTOM_ROW
+];
+
+const dockedCache = {};
+
+export const dockedFor = (variant, shifted) => {
+	const name = `${LOWER_BY_VARIANT[variant] ? variant : 'qwerty'}-${shifted ? 'upper' : 'lower'}`;
+	if (!dockedCache[name]) {
+		dockedCache[name] = dockedRows(shifted ? upperFor(variant) : lowerFor(variant));
+	}
+	return dockedCache[name];
+};
+
+const boxCache = new WeakMap();
+
+// Each key once, with the block of cells it covers: a run along its row, grown down
+// while the rows below repeat that run.
+export const keyBoxes = (layout) => {
+	if (boxCache.has(layout)) return boxCache.get(layout);
+	const covered = layout.map((line) => line.map(() => false));
+	const repeats = (row, key, col, lastCol) => {
+		for (let c = col; c <= lastCol; c++) {
+			if (layout[row][c] !== key) return false;
+		}
+		return true;
+	};
+	const boxes = [];
+	layout.forEach((line, row) => {
+		line.forEach((key, col) => {
+			if (covered[row][col]) return;
+			let lastCol = col;
+			while (line[lastCol + 1] === key) lastCol++;
+			let lastRow = row;
+			while (lastRow + 1 < layout.length && repeats(lastRow + 1, key, col, lastCol)) lastRow++;
+			for (let r = row; r <= lastRow; r++) {
+				for (let c = col; c <= lastCol; c++) covered[r][c] = true;
+			}
+			boxes.push({key, row, col, lastRow, lastCol});
+		});
+	});
+	boxCache.set(layout, boxes);
+	return boxes;
+};
+
 export const variantForLocale = (locale) => {
 	const language = String(locale || '').split(/[-_]/)[0].toLowerCase();
 	if (language === 'fr') return 'azerty';
