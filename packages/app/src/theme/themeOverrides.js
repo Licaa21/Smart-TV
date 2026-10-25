@@ -567,7 +567,11 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${detailsCss.btnWrapper}:focus .${detailsCss.btnAction}`, `background: ${detailsFocus.button}; border-color: ${focusColor};`);
 	rule(`.${detailsCss.btnWrapper}:focus .${detailsCss.btnAction} .${detailsCss.btnIcon}`, `color: ${detailsFocus.buttonInk}; fill: ${detailsFocus.buttonInk};`);
 	rule(`.${detailsCss.favorited}, .${detailsCss.btnWrapper}:focus .${detailsCss.btnAction} .${detailsCss.favorited}`, `color: ${recordingActive}; fill: ${recordingActive};`);
-	rule(`.${detailsCss.watched}, .${detailsCss.btnWrapper}:focus .${detailsCss.btnAction} .${detailsCss.watched}`, `color: ${detailsAccent.css}; fill: ${detailsAccent.css};`);
+	// The check of a watched button is drawn in the accent. A picked accent is also the fill of the focused button, so there the
+	// check takes the focused ink, or a white pick would vanish on the white fill.
+	const watchedOnFocus = picked.details ? detailsFocus.buttonInk : detailsAccent.css;
+	rule(`.${detailsCss.watched}`, `color: ${detailsAccent.css}; fill: ${detailsAccent.css};`);
+	rule(`.${detailsCss.btnWrapper}:focus .${detailsCss.btnAction} .${detailsCss.watched}`, `color: ${watchedOnFocus}; fill: ${watchedOnFocus};`);
 	rule(`.${detailsCss.btnDetail}`, `color: ${os(0.5)};`);
 	rule(`.${detailsCss.btnWrapper}:focus .${detailsCss.btnDetail}`, `color: ${onBackground};`);
 	rule(`.${detailsCss.btnLabel}, .${detailsCss.seasonName}, .${detailsCss.seasonEpTitle}, .${detailsCss.castName}, .${detailsCss.trackName}, .${detailsCss.trackTitle}`, `color: ${onSurface};`);

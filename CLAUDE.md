@@ -11,8 +11,8 @@ use. It is not a project for everyone. Three changes are proposed upstream: the 
 The rules that matter most, each explained further down:
 
 1. **Ask before every change.** Questions come first, with options and a recommendation. See "Working rules".
-2. **Before any coding on `implement`, bring `daily` into it** (`git fetch origin` then `git merge origin/daily` in `implement/`), so the work starts on what is new, upstream's changes and earlier merge fixes included.
-3. **Never commit to `main` or `daily`**, except the README and ignore rules on `main`. Work goes on `implement`.
+2. **Before any coding on `implement`, bring upstream into `daily` first, and only then `daily` into `implement`.** Never pull from `daily` alone, since it may be behind upstream. The steps are in step 0 of "How changes flow".
+3. **Never commit to `main` or `daily`**, except the README and ignore rules on `main` and the upstream merges of step 0 (merge commits and conflict fixes). Work goes on `implement`.
 4. **Build only in `daily/`**, with `bash fork-tools/build-daily-wgt.sh`.
 5. **A change is done only when** lint and tests are clean, the code review found nothing real, every string has a
    Romanian one, and this file and the README are up to date.
@@ -57,7 +57,7 @@ ode_modules`.
 
 ## How changes flow
 
-0. Before any coding on `implement`, bring `daily` into it: `git fetch origin`, then `git merge origin/daily` in `implement/` (a fast-forward when `implement` has nothing new, a merge when it does). `daily` holds `main` (upstream) and `implement` together and any conflict already fixed, so the work starts on what is new. Do it again at the start of each piece of work, not once.
+0. Before any coding on `implement`: bring upstream into `daily` first, then `daily` into `implement`. Never pull from `daily` alone, since it may be behind upstream. In `main/`, `git fetch upstream` and `git merge upstream/main`; in `daily/`, merge `main` into it (`bash fork-tools/update-daily.sh` does both and also merges `implement`), solve the conflicts there, ask the user when something needs their idea, run the merge checklist below (with its code review of the conflict resolutions) when upstream brought something new, and push. Only then, in `implement/`, `git fetch origin` and `git merge origin/daily` (a fast-forward when `implement` has nothing new, a merge when it does), so the work starts on what upstream added and on every conflict already fixed. Do it again at the start of each piece of work, not once. When upstream has nothing new, `daily` is already current and the pull is a fast-forward.
 1. Upstream moves. `main` takes it (`git merge upstream/main`, never rewritten).
 2. The fork's changes are committed on `implement`, in `implement/`. Never on `daily`, never on `main` (apart from the
    README and ignore rules).
@@ -269,13 +269,13 @@ did, what the fork keeps instead, and what to do on a merge.
 ### 11. Trailer quality, the Player signature and the Settings rows
 
 - **Upstream:** `youtubeTrailer.js` follows a Fire TV trailer's separate soundtrack (`followSoundtrack`, `attachVideoOnly`) and leaves hls.js to its own quality choice. The WebOS player has no `startPaused`. Settings shows the three backdrop switches (Home Screen, Details Screen, Library Backdrops, since e97f2450) in place of the one.
-- **The fork keeps:** `pickTrailerLevel` (one quality per trailer, so the sound stays with the picture) next to upstream's soundtrack follower, the `startPaused` prop and the Back-from-player pause it serves, the Settings Size row beside the three switches, and Seerr cards opening through `seerrCardTarget` before upstream's Default Action (`autoPlay`) is applied in `handleSelectItem` (`App.js`, `Browse.js`). Upstream's rebuilt playback information dialog (`PlaybackInfoModal`) is taken whole, and the old info styles and helpers in the players are gone with it.
+- **The fork keeps:** `pickTrailerLevel` (one quality per trailer, so the sound stays with the picture) next to upstream's soundtrack follower, the `startPaused` prop and the Back-from-player pause it serves, the Settings Size row (upstream moved the three backdrop switches out of Appearance > Display into Home Screen > Looks, Details Page > Display and Libraries > Library View, and the fork takes that), and Seerr cards opening through `seerrCardTarget` before upstream's Default Action (`autoPlay`) is applied in `handleSelectItem` (`App.js`, `Browse.js`). Upstream's rebuilt playback information dialog (`PlaybackInfoModal`) is taken whole, and the old info styles and helpers in the players are gone with it.
 - **On a merge:** keep those, and keep the fork's own screens that read `showHomeBackdrop` through `ScreenBackdrop` (Seerr Discover and the Seerr browse screens follow the Home Screen switch, not the Library one).
 - **Files:** `services/youtubeTrailer.js`, `views/Player/WebOSPlayer.js`, `views/Settings/settingsSchema.js`, `App/App.js`, `views/Browse/Browse.js`.
 
 ## The plugin fork, and the TMDB text
 
-The Moonbase plugin has a fork of its own, Licaa21/Plugin, in `E:\VSCode Projects\Moonfin Plugin Fork` (`main/`, `implement/`, `local/`, with its own CLAUDE.md in `implement/`; another chat works there). Its releases are installed on the Jellyfin server from the fork's manifest, `https://raw.githubusercontent.com/Licaa21/Plugin/refs/heads/main/manifest.json`; 2.4.0.1 was installed on 2026-10-25 over upstream's Moonbase 2.4.0.0 (same id, the configuration was kept), and 2.4.0.3 (the settings the app syncs, 102 typed fields) the same day.
+The Moonbase plugin has a fork of its own, Licaa21/Plugin, in `E:\VSCode Projects\Moonfin Plugin Fork` (`main/`, `implement/`, `local/`, with its own CLAUDE.md in `implement/`; another chat works there). Its releases are installed on the Jellyfin server from the fork's manifest, `https://raw.githubusercontent.com/Licaa21/Plugin/refs/heads/main/manifest.json`; 2.4.0.1 was installed on 2026-10-25 over upstream's Moonbase 2.4.0.0 (same id, the configuration was kept), and 2.4.0.3 (the settings the app syncs, 102 typed fields) the same day. Its releases from 2.4.0.4 on bundle upstream's Moonfin web app (the `frontend/` folder of upstream's zip, about 66 MB); 2.4.0.1 to 2.4.0.3 did not, which left the Moonfin button in Jellyfin web at a 404 until the files were copied into the installed plugin folder by hand on 2026-10-25.
 
 **The app has no TMDB key of its own.** It asks the plugin, which holds the server-wide key: `services/tmdbProxy.js` calls `Moonfin/Tmdb/Details`, `Season` and `Recommendations` (and the existing `NextEpisode`), which answer in TMDB's own shapes (the contract is in the plugin's CLAUDE.md, section "What the TV client expects"). `tmdbGet(path, language)` there turns a TMDB path into the route. The callers are `utils/seerrTitle.js` (a Seerr title's words), `utils/seerrSeasons.js` (a season's episodes), `services/homeRecommendations.js` (the online recommendations) and `utils/upcomingEpisode.js` (the air date, through `NextEpisode`). Whenever the plugin cannot answer (no routes, no server key, TMDB down) they use Seerr's own text, as the app did without a key. A 503, a 404 with no JSON body, a 401 or a 403 puts the server's routes aside for five minutes (`tmdbAvailable()`), and a timeout does not. An English language asks Seerr in English and never the plugin. The old `tmdbApiKey` setting, its Integrations screen and the sync of it are gone, and a key an earlier build stored on the device is dropped at the first start.
 
@@ -299,6 +299,20 @@ The plugin chat works in `E:VSCode ProjectsMoonfin Plugin Forkimplement`. Never 
 - **The fork keeps:** `services/tmdbProxy.js` and the callers listed in "The plugin fork, and the TMDB text": the words of a Seerr title and its seasons, and the online recommendations, come from the fork plugin's `Moonfin/Tmdb` routes, with Seerr's text as the fallback.
 - **On a merge:** keep the proxy calls in `seerrTitle.js`, `seerrSeasons.js`, `homeRecommendations.js` and `useSeerrDetailsData.js` (the status poll asks Seerr alone, `statusOnly`), and never bring back a TMDB key or a direct call to api.themoviedb.org.
 - **Files:** `services/tmdbProxy.js`, `utils/seerrTitle.js`, `utils/seerrSeasons.js`, `utils/tmdbText.js`, `services/homeRecommendations.js`, `views/Details/useSeerrDetailsData.js`.
+
+### 13. The subtitle lift and the second subtitle track
+
+- **Upstream:** `getSubtitleOverlayStyle(settings, shiftPercent)` moves the first subtitle up when a second SRT or WebVTT track is on screen (dual subtitles, 92978038), and draws both in `views/Player/SubtitleTextOverlay.js`.
+- **The fork keeps:** its own lift, where the controls and the pause description push the subtitles up as a slide (`useSubtitleLift`, `subtitleBottomPercent`, `canvasLiftFor`, the PGS and ASS canvas), so the helper is `getSubtitleOverlayStyle(settings, lift, shiftPercent)` and `SubtitleTextOverlay` takes a `lift` prop and keeps the `data-subtitle-text` marks that `styles/perf-overrides.less` reads.
+- **On a merge:** keep both arguments, and keep `lift={subtitleLift}` where the players draw `SubtitleTextOverlay`.
+- **Files:** `utils/subtitleConstants.js`, `views/Player/SubtitleTextOverlay.js`, `TizenPlayer.js`, `WebOSPlayer.js`.
+
+### 14. The Seerr trailer lookup, Discover sliders and the sign-in PIN
+
+- **Upstream:** a trailer picker for titles with several trailers (`trailerChoices`), Seerr's custom Discover sliders as Home rows and on Discover (rebuilt Discover rows cut to 9 titles a page), and a server-backed sign-in PIN through the plugin (`useSignInPin`, `utils/signInPin.js`) that replaced the local PIN gate.
+- **The fork keeps:** the lookup of the trailer Seerr knows for a library title that carries none (`lookedUpVideoId`, `hasLookedUpTrailer`) next to upstream's picker; its own Discover screen (entry 2) with the sliders added to its `rowConfigs` and every title of a slider page kept; and takes upstream's sign-in PIN whole.
+- **On a merge:** keep the lookup in `useDetailsTrailer.js`, the `rowConfigs` use in `visibleRows` of `SeerrDiscover.js`, and upstream's PIN code as it comes.
+- **Files:** `views/Details/useDetailsTrailer.js`, `views/SeerrDiscover/SeerrDiscover.js`, `App/App.js`.
 
 ## When the user says Moonbase (the plugin) updated
 
