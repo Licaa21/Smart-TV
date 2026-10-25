@@ -696,7 +696,6 @@ const useBrowseData = ({
 		settings.sinceYouWatchedSourceItem,
 		settings.sinceYouWatchedSourceType,
 		settings.sinceYouWatchedIncludeWatched,
-		recommendations,
 		settings.rewatchIncludeMovies,
 		settings.rewatchIncludeShows,
 		settings.rewatchIncludeCollections,

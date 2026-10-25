@@ -1426,7 +1426,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const handleChannelKeys = useHeaderGridKeys(
 		HEADER_IDS[libraryStyle],
 		groupedActive ? 'library-group-row-0' : 'library-grid-area',
-		!showSortPanel && !showSettingsPanel && !isMusicBrowseHome
+		!showSortPanel && !showSettingsPanel && !isBrowseHome
 	);
 
 	if (!library && !genreFilter && !studioFilter) {

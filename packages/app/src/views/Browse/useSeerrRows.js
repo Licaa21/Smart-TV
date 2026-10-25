@@ -39,7 +39,7 @@ const useSeerrRows = ({seerrEnabled, seerrAuthenticated, seerrUserId, homeRows, 
 			return undefined;
 		}
 
-		const key = `${seerrUserId}|${enabledSections.map((section) => section.id).join(',')}`;
+		const key = `${seerrUserId}|${enabledSections.map((section) => section.id).join(',')}|${sliderRows.map((row) => row.id).join(',')}`;
 		const reusing = reuseRef.current && memoryCache.seerrRows?.key === key && memoryCache.seerrRows.owner === owner;
 		reuseRef.current = false;
 		if (reusing) {

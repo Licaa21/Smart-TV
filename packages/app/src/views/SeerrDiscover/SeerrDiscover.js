@@ -538,7 +538,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		return () => {
 			cancelled = true;
 		};
-	}, [isAuthenticated, isLoading]);
+	}, [isAuthenticated, isLoading, reloadKey]);
 
 	// Load more items for a specific row
 	const loadMoreForRow = useCallback(async (rowId) => {

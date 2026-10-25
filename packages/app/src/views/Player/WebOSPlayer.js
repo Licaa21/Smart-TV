@@ -1908,6 +1908,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		onSkip: onPlayNextWithCleanup
 	});
 	const {active: cinemaSkipActive, update: updateCinemaSkip} = cinemaSkip;
+	// The skip button counts down from the playback time, which the clock stops redrawing while nothing shows it
+	clockWantedRef.current = clockWantedRef.current || Boolean(cinemaSkip.shown);
 
 	const {carouselOpenRef, openCarousel, stepChannel, markChannelPlaying, refreshRecordings, carouselProps} = useChannelCarousel({
 		item, isLiveTV, liveTvChannels, sortBy: settings.liveTvChannelSortBy,
