@@ -3,7 +3,7 @@ import {act, renderHook} from '@testing-library/react';
 import seerrApi from '../../services/seerrApi';
 import {resolveMetadataLanguage} from '../../utils/metadataLanguage';
 import {MEDIA_STATUS} from '../../utils/seerrStatus';
-import {tmdbGet} from '../../utils/tmdbText';
+import {tmdbGet} from '../../services/tmdbProxy';
 import useSeerrDetailsData, {statusPollInterval} from './useSeerrDetailsData';
 
 jest.mock('@enact/i18n/$L', () => ({__esModule: true, default: (str) => str}));
@@ -25,10 +25,8 @@ jest.mock('../../services/seerrApi', () => ({
 }));
 
 // The language lookup talks to the media server, which a test has none of.
-// What the plugin syncs down, which is where the words in the metadata language come from.
-let mockSettings = {};
-jest.mock('../../context/SettingsContext', () => ({useSettings: () => ({settings: mockSettings})}));
-jest.mock('../../utils/tmdbText', () => ({...jest.requireActual('../../utils/tmdbText'), tmdbGet: jest.fn()}));
+// The words in the metadata language come from TMDB through the plugin.
+jest.mock('../../services/tmdbProxy', () => ({tmdbGet: jest.fn(), tmdbAvailable: () => true}));
 jest.mock('../../services/jellyfinApi', () => ({api: {}, getServerUrl: () => 'http://server', getUserId: () => 'u1'}));
 jest.mock('../../utils/metadataLanguage', () => ({
 	...jest.requireActual('../../utils/metadataLanguage'),
@@ -63,8 +61,9 @@ beforeEach(() => {
 	hidden = false;
 	// The test config resets mocks between tests, so their answers are given here.
 	resolveMetadataLanguage.mockResolvedValue('ro');
-	mockSettings = {};
 	tmdbGet.mockReset();
+	// The plugin answers with no words, so the title is Seerr's and a page load is one Seerr call
+	tmdbGet.mockResolvedValue({});
 	seerrApi.getMovie.mockImplementation(async () => movie());
 	seerrApi.getUser.mockResolvedValue({id: 1});
 	seerrApi.getUserQuota.mockResolvedValue(null);
@@ -87,18 +86,17 @@ describe('the refresh interval', () => {
 });
 
 describe('the language of the title', () => {
-	test('is the Seerr answer, asked in the language, when there is no TMDB key', async () => {
+	test('is the Seerr answer, asked in the language, when the plugin cannot give the words', async () => {
+		tmdbGet.mockRejectedValue(new Error('The plugin answered 404'));
 		const {result} = await open();
 		expect(seerrApi.getMovie).toHaveBeenCalledWith(299534, 'ro');
-		expect(tmdbGet).not.toHaveBeenCalled();
 		expect(result.current.details.overview).toBe('Răzbunătorii.');
 	});
 
-	test('takes its words from TMDB in the metadata language when the plugin has given a key', async () => {
-		mockSettings = {tmdbApiKey: 'key'};
+	test('takes its words from TMDB in the metadata language through the plugin', async () => {
 		tmdbGet.mockResolvedValue({title: 'Răzbunătorii: Sfârșitul', overview: 'Descriere.', tagline: ''});
 		const {result} = await open();
-		expect(tmdbGet).toHaveBeenCalledWith('/movie/299534', 'ro', 'key');
+		expect(tmdbGet).toHaveBeenCalledWith('/movie/299534', 'ro');
 		expect(result.current.language).toBe('ro');
 		expect(result.current.details).toMatchObject({title: 'Răzbunătorii: Sfârșitul', overview: 'Descriere.'});
 	});

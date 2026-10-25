@@ -1141,17 +1141,6 @@ export const SETTINGS_SCHEMA = [
 				]
 			},
 			{
-				id: 'tmdb',
-				clean: true,
-				icon: 'trending_up',
-				label: () => $L('TMDB'),
-				description: () => $L('Your own TMDB key for this TV'),
-				keywords: () => [$L('TMDB API key')],
-				rows: [
-					{kind: KIND.CUSTOM, render: 'tmdbPanel'}
-				]
-			},
-			{
 				id: 'achievements',
 				icon: 'military_tech',
 				label: () => $L('Achievement Badges'),

@@ -273,16 +273,13 @@ did, what the fork keeps instead, and what to do on a merge.
 - **On a merge:** keep those, and keep the fork's own screens that read `showHomeBackdrop` through `ScreenBackdrop` (Seerr Discover and the Seerr browse screens follow the Home Screen switch, not the Library one).
 - **Files:** `services/youtubeTrailer.js`, `views/Player/WebOSPlayer.js`, `views/Settings/settingsSchema.js`, `App/App.js`, `views/Browse/Browse.js`.
 
-## The plugin fork, and the TMDB key still to be removed from the client
+## The plugin fork, and the TMDB text
 
-The Moonbase plugin has a fork of its own, Licaa21/Plugin, in `E:VSCode ProjectsMoonfin Plugin Fork` (`main/`, `implement/`, `local/`, with its own CLAUDE.md in `implement/`; another chat works there). The user installs its releases on the Jellyfin server from the fork's manifest, `https://raw.githubusercontent.com/Licaa21/Plugin/refs/heads/main/manifest.json`. Its CLAUDE.md, section "What the TV client expects", is the contract for the routes this app will call: `Moonfin/Tmdb/Details`, `Season` and `Recommendations` (and the existing `NextEpisode`), which answer in TMDB's own shapes and use the plugin's server-wide key.
+The Moonbase plugin has a fork of its own, Licaa21/Plugin, in `E:\VSCode Projects\Moonfin Plugin Fork` (`main/`, `implement/`, `local/`, with its own CLAUDE.md in `implement/`; another chat works there). Its releases are installed on the Jellyfin server from the fork's manifest, `https://raw.githubusercontent.com/Licaa21/Plugin/refs/heads/main/manifest.json`; 2.4.0.1 was installed on 2026-10-25 over upstream's Moonbase 2.4.0.0 (same id, the configuration was kept).
 
-**When the user says the fork plugin with those routes is installed**, do this, asking first on anything that is a choice:
+**The app has no TMDB key of its own.** It asks the plugin, which holds the server-wide key: `services/tmdbProxy.js` calls `Moonfin/Tmdb/Details`, `Season` and `Recommendations` (and the existing `NextEpisode`), which answer in TMDB's own shapes (the contract is in the plugin's CLAUDE.md, section "What the TV client expects"). `tmdbGet(path, language)` there turns a TMDB path into the route. The callers are `utils/seerrTitle.js` (a Seerr title's words), `utils/seerrSeasons.js` (a season's episodes), `services/homeRecommendations.js` (the online recommendations) and `utils/upcomingEpisode.js` (the air date, through `NextEpisode`). Whenever the plugin cannot answer (no routes, no server key, TMDB down) they use Seerr's own text, as the app did without a key. A 503, a 404 with no JSON body, a 401 or a 403 puts the server's routes aside for five minutes (`tmdbAvailable()`), and a timeout does not. An English language asks Seerr in English and never the plugin. The old `tmdbApiKey` setting, its Integrations screen and the sync of it are gone, and a key an earlier build stored on the device is dropped at the first start.
 
-1. Check the routes on the real server as the Claude user, read only (see "Testing against the real server"), and compare their answers with the contract. If they differ, stop and tell the user.
-2. Make the app call them instead of TMDB: `utils/tmdbText.js` (`tmdbGet` becomes a call to the plugin, `seasonFromTmdb` and `withTmdbText` keep working on the same shapes), `utils/seerrTitle.js`, `utils/seerrSeasons.js`, `services/homeRecommendations.js` (`fetchTmdbRecommendations`) and `utils/upcomingEpisode.js` (the air date through `Moonfin/Tmdb/NextEpisode`). Any answer but 200 means Seerr's own text, as the app does today without a key.
-3. Remove the client's own key: the `tmdbApiKey` setting (`defaultSettings.js`, the sync in `SettingsContext.js`, the `tmdbPanel` row in `settingsSchema.js` and `TmdbKeyPanel.js`), its strings (English and Romanian) and tests, and the places that pass `settings.tmdbApiKey` along (`useBrowseData.js`, `browseRowLoaders.js`).
-4. Tests for the calls and the fallback, lint, the Romanian check, the code review, a look at a Seerr title and season in the browser on the real server, then a build when the user wants one. Update item 3 of "When the user says Moonbase (the plugin) updated" and the README line about the TMDB key.
+Known limits, accepted: a plugin that hangs makes each Seerr title wait for the 8 second timeout once per title, the plugin's TMDB routes are not skipped when the Moonfin plugin setting is off (one 404 per five minutes), a title that loaded during the five minute window keeps Seerr's text until it is opened again, and a refusal (401, 403) from an expired token also puts the routes aside for five minutes.
 
 ### Talking to the plugin fork's chat
 
@@ -295,6 +292,13 @@ When the plugin fork's chat is open at the same time (`ListAgents` shows it as a
 5. A plugin fact (a route shape, a version, a release state) is asked of the plugin chat; a client fact (what this app reads, a path here) is answered here.
 
 The plugin chat works in `E:VSCode ProjectsMoonfin Plugin Forkimplement`. Never `git add -A` or commit in that folder from here: its working tree holds the other chat's unfinished work (that happened once and put its work in the wrong commit).
+
+### 12. TMDB text through the plugin fork
+
+- **Upstream:** the client has no TMDB key and reads Seerr's own text.
+- **The fork keeps:** `services/tmdbProxy.js` and the callers listed in "The plugin fork, and the TMDB text": the words of a Seerr title and its seasons, and the online recommendations, come from the fork plugin's `Moonfin/Tmdb` routes, with Seerr's text as the fallback.
+- **On a merge:** keep the proxy calls in `seerrTitle.js`, `seerrSeasons.js`, `homeRecommendations.js` and `useSeerrDetailsData.js` (the status poll asks Seerr alone, `statusOnly`), and never bring back a TMDB key or a direct call to api.themoviedb.org.
+- **Files:** `services/tmdbProxy.js`, `utils/seerrTitle.js`, `utils/seerrSeasons.js`, `utils/tmdbText.js`, `services/homeRecommendations.js`, `views/Details/useSeerrDetailsData.js`.
 
 ## When the user says Moonbase (the plugin) updated
 
@@ -311,9 +315,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
    client pass off, since a copy the plugin cached in English can still come back.
 2. **The seasonal row** (`/Moonfin/...` seasonal endpoint) had no language parameter even in the plugin's master. Keep
    `localizeExternalItems` for it until the plugin adds one.
-3. **The TMDB key.** The server-wide key is never sent to clients, so the client's own `tmdbApiKey` setting (Integration
-   settings) stays until the plugin proxies TMDB text (episode names and descriptions, titles, people) itself. The plugin's
-   TMDB proxies return only ratings, names and air dates.
+3. **The TMDB text.** The fork's plugin (Licaa21/Plugin, see the section above) serves it, and the app has no key of its own. Upstream's Moonbase does not have those routes: if the user goes back to it, Seerr titles and episodes are in Seerr's own language and the online recommendations come from Seerr.
 4. **README on `main`:** reword the "Rows in the metadata language" line to match what is left, and the line about the
    TMDB key if item 3 changed.
 

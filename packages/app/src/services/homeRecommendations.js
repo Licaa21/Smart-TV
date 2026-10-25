@@ -3,6 +3,7 @@ import {scopedGetItems, searchLibraries, visibleLibraryIds} from './libraryScope
 import {getActiveParentalFilter} from './parentalControls';
 import {byLastPlayedDesc} from '../utils/libraryScopeRules';
 import seerrApi from './seerrApi';
+import {tmdbGet} from './tmdbProxy';
 import {normalizeMediaItem} from '../utils/seerrHomeRows';
 import {currentMetadataLanguage} from '../utils/metadataLanguage';
 
@@ -486,7 +487,7 @@ export async function loadSinceYouWatchedRows(api, settings, enabledIndexes, onl
 				: null);
 
 			if (online) {
-				const onlineItems = await getOnlineRecommendations(settings, seed, language).catch(() => []);
+				const onlineItems = await getOnlineRecommendations(seed, language).catch(() => []);
 				if (onlineItems.length) return row(onlineItems, true);
 			}
 
@@ -522,21 +523,11 @@ export async function loadSinceYouWatchedRows(api, settings, enabledIndexes, onl
 	return rows.filter(Boolean);
 }
 
-// Online recommendations come from TMDB using the plugin synced key, falling back
-// to the Seerr proxy. Results are normalized to the external card shape.
-async function fetchTmdbRecommendations(tmdbApiKey, tmdbId, mediaType, language) {
-	if (!tmdbApiKey) return [];
+// Online recommendations come from TMDB through the plugin, which holds the key, falling back to the Seerr proxy. Results
+// are normalized to the external card shape.
+async function fetchTmdbRecommendations(tmdbId, mediaType, language) {
 	try {
-		let url = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/recommendations?language=${encodeURIComponent(language || 'en-US')}&page=1`;
-		const options = {};
-		if (tmdbApiKey.startsWith('eyJ')) {
-			options.headers = {Authorization: `Bearer ${tmdbApiKey}`};
-		} else {
-			url += `&api_key=${encodeURIComponent(tmdbApiKey)}`;
-		}
-		const res = await fetch(url, options);
-		if (!res.ok) return [];
-		const data = await res.json();
+		const data = await tmdbGet(`/${mediaType}/${tmdbId}/recommendations`, language);
 		return Array.isArray(data && data.results) ? data.results : [];
 	} catch (_error) {
 		return [];
@@ -554,12 +545,12 @@ async function fetchSeerrRecommendations(tmdbId, mediaType, language) {
 	}
 }
 
-export async function getOnlineRecommendations(settings, seed, language) {
+export async function getOnlineRecommendations(seed, language) {
 	const tmdbId = seed.ProviderIds && seed.ProviderIds.Tmdb;
 	if (!tmdbId) return [];
 	const mediaType = seed.Type === 'Series' ? 'tv' : 'movie';
 
-	let results = await fetchTmdbRecommendations(settings.tmdbApiKey, String(tmdbId), mediaType, language);
+	let results = await fetchTmdbRecommendations(String(tmdbId), mediaType, language);
 	if (!results.length) results = await fetchSeerrRecommendations(String(tmdbId), mediaType, language);
 
 	return results.filter((item) => item && item.id).slice(0, 15).map(normalizeMediaItem);

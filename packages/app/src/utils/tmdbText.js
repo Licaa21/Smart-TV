@@ -1,22 +1,5 @@
-// Titles, seasons and episodes in the metadata language, straight from TMDB with the key the plugin syncs
-// down. The Seerr payload carries everything else about a title, and this only supplies the words, since
-// Seerr answers in its own language. The key is a v4 token or a v3 key, which are sent differently.
-
-const BASE = 'https://api.themoviedb.org/3';
-
-export const tmdbGet = async (path, language, rawKey) => {
-	const key = String(rawKey).trim();
-	let url = `${BASE}${path}?language=${encodeURIComponent(language)}`;
-	const options = {};
-	if (String(key).startsWith('eyJ')) options.headers = {Authorization: `Bearer ${key}`};
-	else url += `&api_key=${encodeURIComponent(key)}`;
-	const response = await fetch(url, options);
-	if (!response.ok) throw new Error(`TMDB answered ${response.status}`);
-	const data = await response.json();
-	// A page that is not TMDB's, such as a network's sign in page, can answer 200 with something else.
-	if (!data || typeof data !== 'object' || data.success === false) throw new Error('TMDB gave no usable answer');
-	return data;
-};
+// Titles, seasons and episodes in TMDB's shapes, as the plugin answers them (services/tmdbProxy.js). The Seerr payload
+// carries everything else about a title, and this only lays the words over it, since Seerr answers in its own language.
 
 // What TMDB calls a season, in the shape Seerr's own answer for it has.
 export const seasonFromTmdb = (season) => ({

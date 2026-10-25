@@ -71,7 +71,6 @@ import LibrariesView from './LibrariesView';
 import LibraryOrderView from './LibraryOrderView';
 import MediaBarSourceView from './MediaBarSourceView';
 import SeerrAccountPanel from './SeerrAccountPanel';
-import TmdbKeyPanel from './TmdbKeyPanel';
 import MoonbasePanel from './MoonbasePanel';
 import {LOG_RENDER_STEP} from './useDiagnosticsLog';
 import {DETAIL_SECTIONS_HIDDEN_KEY, toggleHiddenSection} from '../../utils/detailSectionLayout';
@@ -1171,8 +1170,6 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	}, []);
 
 
-	const saveTmdbKey = useCallback((key) => updateSetting('tmdbApiKey', key), [updateSetting]);
-
 	// Kept out of settingsCtx because the search index has no use for them and they are
 	// rebuilt every render, which would defeat the memo above.
 	const customRenderers = {
@@ -1212,7 +1209,6 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 				onLogout={handleSeerrLogout}
 			/>
 		),
-		tmdbPanel: () => <TmdbKeyPanel value={settings.tmdbApiKey} onSave={saveTmdbKey} />,
 		aboutHeader: renderAboutHeader,
 		aboutDataActions: renderAboutDataActions,
 		imageCacheActions: renderImageCacheActions,

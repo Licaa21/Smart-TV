@@ -6,8 +6,9 @@
 
 import seerrApi from '../services/seerrApi';
 import serverLogger from '../services/serverLogger';
+import {tmdbAvailable, tmdbGet} from '../services/tmdbProxy';
 import {isEnglish} from './metadataLanguage';
-import {seasonFromTmdb, tmdbGet} from './tmdbText';
+import {seasonFromTmdb} from './tmdbText';
 
 const TICKS_PER_MINUTE = 600000000;
 const FALLBACK_LANGUAGE = 'en-US';
@@ -124,17 +125,17 @@ const withGapsFilled = async (episodes, language, loadEnglish) => {
 	}
 };
 
-// One season's episodes in the metadata language. With the TMDB key the plugin syncs down they come from
-// TMDB. Without the key, or when TMDB cannot be reached, they are Seerr's, which asks TMDB in that language with
-// the key it holds. Either way English fills what that language has none of.
-export const loadSeerrSeason = async (details, seasonNumber, language, tmdbApiKey = '') => {
+// One season's episodes in the metadata language. They come from TMDB through the plugin, which holds the key. When the
+// plugin cannot give them (no routes yet, no server key) or TMDB cannot be reached, they are Seerr's, which asks TMDB in
+// that language with the key it holds. Either way English fills what that language has none of.
+export const loadSeerrSeason = async (details, seasonNumber, language) => {
 	// Once a series, to say where the words came from and how many episodes came with a description, and how many of
 	// those were in the language itself before English filled the rest in (`before` is the list before the filling).
 	const report = (from, list, before = list) => {
 		const logKey = `${details.id}|${from}|${language}`;
 		if (list.length && lastLogged !== logKey) {
 			lastLogged = logKey;
-			serverLogger.playback('Seerr season text', {from, language, keyed: Boolean(tmdbApiKey), season: seasonNumber, episodes: list.length, withDescription: list.filter((e) => e.Overview).length, descriptionsInLanguage: before.filter((e) => e.Overview).length, namesInLanguage: before.filter((e) => e.Name).length, name: String(list[0].Name || '').slice(0, 30)});
+			serverLogger.playback('Seerr season text', {from, language, season: seasonNumber, episodes: list.length, withDescription: list.filter((e) => e.Overview).length, descriptionsInLanguage: before.filter((e) => e.Overview).length, namesInLanguage: before.filter((e) => e.Name).length, name: String(list[0].Name || '').slice(0, 30)});
 		}
 		return list;
 	};
@@ -142,24 +143,24 @@ export const loadSeerrSeason = async (details, seasonNumber, language, tmdbApiKe
 		const first = seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber, language || undefined), details);
 		return report('Seerr', await withGapsFilled(first, language, async () => seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber, FALLBACK_LANGUAGE), details)), first);
 	};
-	if (!tmdbApiKey || !language) return fromSeerr();
+	if (!language || !tmdbAvailable()) return fromSeerr();
 
 	const path = `/tv/${details.id}/season/${seasonNumber}`;
 	let episodes;
 	try {
-		const raw = await tmdbGet(path, language, tmdbApiKey);
+		const raw = await tmdbGet(path, language);
 		if (!Array.isArray(raw.episodes)) throw new Error('TMDB gave no episodes');
 		episodes = seerrEpisodeItems(seasonFromTmdb(raw), details);
 	} catch (err) {
-		// Once a series, since a bad key fails every season of it.
+		// Once a series, since a plugin without the routes fails every season of it.
 		if (lastLogged !== `${details.id}|failed`) {
 			lastLogged = `${details.id}|failed`;
-			serverLogger.playback('Seerr season text', {from: 'Seerr, TMDB did not answer', error: err.message});
+			serverLogger.playback('Seerr season text', {from: 'Seerr, the plugin could not give TMDB text', error: err.message});
 		}
 		return fromSeerr();
 	}
 
 	const own = episodes;
-	episodes = await withGapsFilled(episodes, language, async () => seerrEpisodeItems(seasonFromTmdb(await tmdbGet(path, FALLBACK_LANGUAGE, tmdbApiKey)), details));
-	return report('TMDB', episodes, own);
+	episodes = await withGapsFilled(episodes, language, async () => seerrEpisodeItems(seasonFromTmdb(await tmdbGet(path, FALLBACK_LANGUAGE)), details));
+	return report('TMDB through the plugin', episodes, own);
 };

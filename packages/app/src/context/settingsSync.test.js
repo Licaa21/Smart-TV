@@ -444,12 +444,12 @@ describe('the sync profile setting', () => {
 });
 
 describe('resolveFromEnvelope', () => {
-	const admin = {themeMusicEnabled: false, themeMusicVolume: 10, navbarPosition: 'top', confirmExit: true, tmdbApiKey: 'admin-key'};
+	const admin = {themeMusicEnabled: false, themeMusicVolume: 10, navbarPosition: 'top', confirmExit: true};
 	const envelope = {
-		global: {themeMusicVolume: 20, navbarPosition: 'left', tmdbApiKey: 'global-key'},
+		global: {themeMusicVolume: 20, navbarPosition: 'left'},
 		desktop: {themeMusicVolume: 50},
 		mobile: {themeMusicVolume: 60},
-		tv: {themeMusicVolume: 40, themeMusicEnabled: true, tmdbApiKey: 'tv-key'}
+		tv: {themeMusicVolume: 40, themeMusicEnabled: true}
 	};
 
 	test('lays the TV profile over global over the admin defaults when nothing is picked', () => {
@@ -459,7 +459,6 @@ describe('resolveFromEnvelope', () => {
 		expect(resolved.themeMusicEnabled).toBe(true);
 		expect(resolved.navbarPosition).toBe('left');
 		expect(resolved.exitConfirmation).toBe(true);
-		expect(resolved.tmdbApiKey).toBe('tv-key');
 		expect(resolveFromEnvelope(envelope, admin, '')).toEqual(resolved);
 		expect(resolveFromEnvelope(envelope, admin, 'bogus')).toEqual(resolved);
 	});
@@ -475,7 +474,6 @@ describe('resolveFromEnvelope', () => {
 		expect(mobile.themeMusicEnabled).toBe(false);
 		expect(desktop.navbarPosition).toBe('left');
 		expect(desktop.exitConfirmation).toBe(true);
-		expect(desktop.tmdbApiKey).toBe('global-key');
 	});
 
 	test('has nothing above global when global is active', () => {
@@ -485,7 +483,6 @@ describe('resolveFromEnvelope', () => {
 		expect(resolved.themeMusicEnabled).toBe(false);
 		expect(resolved.navbarPosition).toBe('left');
 		expect(resolved.exitConfirmation).toBe(true);
-		expect(resolved.tmdbApiKey).toBe('global-key');
 	});
 
 	test('falls back to the admin defaults alone when there is no envelope', () => {
@@ -493,7 +490,6 @@ describe('resolveFromEnvelope', () => {
 
 		expect(resolved.themeMusicVolume).toBe(10);
 		expect(resolved.navbarPosition).toBe('top');
-		expect(resolved.tmdbApiKey).toBe('admin-key');
 	});
 
 	test('takes the whole home layout from the active profile first', () => {

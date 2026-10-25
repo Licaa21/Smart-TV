@@ -362,7 +362,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 
 					if (source === 'online') {
 						const onlineLanguage = await currentMetadataLanguage().catch(() => null);
-						const onlineCards = await getOnlineRecommendations(currentSettings, data, onlineLanguage).catch(() => []);
+						const onlineCards = await getOnlineRecommendations(data, onlineLanguage).catch(() => []);
 						if (onlineCards.length) return {data: {Items: onlineCards}, source: 'tmdb'};
 					}
 

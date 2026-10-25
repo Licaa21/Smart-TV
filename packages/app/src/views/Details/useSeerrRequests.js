@@ -16,7 +16,7 @@ import {closeSeerrTagsDialog} from '../../utils/seerrTagsDialogBack';
 import {fetchSeerrTitle} from '../../utils/seerrTitle';
 
 const useSeerrRequests = ({
-	mediaId, mediaType, details, language, tmdbApiKey, setDetails, setError, isAuthenticated,
+	mediaId, mediaType, details, language, setDetails, setError, isAuthenticated,
 	userPermissions, currentUserId, is4kEnabled, hdStatus, status4k
 }) => {
 	const [requesting, setRequesting] = useState(false);
@@ -194,8 +194,8 @@ const useSeerrRequests = ({
 	);
 
 	const reloadDetails = useCallback(async () => {
-		setDetails(await fetchSeerrTitle(mediaType, mediaId, language, {tmdbApiKey}));
-	}, [mediaId, mediaType, language, tmdbApiKey, setDetails]);
+		setDetails(await fetchSeerrTitle(mediaType, mediaId, language));
+	}, [mediaId, mediaType, language, setDetails]);
 
 	// Each label speaks only for its own half, since asking and taking back are
 	// separate controls.

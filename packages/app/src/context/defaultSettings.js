@@ -203,8 +203,6 @@ export const defaultSettings = {
 	sinceYouWatchedSourceItem: 'recentlyWatched',
 	sinceYouWatchedSourceType: 'movies',
 	sinceYouWatchedIncludeWatched: false,
-	// Pulled from the server plugin, never pushed back. Empty until synced.
-	tmdbApiKey: '',
 	rewatchIncludeMovies: true,
 	rewatchIncludeShows: true,
 	rewatchIncludeCollections: true,

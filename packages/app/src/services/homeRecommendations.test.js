@@ -7,8 +7,13 @@ jest.mock('./storage', () => ({
 jest.mock('./jellyfinApi', () => ({
 	HOME_ROW_ITEM_FIELDS: 'Id,Name,Type'
 }));
+// The online recommendations come through the plugin, and from Seerr when it cannot give them.
+jest.mock('./tmdbProxy', () => ({tmdbGet: jest.fn()}));
+jest.mock('./seerrApi', () => ({__esModule: true, default: {getTvRecommendations: jest.fn(), getMovieRecommendations: jest.fn()}}));
 
-import {canScoreSeedLocally, loadRewatchItems, loadSinceYouWatchedRows, mergeRecommendations, RECOMMENDATION_FETCH_LIMIT, scoreCandidate} from './homeRecommendations';
+import seerrApi from './seerrApi';
+import {tmdbGet} from './tmdbProxy';
+import {canScoreSeedLocally, getOnlineRecommendations, loadRewatchItems, loadSinceYouWatchedRows, mergeRecommendations, RECOMMENDATION_FETCH_LIMIT, scoreCandidate} from './homeRecommendations';
 import {
 	getSinceYouWatchedSourceOptions,
 	getRecommendationSystemSourceOptions
@@ -536,5 +541,35 @@ describe('loadRewatchItems collections', () => {
 		const items = await loadRewatchItems(api, {...settings, rewatchSortBy: 'recentlyWatched'});
 
 		expect(items.map((item) => item.Id)).toEqual(['c2', 'c1']);
+	});
+});
+
+describe('getOnlineRecommendations', () => {
+	const series = {Type: 'Series', ProviderIds: {Tmdb: '1396'}};
+	beforeEach(() => {
+		tmdbGet.mockReset();
+		seerrApi.getTvRecommendations.mockReset();
+		seerrApi.getMovieRecommendations.mockReset();
+	});
+
+	test('asks the plugin for the recommendations of the title, in the language', async () => {
+		tmdbGet.mockResolvedValue({results: [{id: 60059, name: 'Better Call Saul', media_type: 'tv'}]});
+		const cards = await getOnlineRecommendations(series, 'ro');
+		expect(tmdbGet).toHaveBeenCalledWith('/tv/1396/recommendations', 'ro');
+		expect(cards).toHaveLength(1);
+		expect(seerrApi.getTvRecommendations).not.toHaveBeenCalled();
+	});
+
+	test('uses the recommendations of Seerr when the plugin cannot give them', async () => {
+		tmdbGet.mockRejectedValue(new Error('The plugin answered 503'));
+		seerrApi.getTvRecommendations.mockResolvedValue({results: [{id: 2, name: 'Dexter', media_type: 'tv'}]});
+		const cards = await getOnlineRecommendations(series, 'ro');
+		expect(seerrApi.getTvRecommendations).toHaveBeenCalledWith('1396', 1, 'ro');
+		expect(cards).toHaveLength(1);
+	});
+
+	test('has nothing for a title with no TMDB id', async () => {
+		await expect(getOnlineRecommendations({Type: 'Movie', ProviderIds: {}}, 'ro')).resolves.toEqual([]);
+		expect(tmdbGet).not.toHaveBeenCalled();
 	});
 });

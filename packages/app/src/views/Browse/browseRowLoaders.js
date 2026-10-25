@@ -533,7 +533,6 @@ const loadPluginsAndRecos = async (ctx) => {
 					sinceYouWatchedSourceItem: settings.sinceYouWatchedSourceItem,
 					sinceYouWatchedSourceType: settings.sinceYouWatchedSourceType,
 					sinceYouWatchedIncludeWatched: settings.sinceYouWatchedIncludeWatched,
-					tmdbApiKey: settings.tmdbApiKey,
 					recommendationsSupported
 				}, sinceYouWatchedIndexes, seerrEnabled && seerrAuthenticated).catch(() => [])
 				: Promise.resolve([]),

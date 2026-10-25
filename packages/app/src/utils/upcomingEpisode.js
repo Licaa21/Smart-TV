@@ -169,32 +169,6 @@ export const fetchUpcomingEpisode = async ({item, settings, serverUrl, serverTok
 	}
 
 	if (tmdbId) {
-		if (settings?.tmdbApiKey) {
-			try {
-				const res = await fetchWithTimeout(
-					`https://api.themoviedb.org/3/tv/${encodeURIComponent(tmdbId)}?api_key=${encodeURIComponent(settings.tmdbApiKey)}`,
-					{},
-					5000
-				);
-				if (res.ok) {
-					const data = await res.json();
-					const nextEp = data.next_episode_to_air;
-					if (nextEp?.air_date) {
-						const info = {
-							seasonNumber: nextEp.season_number ?? 1,
-							episodeNumber: nextEp.episode_number ?? 1,
-							airDate: nextEp.air_date,
-							title: nextEp.name || null
-						};
-						seriesCache.set(seriesId, info);
-						return info;
-					}
-				}
-			} catch (err) {
-				void err;
-			}
-		}
-
 		if (settings?.useMoonfinPlugin && serverUrl && serverToken) {
 			try {
 				const proxyUrl = `${serverUrl}/Moonfin/Tmdb/NextEpisode?tmdbId=${encodeURIComponent(tmdbId)}`;

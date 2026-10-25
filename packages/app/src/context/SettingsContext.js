@@ -6,7 +6,6 @@ import {normalizeOverlayColorKey} from '../theme/overlayColors';
 import {noteAnsweredSettings, SETUP_QUESTION_KEYS} from '../utils/setupWizardGate';
 import {getAvailableThemeList, getAvailableThemes, isBuiltInThemeId, registerStoreTheme, removeStoreTheme, replaceCustomThemes, resolveThemeById} from '../theme/themeRegistry';
 import {applyOledMode} from '../utils/oledMode';
-import serverLogger from '../services/serverLogger';
 import {normalizeRatingSources, ratingSourcesToServer} from '../utils/ratingSources';
 import {SEASONAL_DENSITIES, normalizeSeasonalTheme} from '../utils/seasonalEffects';
 import {normalizeSeasonalHiddenHolidays, normalizeSeasonalRowCountry} from '../utils/seasonalRow';
@@ -350,11 +349,6 @@ export const profileToLocal = (serverProfile) => {
 	// Continue Watching syncs on its own server key, while this app keeps it with the other rows.
 	const continueWatching = rowImageTypeFromServer(serverProfile.homeImageTypeContinueWatching);
 	if (continueWatching) local.homeRowImageTypes = {...local.homeRowImageTypes, resume: continueWatching};
-	// The TMDB key is read only. We pull it so online rows can call TMDB, but it
-	// stays out of SYNCABLE_KEYS so the client never pushes it back.
-	if (serverProfile.tmdbApiKey !== undefined && serverProfile.tmdbApiKey !== null) {
-		local.tmdbApiKey = serverProfile.tmdbApiKey;
-	}
 	return local;
 };
 
@@ -428,8 +422,6 @@ export const resolveFromEnvelope = (envelope, adminDefaults, profile) => {
 	}).homeRowImageTypes;
 	if (rowImageTypes) resolved.homeRowImageTypes = rowImageTypes;
 	else delete resolved.homeRowImageTypes;
-	const tmdbLayer = firstWith('tmdbApiKey');
-	if (tmdbLayer) resolved.tmdbApiKey = tmdbLayer.tmdbApiKey;
 
 	// Same precedence as everything else, except the layout moves as one unit. The first
 	// profile that has any layout supplies all of it, so admin defaults only reach a user
@@ -677,6 +669,11 @@ export function SettingsProvider({children}) {
 				}
 				if (!stored.visualTheme) {
 					stored.visualTheme = 'moonfin';
+					migrated = true;
+				}
+				// The app has no TMDB key of its own any more, the plugin holds it, so one saved here earlier is dropped
+				if ('tmdbApiKey' in stored) {
+					delete stored.tmdbApiKey;
 					migrated = true;
 				}
 				if (typeof stored.customThemeId !== 'string') {
@@ -1045,17 +1042,7 @@ export function SettingsProvider({children}) {
 
 			const resolved = resolveFromEnvelope(serverData, adminDefaults, settingsRef.current.syncProfile);
 
-			// Whether the plugin's TMDB key came down with the settings, never the key itself, and under what names the
-			// server calls anything that looks like one, since Seerr episode text and other TMDB reads wait on it.
-			serverLogger.info('Application', 'Settings sync: TMDB key', {
-				arrived: Boolean(resolved.tmdbApiKey),
-				inAdminDefaults: Boolean(adminDefaults && adminDefaults.tmdbApiKey),
-				names: [serverData, adminDefaults, ...Object.values(serverData || {})]
-					.filter((source) => source && typeof source === 'object')
-					.reduce((all, source) => all.concat(Object.keys(source).filter((key) => /tmdb/i.test(key))), [])
-			});
-
-			const hasServerValues = resolved.tmdbApiKey !== undefined || SYNCABLE_KEYS.some(key => resolved[key] !== undefined);
+			const hasServerValues = SYNCABLE_KEYS.some(key => resolved[key] !== undefined);
 			if (!hasServerValues) return pluginAnswered ? 'empty' : 'unavailable';
 			// A value the profile carries was chosen somewhere, on this device or
 			// another, so the setup wizard has nothing left to ask about it.
@@ -1076,7 +1063,6 @@ export function SettingsProvider({children}) {
 						? prev[key]
 						: incoming;
 				}
-				const tmdbApiKey = resolved.tmdbApiKey !== undefined ? resolved.tmdbApiKey : prev.tmdbApiKey;
 				const homeRowsStyle = normalizeHomeRowsStyle(nextValues.homeRowsStyle);
 				const detailScreenStyle = normalizeDetailScreenStyle(nextValues.detailScreenStyle);
 
@@ -1091,8 +1077,7 @@ export function SettingsProvider({children}) {
 
 				// Unchanged values kept their previous reference, so comparing identity is
 				// enough here.
-				const changed = tmdbApiKey !== prev.tmdbApiKey ||
-					homeRowsStyle !== prev.homeRowsStyle ||
+				const changed = homeRowsStyle !== prev.homeRowsStyle ||
 					detailScreenStyle !== prev.detailScreenStyle ||
 					customThemeId !== prev.customThemeId ||
 					visualTheme !== prev.visualTheme ||
@@ -1102,7 +1087,6 @@ export function SettingsProvider({children}) {
 					const updated = {
 						...prev,
 						...nextValues,
-						tmdbApiKey,
 						homeRowsStyle,
 						detailScreenStyle,
 						customThemeId,
