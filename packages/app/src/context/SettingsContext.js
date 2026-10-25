@@ -316,6 +316,7 @@ export const SYNCABLE_KEYS = [
 	'personalRatingStyle', 'recentlyReleasedSeriesType', 'mergeRecentRowsByType', 'playlistsGroupByType', 'groupItemsIntoCollections',
 	'useDetailedSubHeadings', 'showMediaDetailsOnLibraryPage', 'hideBackdropsInLibraries', 'libraryStyle', 'bookLibraryStyle', 'musicLibraryStyle',
 	'keyboardStyle',
+	'preferredSecondarySubtitleLanguage', 'secondarySubtitleSize', 'secondarySubtitleOffset', 'secondarySubtitleColor',
 	'syncplayEnabled', 'syncplayAutoOpen',
 	'showSyncPlayButton',
 	'syncPlayAdvancedCorrectionEnabled', 'syncPlayEnableSyncCorrection',

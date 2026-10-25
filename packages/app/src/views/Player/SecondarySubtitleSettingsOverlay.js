@@ -26,7 +26,7 @@ const SettingsContainer = SpotlightContainerDecorator({
 
 const stopPropagation = (e) => e.stopPropagation();
 
-// The second track's size, vertical offset and color. They stay on this device and never sync.
+// The second track's size, vertical offset and color. They sync with the rest of the settings.
 const SecondarySubtitleSettingsOverlay = ({onClose, isHdr}) => {
 	const {settings, updateSetting} = useSettings();
 	// Until it's set the second track takes the first track's size.

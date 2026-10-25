@@ -65,8 +65,8 @@ export const defaultSettings = {
 	preferSdhSubtitles: false,
 	preferTextSubtitles: false,
 	preferExternalSubtitles: false,
-	// The second subtitle track's settings stay on this device. A size of 0 and an empty
-	// color follow the first track.
+	// The second subtitle track's settings, synced like the rest so the plugin can hold a default. A size of 0 and an
+	// empty color follow the first track.
 	preferredSecondarySubtitleLanguage: '',
 	secondarySubtitleSize: 0,
 	secondarySubtitleOffset: 8,
