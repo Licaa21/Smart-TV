@@ -126,6 +126,26 @@ const CONTENT_TYPE_FROM_SERVER = Object.fromEntries(
 // that sets it only reaches 20 seconds.
 const MIN_INTERVAL_MS = 100;
 
+// The other clients keep the max bitrate as Mbps text ("120", "auto" for Auto) and the screensaver timeout as a unit and a
+// count ("m5" for five minutes), which is what the stored profiles hold. This app keeps bits per second and seconds.
+const bitrateToServer = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? (v === 0 ? 'auto' : String(Math.round(v / 1e6))) : undefined);
+const bitrateFromServer = (v) => {
+	if (String(v).trim().toLowerCase() === 'auto') return 0;
+	const n = /^\s*\d+(\.\d+)?\s*$/.test(v) ? Number(v) : NaN;
+	if (!Number.isFinite(n)) return undefined;
+	return n >= 1e5 ? n : Math.round(n * 1e6);
+};
+const timeoutToServer = (v) => {
+	if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) return undefined;
+	return v % 60 === 0 ? `m${v / 60}` : `s${Math.round(v)}`;
+};
+const plainNumber = (v) => (/^\s*-?\d+(\.\d+)?\s*$/.test(v) ? Number(v) : undefined);
+const UNIT_SECONDS = {s: 1, m: 60, h: 3600};
+const timeoutFromServer = (v) => {
+	const match = /^\s*([smh]?)(\d+)\s*$/.exec(String(v));
+	const seconds = match ? Number(match[2]) * UNIT_SECONDS[match[1] || 's'] : 0;
+	return seconds > 0 ? seconds : undefined;
+};
 const secondsToMs = (v) => (typeof v === 'number' ? Math.round(v * 1000) : undefined);
 const msToSeconds = (v) => (typeof v === 'number' ? Math.round(v / 1000) : undefined);
 
@@ -228,6 +248,9 @@ const VALUE_CONVERSIONS = {
 		toServer: secondsToMs,
 		fromServer: msToSeconds
 	},
+	// The plugin keeps these two as text (decimal digits), where this app has numbers
+	maxBitrate: {toServer: bitrateToServer, fromServer: bitrateFromServer},
+	screensaverTimeout: {toServer: timeoutToServer, fromServer: timeoutFromServer},
 	autoAdvanceInterval: {
 		toServer: secondsToMs,
 		// A small number is the seconds an older build pushed before this was
@@ -329,6 +352,29 @@ export const SYNCABLE_KEYS = [
 	'focusBorderColor',
 	'navbarOpacity',
 	'navbarColor',
+	// Everything else with a Settings row that is not tied to this device, so the plugin can hold a default for it and a
+	// viewer's own choice still wins. The list is the one in the plugin fork's local/client-settings.json (deviceOnly false).
+	'preferTranscode', 'forceDirectPlay', 'forceCompatibleAv1Transcode', 'dolbyVisionAsHdr10', 'allowManyStreams',
+	'allowHevcLevel52', 'maxBitrate', 'subtitleSize', 'subtitlePosition', 'subtitleOpacity', 'subtitleBackground',
+	'subtitleBackgroundColor', 'subtitleColor', 'subtitleShadowColor', 'subtitleShadowOpacity', 'subtitleShadowBlur',
+	'subtitlePositionAbsolute', 'subtitleHdrSeparate', 'subtitleSizeHdr', 'subtitlePositionHdr', 'subtitleOpacityHdr',
+	'subtitleBackgroundHdr', 'subtitleBackgroundColorHdr', 'subtitleColorHdr', 'subtitleShadowColorHdr', 'subtitleShadowOpacityHdr',
+	'subtitleShadowBlurHdr', 'subtitlePositionAbsoluteHdr', 'pgsSubtitleSize', 'pgsSubtitlePosition', 'pgsSubtitleOpacity',
+	'pgsSubtitleBrightness', 'pgsSubtitleBackgroundColor', 'pgsSubtitleBackground', 'seekStep', 'rememberSeriesAudio',
+	'animeAudioLanguage', 'animeFallbackAudioLanguage', 'preferStereoAudio', 'audioCodecOrder', 'trickPlayMode',
+	'trickPlayPreviewScale', 'trickPlayVerticalPosition', 'trickPlayFollowScrub', 'trickPlayPauseWhileScrubbing',
+	'waitForAssSubtitles', 'maxAudioChannels', 'transcodeAudioCodecs', 'downmixToStereo', 'displayAudioLatest',
+	'displayAudioLastPlayed', 'displayAudioFavorites', 'displayAudioPlaylists', 'displayAudioAlbumArtists', 'displayAudioArtists',
+	'displayAudioAlbums', 'audioSortOption', 'playlistsRowSortBy', 'audioRowsSortBy', 'favoritesRowSortOrder',
+	'collectionsRowSortOrder', 'genresRowSortOrder', 'playlistsRowSortOrder', 'audioRowsSortOrder', 'displayStudiosRows',
+	'studiosRowSortBy', 'studiosRowSortOrder', 'rememberRowCard', 'serverLogging', 'updateNotificationsEnabled',
+	'screensaverEnabled', 'screensaverTimeout', 'screensaverDimmingLevel', 'cardFocusZoom', 'modernCardTransitionSpeed',
+	'showDescriptionOnPause', 'introAction', 'outroAction', 'screensaverAgeFilter', 'screensaverMaxRating', 'uiScale',
+	'settingsScale', 'enablePgsRendering', 'liveTvSkipGuide', 'stereoUpmixEnabled', 'searchDefaultTab', 'showFriendsButton',
+	'muteChatBannersDuringPlayback', 'accentNavigation', 'accentHome', 'accentSettings', 'accentSettingsFocus',
+	'accentAchievements', 'accentDetails', 'accentPlayer', 'accentSkip', 'accentLiveTv', 'accentOther', 'skipOverlayLayout',
+	'nextUpLayout', 'skipOverlayPosition', 'skipOverlaySize', 'skipOverlayBackground', 'skipOverlayOpacity', 'skipOverlayAccent',
+	'skipOverlayText'
 ];
 
 export const profileToLocal = (serverProfile) => {
@@ -343,6 +389,13 @@ export const profileToLocal = (serverProfile) => {
 			// A converter returns undefined when the stored value makes no sense here,
 			// so keep what we already have rather than blanking it.
 			if (converted === undefined) continue;
+			// A number setting is read as a number (one kept as text counts) and anything else is left out, since the screens compute with it.
+			if (typeof defaultSettings[localKey] === 'number') {
+				const n = typeof converted === 'string' ? plainNumber(converted) : converted;
+				if (!Number.isFinite(n)) continue;
+				local[localKey] = n;
+				continue;
+			}
 			local[localKey] = converted;
 		}
 	}

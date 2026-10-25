@@ -1,6 +1,6 @@
 // The audio codecs the priority editor in Settings lets the viewer rank, in the default order
 // (best first). Labels are plain English and translated where shown, with $L(codec.label).
-// Moonfin Core has no such setting, so this one stays on the device and never syncs.
+// Moonfin Core has no such setting; the fork plugin holds a default for it.
 
 export const AUDIO_CODEC_ORDER_KEY = 'audioCodecOrder';
 

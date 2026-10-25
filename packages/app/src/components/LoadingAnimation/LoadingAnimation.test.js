@@ -67,12 +67,12 @@ describe('loading animation layout', () => {
 		expect(Object.keys(POSITION_LAYOUT).filter(facesLeft)).toEqual(['topRight', 'middleRight', 'bottomRight']);
 	});
 
-	test('starts as the spinner, medium, in the middle, at moderate speed, without its text', () => {
-		expect(defaultSettings.loadingAnimationImage).toBe('spinner');
+	test('starts as the spinning logo, medium, in the middle, at full speed, with its text', () => {
+		expect(defaultSettings.loadingAnimationImage).toBe('moonfinLogo');
 		expect(defaultSettings.loadingAnimationSize).toBe('medium');
 		expect(defaultSettings.loadingAnimationPosition).toBe('middle');
-		expect(defaultSettings.loadingAnimationSpeed).toBe('moderate');
-		expect(defaultSettings.showLoadingAnimationText).toBe(false);
+		expect(defaultSettings.loadingAnimationSpeed).toBe('fast');
+		expect(defaultSettings.showLoadingAnimationText).toBe(true);
 	});
 });
 

@@ -180,7 +180,8 @@ describe('localToProfile', () => {
 	test('says nothing about settings this app has no screen for', () => {
 		const profile = localToProfile(defaultSettings);
 
-		for (const key of ['showCastButton', 'detailShowTechnicalDetails', 'recommendationsApplyParentalRatingCap']) {
+		for (const key of ['showCastButton', 'detailShowTechnicalDetails', 'recommendationSystemSource',
+			'recommendationsApplyParentalRatingCap']) {
 			expect(profile).not.toHaveProperty(key);
 		}
 	});
@@ -243,7 +244,7 @@ describe('localToProfile', () => {
 			loadingAnimationImage: 'runner',
 			loadingAnimationSize: 'medium',
 			loadingAnimationPosition: 'middle',
-			loadingAnimationSpeed: 'moderate',
+			loadingAnimationSpeed: 'fast',
 			showLoadingAnimationText: false
 		});
 	});
@@ -325,8 +326,8 @@ describe('the backdrop toggles', () => {
 });
 
 describe('the library style', () => {
-	test('defaults to modern, as the fork starts', () => {
-		expect(defaultSettings.libraryStyle).toBe('modern');
+	test('defaults to classic', () => {
+		expect(defaultSettings.libraryStyle).toBe('classic');
 	});
 
 	test('takes and sends each style under its own name', () => {
@@ -649,4 +650,55 @@ test('Home rows read back from the webOS database still match the server copy', 
 	expect(sameSyncedValue(server, kept)).toBe(true);
 	expect(sameSyncedValue(server, [{...kept[0], enabled: false}])).toBe(false);
 	expect(sameSyncedValue(server, [...kept, {_id: '1b', id: 'nextup', enabled: true, order: 1}])).toBe(false);
+});
+
+// Every setting that is not tied to this device is synced, so the plugin can hold a default for it and a viewer's own choice wins.
+describe('the keys the app does not sync', () => {
+	const NOT_SYNCED = ['pinCode', 'pinCodeHash', 'pinFailedAttempts', 'pinLockedUntil', 'pinCodeProtection', 'kidsModeEnabled', 'kidsPinHash',
+		'kidsPinFailedAttempts', 'kidsPinLockedUntil', 'autoLoginBehavior', 'autoLoginServerId', 'autoLoginUserId', 'alwaysAuthenticate', 'allowInsecureCerts',
+		'syncProfile', 'useMoonfinPlugin'];
+
+	test('keep to the account, security and device ones', () => {
+		for (const key of NOT_SYNCED) expect(SYNCABLE_KEYS).not.toContain(key);
+		expect(SYNCABLE_KEYS).not.toContain('tmdbApiKey');
+	});
+
+	test('leave the trick play, subtitle look, accent and arranged list settings synced', () => {
+		for (const key of ['trickPlayMode', 'subtitleShadowBlur', 'pgsSubtitleBackground', 'accentHome', 'accentOther', 'audioCodecOrder', 'maxBitrate', 'screensaverTimeout']) {
+			expect(SYNCABLE_KEYS).toContain(key);
+		}
+	});
+
+	test('name no key twice', () => {
+		expect(new Set(SYNCABLE_KEYS).size).toBe(SYNCABLE_KEYS.length);
+	});
+});
+
+describe('the two settings the other clients keep as text', () => {
+	test('go out as Mbps text and a unit with a count', () => {
+		expect(localToProfile({...defaultSettings, maxBitrate: 120000000, screensaverTimeout: 300}, ['maxBitrate', 'screensaverTimeout']))
+			.toEqual({maxBitrate: '120', screensaverTimeout: 'm5'});
+		expect(localToProfile({...defaultSettings, maxBitrate: 0, screensaverTimeout: 90}, ['maxBitrate', 'screensaverTimeout']))
+			.toEqual({maxBitrate: 'auto', screensaverTimeout: 's90'});
+	});
+
+	test('come back as bits per second and seconds', () => {
+		expect(profileToLocal({maxBitrate: '60', screensaverTimeout: 'm2'})).toMatchObject({maxBitrate: 60000000, screensaverTimeout: 120});
+		expect(profileToLocal({maxBitrate: 'auto', screensaverTimeout: 's30'})).toMatchObject({maxBitrate: 0, screensaverTimeout: 30});
+		expect(profileToLocal({maxBitrate: '120000000', screensaverTimeout: '90'})).toMatchObject({maxBitrate: 120000000, screensaverTimeout: 90});
+	});
+
+	test('leave out a text that makes no sense', () => {
+		expect(profileToLocal({maxBitrate: '0'})).toMatchObject({maxBitrate: 0});
+		expect(profileToLocal({maxBitrate: '60 Mbps', screensaverTimeout: 'never'})).toEqual({});
+		expect(profileToLocal({screensaverTimeout: 'm0'})).toEqual({});
+	});
+});
+
+describe('a value of the wrong kind from the server', () => {
+	test('is left out, so the setting keeps what it has', () => {
+		expect(profileToLocal({uiScale: 'big', seekStep: '10x'})).toEqual({});
+		expect(profileToLocal({seekStep: '10'})).toEqual({seekStep: 10});
+		expect(profileToLocal({uiScale: 1.2, seekStep: 15})).toEqual({uiScale: 1.2, seekStep: 15});
+	});
 });
