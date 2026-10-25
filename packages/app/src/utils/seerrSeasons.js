@@ -125,8 +125,8 @@ const withGapsFilled = async (episodes, language, loadEnglish) => {
 	}
 };
 
-// One season's episodes in the metadata language. They come from TMDB through the plugin, which holds the key. When the
-// plugin cannot give them (no routes yet, no server key) or TMDB cannot be reached, they are Seerr's, which asks TMDB in
+// One season's episodes in the metadata language. They come from TMDB through the plugin, which holds the key (English is
+// asked of Seerr alone). When the plugin cannot give them (no routes yet, no server key) or TMDB cannot be reached, they are Seerr's, which asks TMDB in
 // that language with the key it holds. Either way English fills what that language has none of.
 export const loadSeerrSeason = async (details, seasonNumber, language) => {
 	// Once a series, to say where the words came from and how many episodes came with a description, and how many of
@@ -150,7 +150,7 @@ export const loadSeerrSeason = async (details, seasonNumber, language) => {
 	let episodes;
 	try {
 		const raw = await tmdbGet(path, language);
-		if (!Array.isArray(raw.episodes)) throw new Error('TMDB gave no episodes');
+		if (!Array.isArray(raw.episodes) || !raw.episodes.length) throw new Error('TMDB gave no episodes');
 		episodes = seerrEpisodeItems(seasonFromTmdb(raw), details);
 	} catch (err) {
 		// Once a series, since a plugin without the routes fails every season of it.

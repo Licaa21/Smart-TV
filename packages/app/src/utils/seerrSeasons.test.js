@@ -101,6 +101,13 @@ describe('loadSeerrSeason', () => {
 		expect(episodes[0].Overview).toBe('In English.');
 	});
 
+	it('is the Seerr answer when the plugin gives a season with no episodes', async () => {
+		tmdbGet.mockResolvedValueOnce({season_number: 1, episodes: []});
+		seerrApi.getTvSeason.mockResolvedValueOnce(season([{name: 'Pilot', overview: 'In English.'}]));
+		const episodes = await loadSeerrSeason(details, 1, 'ro');
+		expect(episodes[0].Overview).toBe('In English.');
+	});
+
 	it('asks Seerr alone for English, never the plugin', async () => {
 		seerrApi.getTvSeason.mockResolvedValue(season([{name: 'Pilot', overview: 'In English.', airDate: '2008-01-20'}]));
 		const episodes = await loadSeerrSeason(details, 1, 'en-US');
