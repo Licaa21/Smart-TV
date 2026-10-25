@@ -717,7 +717,7 @@ describe('the keys the app does not sync', () => {
 	});
 
 	test('leave the trick play, subtitle look, accent and arranged list settings synced', () => {
-		for (const key of ['trickPlayMode', 'subtitleShadowBlur', 'pgsSubtitleBackground', 'accentHome', 'accentOther', 'audioCodecOrder', 'maxBitrate', 'screensaverTimeout']) {
+		for (const key of ['preferredSecondarySubtitleLanguage', 'secondarySubtitleSize', 'secondarySubtitleOffset', 'secondarySubtitleColor', 'trickPlayMode', 'subtitleShadowBlur', 'pgsSubtitleBackground', 'accentHome', 'accentOther', 'audioCodecOrder', 'maxBitrate', 'screensaverTimeout']) {
 			expect(SYNCABLE_KEYS).toContain(key);
 		}
 	});
@@ -753,5 +753,15 @@ describe('a value of the wrong kind from the server', () => {
 		expect(profileToLocal({uiScale: 'big', seekStep: '10x'})).toEqual({});
 		expect(profileToLocal({seekStep: '10'})).toEqual({seekStep: 10});
 		expect(profileToLocal({uiScale: 1.2, seekStep: 15})).toEqual({uiScale: 1.2, seekStep: 15});
+	});
+});
+
+describe('the secondary subtitle settings', () => {
+	test('go out under their own names and come back as they went', () => {
+		const local = {...defaultSettings, preferredSecondarySubtitleLanguage: 'eng', secondarySubtitleSize: 48, secondarySubtitleOffset: 12, secondarySubtitleColor: '#ffff00'};
+		const keys = ['preferredSecondarySubtitleLanguage', 'secondarySubtitleSize', 'secondarySubtitleOffset', 'secondarySubtitleColor'];
+		const wire = localToProfile(local, keys);
+		expect(wire).toEqual({preferredSecondarySubtitleLanguage: 'eng', secondarySubtitleSize: 48, secondarySubtitleOffset: 12, secondarySubtitleColor: '#ffff00'});
+		expect(profileToLocal(wire)).toEqual(wire);
 	});
 });
