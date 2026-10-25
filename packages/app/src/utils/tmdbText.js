@@ -19,7 +19,6 @@ export const seasonFromTmdb = (season) => ({
 	}))
 });
 
-// Seerr's payload with the words of TMDB's, wherever TMDB has some. Names of seasons are matched by number.
 // The words a title already has, laid over a fresh Seerr answer, so a refresh that only wants its status keeps them.
 export const keepingText = (fresh, previous) => {
 	if (!previous) return fresh;
@@ -34,6 +33,7 @@ export const keepingText = (fresh, previous) => {
 	};
 };
 
+// Seerr's payload with the words of TMDB's, wherever TMDB has some. Names of seasons are matched by number.
 export const withTmdbText = (seerrData, tmdbData) => {
 	if (!tmdbData) return seerrData;
 	const names = new Map((tmdbData.seasons || []).map((season) => [season.season_number, season.name]));

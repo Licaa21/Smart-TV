@@ -143,7 +143,8 @@ export const loadSeerrSeason = async (details, seasonNumber, language) => {
 		const first = seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber, language || undefined), details);
 		return report('Seerr', await withGapsFilled(first, language, async () => seerrEpisodeItems(await seerrApi.getTvSeason(details.id, seasonNumber, FALLBACK_LANGUAGE), details)), first);
 	};
-	if (!language || !tmdbAvailable()) return fromSeerr();
+	// English is asked of Seerr alone, as a title's is, and so is a plugin known not to answer
+	if (!language || isEnglish(language) || !tmdbAvailable()) return fromSeerr();
 
 	const path = `/tv/${details.id}/season/${seasonNumber}`;
 	let episodes;
