@@ -153,3 +153,25 @@ export const applyProfileTuning = (profile, settings = {}, capabilities, {isLive
 
 	return tuned;
 };
+
+const isVideoHls = (entry) => entry.Type === 'Video' && String(entry.Protocol).toLowerCase() === 'hls';
+const isTsVideoHls = (entry) => isVideoHls(entry) && String(entry.Container).toLowerCase() === 'ts';
+
+// Emby's live HLS only works in MPEG-TS segments. In fMP4 its playlist gives every segment a zero
+// length and no init section. The server takes the first entry it can satisfy, so a live channel
+// on Emby gets the TS entries moved ahead of fMP4, or a TS copy of the fMP4 one where a platform
+// offers only fMP4. The copy stops at 5.1, since TS cant carry AAC past that.
+export const preferMpegTsHlsForLive = (profile) => {
+	const entries = profile?.TranscodingProfiles;
+	if (!Array.isArray(entries)) return profile;
+	const first = entries.findIndex(isVideoHls);
+	if (first === -1 || isTsVideoHls(entries[first])) return profile;
+	const tsEntries = entries.filter(isTsVideoHls);
+	const lead = tsEntries.length ? tsEntries : [{
+		...entries[first],
+		Container: 'ts',
+		...(Number(entries[first].MaxAudioChannels) > 6 ? {MaxAudioChannels: '6'} : {})
+	}];
+	const others = entries.filter((entry) => !isTsVideoHls(entry));
+	return {...profile, TranscodingProfiles: [...others.slice(0, first), ...lead, ...others.slice(first)]};
+};

@@ -1,4 +1,4 @@
-import {applyProfileTuning, canTranscodeAudioCodecAway, transcodesAudioCodec} from './deviceProfileTuning';
+import {applyProfileTuning, canTranscodeAudioCodecAway, preferMpegTsHlsForLive, transcodesAudioCodec} from './deviceProfileTuning';
 
 const profile = () => ({
 	SubtitleProfiles: [
@@ -178,5 +178,28 @@ describe('transcode audio codecs', () => {
 		]};
 		expect(canTranscodeAudioCodecAway(xbox, 'aac')).toBe(false);
 		expect(canTranscodeAudioCodecAway(xbox, 'opus')).toBe(true);
+	});
+});
+
+describe('preferMpegTsHlsForLive', () => {
+	const hls = (Container, extra) => ({Container, Type: 'Video', Context: 'Streaming', Protocol: 'hls', VideoCodec: 'h264', ...extra});
+	const containers = (result) => result.TranscodingProfiles.map((entry) => entry.Container);
+
+	test('moves the TS entry ahead of fMP4', () => {
+		const vega = {TranscodingProfiles: [hls('mp4'), hls('ts'), {Container: 'mp4', Type: 'Video', Context: 'Static'}]};
+		expect(containers(preferMpegTsHlsForLive(vega))).toEqual(['ts', 'mp4', 'mp4']);
+		expect(preferMpegTsHlsForLive(vega).TranscodingProfiles[2].Context).toBe('Static');
+	});
+
+	test('adds a TS copy where a platform offers only fMP4, at 5.1 at most', () => {
+		const xbox = {TranscodingProfiles: [hls('mp4', {MaxAudioChannels: '8'}), {Container: 'mp3', Type: 'Audio'}]};
+		const result = preferMpegTsHlsForLive(xbox);
+		expect(containers(result)).toEqual(['ts', 'mp4', 'mp3']);
+		expect(result.TranscodingProfiles[0]).toMatchObject({Protocol: 'hls', VideoCodec: 'h264', MaxAudioChannels: '6'});
+	});
+
+	test('leaves a profile that already leads with TS alone', () => {
+		const tizen = {TranscodingProfiles: [hls('ts'), hls('mp4')]};
+		expect(preferMpegTsHlsForLive(tizen)).toBe(tizen);
 	});
 });

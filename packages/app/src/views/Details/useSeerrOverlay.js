@@ -9,6 +9,7 @@ import seerrApi from '../../services/seerrApi';
 import {hasSeerrChips} from '../../components/seerr/SeerrSections';
 import {hasMediaFacts} from '../../utils/seerrMediaFacts';
 import {normalizeMediaItem} from '../../utils/seerrHomeRows';
+import {streamingProviders as providersFor} from '../../utils/seerrStreaming';
 import {IDLE, bestSearchMatch, seerrTargetFor} from '../../utils/seerrTarget';
 import useSeerrDetailsData from './useSeerrDetailsData';
 import useSeerrRequests from './useSeerrRequests';
@@ -107,12 +108,18 @@ const useSeerrOverlay = ({item, seerrOnly, showsSection}) => {
 		[data.recommendations, showsRecommendations]
 	);
 
+	const streamingProviders = useMemo(
+		() => providersFor(data.details, data.streamingRegion),
+		[data.details, data.streamingRegion]
+	);
+
 	const isActive = Boolean(target.mediaId && data.details);
 
 	// The parts of the Seerr block with something to show that the viewer left on.
 	const pieces = {
 		chips: isActive && showsSection('seerrGenresTags') && hasSeerrChips(data.details),
 		facts: isActive && showsSection('seerrStats') && hasMediaFacts(data.details, target.mediaType),
+		streaming: isActive && showsSection('seerrStreaming') && streamingProviders.length > 0,
 		recommendations: isActive && recommendationCards.length > 0,
 		similar: isActive && similarCards.length > 0,
 		collection: isActive && showsSection('seerrCollection') && Boolean(data.details.collection)
@@ -120,7 +127,7 @@ const useSeerrOverlay = ({item, seerrOnly, showsSection}) => {
 
 	// A title Seerr knows of but has nothing to say about would otherwise offer
 	// an empty tab.
-	const hasTabContent = pieces.chips || pieces.facts || pieces.recommendations || pieces.similar || pieces.collection;
+	const hasTabContent = pieces.chips || pieces.facts || pieces.streaming || pieces.recommendations || pieces.similar || pieces.collection;
 
 	const offersRequest = seerrOnly
 		? requests.canRequestHd || requests.canRequest4k
@@ -141,6 +148,7 @@ const useSeerrOverlay = ({item, seerrOnly, showsSection}) => {
 		loading: data.loading || resolvingImdb,
 		similarCards,
 		recommendationCards,
+		streamingProviders,
 		displayName,
 		mediaType: target.mediaType,
 		isActive,

@@ -4,8 +4,11 @@ import {api as activeApi} from '../services/jellyfinApi';
 import {TICKS_PER_PAGE} from '../utils/books';
 
 // Saves a comic or PDF page a moment after the reader settles on it and again
-// when the reader closes, and marks the book read on its last page. The page it
-// opened on counts as already saved, so just opening a book writes nothing.
+// when the reader closes, and marks the book read once it's 98 percent of the way
+// through. The page it opened on counts as already saved, so just opening a book
+// writes nothing.
+const PLAYED_SHARE = 0.98;
+
 const useBookProgress = (item, page, count) => {
 	const saved = useRef(null);
 	const latest = useRef({page, count});
@@ -17,7 +20,7 @@ const useBookProgress = (item, page, count) => {
 		saved.current = current;
 		const api = getApiForItem(item) || activeApi;
 		api.setPlaybackPosition(item.Id, current * TICKS_PER_PAGE)
-			.then(() => (current === total - 1 ? api.setWatched(item.Id, true) : null))
+			.then(() => ((current + 1) / total >= PLAYED_SHARE ? api.setWatched(item.Id, true) : null))
 			.catch(() => {});
 	}, [item]);
 

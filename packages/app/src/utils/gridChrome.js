@@ -64,6 +64,21 @@ export const horizontalCellPad = (cardWidth, gridWidth) => {
 	return pad;
 };
 
+// Where a page key takes a grid. A page is the rows whose cards are fully on screen. Forward
+// scrolls the first row cut off at the bottom up to the top, back does the reverse, and focus
+// moves as many rows in its column, landing on the last item from a short last row. Rows start
+// stride apart, each card cardTop below its row's start. Null when focus has nowhere to go.
+export const pageGrid = ({from, direction, count, columns, stride, cardTop, cardHeight, scrollTop, viewport}) => {
+	const firstVisibleRow = Math.ceil((scrollTop - 0.5) / stride);
+	const firstCutOffRow = Math.floor((scrollTop + viewport + 0.5 - cardTop - cardHeight) / stride) + 1;
+	const rows = Math.max(1, firstCutOffRow - firstVisibleRow);
+	const lastRow = Math.floor((count - 1) / columns);
+	const clampRow = (row) => Math.max(0, Math.min(lastRow, row));
+	const target = Math.min(count - 1, clampRow(Math.floor(from / columns) + direction * rows) * columns + from % columns);
+	if (target === from) return null;
+	return {target, scrollTop: clampRow(firstVisibleRow + direction * rows) * stride};
+};
+
 // Down out of the toolbar drops into the grid. A screen with something focusable
 // above the toolbar passes it too, since the row it sits on is too wide for the
 // five-way to find it on its own.

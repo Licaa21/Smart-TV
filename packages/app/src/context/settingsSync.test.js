@@ -14,7 +14,7 @@ jest.mock('../services/seerrApi', () => ({saveMoonfinProfile: jest.fn(() => Prom
 import {saveMoonfinProfile} from '../services/seerrApi';
 import {
 	SYNCABLE_KEYS, SYNC_PROFILES, __pushQueue, activeSyncProfile, defaultSettings, flushSettingsPush,
-	localToProfile, profileToLocal, resolveFromEnvelope, sameSyncedValue
+	localToProfile, migrateKeyboardStyle, profileToLocal, resolveFromEnvelope, sameSyncedValue
 } from './SettingsContext';
 import {__resetHomeLayoutPassthrough, homeRowsFromProfile} from '../utils/homeLayout';
 
@@ -356,6 +356,59 @@ describe('the music library style', () => {
 
 	test('keeps the style it has when the profile names one this app has no way to draw', () => {
 		expect(profileToLocal({musicLibraryStyle: 'bookstore'})).toEqual({});
+	});
+});
+
+describe('the book library style', () => {
+	test('defaults to bookstore', () => {
+		expect(defaultSettings.bookLibraryStyle).toBe('bookstore');
+	});
+
+	test('takes and sends each style under its own name', () => {
+		['classic', 'readingRoom', 'bookstore'].forEach((style) => {
+			expect(profileToLocal({bookLibraryStyle: style})).toEqual({bookLibraryStyle: style});
+			expect(localToProfile({...defaultSettings, bookLibraryStyle: style}, ['bookLibraryStyle'])).toEqual({bookLibraryStyle: style});
+		});
+	});
+
+	test('keeps the style it has when the profile names one this app has no way to draw', () => {
+		expect(profileToLocal({bookLibraryStyle: 'immersive'})).toEqual({});
+	});
+});
+
+describe('the keyboard style', () => {
+	test('defaults to docked', () => {
+		expect(defaultSettings.keyboardStyle).toBe('docked');
+		expect(defaultSettings).not.toHaveProperty('preferSystemImeKeyboard');
+	});
+
+	test('takes and sends each style under its own name', () => {
+		['native', 'classic', 'glass', 'docked'].forEach((style) => {
+			expect(profileToLocal({keyboardStyle: style})).toEqual({keyboardStyle: style});
+			expect(localToProfile({...defaultSettings, keyboardStyle: style}, ['keyboardStyle'])).toEqual({keyboardStyle: style});
+		});
+	});
+
+	test('keeps the style it has when the profile names one this app has no way to draw', () => {
+		expect(profileToLocal({keyboardStyle: 'floating'})).toEqual({});
+	});
+
+	test('turns a stored Prefer System Keyboard into the native style once', () => {
+		const stored = {preferSystemImeKeyboard: true};
+		expect(migrateKeyboardStyle(stored)).toBe(true);
+		expect(stored).toEqual({keyboardStyle: 'native'});
+		expect(migrateKeyboardStyle(stored)).toBe(false);
+		expect(stored).toEqual({keyboardStyle: 'native'});
+	});
+
+	test('leaves a picked style alone and lets the switch turned off take the default', () => {
+		const picked = {preferSystemImeKeyboard: true, keyboardStyle: 'glass'};
+		expect(migrateKeyboardStyle(picked)).toBe(true);
+		expect(picked).toEqual({keyboardStyle: 'glass'});
+		const off = {preferSystemImeKeyboard: false};
+		expect(migrateKeyboardStyle(off)).toBe(true);
+		expect(off).toEqual({});
+		expect(migrateKeyboardStyle({})).toBe(false);
 	});
 });
 

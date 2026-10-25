@@ -1,4 +1,4 @@
-import {clearCapabilitiesCache, detectXboxVersion, getDeviceCapabilities, getDeviceName, getJellyfinDeviceProfile} from '../../../platform-xbox/src/deviceProfile';
+import {clearCapabilitiesCache, detectXboxVersion, getDeviceCapabilities, getDeviceName, getH264FallbackProfile, getJellyfinDeviceProfile} from '../../../platform-xbox/src/deviceProfile';
 import {getPlayMethod, notePlaybackError, resumesAfterFirstFrame} from '../../../platform-xbox/src/video';
 
 // Chromium with the HEVC decoder present
@@ -219,7 +219,7 @@ describe('the profile with the console player', () => {
 		const profile = await getJellyfinDeviceProfile();
 		expect(profile.DirectPlayProfiles.find((entry) => entry.Container === 'mkv').AudioCodec).toContain('dts,truehd');
 		expect(profile.DirectPlayProfiles.some((entry) => entry.Container === 'webm')).toBe(true);
-		expect(profile.DirectPlayProfiles.some((entry) => entry.Container === 'ts')).toBe(true);
+		expect(profile.DirectPlayProfiles.some((entry) => entry.Container === 'ts,mpegts')).toBe(true);
 		expect(profile.DirectPlayProfiles.some((entry) => entry.Container === 'hls')).toBe(true);
 		const range = profile.CodecProfiles.find((entry) => entry.Codec === 'hevc').Conditions.find((condition) => condition.Property === 'VideoRangeType');
 		expect(range.Value).toBe('SDR|HDR10|HDR10Plus|DOVIWithHDR10|DOVIWithHDR10Plus|DOVIWithEL|DOVIWithELHDR10Plus|DOVIInvalid');
@@ -244,10 +244,11 @@ describe('the profile with the console player', () => {
 
 	test('transcodes to 7.1 AAC in fMP4 for the console player and stereo TS for the WebView', async () => {
 		await capabilitiesFor(nativeBoot());
-		expect((await getJellyfinDeviceProfile()).TranscodingProfiles[0]).toMatchObject({Protocol: 'hls', Container: 'mp4', AudioCodec: 'aac', MaxAudioChannels: '8'});
+		expect((await getJellyfinDeviceProfile()).TranscodingProfiles[0]).toMatchObject({Protocol: 'hls', Container: 'mp4', AudioCodec: 'aac', VideoCodec: 'h264,hevc', MaxAudioChannels: '8'});
+		expect((await getH264FallbackProfile()).TranscodingProfiles[0]).toMatchObject({Container: 'mp4', VideoCodec: 'h264'});
 		window.localStorage.setItem('moonfin_settings', JSON.stringify({xboxNativePlayer: false}));
 		await capabilitiesFor(nativeBoot());
-		expect((await getJellyfinDeviceProfile()).TranscodingProfiles[0]).toMatchObject({Protocol: 'hls', Container: 'ts', MaxAudioChannels: '2'});
+		expect((await getJellyfinDeviceProfile()).TranscodingProfiles[0]).toMatchObject({Protocol: 'hls', Container: 'ts', VideoCodec: 'h264', MaxAudioChannels: '2'});
 	});
 
 	test('turned off, the WebView answers as before', async () => {

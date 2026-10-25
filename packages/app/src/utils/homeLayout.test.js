@@ -220,6 +220,28 @@ describe('picked rows in the layout', () => {
 	});
 });
 
+describe('Seerr slider rows in the layout', () => {
+	const slider = {
+		kind: 'pluginDynamic',
+		type: 'none',
+		enabled: true,
+		order: 1,
+		serverId: 'http://server:8096/',
+		pluginSource: 'seerr',
+		pluginSection: '7',
+		pluginAdditionalData: '18',
+		pluginDisplayText: 'A24 Films'
+	};
+	const sliderId = 'pluginDynamic:seerr:http://server:8096:7:18';
+
+	test('a slider put on Home by another client becomes a row under the id that client gave it, and goes back the same way', () => {
+		const rows = homeRowsFromProfile({homeSections: [{type: 'resume', enabled: true, order: 0}, slider]});
+		expect(rowById(rows, sliderId)).toMatchObject({name: 'A24 Films', source: 'seerr', sliderId: '7', sliderType: '18'});
+		expect(homeRowsToSections(rows)).toContainEqual({...slider, serverId: 'http://server:8096'});
+		expect(homeRowsToRowOrder(rows)).toEqual(['resume']);
+	});
+});
+
 describe('the seasonal row in a saved layout', () => {
 	test('a layout that lacks it gets it switched off unless its toggle says on', () => {
 		const saved = [{id: 'resume', enabled: true, order: 0}];

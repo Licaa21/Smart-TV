@@ -10,14 +10,7 @@ const PIN_FREE_ATTEMPTS = 5;
 const PIN_LOCKOUT_STEP_MS = 30 * 1000;
 export const PIN_MAX_LOCKOUT_MS = 15 * 60 * 1000;
 
-// Where each PIN keeps its hash and its counters. There is one settings blob for the television
-// rather than one per account, so the two codes are kept apart by their keys.
-export const SIGN_IN_PIN = {
-	hash: 'pinCodeHash',
-	failed: 'pinFailedAttempts',
-	until: 'pinLockedUntil'
-};
-
+// Where the Kids Mode PIN keeps its hash and its counters in the settings.
 export const KIDS_PIN = {
 	hash: 'kidsPinHash',
 	failed: 'kidsPinFailedAttempts',

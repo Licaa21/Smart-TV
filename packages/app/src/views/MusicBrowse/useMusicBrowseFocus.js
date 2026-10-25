@@ -7,8 +7,9 @@ const FOCUS_ATTEMPTS = 6;
 
 // Owns the scroller, the node elements and the focus calls. Every callback here
 // is identity stable because MediaRow's memo comparator ignores callbacks, so an
-// unstable one would leave a row holding a stale closure.
-const useMusicBrowseFocus = (chain) => {
+// unstable one would leave a row holding a stale closure. An `idForNode` passed
+// in has to be stable too.
+const useMusicBrowseFocus = (chain, idForNode = spotlightIdForNode) => {
 	const scrollerRef = useRef(null);
 	const nodeRefs = useRef(new Map());
 	const chainRef = useRef(chain);
@@ -26,7 +27,7 @@ const useMusicBrowseFocus = (chain) => {
 	}, []);
 
 	const focusNode = useCallback((node) => {
-		const id = spotlightIdForNode(node);
+		const id = idForNode(node);
 		if (!id) return;
 		lastNodeRef.current = node;
 		// Scroll first: focusing something offscreen lets the browser scroll it in
@@ -42,7 +43,7 @@ const useMusicBrowseFocus = (chain) => {
 			if (attempts < FOCUS_ATTEMPTS) rafRef.current = window.requestAnimationFrame(tryFocus);
 		};
 		rafRef.current = window.requestAnimationFrame(tryFocus);
-	}, [scrollToNode]);
+	}, [scrollToNode, idForNode]);
 
 	useEffect(() => () => {
 		if (rafRef.current) window.cancelAnimationFrame(rafRef.current);

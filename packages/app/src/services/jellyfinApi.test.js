@@ -1,4 +1,4 @@
-import {api, createApiForServer, setServer, setServerType, setAuth, reportCapabilities, resolveItemsByProviderIds, resetLibraryIndexForTests} from './jellyfinApi';
+import {api, createApiForServer, getUserId, setServer, setServerType, setAuth, reportCapabilities, resolveItemsByProviderIds, resetLibraryIndexForTests} from './jellyfinApi';
 import {platformFetch} from './secureFetch';
 
 jest.mock('./secureFetch', () => ({platformFetch: jest.fn()}));
@@ -205,5 +205,30 @@ describe('reads made as the app starts', () => {
 		expect(capabilityReports()).toHaveLength(0);
 		reportCapabilities();
 		expect(capabilityReports()).toHaveLength(1);
+	});
+});
+
+describe('creating a playlist', () => {
+	const sentBody = () => {
+		const [, options] = platformFetch.mock.calls.find(([url]) => url.includes('/Playlists'));
+		return JSON.parse(options.body);
+	};
+
+	test('makes it private on Jellyfin', async () => {
+		setServerType('jellyfin');
+		await api.createPlaylist('Mix', ['a', 'b']);
+		expect(sentBody()).toEqual({Name: 'Mix', Ids: ['a', 'b'], UserId: getUserId(), IsPublic: false});
+	});
+
+	test('sends Emby the items as a comma list', async () => {
+		setServerType('emby');
+		await api.createPlaylist('Mix', ['a', 'b']);
+		expect(sentBody()).toEqual({Name: 'Mix', Ids: 'a,b', UserId: getUserId()});
+	});
+
+	test('follows the type of the server it was made for', async () => {
+		setServerType('jellyfin');
+		await createApiForServer('http://other', 'tok', 'u2', 'emby').createPlaylist('Mix', ['a']);
+		expect(sentBody()).toEqual({Name: 'Mix', Ids: 'a', UserId: 'u2'});
 	});
 });

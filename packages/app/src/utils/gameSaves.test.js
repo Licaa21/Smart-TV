@@ -1,7 +1,8 @@
-jest.mock('../services/gamesApi', () => ({getStateBytes: jest.fn(), putStateBytes: jest.fn()}));
+jest.mock('../services/gamesApi', () => ({getStateBytes: jest.fn(), putStateBytes: jest.fn(), getSram: jest.fn(), putSram: jest.fn()}));
+jest.mock('../services/jellyfinApi', () => ({getServerUrl: () => 'https://server', getUserId: () => 'user'}));
 
 import * as gamesApi from '../services/gamesApi';
-import {gameStateKey, loadGameStateWithMigration} from './gameSaves';
+import {gameStateKey, loadGameStateWithMigration, loadSram, saveSram} from './gameSaves';
 
 describe('gameStateKey', () => {
 	it('namespaces EmulatorJS save states by core', () => {
@@ -66,5 +67,48 @@ describe('loadGameStateWithMigration', () => {
 
 		await expect(loadGameStateWithMigration('game1', 'arcade')).rejects.toMatchObject({status: 500});
 		expect(gamesApi.putStateBytes).not.toHaveBeenCalled();
+	});
+});
+
+describe('battery saves', () => {
+	beforeEach(() => {
+		window.localStorage.clear();
+		gamesApi.getSram.mockReset();
+		gamesApi.putSram.mockReset();
+	});
+
+	it('downloads the server copy when nothing is waiting to upload', async () => {
+		gamesApi.getSram.mockResolvedValue(new Uint8Array([1]));
+
+		expect(Array.from(await loadSram('g1'))).toEqual([1]);
+		expect(gamesApi.putSram).not.toHaveBeenCalled();
+	});
+
+	it('reads a failed download as no battery save', async () => {
+		gamesApi.getSram.mockRejectedValue(new Error('network'));
+
+		await expect(loadSram('g1')).resolves.toBeNull();
+	});
+
+	it('keeps a failed upload and sends it before the next launch instead of downloading', async () => {
+		gamesApi.putSram.mockRejectedValueOnce(new Error('network'));
+		await saveSram('g1', new Uint8Array([5, 6]));
+
+		gamesApi.putSram.mockResolvedValueOnce(undefined);
+		const loaded = await loadSram('g1');
+
+		expect(Array.from(loaded)).toEqual([5, 6]);
+		expect(Array.from(gamesApi.putSram.mock.calls[1][1])).toEqual([5, 6]);
+		expect(gamesApi.getSram).not.toHaveBeenCalled();
+
+		gamesApi.getSram.mockResolvedValue(null);
+		await loadSram('g1');
+		expect(gamesApi.getSram).toHaveBeenCalled();
+	});
+
+	it('skips an empty battery save', async () => {
+		await saveSram('g1', null);
+
+		expect(gamesApi.putSram).not.toHaveBeenCalled();
 	});
 });

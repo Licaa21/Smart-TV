@@ -4,7 +4,8 @@ import {DEFAULT_HOME_ROWS} from '../../context/SettingsContext';
 import {createApiForServer} from '../../services/jellyfinApi';
 import {SEERR_CONFIG_TO_SECTION} from '../../utils/seerrHomeRows';
 import {getGenresIncludeTypes} from '../../utils/homeRowSorting';
-import {makePickedRow, serverKey} from '../../utils/pickedRows';
+import {makePickedRow, makeSeerrSliderRow, serverKey} from '../../utils/pickedRows';
+import {loadDiscoverSliders, reconcileSliderRows} from '../../utils/seerrSliders';
 import {isHomeRowVisibleByGates, mergeFoundRows} from './homeSectionsModel';
 import {editedListKey} from './settingsRows';
 
@@ -91,6 +92,17 @@ const useHomeRowsEditor = ({api, serverUrl, servers, settings, updateSetting, up
 		toggleHomeRowEnabled(SEERR_CONFIG_TO_SECTION[rowId] || rowId);
 	}, [toggleHomeRowEnabled]);
 
+	// A slider put on Home for the first time joins the end. One taken off keeps its entry, so a
+	// layout synced from a device that still has it doesn't bring it back on.
+	const toggleSeerrSlider = useCallback((slider) => {
+		const current = Array.isArray(settings.homeRows) ? settings.homeRows : [];
+		const entry = makeSeerrSliderRow({serverUrl, sliderId: slider.id, sliderType: slider.type, name: slider.title}, true, current.length);
+		const existing = current.find((row) => row.id === entry.id);
+		updateSetting('homeRows', existing
+			? current.map((row) => (row.id === entry.id ? {...row, enabled: !row.enabled} : row))
+			: [...current, entry]);
+	}, [serverUrl, settings.homeRows, updateSetting]);
+
 	const openHomeRows = useCallback(() => {
 		const rows = [...(settings.homeRows || DEFAULT_HOME_ROWS)].sort((a, b) => a.order - b.order);
 		openedRef.current = editedListKey(rows);
@@ -103,12 +115,17 @@ const useHomeRowsEditor = ({api, serverUrl, servers, settings, updateSetting, up
 			.then((result) => setServerHasLiveTv((result?.Items || []).length > 0))
 			.catch(() => {});
 
-		findPickableRows({api, serverUrl, servers, settings})
-			.catch(() => [])
-			.then((found) => {
-				const merged = mergeFoundRows(rows, found);
-				// A pick the server dropped or renamed is saved right away, whatever happens to the rest
-				if (merged.changed) updateSetting('homeRows', withOrder(merged.rows));
+		// A failed slider read leaves the slider rows alone, rather than reading as Seerr having none
+		// and dropping them all.
+		Promise.all([
+			findPickableRows({api, serverUrl, servers, settings}).catch(() => []),
+			settings.useMoonfinPlugin ? loadDiscoverSliders({force: true}).catch(() => null) : null
+		])
+			.then(([found, sliders]) => {
+				const reconciled = sliders ? reconcileSliderRows(rows, sliders, serverUrl) : {rows, changed: false};
+				const merged = mergeFoundRows(reconciled.rows, found);
+				// A pick or slider the server dropped or renamed is saved right away, whatever happens to the rest
+				if (merged.changed || reconciled.changed) updateSetting('homeRows', withOrder(merged.rows));
 				openedRef.current = editedListKey(merged.rows);
 				foundRef.current = {rows: found, added: new Set(merged.added.map((row) => row.id))};
 				setTempHomeRows(withOrder([...merged.rows, ...merged.added]));
@@ -172,6 +189,7 @@ const useHomeRowsEditor = ({api, serverUrl, servers, settings, updateSetting, up
 		serverHasLiveTv,
 		toggleHomeRowEnabled,
 		toggleSeerrHomeRow,
+		toggleSeerrSlider,
 		openHomeRows,
 		commitHomeRows,
 		resetHomeRows,

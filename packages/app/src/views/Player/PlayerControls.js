@@ -7,6 +7,8 @@ import TrickplayPreview from '../../components/TrickplayPreview';
 import {isTrickplayOn} from '../../utils/trickplayLayout';
 import SubtitleOffsetOverlay from './SubtitleOffsetOverlay';
 import SubtitleSettingsOverlay from './SubtitleSettingsOverlay';
+import SecondarySubtitleSettingsOverlay from './SecondarySubtitleSettingsOverlay';
+import SubtitleFetchIndicator, {useSubtitleFetchShown} from './SubtitleFetchIndicator';
 import {getPlatform} from '../../platform';
 import {ModalContainer} from '../../utils/spotlightContainers';
 import {numberedTrackName, sortSubtitleStreams, subtitleTrackDetail, audioTrackDetail} from '../../utils/trackLabels';
@@ -19,9 +21,13 @@ import {
 	IconPlay, IconPause, IconRewind, IconForward, IconSubtitle, IconSubtitleOff, IconAudio,
 	IconChapters, IconEpisodes, IconPrevious, IconNext, IconQuality, IconInfo, IconCast, IconZoom,
 	IconShuffle, IconRepeat, IconRepeatOne, IconSleep, IconGuide, IconChannels,
-	IconFavorite, IconFavoriteFilled, IconPlaylistAdd, IconLyrics, IconQueueMusic
+	IconFavorite, IconFavoriteFilled, IconPlaylistAdd, IconLyrics, IconQueueMusic, IconLiveRewind, IconLiveForward,
+	IconLivePlay, IconLivePause, IconLiveTv, IconRecord, IconSeriesRecord, LIVE_RED
 } from './PlayerConstants';
+import {MARK_SKIPPED_GREY} from '../LiveTV/GuideIcons';
+import LiveRecordingDialog, {LiveRecordingToast} from './LiveRecordingDialog';
 import {formatClockTime} from '../../utils/clock';
+import {AT_LIVE_SECONDS} from './liveWindow';
 import {episodeLine} from '../../utils/liveTvGuide';
 import {chapterMarkerPositions} from '../../utils/chapterMarkers';
 import {keepFocusInView} from '../../utils/focusScroll';
@@ -34,10 +40,10 @@ import audioCss from './audio/AudioMode.module.less';
 
 export const usePlayerButtons = ({
 	isPaused, audioStreams, subtitleStreams, chapters,
-	nextEpisode, isAudioMode, isLiveTV, hasNextTrack, hasPrevTrack,
+	nextEpisode, isAudioMode, isLiveTV, liveRewind, atLive, hasNextTrack, hasPrevTrack,
 	shuffleMode, repeatMode, selectedQuality,
 	selectedSubtitleIndex, canDownloadRemoteSubtitles, hasCastMembers, zoomModeLabel, zoomModeKey,
-	sleepMinutes, canBrowseEpisodes = false, isFavorite, hasLyrics, audioPanel
+	sleepMinutes, canBrowseEpisodes = false, isFavorite, hasLyrics, audioPanel, recordable, recordMark
 }) => {
 	const {settings} = useSettings();
 	const topButtons = useMemo(() => {
@@ -68,12 +74,16 @@ export const usePlayerButtons = ({
 				);
 			}
 		} else {
-			buttons.push(
-				{id: 'playPause', icon: isPaused ? <IconPlay /> : <IconPause />, label: isPaused ? $L('Play') : $L('Pause'), action: 'playPause'}
-			);
+			const playPause = {id: 'playPause', icon: isPaused ? <IconLivePlay /> : <IconLivePause />, label: isPaused ? $L('Play') : $L('Pause'), action: 'playPause'};
+			buttons.push(...(liveRewind ? [
+				{id: 'rewind', icon: <IconLiveRewind />, label: $L('Seek back'), action: 'rewind'},
+				playPause,
+				{id: 'forward', icon: <IconLiveForward />, label: $L('Seek forward'), action: 'forward'},
+				{id: 'jumpToLive', icon: <IconLiveTv color={atLive ? LIVE_RED : undefined} />, label: $L('Jump to Live'), action: 'jumpToLive'}
+			] : [playPause]));
 		}
 		return buttons;
-	}, [isPaused, isAudioMode, isLiveTV, nextEpisode, hasNextTrack, hasPrevTrack, shuffleMode, repeatMode]);
+	}, [isPaused, isAudioMode, isLiveTV, liveRewind, atLive, nextEpisode, hasNextTrack, hasPrevTrack, shuffleMode, repeatMode]);
 
 	const osdOrder = settings[OSD_ORDER_KEY];
 	const osdHidden = settings[OSD_HIDDEN_KEY];
@@ -102,6 +112,14 @@ export const usePlayerButtons = ({
 				{id: 'quality', icon: <IconQuality />, label: $L('Playback Quality'), action: 'quality'},
 				{id: 'zoom', icon: <IconZoom />, label: $L('Zoom').concat(` (${zoomModeLabel})`), action: 'zoom', active: zoomModeKey !== 'fit'},
 				{id: 'sleep', icon: <IconSleep />, label: $L('Sleep timer'), action: 'sleep', active: sleepMinutes != null},
+				...(recordable ? [{
+					id: 'record',
+					icon: recordMark === 'series' || recordMark === 'skipped'
+						? <IconSeriesRecord color={recordMark === 'series' ? LIVE_RED : MARK_SKIPPED_GREY} />
+						: <IconRecord color={recordMark === 'record' ? LIVE_RED : undefined} />,
+					label: recordMark && recordMark !== 'skipped' ? $L('Cancel Recording') : $L('Record'),
+					action: 'record'
+				}] : []),
 				{id: 'info', icon: <IconInfo />, label: $L('Playback Information'), action: 'info'}
 			], {order: osdOrder, hidden: osdHidden});
 		}
@@ -119,7 +137,7 @@ export const usePlayerButtons = ({
 			{id: 'sleep', icon: <IconSleep />, label: $L('Sleep timer'), action: 'sleep', active: sleepMinutes != null},
 			{id: 'info', icon: <IconInfo />, label: $L('Playback Information'), action: 'info'}
 		], {order: osdOrder, hidden: osdHidden, catalogue: OSD_BUTTONS});
-	}, [audioStreams.length, chapters.length, canBrowseEpisodes, subtitleStreams.length, isAudioMode, isLiveTV, selectedQuality, selectedSubtitleIndex, canDownloadRemoteSubtitles, hasCastMembers, zoomModeLabel, zoomModeKey, sleepMinutes, osdOrder, osdHidden, isFavorite, hasLyrics, audioPanel]);
+	}, [audioStreams.length, chapters.length, canBrowseEpisodes, subtitleStreams.length, isAudioMode, isLiveTV, selectedQuality, selectedSubtitleIndex, canDownloadRemoteSubtitles, hasCastMembers, zoomModeLabel, zoomModeKey, sleepMinutes, osdOrder, osdHidden, isFavorite, hasLyrics, audioPanel, recordable, recordMark]);
 
 	return {topButtons, bottomButtons};
 };
@@ -152,6 +170,7 @@ const PlayerControls = ({
 	isHdrContent = false,
 	activeModal,
 	isAudioMode,	isLiveTV,	focusRow,
+	liveWindow,
 	title,
 	subtitle,
 	logoUrl,
@@ -202,10 +221,21 @@ const PlayerControls = ({
 	castMembers,
 	isLoadingCastMembers,
 	handleSubtitleOffsetChange,
+	secondarySubtitleIndex,
+	secondarySubtitleStreams,
+	secondarySubtitleOffset,
+	secondarySubtitleTrackEvents,
+	handleChooseSubtitleSlot,
+	handleSelectSecondarySubtitle,
+	handleOpenSecondarySubtitleOffset,
+	handleOpenSecondarySubtitleSettings,
+	handleSecondarySubtitleOffsetChange,
+	subtitleFetching,
 	closeModal,
 	stopPropagation,
 	transcodeForced,
-	videoRef
+	videoRef,
+	liveRecording
 }) => {
 	const { settings } = useSettings();
 	const isTizenPlatform = getPlatform() === 'tizen';
@@ -256,6 +286,14 @@ const PlayerControls = ({
 	// nothing to report instead.
 	const remoteSubtitleBusy = isSearchingRemoteSubtitles || isDownloadingRemoteSubtitle;
 	const showRemoteSubtitleResults = !remoteSubtitleBusy && !remoteSubtitleError;
+	const showSubtitleFetch = useSubtitleFetchShown(subtitleFetching) && !isAudioMode;
+	const controlsShown = controlsVisible && !activeModal;
+
+	const subtitleSlotLabel = (index) => {
+		const stream = subtitleStreams.find((s) => s.index === index);
+		if (!stream) return $L('None');
+		return stream.displayTitle || stream.language || $L('Subtitle');
+	};
 
 	// Every button carries its own tooltip and the stylesheet reveals the focused one,
 	// so moving along the row doesn't re-render anything.
@@ -329,7 +367,7 @@ const PlayerControls = ({
 
 	return (
 		<>
-			<div className={`${css.playerControls} ${controlsVisible && !activeModal ? css.visible : ''} ${isAudioMode ? css.audioControls : ''}`}>
+			<div className={`${css.playerControls} ${controlsShown ? css.visible : ''} ${isAudioMode ? css.audioControls : ''}`}>
 				{!isAudioMode && (
 				<div className={css.controlsTop}>
 					{isLiveTV ? (
@@ -367,29 +405,57 @@ const PlayerControls = ({
 				)}
 
 				<div className={css.controlsBottom} data-player-controls-bottom>
+					{showSubtitleFetch && controlsShown && <SubtitleFetchIndicator />}
 					{isLiveTV && (() => {
-						// The live timeline is the current program's span, not a seek bar.
-						// Without guide data it falls back to a clock and a LIVE tag.
+						// With a rewind window the bar runs from its start to the live point, the left
+						// label is the time of day being watched and the right one how far behind live
+						// it is. Otherwise it's the current program's span, or a clock and a LIVE tag
+						// without guide data.
 						const now = Date.now();
-						const start = liveProgram ? new Date(liveProgram.StartDate) : null;
-						const end = liveProgram ? new Date(liveProgram.EndDate) : null;
-						const progress = start && end
-							? Math.max(0, Math.min(1, (now - start.getTime()) / (end.getTime() - start.getTime())))
-							: 0;
 						const programEpisodeLine = episodeLine(liveProgram);
+						let progress = 0;
+						let startLabel;
+						let endLabel;
+						if (liveWindow) {
+							const behind = Math.max(0, liveWindow.edge - displayTime);
+							progress = Math.max(0, Math.min(1, (displayTime - liveWindow.start) / (liveWindow.edge - liveWindow.start)));
+							startLabel = formatClockTime(new Date(now - behind * 1000), settings.clockDisplay);
+							endLabel = behind <= AT_LIVE_SECONDS ? $L('LIVE') : `-${formatTime(behind)}`;
+						} else {
+							const start = liveProgram ? new Date(liveProgram.StartDate) : null;
+							const end = liveProgram ? new Date(liveProgram.EndDate) : null;
+							if (start && end) {
+								progress = Math.max(0, Math.min(1, (now - start.getTime()) / (end.getTime() - start.getTime())));
+							}
+							startLabel = formatClockTime(start || new Date(), settings.clockDisplay);
+							endLabel = end ? formatClockTime(end, settings.clockDisplay) : $L('LIVE');
+						}
 						return (
 							<div className={css.liveTimeline}>
 								{programEpisodeLine && (
 									<div className={css.liveEpisodeTitle}>{programEpisodeLine}</div>
 								)}
-								<div className={css.liveProgressTrack}>
-									{liveProgram && (
-										<div className={css.liveProgressFill} style={{width: `${progress * 100}%`}} />
-									)}
-								</div>
+								{liveWindow ? (
+									<SpottableDiv
+										className={css.progressBar}
+										onKeyDown={handleProgressKeyDown}
+										onBlur={handleProgressBlur}
+										spotlightDisabled={focusRow !== 'progress'}
+										spotlightId="progress-bar"
+									>
+										<div className={css.progressFill} style={{transform: `scaleX(${progress})`, WebkitTransform: `scaleX(${progress})`}} />
+										<div className={css.seekIndicator} style={{left: `${progress * 100}%`}} />
+									</SpottableDiv>
+								) : (
+									<div className={css.liveProgressTrack}>
+										{liveProgram && (
+											<div className={css.liveProgressFill} style={{width: `${progress * 100}%`}} />
+										)}
+									</div>
+								)}
 								<div className={css.liveTimeLabels}>
-									<span>{formatClockTime(start || new Date(), settings.clockDisplay)}</span>
-									<span>{end ? formatClockTime(end, settings.clockDisplay) : $L('LIVE')}</span>
+									<span>{startLabel}</span>
+									<span>{endLabel}</span>
 								</div>
 							</div>
 						);
@@ -531,6 +597,63 @@ const PlayerControls = ({
 				</div>
 			)}
 
+			{showSubtitleFetch && !controlsShown && <SubtitleFetchIndicator standalone />}
+
+			{activeModal === 'subtitleSlot' && (
+				<div className={css.trackModal} onClick={closeModal}>
+					<ModalContainer className={css.modalContent} onClick={stopPropagation} data-modal="subtitleSlot" spotlightId="subtitleSlot-modal">
+						<h2 className={css.modalTitle}>{$L('Subtitles')}</h2>
+						<div className={css.trackList}>
+							<TrackOptionRow
+								label={$L('Primary')}
+								detail={subtitleSlotLabel(selectedSubtitleIndex)}
+								data-slot="primary"
+								onClick={handleChooseSubtitleSlot}
+							/>
+							<TrackOptionRow
+								label={$L('Secondary')}
+								detail={subtitleSlotLabel(secondarySubtitleIndex)}
+								data-slot="secondary"
+								onClick={handleChooseSubtitleSlot}
+							/>
+							<TrackDivider />
+							<TrackOptionRow label={$L('Cancel')} dimmed onClick={closeModal} />
+						</div>
+					</ModalContainer>
+				</div>
+			)}
+
+			{activeModal === 'secondarySubtitle' && (
+				<div className={css.trackModal} onClick={closeModal}>
+					<ModalContainer className={css.modalContent} onClick={stopPropagation} data-modal="secondarySubtitle" spotlightId="secondarySubtitle-modal">
+						<h2 className={css.modalTitle}>{$L('Secondary Subtitle Track')}</h2>
+						<div className={css.trackList}>
+							<TrackOptionRow
+								label={$L('None')}
+								selected={secondarySubtitleIndex == null}
+								data-index={-1}
+								onClick={handleSelectSecondarySubtitle}
+							/>
+							{secondarySubtitleStreams.map((stream, i) => (
+								<TrackOptionRow
+									key={stream.index}
+									label={numberedTrackName(i + 1, stream.displayTitle, $L('Subtitle'))}
+									detail={subtitleTrackDetail({name: stream.displayTitle, codec: stream.codec, language: stream.language, isExternal: stream.isExternal, deliveryMethod: stream.deliveryMethod, isForced: stream.isForced, isHearingImpaired: stream.isHearingImpaired})}
+									selected={stream.index === secondarySubtitleIndex}
+									data-index={stream.index}
+									onClick={handleSelectSecondarySubtitle}
+								/>
+							))}
+							<TrackDivider />
+							<TrackOptionRow label={$L('Offset')} spotlightId="btn-secondary-subtitle-offset" onClick={handleOpenSecondarySubtitleOffset} />
+							<TrackOptionRow label={$L('Appearance')} spotlightId="btn-secondary-subtitle-appearance" onClick={handleOpenSecondarySubtitleSettings} />
+							<TrackDivider />
+							<TrackOptionRow label={$L('Cancel')} dimmed onClick={closeModal} />
+						</div>
+					</ModalContainer>
+				</div>
+			)}
+
 			{activeModal === 'subtitleDownload' && (
 				<div className={css.trackModal} onClick={closeModal}>
 					<ModalContainer className={css.modalContent} onClick={stopPropagation} data-modal="subtitleDownload" spotlightId="subtitleDownload-modal">
@@ -580,6 +703,17 @@ const PlayerControls = ({
 					</ModalContainer>
 				</div>
 			)}
+
+			{activeModal === 'record' && liveRecording?.available && (
+				<LiveRecordingDialog
+					css={css}
+					recording={liveRecording}
+					clockDisplay={settings.clockDisplay}
+					onClose={closeModal}
+					stopPropagation={stopPropagation}
+				/>
+			)}
+			<LiveRecordingToast toast={liveRecording?.toast} onDone={liveRecording?.clearToast} />
 
 			{activeModal === 'sleep' && (
 				<div className={css.trackModal} onClick={closeModal}>
@@ -750,6 +884,24 @@ const PlayerControls = ({
 					subtitleTrackEvents={subtitleTrackEvents}
 					onClose={closeModal}
 					onOffsetChange={handleSubtitleOffsetChange}
+				/>
+			)}
+
+			{activeModal === 'secondarySubtitleOffset' && (
+				<SubtitleOffsetOverlay
+					visible
+					currentOffset={secondarySubtitleOffset}
+					currentTime={currentTime}
+					subtitleTrackEvents={secondarySubtitleTrackEvents}
+					onClose={closeModal}
+					onOffsetChange={handleSecondarySubtitleOffsetChange}
+				/>
+			)}
+
+			{activeModal === 'secondarySubtitleSettings' && (
+				<SecondarySubtitleSettingsOverlay
+					onClose={closeModal}
+					isHdr={isHdrContent}
 				/>
 			)}
 

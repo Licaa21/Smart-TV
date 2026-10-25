@@ -5,15 +5,17 @@ import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDeco
 import Spotlight from '@enact/spotlight';
 import {VirtualGridList} from '@enact/sandstone/VirtualList';
 
+import {GameBoxArt} from '../../components/GameCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
 import BackdropLayer from '../../components/BackdropLayer';
 import * as gamesApi from '../../services/gamesApi';
 import {useSettings} from '../../context/SettingsContext';
-import {gameDisplayTitle, gameFallbackColor, hideBrokenArt} from '../../utils/gameArt';
+import useQuickReturnGrid from '../../hooks/useQuickReturnGrid';
+import {boxArtCell, boxArtNeedsFill, gameDisplayTitle, gameFallbackColor, medianAspect, saveGridAspect, savedGridAspect} from '../../utils/gameArt';
 import {buildGameIndex, gameIndexMatches, gameQueryWords} from '../../utils/gameBrowse';
-import {LETTERS, createGridKeyDown, createToolbarKeyDown, focusOverhang, horizontalCellPad} from '../../utils/gridChrome';
-import {KEYS} from '../../utils/keys';
+import {LETTERS, createGridKeyDown, createToolbarKeyDown, focusOverhang, horizontalCellPad, pageGrid} from '../../utils/gridChrome';
+import {KEYS, pageDirection} from '../../utils/keys';
 
 import css from './GameSystem.module.less';
 
@@ -31,17 +33,31 @@ const GRID_INSET = 140;
 // The least room a row leaves between two cards, which the two title lines need
 // more of than a poster grid does.
 const MIN_ROW_GAP = 10;
-// A cover stands 1.34 times its own width, with the title underneath.
+// A portrait card's width. The grid's box art shape widens or shortens it.
 const CARD_WIDTH = 145;
-const COVER_HEIGHT = Math.round(CARD_WIDTH * 1.34);
 const CAPTION_HEIGHT = 70;
-const CARD_HEIGHT = COVER_HEIGHT + CAPTION_HEIGHT;
 
 // What the backdrop tries in turn.
 const BACKDROP_KINDS = ['snap', 'title', 'boxart'];
 
 const handleToolbarKeyDown = createToolbarKeyDown('game-grid', 'game-search');
 const handleGridKeyDown = createGridKeyDown(css.grid, 'game-back-btn');
+
+// The element the grid scrolls in, which the list doesn't hand out.
+const scrollerOf = (node) => {
+	for (let el = node.parentElement; el; el = el.parentElement) {
+		const overflow = window.getComputedStyle(el).overflowY;
+		if (overflow === 'scroll' || overflow === 'auto') return el;
+	}
+	return null;
+};
+
+// A card scrolled to is drawn a frame or two later, so this waits for it.
+const focusCard = (index, attempts = 12) => window.requestAnimationFrame(() => {
+	const node = document.querySelector(`[data-spotlight-id="game-grid"] [data-index="${index}"]`);
+	if (node) Spotlight.focus(node);
+	else if (attempts > 0) focusCard(index, attempts - 1);
+});
 
 const GameSystem = ({library, system, onSelectGame, onBack, backHandlerRef}) => {
 	const {settings} = useSettings();
@@ -53,6 +69,9 @@ const GameSystem = ({library, system, onSelectGame, onBack, backHandlerRef}) => 
 	const [focusedGame, setFocusedGame] = useState(null);
 	const [detail, setDetail] = useState(null);
 	const [backdropUrl, setBackdropUrl] = useState('');
+	const [aspects, setAspects] = useState(null);
+	const [gridAspect, setGridAspect] = useState(null);
+	const {getScrollTo, scrollTo} = useQuickReturnGrid('game-grid');
 
 	const libraryId = library?.Id;
 	const systemId = system?.id;
@@ -77,6 +96,31 @@ const GameSystem = ({library, system, onSelectGame, onBack, backHandlerRef}) => 
 				setError(e?.message || $L('Failed to load games'));
 				setLoading(false);
 			});
+		return () => { cancelled = true; };
+	}, [libraryId, systemId]);
+
+	// Every card takes the system's middle box art shape. The grid keeps the shape it had last time
+	// and saves any new one for the next visit, so only a first visit changes shape once the sizes
+	// come in.
+	useEffect(() => {
+		if (!libraryId || !systemId) return undefined;
+		let cancelled = false;
+		const scope = `${libraryId}/${systemId}`;
+		setAspects(null);
+		setGridAspect(savedGridAspect(scope));
+		gamesApi.getBoxArtAspects(libraryId, systemId).then((found) => {
+			if (cancelled) return;
+			setAspects(found);
+			if (!found) {
+				setGridAspect(null);
+				return;
+			}
+			const median = medianAspect(found);
+			if (median == null) return;
+			setGridAspect((current) => current ?? median);
+			const saved = savedGridAspect(scope);
+			if (saved == null || Math.abs(saved - median) > 0.01) saveGridAspect(scope, median);
+		});
 		return () => { cancelled = true; };
 	}, [libraryId, systemId]);
 
@@ -187,16 +231,54 @@ const GameSystem = ({library, system, onSelectGame, onBack, backHandlerRef}) => 
 		if (entry && onSelectGame) onSelectGame(library, entry.game);
 	}, [onSelectGame, library]);
 
-	const cellPadX = horizontalCellPad(CARD_WIDTH, window.innerWidth - GRID_INSET);
-	const cellPadY = Math.max(MIN_ROW_GAP, focusOverhang(CARD_HEIGHT));
+	const cell = boxArtCell(gridAspect);
+	const cellAspect = cell.width / cell.height;
+	const gridWidth = window.innerWidth - GRID_INSET;
+	const preferredWidth = CARD_WIDTH * cell.width;
+	const cellPadX = horizontalCellPad(preferredWidth, gridWidth);
+	// Each cell asks for the width the grid would stretch it to, so the cover keeps the shape it's
+	// given here.
+	const columns = Math.max(1, Math.floor(gridWidth / (preferredWidth + cellPadX * 2)));
+	const cellWidth = Math.floor(gridWidth / columns);
+	const coverHeight = Math.round((cellWidth - cellPadX * 2) / cellAspect);
+	const cardHeight = coverHeight + CAPTION_HEIGHT;
+	const cellPadY = Math.max(MIN_ROW_GAP, focusOverhang(cardHeight));
 	const cellPadding = `${cellPadY}px ${cellPadX}px`;
-	const gridItemSize = {minWidth: CARD_WIDTH + cellPadX * 2, minHeight: CARD_HEIGHT + cellPadY * 2};
+	const gridItemSize = {minWidth: cellWidth, minHeight: cardHeight + cellPadY * 2};
+	const layoutRef = useRef(null);
+	layoutRef.current = {columns, stride: gridItemSize.minHeight, cardTop: cellPadY, cardHeight};
+
+	// Taken on the way down to the card, since the list would scroll on its own for Page Up and
+	// Page Down.
+	const handlePageKey = useCallback((e) => {
+		const direction = pageDirection(e.keyCode);
+		if (!direction) return;
+		e.preventDefault();
+		e.stopPropagation();
+		const from = parseInt(e.target.dataset.index, 10);
+		const scroller = scrollerOf(e.target);
+		if (isNaN(from) || !scroller) return;
+		const page = pageGrid({
+			...layoutRef.current,
+			from,
+			direction,
+			count: visibleRef.current.length,
+			scrollTop: scroller.scrollTop,
+			viewport: scroller.clientHeight
+		});
+		if (!page) return;
+		scrollTo({position: {y: page.scrollTop}, animate: false});
+		focusCard(page.target);
+	}, [scrollTo]);
 
 	const renderItem = useCallback(({index, ...rest}) => {
 		const entry = visibleRef.current[index];
 		if (!entry) return <div {...rest} className={css.itemCard} style={{padding: cellPadding}} />;
 
 		const artUrl = gamesApi.gameThumbUrl(libraryId, entry.game.id);
+		// Art shows whole when it's off the grid's shape, or the server sent no size for it.
+		const aspect = aspects?.get(entry.game.id);
+		const contain = gridAspect != null && aspects != null && (aspect == null || boxArtNeedsFill(aspect, cellAspect));
 		return (
 			<SpottableDiv
 				{...rest}
@@ -208,14 +290,14 @@ const GameSystem = ({library, system, onSelectGame, onBack, backHandlerRef}) => 
 				data-index={index}
 			>
 				<div className={css.itemCardInner}>
-					<div className={css.cover} style={{height: COVER_HEIGHT, background: gameFallbackColor(entry.game.id)}}>
-						{artUrl && <img className={css.coverImage} src={artUrl} alt="" loading="lazy" onError={hideBrokenArt} />}
+					<div className={css.cover} style={{height: coverHeight, background: gameFallbackColor(entry.game.id)}}>
+						{artUrl && <GameBoxArt url={artUrl} contain={contain} lazy />}
 					</div>
 					<div className={css.cardTitle}>{entry.title}</div>
 				</div>
 			</SpottableDiv>
 		);
-	}, [libraryId, handleItemClick, cellPadding]);
+	}, [libraryId, handleItemClick, cellPadding, coverHeight, aspects, gridAspect, cellAspect]);
 
 	const showDetails = settings?.showMediaDetailsOnLibraryPage !== false;
 	const focusedTitle = focusedGame ? gameDisplayTitle(focusedGame.title, focusedGame.fileName) : '';
@@ -319,7 +401,7 @@ const GameSystem = ({library, system, onSelectGame, onBack, backHandlerRef}) => 
 					) : visibleGames.length === 0 ? (
 						<div className={css.center}><div className={css.message}>{$L('No items found')}</div></div>
 					) : (
-						<div className={css.gridWrapper}>
+						<div className={css.gridWrapper} onKeyDownCapture={handlePageKey}>
 							<VirtualGridList
 								className={css.grid}
 								dataSize={visibleGames.length}
@@ -329,6 +411,7 @@ const GameSystem = ({library, system, onSelectGame, onBack, backHandlerRef}) => 
 								horizontalScrollbar="hidden"
 								verticalScrollbar="hidden"
 								spacing={0}
+								cbScrollTo={getScrollTo}
 								onKeyDown={handleGridKeyDown}
 								spotlightId="game-grid"
 							/>

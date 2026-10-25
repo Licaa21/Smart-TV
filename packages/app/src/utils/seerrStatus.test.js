@@ -28,7 +28,7 @@ describe('getRequestStatusInfo', () => {
 	});
 
 	test('processing while something is queued, requested while nothing is', () => {
-		const queued = request({media: {status: MEDIA_STATUS.PROCESSING, downloadStatus: [{size: 1}]}});
+		const queued = request({media: {status: MEDIA_STATUS.PROCESSING, downloadStatus: [{downloadId: 'dl', size: 1}]}});
 		const idle = request({media: {status: MEDIA_STATUS.PROCESSING, downloadStatus: []}});
 
 		expect(getRequestStatusInfo(queued).label).toBe('Processing');
@@ -36,7 +36,7 @@ describe('getRequestStatusInfo', () => {
 	});
 
 	test('partially available says processing while the rest downloads', () => {
-		const queued = request({media: {status: MEDIA_STATUS.PARTIALLY_AVAILABLE, downloadStatus: [{size: 1}]}});
+		const queued = request({media: {status: MEDIA_STATUS.PARTIALLY_AVAILABLE, downloadStatus: [{downloadId: 'dl', size: 1}]}});
 		const idle = request({media: {status: MEDIA_STATUS.PARTIALLY_AVAILABLE}});
 
 		expect(getRequestStatusInfo(queued).label).toBe('Processing');
@@ -44,7 +44,7 @@ describe('getRequestStatusInfo', () => {
 	});
 
 	test('a 4K request reads the 4K side of the media', () => {
-		const info = getRequestStatusInfo(request({is4k: true, media: {status: MEDIA_STATUS.AVAILABLE, status4k: MEDIA_STATUS.PROCESSING, downloadStatus4k: [{size: 1}]}}));
+		const info = getRequestStatusInfo(request({is4k: true, media: {status: MEDIA_STATUS.AVAILABLE, status4k: MEDIA_STATUS.PROCESSING, downloadStatus4k: [{downloadId: 'dl', size: 1}]}}));
 
 		expect(info.label).toBe('Processing');
 	});
@@ -59,7 +59,7 @@ describe('getRequestStatusInfo', () => {
 
 describe('getDownloadSummary', () => {
 	test('carries the byte counts alongside the fraction', () => {
-		const summary = getDownloadSummary([{size: 4 * GB, sizeLeft: 3 * GB}, {size: 1 * GB, sizeLeft: 0}]);
+		const summary = getDownloadSummary([{downloadId: 'a', size: 4 * GB, sizeLeft: 3 * GB}, {downloadId: 'b', size: 1 * GB, sizeLeft: 0}]);
 
 		expect(summary.totalBytes).toBe(5 * GB);
 		expect(summary.downloadedBytes).toBe(2 * GB);
@@ -68,13 +68,23 @@ describe('getDownloadSummary', () => {
 	});
 
 	test('nothing left to fetch means importing', () => {
-		expect(getDownloadSummary([{size: 10, sizeLeft: 0}]).isImporting).toBe(true);
+		expect(getDownloadSummary([{downloadId: 'dl', size: 10, sizeLeft: 0}]).isImporting).toBe(true);
 	});
 
 	test('entries without a size are left out, and no sizes at all is nothing', () => {
 		expect(getDownloadSummary([{size: 0}, {}])).toBeNull();
 		expect(getDownloadSummary([])).toBeNull();
 		expect(getDownloadSummary(null)).toBeNull();
+	});
+
+	test('counts a season pack once and skips the releases held back', () => {
+		const pack = {downloadId: 'S06', size: 19 * GB, sizeLeft: 5 * GB};
+		const heldBack = {size: 23 * GB, sizeLeft: 23 * GB};
+		const summary = getDownloadSummary([heldBack, pack, {...pack}, heldBack, {...pack, downloadId: ''}]);
+
+		expect(summary.totalBytes).toBe(19 * GB);
+		expect(summary.downloadedBytes).toBe(14 * GB);
+		expect(getDownloadSummary([heldBack, heldBack])).toBeNull();
 	});
 });
 
@@ -141,7 +151,7 @@ describe('isMediaInFlight', () => {
 	});
 
 	test('a partly available title with a download running is in flight', () => {
-		const media = {status: MEDIA_STATUS.PARTIALLY_AVAILABLE, downloadStatus: [{size: 100, sizeLeft: 40}]};
+		const media = {status: MEDIA_STATUS.PARTIALLY_AVAILABLE, downloadStatus: [{downloadId: 'dl', size: 100, sizeLeft: 40}]};
 		expect(isMediaInFlight(media, false)).toBe(true);
 	});
 

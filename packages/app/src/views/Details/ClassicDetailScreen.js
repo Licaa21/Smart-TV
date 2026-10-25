@@ -6,16 +6,18 @@ import MediaCard from '../../components/MediaCard';
 import RatingsRow from '../../components/RatingsRow';
 import {formatDuration, getImageUrl} from '../../utils/helpers';
 import {castPhotoUrl, hidesMediaDescription, seriesThumbUrl} from './detailsMedia';
+import {splitAdditionalParts} from './extraCategories';
 import {isMdblistEnabled} from '../../services/mdblistApi';
 import {formatTime} from '../Player/PlayerConstants';
 import {SeerrStatusBadge, SeerrDownloadBars, SeerrSeasonDot} from '../../components/seerr/SeerrStatusBadge';
-import {SeerrChips, SeerrFacts, SeerrCollectionBanner} from '../../components/seerr/SeerrSections';
-import {SpottableDiv, RowContainer} from './detailsSpottables';
+import {SeerrChips, SeerrFacts, SeerrStreaming, SeerrCollectionBanner} from '../../components/seerr/SeerrSections';
+import {SpottableDiv, RowContainer, ShortRowContainer} from './detailsSpottables';
 import ExpandableOverview from './ExpandableOverview';
 import {handleSectionKeyDown, handleScrollerFocus} from './detailsFocus';
 import {PosterBadges, WatchedCheckIcon, FavoriteHeartIcon} from './DetailBadges';
 import DetailMetadata from './DetailMetadata';
 import NextUpCard from './NextUpCard';
+import {ReviewCards} from './ReviewCard';
 import {DETAIL_METADATA, arrange} from '../../utils/detailMetadataLayout';
 import {fetchUpcomingEpisode, formatUpcomingEpisode} from '../../utils/upcomingEpisode';
 import {DETAIL_ICON_PATHS} from './detailIcons';
@@ -68,6 +70,8 @@ const ClassicDetailScreen = ({
 	cast,
 	collectionSections,
 	similar,
+	reviews = [],
+	onSelectReview,
 	onSeasonSelect,
 	onEpisodeSelect,
 	onChapterSelect,
@@ -172,6 +176,47 @@ const ClassicDetailScreen = ({
 	};
 
 	const metadataElements = orderedItems.map((meta) => renderMetadataPiece(meta.id)).filter(Boolean);
+
+	const {parts: additionalParts, others: otherExtras} = splitAdditionalParts(extras);
+
+	const renderExtrasRow = (title, items) => (
+		<RowContainer className={css.section}>
+			<div className={css.sectionHeader}>
+				<h3 className={css.sectionTitle}>{title}</h3>
+			</div>
+			<div className={css.sectionScroll} onFocus={handleScrollerFocus}>
+				{items.map(extra => {
+					const extraThumbUrl = extra.ImageTags?.Primary
+						? getImageUrl(serverUrl, extra.Id, 'Primary', {maxWidth: 400, quality: 80})
+						: null;
+					const extraDuration = extra.RunTimeTicks ? formatDuration(extra.RunTimeTicks) : '';
+
+					return (
+						<SpottableDiv
+							key={extra.Id}
+							className={css.extraCard}
+							data-extra-id={extra.Id}
+							onClick={onExtraSelect}
+						>
+							<div className={css.extraThumb}>
+								{extraThumbUrl ? (
+									<img src={extraThumbUrl} alt="" />
+								) : (
+									<div className={css.extraThumbPlaceholder}>
+										<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+									</div>
+								)}
+							</div>
+							<div className={css.extraInfo}>
+								<span className={css.extraName}>{extra.Name}</span>
+								{extraDuration && <span className={css.extraDuration}>{extraDuration}</span>}
+							</div>
+						</SpottableDiv>
+					);
+				})}
+			</div>
+		</RowContainer>
+	);
 
 	return (
 		<>
@@ -419,44 +464,8 @@ const ClassicDetailScreen = ({
 				</RowContainer>
 			)}
 
-			{extras.length > 0 && (
-				<RowContainer className={css.section}>
-					<div className={css.sectionHeader}>
-						<h3 className={css.sectionTitle}>{$L('Extras')}</h3>
-					</div>
-					<div className={css.sectionScroll} onFocus={handleScrollerFocus}>
-						{extras.map(extra => {
-							const extraThumbUrl = extra.ImageTags?.Primary
-								? getImageUrl(serverUrl, extra.Id, 'Primary', {maxWidth: 400, quality: 80})
-								: null;
-							const extraDuration = extra.RunTimeTicks ? formatDuration(extra.RunTimeTicks) : '';
-
-							return (
-								<SpottableDiv
-									key={extra.Id}
-									className={css.extraCard}
-									data-extra-id={extra.Id}
-									onClick={onExtraSelect}
-								>
-									<div className={css.extraThumb}>
-										{extraThumbUrl ? (
-											<img src={extraThumbUrl} alt="" />
-										) : (
-											<div className={css.extraThumbPlaceholder}>
-												<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
-											</div>
-										)}
-									</div>
-									<div className={css.extraInfo}>
-										<span className={css.extraName}>{extra.Name}</span>
-										{extraDuration && <span className={css.extraDuration}>{extraDuration}</span>}
-									</div>
-								</SpottableDiv>
-							);
-						})}
-					</div>
-				</RowContainer>
-			)}
+			{additionalParts.length > 0 && renderExtrasRow($L('Additional Parts'), additionalParts)}
+			{otherExtras.length > 0 && renderExtrasRow($L('Extras'), otherExtras)}
 
 			{cast.length > 0 && (
 				<RowContainer className={css.section}>
@@ -523,6 +532,17 @@ const ClassicDetailScreen = ({
 				</RowContainer>
 			)}
 
+			{reviews.length > 0 && (
+				<ShortRowContainer className={css.section}>
+					<div className={css.sectionHeader}>
+						<h3 className={css.sectionTitle}>{$L('Reviews')}</h3>
+					</div>
+					<div className={css.sectionScroll} onFocus={handleScrollerFocus}>
+						<ReviewCards reviews={reviews} onSelect={onSelectReview} />
+					</div>
+				</ShortRowContainer>
+			)}
+
 			{seerr.pieces.chips && (
 				<RowContainer className={css.section}>
 					<SeerrChips details={seerr.details} mediaType={seerr.mediaType} seerrNav={seerrNav} />
@@ -535,9 +555,11 @@ const ClassicDetailScreen = ({
 				</RowContainer>
 			)}
 
-			{seerr.pieces.facts && (
-				<RowContainer className={css.section}>
-					<SeerrFacts details={seerr.details} mediaType={seerr.mediaType} />
+			{/* Streaming can't take focus, so it shares the facts row and comes into view with the facts card. */}
+			{(seerr.pieces.facts || seerr.pieces.streaming) && (
+				<RowContainer className={`${css.section} ${css.seerrFactsRow}`}>
+					{seerr.pieces.facts && <SeerrFacts details={seerr.details} mediaType={seerr.mediaType} />}
+					{seerr.pieces.streaming && <SeerrStreaming providers={seerr.streamingProviders} />}
 				</RowContainer>
 			)}
 

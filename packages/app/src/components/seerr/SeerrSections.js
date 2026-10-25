@@ -178,6 +178,24 @@ export const SeerrFacts = memo(({details, mediaType}) => {
 	);
 });
 
+export const SeerrStreaming = memo(({providers}) => {
+	if (!providers?.length) return null;
+
+	return (
+		<div className={css.streaming}>
+			<span className={css.factLabel}>{$L('Streaming on')}</span>
+			<div className={css.streamingProviders}>
+				{providers.map((provider) => (
+					<div key={provider.id} className={css.streamingProvider}>
+						<img className={css.streamingLogo} src={seerrApi.getImageUrl(provider.logoPath, 'w92')} alt="" />
+						<span className={css.streamingName}>{provider.name}</span>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+});
+
 export const SeerrCollectionBanner = memo(({collection, onOpen}) => {
 	const handleClick = useCallback(() => {
 		if (collection?.id != null) onOpen?.(collection.id);

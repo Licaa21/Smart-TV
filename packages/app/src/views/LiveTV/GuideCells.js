@@ -1,15 +1,16 @@
 import {memo, useCallback, useState} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
-import Marquee from '@enact/sandstone/Marquee';
+import Marquee, {MarqueeController} from '@enact/sandstone/Marquee';
 import Spinner from '@enact/sandstone/Spinner';
 
-import {fittingItems} from '../../utils/measureText';
 import {rem} from '../../utils/rootScale';
-import {GUIDE_ICONS, GuideIcon} from './GuideIcons';
+import {GUIDE_ICONS, GuideIcon, RecordingMark} from './GuideIcons';
 
 import css from './LiveTV.module.less';
 
 const SpottableDiv = Spottable('div');
+// A focused cell's title and episode line scroll in step, and only the ones that overflow move.
+const MarqueeGroup = MarqueeController('div');
 
 // The accent color a program without a genre borrows.
 const ACCENT = {color: '#00a4dc', rgb: '0, 164, 220'};
@@ -17,18 +18,16 @@ const ACCENT = {color: '#00a4dc', rgb: '0, 164, 220'};
 // Every horizontal padding a cell's text sits inside: the cell gap, the text inset, and the
 // right hand inset.
 const CELL_TEXT_INSET = 1.5 + 17 + 12;
-// Below this a cell drops its metadata line and keeps its title on one line.
+// Below this a cell drops its episode line and keeps its title on one line.
 const MIN_META_WIDTH = 139;
 // A continuation cell this narrow gives up its inset so the arrow still fits.
 const NARROW_MARKER_WIDTH = 70;
-const META_FONT_SIZE = 20;
-const META_SEPARATOR = ' · ';
 
 // One slice of a row's timeline: a program, a gap in the schedule, a hole a filter made, or the
 // placeholder a row shows while its programs load. The row owns focus and navigation, the cell
 // only draws what it's handed.
 export const ProgramCell = memo(({
-	cell, left, width, spotlightId, genre, rating, tags, isLive, isPast, progress, hasTimer,
+	cell, left, width, spotlightId, genre, episode, mark, isLive, isPast, progress,
 	startsBeforeWindow, noProgramLabel, onFocusCell, onKeyDownCell, onSelectCell
 }) => {
 	const [focused, setFocused] = useState(false);
@@ -49,11 +48,8 @@ export const ProgramCell = memo(({
 
 	const innerWidth = width - CELL_TEXT_INSET;
 	const showMarker = startsBeforeWindow && !isGap;
-	const metaItems = !isGap && innerWidth >= MIN_META_WIDTH
-		? fittingItems([rating, ...tags].filter((item) => item && item.trim()).map((item) => item.trim()), innerWidth, META_FONT_SIZE, META_SEPARATOR)
-		: [];
-	const showMeta = metaItems.length > 0;
-	// The row has room for a second title line only when there's no metadata line under it.
+	const showMeta = !isGap && innerWidth >= MIN_META_WIDTH && Boolean(episode);
+	// The row has room for a second title line only when there's no episode line under it.
 	const wrapTitle = !isGap && !loading && innerWidth >= MIN_META_WIDTH && !showMeta;
 	const narrowMarker = showMarker && width < NARROW_MARKER_WIDTH;
 
@@ -64,19 +60,27 @@ export const ProgramCell = memo(({
 		body = <div className={css.cellCentered}><span className={css.gapLabel}>{noProgramLabel}</span></div>;
 	} else {
 		const title = program?.Name || '';
-		const titleNode = focused && !wrapTitle
-			? <Marquee className={css.cellTitle} marqueeOn="render" marqueeSpeed={29} marqueeDelay={1500}>{title}</Marquee>
-			: <div className={`${css.cellTitle} ${wrapTitle ? css.cellTitleWrap : ''}`}>{title}</div>;
-		body = (
-			<div className={`${css.cellText} ${narrowMarker ? css.cellTextNarrow : ''}`}>
+		const scroll = focused && !wrapTitle;
+		const lines = (
+			<>
 				<div className={css.cellTitleRow}>
 					{showMarker && <GuideIcon className={css.continuesIcon} path={GUIDE_ICONS.continuesFrom} />}
-					<div className={css.cellTitleBox}>{titleNode}</div>
-					{hasTimer && <GuideIcon className={css.timerDot} path={GUIDE_ICONS.record} />}
+					<div className={css.cellTitleBox}>
+						{scroll
+							? <Marquee className={css.cellTitle} marqueeOn="render" marqueeSpeed={29} marqueeDelay={1500}>{title}</Marquee>
+							: <div className={`${css.cellTitle} ${wrapTitle ? css.cellTitleWrap : ''}`}>{title}</div>}
+					</div>
+					{mark && <RecordingMark mark={mark} className={css.timerDot} />}
 				</div>
-				{showMeta && <div className={css.cellMeta}>{metaItems.join(META_SEPARATOR)}</div>}
-			</div>
+				{showMeta && (focused
+					? <Marquee className={css.cellMeta} marqueeOn="render" marqueeSpeed={29} marqueeDelay={1500}>{episode}</Marquee>
+					: <div className={css.cellMeta}>{episode}</div>)}
+			</>
 		);
+		const textClass = `${css.cellText} ${narrowMarker ? css.cellTextNarrow : ''}`;
+		body = focused
+			? <MarqueeGroup className={textClass}>{lines}</MarqueeGroup>
+			: <div className={textClass}>{lines}</div>;
 	}
 
 	return (

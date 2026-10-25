@@ -11,9 +11,10 @@ import css from './Settings.module.less';
 const ICONS = {
 	logo: 'branding_watermark_outlined', tagline: 'format_quote', poster: 'image_outlined', upNext: 'skip_next_outlined',
 	cast: 'people_outline', crew: 'movie_creation_outlined', studios: 'business_outlined', chapters: 'bookmarks_outlined',
-	extras: 'video_library_outlined', collections: 'collections_bookmark_outlined', moreLikeThis: 'recommend_outlined',
+	extras: 'video_library_outlined', collections: 'collections_bookmark_outlined', moreLikeThis: 'recommend_outlined', reviews: 'rate_review',
 	moreEpisodes: 'view_list_outlined', mediaInfo: 'info_outline', seerrGenresTags: 'sell_outlined', seerrStats: 'bar_chart',
-	seerrRecommendations: 'auto_awesome_outlined', seerrSimilar: 'grid_view_outlined', seerrCollection: 'collections_outlined',
+	seerrStreaming: 'ondemand_video', seerrRecommendations: 'auto_awesome_outlined', seerrSimilar: 'grid_view_outlined',
+	seerrCollection: 'collections_outlined',
 	seerrPersonAppearances: 'theaters_outlined', seerrPersonCrew: 'engineering_outlined', biography: 'article_outlined',
 	birthplace: 'place_outlined', guestAppearances: 'person_add_alt_outlined', musicVideos: 'music_video_outlined',
 	playlistOrder: 'format_list_numbered'

@@ -6,6 +6,7 @@ import {SeerrSeasonDot} from '../seerr/SeerrStatusBadge';
 import {showsWatchedCheck} from '../../utils/playedState';
 import SeerrIcon from '../icons/SeerrIcon';
 import {AnimeCardPill} from '../AnimeMarkerPills';
+import IncompleteBadge from '../IncompleteBadge';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
@@ -366,6 +367,7 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 					</div>
 				)}
 
+				<IncompleteBadge itemId={item.Id} belowFavorite={item.UserData?.IsFavorite} />
 				<AnimeCardPill item={item} serverUrl={itemServerUrl} hasProgressBar={showIndicators && progress > 0} />
 			</div>
 

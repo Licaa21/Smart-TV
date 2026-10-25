@@ -397,6 +397,17 @@ async function tryInnertube (videoId, preferHighQuality, captionLanguage, muxedO
 	return null;
 }
 
+// A video's length in seconds and its channel name, from the same player call that resolves the
+// stream. Null when no client answers with them.
+export async function fetchVideoDetails (videoId) {
+	for (let i = 0; i < INNERTUBE_CLIENTS.length; i++) {
+		const data = await requestPlayerWithVisitor(videoId, INNERTUBE_CLIENTS[i]);
+		const details = data && data.videoDetails;
+		if (details) return {lengthSeconds: Number(details.lengthSeconds) || 0, author: details.author || ''};
+	}
+	return null;
+}
+
 // A manifest of its own for the best H.264 rung, with the soundtrack and caption groups left out.
 // YouTube also lists VP9 rungs, which only go past the H.264 ones above 1080p.
 export function videoOnlyManifest (master) {

@@ -7,11 +7,11 @@ const eng = {index: 3, language: 'eng', title: 'English'};
 const OFF = {language: 'none', title: '', relativeIndex: 0};
 
 describe('createSeriesTrackPref', () => {
-	test('records the language, the name and the place among its own language', () => {
+	test('records the language, the name and the place among full tracks in its language', () => {
 		expect(createSeriesTrackPref([forced, full, eng], 2)).toEqual({
 			language: 'deu',
 			title: 'full',
-			relativeIndex: 1
+			relativeIndex: 0
 		});
 	});
 
@@ -79,6 +79,15 @@ describe('matchSeriesTrackIndex', () => {
 			{index: 5, language: 'eng', title: 'English'}
 		];
 		expect(matchSeriesTrackIndex(later, second)).toBe(5);
+	});
+
+	test('a full track remembered from another episode skips a forced track listed first', () => {
+		const earlier = createSeriesTrackPref([{index: 10, language: 'eng', title: 'English'}], 10);
+		const episode = [
+			{index: 10, language: 'eng', title: 'English (Forced)', displayTitle: 'English (Forced) - SUBRIP'},
+			{index: 11, language: 'eng', displayTitle: 'English - SUBRIP'}
+		];
+		expect(matchSeriesTrackIndex(episode, earlier)).toBe(11);
 	});
 
 	test('nothing in that language means no answer', () => {

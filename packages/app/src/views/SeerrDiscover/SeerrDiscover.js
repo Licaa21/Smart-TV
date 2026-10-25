@@ -16,6 +16,7 @@ import {KEYS} from '../../utils/keys';
 import hydrateRequestMediaItems from '../../utils/seerrHydration';
 import {STREAMING_NETWORKS, MOVIE_STUDIOS, SEERR_SHORTCUTS, pickShortcutBackdrops, normalizeMediaItem, normalizeRequestItem} from '../../utils/seerrHomeRows';
 import {libraryIdOf} from '../../utils/seerrTarget';
+import {isSupportedSlider, loadDiscoverSliders, loadSliderPage} from '../../utils/seerrSliders';
 import {isScrolledAway} from '../../utils/quickReturn';
 import {focusedCardIndex, cardToRestore} from '../../utils/rowFocusMemory';
 
@@ -415,6 +416,9 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 	const [rowPages, setRowPages] = useState({});
 	const [rowHasMore, setRowHasMore] = useState({});
 	const [rowLoading, setRowLoading] = useState({});
+	// The custom sliders a Seerr admin set up, drawn after this screen's own rows in Seerr's order.
+	const [sliderConfigs, setSliderConfigs] = useState([]);
+	const rowConfigs = useMemo(() => [...getRowConfigs(), ...sliderConfigs], [sliderConfigs]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [backdropUrl, setBackdropUrl] = useState('');
 	const [focusedItem, setFocusedItem] = useState(null);
@@ -551,11 +555,44 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		}
 	}, [isAuthenticated, contextUser]);
 
+	// The sliders wait for this screen's own rows, since those replace every row when they land. A
+	// missing or failing endpoint just leaves them out, and their rows load two at a time.
+	useEffect(() => {
+		if (!isAuthenticated || isLoading) return undefined;
+		let cancelled = false;
+		(async () => {
+			let sliders;
+			try {
+				sliders = (await loadDiscoverSliders({force: true})).filter(isSupportedSlider);
+			} catch {
+				return;
+			}
+			if (cancelled || !sliders.length) return;
+			setSliderConfigs(sliders.map((slider) => ({id: `slider-${slider.id}`, title: slider.title, type: 'media', fetchFn: 'slider', slider})));
+			for (let i = 0; i < sliders.length; i += 2) {
+				const batch = sliders.slice(i, i + 2);
+				const pages = await Promise.all(batch.map((slider) => loadSliderPage(slider, 1).catch(() => null)));
+				if (cancelled) return;
+				batch.forEach((slider, index) => {
+					const page = pages[index];
+					if (!page) return;
+					const id = `slider-${slider.id}`;
+					setRows((prev) => ({...prev, [id]: page.results.slice(0, ITEMS_PER_PAGE)}));
+					setRowPages((prev) => ({...prev, [id]: 1}));
+					setRowHasMore((prev) => ({...prev, [id]: page.totalPages > 1}));
+				});
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [isAuthenticated, isLoading]);
+
 	// Load more items for a specific row
 	const loadMoreForRow = useCallback(async (rowId) => {
 		if (rowLoading[rowId] || !rowHasMore[rowId]) return;
 
-		const config = getRowConfigs().find(r => r.id === rowId);
+		const config = rowConfigs.find(r => r.id === rowId);
 		if (!config || !config.fetchFn) return;
 
 		setRowLoading(prev => ({...prev, [rowId]: true}));
@@ -581,6 +618,9 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 				case 'upcomingTv':
 					data = await seerrApi.upcomingTv(nextPage);
 					break;
+				case 'slider':
+					data = await loadSliderPage(config.slider, nextPage);
+					break;
 				default:
 					return;
 			}
@@ -593,7 +633,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 					return {...prev, [rowId]: [...prev[rowId], ...uniqueNew.slice(0, ITEMS_PER_PAGE)]};
 				});
 				setRowPages(prev => ({...prev, [rowId]: nextPage}));
-				setRowHasMore(prev => ({...prev, [rowId]: newItems.length >= 20}));
+				setRowHasMore(prev => ({...prev, [rowId]: config.slider ? nextPage < data.totalPages : newItems.length >= 20}));
 			} else {
 				setRowHasMore(prev => ({...prev, [rowId]: false}));
 			}
@@ -602,7 +642,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		} finally {
 			setRowLoading(prev => ({...prev, [rowId]: false}));
 		}
-	}, [rowLoading, rowHasMore, rowPages]);
+	}, [rowConfigs, rowLoading, rowHasMore, rowPages]);
 
 	// The Modern rows only look at their items when deciding to redraw, so they're handed
 	// a callback that always reaches the current paging state.
@@ -647,16 +687,16 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 
 	const rowItems = useMemo(() => {
 		const items = {};
-		getRowConfigs().forEach((config) => {
+		rowConfigs.forEach((config) => {
 			const raw = rows[config.id];
 			items[config.id] = raw && useModernRows && isModernRowType(config.type) ? toModernItems(config, raw) : raw;
 		});
 		return items;
-	}, [rows, useModernRows]);
+	}, [rowConfigs, rows, useModernRows]);
 
 	const visibleRows = useMemo(() => {
-		return getRowConfigs().filter(r => rowItems[r.id]?.length > 0);
-	}, [rowItems]);
+		return rowConfigs.filter(r => rowItems[r.id]?.length > 0);
+	}, [rowConfigs, rowItems]);
 	const visibleCountRef = useRef(0);
 	visibleCountRef.current = visibleRows.length;
 

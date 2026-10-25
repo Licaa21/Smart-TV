@@ -56,6 +56,18 @@ describe('nouveauSectionOrder', () => {
 		});
 		expect(sections).toEqual(['episodes', 'chapters', 'extras', 'discovery', 'people', 'details']);
 	});
+
+	it('puts reviews right after discovery, and only when there are some', () => {
+		const state = {type: 'Movie', actorCount: 1, similarLoaded: true, similarCount: 2};
+		expect(nouveauSectionOrder({...state, reviewCount: 3})).toEqual(['discovery', 'reviews', 'people', 'details']);
+		expect(nouveauSectionOrder(state)).not.toContain('reviews');
+	});
+
+	it("puts a movie's other parts ahead of its extras", () => {
+		expect(nouveauSectionOrder({type: 'Movie', partCount: 1, extraCount: 2, similarLoaded: true}))
+			.toEqual(['additionalParts', 'extras', 'details']);
+		expect(nouveauSectionOrder({type: 'Movie', similarLoaded: true})).not.toContain('additionalParts');
+	});
 });
 
 describe('shouldIncludeDiscovery', () => {

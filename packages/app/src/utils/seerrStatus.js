@@ -97,13 +97,20 @@ export const getIssueStatusInfo = (issue) => {
 // Sums bytes so a large episode weighs more than a small one. Returns null
 // when nothing is downloading, which falls back to the status chip alone. The
 // byte counts ride along so the bar can say how much is left.
+//
+// Sonarr lists a season pack once per episode, each with the whole pack's size
+// and the same downloadId, so each download counts once. An entry with no
+// downloadId is a release Sonarr or Radarr is holding back and not downloading.
 export const getDownloadSummary = (items) => {
 	if (!Array.isArray(items) || items.length === 0) return null;
 	let total = 0;
 	let left = 0;
+	const seen = new Set();
 	for (const item of items) {
 		const size = item && item.size;
 		if (typeof size !== 'number' || size <= 0) continue;
+		if (!item.downloadId || seen.has(item.downloadId)) continue;
+		seen.add(item.downloadId);
 		total += size;
 		const sizeLeft = typeof item.sizeLeft === 'number' ? item.sizeLeft : 0;
 		left += Math.min(Math.max(sizeLeft, 0), size);

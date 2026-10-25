@@ -14,11 +14,19 @@ import {loadCollectionRowItems} from './collectionRowItems';
 import {apiSortBy, getGenresIncludeTypes, isPlaylistOrder, resolveSortOrder} from '../../utils/homeRowSorting';
 import {collapseLatestTvItems} from '../../utils/latestMediaRowNormalizer';
 import {isPickedRow, isPickedRowShown, isSameServer} from '../../utils/pickedRows';
+import mapBounded from '../../utils/mapBounded';
+
+// How many sections from the top load with Home. A picked row below them waits until Home comes
+// near it, so a Home with hundreds of collections doesn't fetch them all up front.
+const EAGER_SECTION_COUNT = 8;
 
 // The sort settings and enabled flags every loader reads, worked out once rather than by each
-// of them. Everything here is a plain function of the settings and the row list.
-export const buildLoaderContext = ({api, serverUrl, settings, homeRowsConfig, eligibleLibraries, seerrEnabled, seerrAuthenticated, recommendationsSupported, appendRows}) => {
+// of them. Everything here is a plain function of the settings and the row list, apart from the
+// Seerr state, which is read when the Since you watched rows load.
+export const buildLoaderContext = ({api, serverUrl, settings, homeRowsConfig, eligibleLibraries, recommendations, appendRows}) => {
 	const rowEnabled = (id) => homeRowsConfig.some((row) => row.enabled && row.id === id);
+	const enabledRows = homeRowsConfig.filter((row) => row.enabled);
+	const pickedRows = enabledRows.filter((row) => isPickedRow(row) && isPickedRowShown(row, settings, serverUrl));
 	// Playlist order is not a server sort field, so every row hands the server
 	// the fallback and the rows that honor the arrangement check the setting
 	// itself.
@@ -34,9 +42,7 @@ export const buildLoaderContext = ({api, serverUrl, settings, homeRowsConfig, el
 		settings,
 		appendRows,
 		eligibleLibraries,
-		seerrEnabled,
-		seerrAuthenticated,
-		recommendationsSupported,
+		recommendations,
 		favoriteSortBy,
 		favoriteSortOrder: resolveSortOrder(favoriteSortBy, settings.favoritesRowSortOrder),
 		collectionsSortBy,
@@ -56,7 +62,8 @@ export const buildLoaderContext = ({api, serverUrl, settings, homeRowsConfig, el
 		onNowEnabled: rowEnabled('onnow'),
 		rewatchEnabled: settings.displayRewatchRow !== false && rowEnabled('rewatch'),
 		studiosEnabled: settings.displayStudiosRows && rowEnabled('studios'),
-		enabledPluginSections: homeRowsConfig.filter((row) => row.enabled && isPickedRow(row) && isPickedRowShown(row, settings, serverUrl)),
+		enabledPluginSections: pickedRows.filter((row) => enabledRows.indexOf(row) < EAGER_SECTION_COUNT),
+		deferredPluginSections: pickedRows.filter((row) => enabledRows.indexOf(row) >= EAGER_SECTION_COUNT),
 		sinceYouWatchedIndexes: homeRowsConfig
 			.filter((row) => row.enabled && row.id.startsWith('sinceyouwatched'))
 			.map((row) => parseInt(row.id.replace('sinceyouwatched', ''), 10))
@@ -493,50 +500,71 @@ const loadPickedRowItems = async (ctx, api, row) => {
 	return settings.playlistsRowShowEpisodes ? items : collapseLatestTvItems(items);
 };
 
-const loadPluginsAndRecos = async (ctx) => {
-	const {api, appendRows, enabledPluginSections, recommendationsSupported, rewatchEnabled, seerrAuthenticated, seerrEnabled, settings, sinceYouWatchedIndexes} = ctx;
-	const fetchPluginSectionRow = async (row) => {
-		try {
-			const source = await pickedRowSource(ctx, row);
-			if (!source) return null;
-			const items = await loadPickedRowItems(ctx, source.api, row);
-			if (items.length === 0) return null;
-			const {server} = source;
-			return {
-				id: row.id,
-				title: row.name,
-				items: server
-					? items.map((item) => ({
-						...item,
-						_serverId: server.serverId,
-						_serverName: server.name,
-						_serverUrl: server.url,
-						_serverUserId: server.userId,
-						_serverAccessToken: server.accessToken,
-						_serverType: server.serverType || 'jellyfin'
-					}))
-					: items,
-				type: 'portrait',
-				isPluginRow: true
-			};
-		} catch (_error) {
-			return null;
-		}
-	};
-
+const fetchPluginSectionRow = async (ctx, row) => {
 	try {
-		const [pluginRows, sinceYouWatchedRows, rewatchItems] = await Promise.all([
-			Promise.all(enabledPluginSections.map((section) => fetchPluginSectionRow(section))),
-			sinceYouWatchedIndexes.length
-				? loadSinceYouWatchedRows(api, {
-					sinceYouWatchedSource: settings.sinceYouWatchedSource,
-					sinceYouWatchedSourceItem: settings.sinceYouWatchedSourceItem,
-					sinceYouWatchedSourceType: settings.sinceYouWatchedSourceType,
-					sinceYouWatchedIncludeWatched: settings.sinceYouWatchedIncludeWatched,
-					tmdbApiKey: settings.tmdbApiKey,
-					recommendationsSupported
-				}, sinceYouWatchedIndexes, seerrEnabled && seerrAuthenticated).catch(() => [])
-				: Promise.resolve([]),
+		const source = await pickedRowSource(ctx, row);
+		if (!source) return null;
+		const items = await loadPickedRowItems(ctx, source.api, row);
+		if (items.length === 0) return null;
+		const {server} = source;
+		return {
+			id: row.id,
+			title: row.name,
+			items: server
+				? items.map((item) => ({
+					...item,
+					_serverId: server.serverId,
+					_serverName: server.name,
+					_serverUrl: server.url,
+					_serverUserId: server.userId,
+					_serverAccessToken: server.accessToken,
+					_serverType: server.serverType || 'jellyfin'
+				}))
+				: items,
+			type: 'portrait',
+			isPluginRow: true
+		};
+	} catch (_error) {
+		return null;
+	}
+};
+
+// The picked rows Home held back, three at a time, each landing as soon as it's in.
+export const loadDeferredSections = (ctx, sections, onDone) => mapBounded(sections, 3, async (section) => {
+	const row = await fetchPluginSectionRow(ctx, section);
+	if (row) ctx.appendRows([row]);
+	onDone(section.id);
+});
+
+// Also run on its own when Seerr signs in or out, which only these rows read.
+export const loadSinceYouWatched = async (ctx) => {
+	const {api, settings, sinceYouWatchedIndexes} = ctx;
+	if (sinceYouWatchedIndexes.length === 0) return;
+	const recommendations = ctx.recommendations();
+	const rows = await loadSinceYouWatchedRows(api, {
+		sinceYouWatchedSource: settings.sinceYouWatchedSource,
+		sinceYouWatchedSourceItem: settings.sinceYouWatchedSourceItem,
+		sinceYouWatchedSourceType: settings.sinceYouWatchedSourceType,
+		sinceYouWatchedIncludeWatched: settings.sinceYouWatchedIncludeWatched,
+		tmdbApiKey: settings.tmdbApiKey,
+		recommendationsSupported: recommendations.recommendationsSupported
+	}, sinceYouWatchedIndexes, recommendations.seerrEnabled && recommendations.seerrAuthenticated).catch(() => []);
+	// The Seerr state moved while these loaded, so the load it started has the rows to keep.
+	if (ctx.recommendations() !== recommendations) return;
+	ctx.appendRows(rows.map((row) => ({
+		id: row.id,
+		title: $L('Since you watched {name}').replace('{name}', row.seedName),
+		items: row.items,
+		type: 'portrait',
+		isOnlineRecoRow: row.isSeerr === true
+	})));
+};
+
+const loadPluginsAndRewatch = async (ctx) => {
+	const {api, appendRows, enabledPluginSections, rewatchEnabled, settings} = ctx;
+	try {
+		const [pluginRows, rewatchItems] = await Promise.all([
+			Promise.all(enabledPluginSections.map((section) => fetchPluginSectionRow(ctx, section))),
 			rewatchEnabled
 				? loadRewatchItems(api, {
 					rewatchIncludeMovies: settings.rewatchIncludeMovies,
@@ -547,17 +575,7 @@ const loadPluginsAndRecos = async (ctx) => {
 				: Promise.resolve(null)
 		]);
 
-		const rows = [];
-		pluginRows.filter(Boolean).forEach((pluginRow) => rows.push(pluginRow));
-		sinceYouWatchedRows.forEach((row) => {
-			rows.push({
-				id: row.id,
-				title: $L('Since you watched {name}').replace('{name}', row.seedName),
-				items: row.items,
-				type: 'portrait',
-				isOnlineRecoRow: row.isSeerr === true
-			});
-		});
+		const rows = pluginRows.filter(Boolean);
 		if (rewatchItems && rewatchItems.length > 0) {
 			rows.push({
 				id: 'rewatch',
@@ -568,7 +586,7 @@ const loadPluginsAndRecos = async (ctx) => {
 		}
 		appendRows(rows);
 	} catch (e) {
-		console.warn('[Browse] Failed to load plugins/recos:', e);
+		console.warn('[Browse] Failed to load picked rows and Rewatch:', e);
 	}
 };
 // Fired together rather than in sequence: their requests queue on the media server anyway, so
@@ -581,12 +599,6 @@ export const BROWSE_ROW_LOADERS = [
 	{load: loadFavorites, sections: () => FAVORITE_ROW_CONFIGS.map((row) => row.id)},
 	{load: loadGenres, sections: () => ['genres']},
 	{load: loadPlaylistsAndMusic, sections: () => ['playlists', 'audioartists', 'audioalbums', 'audioplaylists', 'resumeaudio', 'activerecordings', 'onnow']},
-	{
-		load: loadPluginsAndRecos,
-		sections: (ctx) => [
-			...ctx.enabledPluginSections.map((section) => section.id),
-			...ctx.sinceYouWatchedIndexes.map((index) => `sinceyouwatched${index}`),
-			'rewatch'
-		]
-	}
+	{load: loadPluginsAndRewatch, sections: (ctx) => [...ctx.enabledPluginSections.map((section) => section.id), 'rewatch']},
+	{load: loadSinceYouWatched, sections: (ctx) => ctx.sinceYouWatchedIndexes.map((index) => `sinceyouwatched${index}`)}
 ];

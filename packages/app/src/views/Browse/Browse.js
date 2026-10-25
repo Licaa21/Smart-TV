@@ -43,6 +43,10 @@ const BACKDROP_SETTLE_MS = 250;
 const FIRST_ROWS = 3;
 const ROWS_AHEAD = 2;
 const ROW_MOUNT_GAP_MS = 50;
+// A picked row Home held back loads once focus is within this many rows of it, so it's usually in
+// by the time focus gets there.
+const NEAR_ROWS_ABOVE = 2;
+const NEAR_ROWS_BELOW = 5;
 // Engines without lazy loading fetch every poster on the page, so rows further down wait for theirs
 // until focus comes near.
 const NATIVE_LAZY_IMAGES = typeof document === 'undefined' || 'loading' in document.createElement('img');
@@ -92,7 +96,8 @@ const Browse = ({
 		seerrEnabled,
 		seerrAuthenticated,
 		seerrUserId,
-		homeRows: homeRowsConfig
+		homeRows: homeRowsConfig,
+		serverUrl
 	});
 	const {rows: externalRows, pending: externalPending} = useExternalRows({settings, homeRows: homeRowsConfig, kidsMode});
 	const pendingRows = useMemo(() => [...seerrPending, ...externalPending], [seerrPending, externalPending]);
@@ -174,7 +179,7 @@ const Browse = ({
 
 	const {
 		isLoading, browseMode, allRowData, featuredItems: loadedFeaturedItems, pendingSections,
-		setBrowseMode, fetchFreshFeaturedItems, refreshVolatileData
+		setBrowseMode, fetchFreshFeaturedItems, refreshVolatileData, loadSectionsNear
 	} = useBrowseData({
 		api,
 		serverUrl,
@@ -696,6 +701,7 @@ const Browse = ({
 			const wanted = rowIndex + 1 + ROWS_AHEAD;
 			setMountedRows((count) => Math.max(count, wanted));
 			if (!NATIVE_LAZY_IMAGES) setImageRows((count) => Math.max(count, wanted));
+			loadSectionsNear(filteredRowsRef.current.slice(Math.max(0, rowIndex - NEAR_ROWS_ABOVE), rowIndex + 1 + NEAR_ROWS_BELOW).map((row) => row.id));
 		}
 		// A pointer hover focuses whatever it crosses, and pulling that row
 		// to its resting spot would make the screen chase the cursor, so the
@@ -705,7 +711,7 @@ const Browse = ({
 			return;
 		}
 		settleRow(rowIndex, rowChanged ? 2 : 1);
-	}, [setBrowseMode, pinMainScroll, settleRow]);
+	}, [setBrowseMode, pinMainScroll, settleRow, loadSectionsNear]);
 
 	const backdropTimerRef = useRef(null);
 	const handleFocusItem = useCallback((item) => {

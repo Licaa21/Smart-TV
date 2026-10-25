@@ -860,6 +860,16 @@ export const upcomingTv = async (page = 1) => {
 	return request(`/discover/tv/upcoming?page=${page}`);
 };
 
+// The sliders a Seerr admin arranged for its Discover page, in their order.
+export const getDiscoverSliders = async () => {
+	const sliders = await request('/settings/discover');
+	return Array.isArray(sliders) ? sliders : [];
+};
+
+// One page of a slider's results. Its path already carries any query the slider's type needs.
+export const getDiscoverSliderPage = async (pathWithQuery, page = 1) =>
+	request(`/${pathWithQuery}${pathWithQuery.indexOf('?') >= 0 ? '&' : '?'}page=${page}`);
+
 export const getGenreSliderMovies = async () => {
 	return request('/discover/genreslider/movie');
 };
@@ -1195,6 +1205,8 @@ export default {
 	upcomingTv,
 	getGenreSliderMovies,
 	getGenreSliderTv,
+	getDiscoverSliders,
+	getDiscoverSliderPage,
 	discoverFiltered,
 	discoverByGenre,
 	discoverByNetwork,

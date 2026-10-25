@@ -96,7 +96,7 @@ export const handleButtonRowKeyDown = (ev) => {
 	if (ev.keyCode !== KEYS.DOWN) return;
 	ev.preventDefault();
 	ev.stopPropagation();
-	const sectionsContainer = document.querySelector(`.${css.sectionsContainer}`);
+	const sectionsContainer = document.querySelector(`.${css.sectionsContainer}`) || document.querySelector(`.${css.seasonEpisodesList}`);
 	if (sectionsContainer) {
 		const firstSpottable = sectionsContainer.querySelector('.spottable');
 		if (firstSpottable) {

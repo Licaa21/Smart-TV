@@ -951,6 +951,26 @@
 		height: 100%;
 		object-fit: cover;
 	}
+
+	// An item's banner art shows whole over a blurred copy of itself that fills the card. The
+	// copy is scaled up so the blur doesn't fade out at the edges.
+	.bannerFill {
+		filter: blur(24px);
+		transform: scale(1.1);
+
+		// The blur roughly doubles the slowest paint of a slide change on a weaker TV, so there the
+		// banner sits on the dark card instead.
+		:global(.perf-low) & {
+			display: none;
+		}
+	}
+
+	.bannerArt {
+		position: absolute;
+		top: 0;
+		left: 0;
+		object-fit: contain;
+	}
 }
 
 .bannerGradient {
@@ -1444,6 +1464,11 @@
 }
 
 .topbarOffset .featuredLogoContainer {
+	top: 130px;
+}
+
+/* The banner card starts below the navbar. The bar keeps its height, so the rows stay where they are. */
+.topbarOffset .bannerCard {
 	top: 130px;
 }
 

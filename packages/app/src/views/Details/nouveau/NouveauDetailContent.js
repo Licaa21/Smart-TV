@@ -38,8 +38,10 @@ import {
 } from './nouveauMetrics';
 import {
 	SECTION_CHAPTERS, SECTION_COLLECTION, SECTION_DETAILS, SECTION_DISCOVERY, SECTION_EPISODES,
-	SECTION_EXTRAS, SECTION_PEOPLE, nouveauSectionOrder, seerrDiscoveryExpected
+	SECTION_EXTRAS, SECTION_PARTS, SECTION_PEOPLE, SECTION_REVIEWS, nouveauSectionOrder, seerrDiscoveryExpected
 } from './nouveauSections';
+import {splitAdditionalParts} from '../extraCategories';
+import ReviewCard from '../ReviewCard';
 import {scrimStyle} from '../../../utils/scrimImage';
 
 import sectionsCss from './sections/NouveauSections.module.less';
@@ -73,7 +75,7 @@ const NO_PERSON_CREDITS = {appearances: [], crewCredits: []};
 const NouveauDetailContent = (props) => {
 	const {
 		item, settings, showsSection, seerr, seerrOnly, isPerson, effectiveServerUrl,
-		backdropUrl, similar = [], extras = [], cast = [], crew = [],
+		backdropUrl, similar = [], reviews = [], onSelectReview, extras = [], cast = [], crew = [],
 		similarLoaded = false, handleChapterSelect, handleExtraSelect, onSelectPerson,
 		onSelectItem, onSelectSeerrCard, handleEpisodePlay, isSeries,
 		episodes = [], seriesEpisodes = [], nextUp = [], seasons = [],
@@ -141,6 +143,7 @@ const NouveauDetailContent = (props) => {
 	};
 
 	const chapters = showsSection('chapters') ? item.Chapters : undefined;
+	const {parts: additionalParts, others: otherExtras} = useMemo(() => splitAdditionalParts(extras), [extras]);
 
 	const sections = useMemo(() => {
 		if (isPerson) return [...personRails.map((rail) => rail.id), SECTION_DETAILS];
@@ -149,12 +152,14 @@ const NouveauDetailContent = (props) => {
 		return nouveauSectionOrder({
 			type: item.Type,
 			chapterCount: chapters?.length || 0,
-			extraCount: extras.length,
+			partCount: additionalParts.length,
+			extraCount: otherExtras.length,
 			actorCount: cast.length,
 			// Directors and writers arrive as one crew list here, so the gate weighs two counts.
 			directorCount: crew.length,
 			similarLoaded,
 			similarCount: similar.length,
+			reviewCount: reviews.length,
 			// With both Seerr lists hidden there is nothing to hold the slot open for.
 			seerrExpected: (showsSection('seerrSimilar') || showsSection('seerrRecommendations')) && seerrDiscoveryExpected({
 				type: item.Type,
@@ -169,8 +174,8 @@ const NouveauDetailContent = (props) => {
 			seerrRecommendationCount: (seerrState.recommendationCards || []).length
 		});
 	}, [
-		item.Type, chapters, item.ProviderIds, isPerson, personRails, extras.length, cast.length,
-		crew.length, similarLoaded, similar.length, seerrOnly, seerr, showsSection
+		item.Type, chapters, item.ProviderIds, isPerson, personRails, additionalParts.length, otherExtras.length, cast.length,
+		crew.length, similarLoaded, similar.length, reviews.length, seerrOnly, seerr, showsSection
 	]);
 
 	// A series arrives as one run of episodes and shows a season at a time, so the selector only
@@ -476,11 +481,11 @@ const NouveauDetailContent = (props) => {
 			);
 		}
 
-		if (id === SECTION_EXTRAS) {
+		if (id === SECTION_PARTS || id === SECTION_EXTRAS) {
 			return (
 				<NouveauRail
-					title={$L('Extras')}
-					items={extras}
+					title={id === SECTION_PARTS ? $L('Additional Parts') : $L('Extras')}
+					items={id === SECTION_PARTS ? additionalParts : otherExtras}
 					gap={RAIL_GAP}
 					spotlightId={`nouveau-rail-${id}`}
 					navbarPosition={settings.navbarPosition}
@@ -613,6 +618,21 @@ const NouveauDetailContent = (props) => {
 			);
 		}
 
+		if (id === SECTION_REVIEWS) {
+			return (
+				<NouveauRail
+					title={$L('Reviews')}
+					items={reviews}
+					gap={RAIL_GAP}
+					spotlightId={`nouveau-rail-${id}`}
+					navbarPosition={settings.navbarPosition}
+					onNavigateUp={handleNavigateUp}
+					onNavigateDown={handleNavigateDown}
+					renderItem={renderReview}
+				/>
+			);
+		}
+
 		if (id === SECTION_PEOPLE) {
 			// Named for what it actually holds, since an item can arrive with only one of the two.
 			const title = cast.length && crew.length ? $L('Cast & Crew')
@@ -728,6 +748,10 @@ const NouveauDetailContent = (props) => {
 				onSelect={onPersonCard}
 			/>
 		);
+	}
+
+	function renderReview (review) {
+		return <ReviewCard review={review} onSelect={onSelectReview} />;
 	}
 
 	function renderChapter (chapter) {

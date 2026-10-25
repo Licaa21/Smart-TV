@@ -3,6 +3,7 @@ import $L from '@enact/i18n/$L';
 
 import VerticalMarquee from '../../components/VerticalMarquee';
 import {DESCRIPTION_MS_PER_PIXEL} from '../../utils/liveTvGuide';
+import {RecordingMark} from './GuideIcons';
 
 import css from './LiveTV.module.less';
 
@@ -11,7 +12,7 @@ const SYNOPSIS_LINE_HEIGHT = 23.2 * 1.2;
 // The band above the grid that previews whatever is focused. The plate on the left shows the
 // program's own artwork when there is some and the channel logo otherwise, and keeps its width
 // either way so the artwork arriving is a swap rather than a resize.
-const GuideHero = ({title, programTitle, programSubtitle, channelLogoUrl, programImageUrl, timeLabel, genreLabel, officialRating, communityRating, badgeLabel, synopsis, isLive}) => {
+const GuideHero = ({title, programTitle, programSubtitle, channelLogoUrl, programImageUrl, timeLabel, genreLabel, officialRating, communityRating, badgeLabel, synopsis, isLive, mark}) => {
 	const [failedUrl, setFailedUrl] = useState(null);
 	const plateUrl = programImageUrl || channelLogoUrl;
 	const usingArtwork = Boolean(programImageUrl);
@@ -56,6 +57,7 @@ const GuideHero = ({title, programTitle, programSubtitle, channelLogoUrl, progra
 							<span className={css.heroChannelTitle}>{title || ''}</span>
 							{badgeLabel && <span className={css.heroBadge}>{badgeLabel.toUpperCase()}</span>}
 							{meta && <span className={css.heroMeta}>{meta}</span>}
+							{mark && <RecordingMark mark={mark} className={css.heroMark} />}
 						</div>
 						{programTitle ? (
 							<div className={css.heroProgramTitle}>

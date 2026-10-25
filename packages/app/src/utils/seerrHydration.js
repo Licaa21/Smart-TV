@@ -85,4 +85,32 @@ export const hydrateWatchlistItems = async (items = []) => {
 	});
 };
 
+// Seerr's recently added list is its own media records, which carry the TMDB id but no title or
+// artwork, so each becomes a card filled in from the title's details.
+export const hydrateRecentlyAddedItems = async (records = []) => {
+	if (!Array.isArray(records) || records.length === 0) return [];
+
+	const lookup = detailsLookup();
+
+	return inBatches(records, async (record) => {
+		const type = record?.mediaType;
+		const item = {id: record?.tmdbId ?? record?.id, mediaType: type, mediaInfo: record};
+		if (!record?.tmdbId || (type !== 'movie' && type !== 'tv')) return item;
+
+		const details = await lookup(type, record.tmdbId);
+		if (!details) return item;
+
+		return {
+			...item,
+			title: details.title,
+			name: details.name,
+			posterPath: details.posterPath,
+			backdropPath: details.backdropPath,
+			overview: details.overview,
+			releaseDate: details.releaseDate,
+			firstAirDate: details.firstAirDate
+		};
+	});
+};
+
 export default hydrateRequestMediaItems;

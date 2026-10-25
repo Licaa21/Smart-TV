@@ -2,7 +2,7 @@ import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
 
 import VerticalMarquee from '../../components/VerticalMarquee';
-import {GUIDE_ICONS, GuideIcon} from '../LiveTV/GuideIcons';
+import {GUIDE_ICONS, GuideIcon, RecordingMark} from '../LiveTV/GuideIcons';
 import {createLiveTvGuideStore} from '../../services/liveTvGuideStore';
 import {formatClockTime} from '../../utils/clock';
 import {KEYS, isBackKey} from '../../utils/keys';
@@ -10,8 +10,8 @@ import {fittingItems} from '../../utils/measureText';
 import {rem, rootScale} from '../../utils/rootScale';
 import {
 	CAROUSEL_CARD_HEIGHT, DESCRIPTION_MS_PER_PIXEL, TV_CANVAS_SCALE, carouselLayoutFor, carouselNeighborhood, categoryTags,
-	channelComparator, channelIndexFor, episodeTitleOf, filterLabel, genreFor, guideLeftEdge, hasSeriesTimer,
-	hasTimer, programAiringAt, progressAt
+	channelComparator, channelIndexFor, episodeTitleOf, filterLabel, genreFor, guideLeftEdge, programAiringAt,
+	progressAt, recordingMark
 } from '../../utils/liveTvGuide';
 
 import css from './ChannelCarousel.module.less';
@@ -91,7 +91,7 @@ const buildEntry = (channel, store, now, serverUrl, clockDisplay) => {
 		genre: program ? genreFor(program) : null,
 		isLive: Boolean(program),
 		progress: program ? progressAt(program, now) : 0,
-		hasTimer: program ? hasTimer(program) || hasSeriesTimer(program) : false,
+		mark: program ? recordingMark(program) : null,
 		programLoading: !program && Boolean(store) && !store.hasProgramsFor(channel.Id)
 	};
 };
@@ -124,7 +124,7 @@ const CarouselCard = memo(({entry, centered, left}) => {
 					{entry.isFavorite && <GuideIcon className={css.headerIcon} path={GUIDE_ICONS.favorite} />}
 					{entry.channelNumber && <span className={css.channelNumber}>{entry.channelNumber}</span>}
 					<span className={css.channelName}>{entry.channelName}</span>
-					{entry.hasTimer && <GuideIcon className={`${css.headerIcon} ${css.timerIcon}`} path={GUIDE_ICONS.record} />}
+					{entry.mark && <RecordingMark mark={entry.mark} className={`${css.headerIcon} ${css.timerIcon}`} />}
 					{entry.logoUrl && !logoFailed && (
 						<div className={css.logo} style={{backgroundImage: `url("${entry.logoUrl}")`}}>
 							{/* Only here to learn when the logo fails, since a background can't say. */}

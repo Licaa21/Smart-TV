@@ -179,6 +179,18 @@ describe('spotlightCardsFor', () => {
 		expect(cards[0].sections.map((s) => s.kind)).toEqual(['seerrChips', 'seerrFacts', 'seerrCollection']);
 	});
 
+	it("puts streaming after the facts and never first, since it can't take the opening focus", () => {
+		const details = (seerr) => spotlightCardsFor(state({seerrOnly: true, seerr}))[0].sections.map((s) => s.kind);
+		expect(details({factCount: 2, streamingCount: 3, collection: {id: 9}})).toEqual(['seerrFacts', 'seerrStreaming', 'seerrCollection']);
+		expect(details({streamingCount: 3, collection: {id: 9}})).toEqual(['seerrCollection', 'seerrStreaming']);
+		expect(spotlightCardsFor(state({seerrOnly: true, seerr: {streamingCount: 3}}))).toEqual([]);
+
+		const similar = (seerr) => spotlightCardsFor(state({similar: [child('s1')], seerr}))
+			.find((c) => c.id === 'similar').sections.map((s) => s.kind);
+		expect(similar({chipCount: 2, streamingCount: 1})).toEqual(['seerrChips', 'seerrStreaming', 'media']);
+		expect(similar({streamingCount: 1})).toEqual(['media', 'seerrStreaming']);
+	});
+
 	it('leaves the details card out when seerr has nothing to say', () => {
 		const cards = spotlightCardsFor(state({seerrOnly: true, cast: [child('p1')], seerr: {}}));
 		expect(ids(cards)).toEqual(['people']);

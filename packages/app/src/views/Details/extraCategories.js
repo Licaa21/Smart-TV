@@ -1,8 +1,9 @@
 import $L from '@enact/i18n/$L';
 
-// The order the extras sections appear in, with anything the server did not label falling
-// into the general bucket at the front.
+// The order the extras sections appear in. A movie's other parts lead, then anything the
+// server didn't label falls into the general bucket.
 export const EXTRA_CATEGORIES = [
+	'additionalParts',
 	'extras',
 	'behindTheScenes',
 	'deletedScenes',
@@ -23,12 +24,22 @@ const BY_EXTRA_TYPE = {
 	Trailer: 'trailers'
 };
 
+// The other files of a movie split across several, like cd1 and cd2, ride along with the extras.
+export const isAdditionalPart = (item) => item?._additionalPart === true;
+
+// For the styles that give the parts a row of their own ahead of one Extras row.
+export const splitAdditionalParts = (extras) => ({
+	parts: extras.filter(isAdditionalPart),
+	others: extras.filter((extra) => !isAdditionalPart(extra))
+});
+
 // Which section an extra belongs in. A server that sends no type, or one this does not know,
 // leaves the item in the general bucket rather than dropping it.
-export const getExtraCategory = (item) => BY_EXTRA_TYPE[item?.ExtraType] || 'extras';
+export const getExtraCategory = (item) => (isAdditionalPart(item) ? 'additionalParts' : BY_EXTRA_TYPE[item?.ExtraType] || 'extras');
 
 export const getExtraCategoryLabel = (key) => {
 	switch (key) {
+		case 'additionalParts': return $L('Additional Parts');
 		case 'behindTheScenes': return $L('Behind the Scenes');
 		case 'deletedScenes': return $L('Deleted Scenes');
 		case 'featurettes': return $L('Featurettes');

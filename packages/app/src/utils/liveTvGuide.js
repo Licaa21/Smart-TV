@@ -102,6 +102,29 @@ export const episodeLine = (program) => {
 export const hasTimer = (program) => program?.TimerId != null;
 export const hasSeriesTimer = (program) => program?.SeriesTimerId != null;
 
+// 'record' for a one off, 'series' when a series rule will record this showing and 'skipped' when
+// the rule passes it over. A string rather than an object, so a memoized cell can compare it.
+export const recordingMark = (program) => {
+	if (hasSeriesTimer(program)) return hasTimer(program) ? 'series' : 'skipped';
+	return hasTimer(program) ? 'record' : null;
+};
+
+// The choices a series recording can make, as the two flags the server's series rule reads.
+export const SERIES_EPISODE_CHOICES = [
+	{key: 'all', label: 'All Episodes', detail: 'Every showing, including repeats', flags: {RecordNewOnly: false, SkipEpisodesInLibrary: false}},
+	{key: 'notRecorded', label: 'Episodes Not Already Recorded', detail: 'Skips episodes already in your library and records each episode once', flags: {RecordNewOnly: false, SkipEpisodesInLibrary: true}},
+	{key: 'newOnly', label: 'New Episodes Only', detail: 'First airings only, no repeats', flags: {RecordNewOnly: true, SkipEpisodesInLibrary: true}}
+];
+
+export const DEFAULT_SERIES_CHOICE = 'notRecorded';
+
+export const seriesChoiceOf = (rule) => {
+	if (rule?.RecordNewOnly) return 'newOnly';
+	return rule?.SkipEpisodesInLibrary ? 'notRecorded' : 'all';
+};
+
+export const seriesChoiceFlags = (key) => SERIES_EPISODE_CHOICES.find((choice) => choice.key === key).flags;
+
 export const isLiveAt = (program, now) => now > programStart(program) && now < programEnd(program);
 
 // The program on air at a moment, counting its first instant. Used to pick what a channel is

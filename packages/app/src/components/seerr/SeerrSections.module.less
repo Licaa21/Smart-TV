@@ -79,6 +79,45 @@
 	color: #ffffff;
 }
 
+// The facts card's box, without the focus ring it has no use for.
+.streaming {
+	max-width: 1100px;
+	padding: 14px 20px;
+	background: rgba(255, 255, 255, 0.06);
+	border: 2px solid var(--theme-card-border, rgba(255, 255, 255, 0.12));
+	border-radius: 10px;
+}
+
+.streamingProviders {
+	display: flex;
+	flex-wrap: wrap;
+	margin-top: 10px;
+}
+
+.streamingProvider {
+	width: 92px;
+	margin: 0 20px 10px 0;
+	text-align: center;
+}
+
+.streamingLogo {
+	display: block;
+	width: 64px;
+	height: 64px;
+	margin: 0 auto;
+	border-radius: 12px;
+	object-fit: cover;
+}
+
+.streamingName {
+	display: block;
+	margin-top: 6px;
+	font-size: 14px;
+	font-weight: 600;
+	color: #ffffff;
+	line-height: 1.2;
+}
+
 .collectionBanner {
 	position: relative;
 	display: flex;

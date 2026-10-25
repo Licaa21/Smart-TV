@@ -451,6 +451,20 @@ export const createLiveTvGuideStore = (api, {sortBy = 'number', now = () => Date
 		}
 	};
 
+	// Refetches the loaded rows after a recording change without clearing them, so focus stays where
+	// it was. A category filter keeps its programs separately and reloads them instead.
+	const refreshRecordings = async () => {
+		if (isCategoryFilter(filter)) {
+			await reloadPrograms();
+			return;
+		}
+		const ids = Array.from(programsLoadedIds);
+		const replacements = await fetchProgramReplacements(ids, windowStart, windowEnd, ++programGeneration);
+		if (!replacements) return;
+		replacements.forEach((programs, id) => programsByChannel.set(id, programs));
+		notify();
+	};
+
 	const toggleProgramRecording = async (program) => {
 		if (program.TimerId != null) {
 			if (!program.TimerId) throw new Error(`TimerId missing for scheduled program ${program.Id}`);
@@ -458,17 +472,17 @@ export const createLiveTvGuideStore = (api, {sortBy = 'number', now = () => Date
 		} else {
 			await api.createLiveTvTimer(program.Id);
 		}
-		await reloadPrograms();
+		await refreshRecordings();
 	};
 
-	const toggleSeriesRecording = async (program) => {
+	const toggleSeriesRecording = async (program, flags) => {
 		if (program.SeriesTimerId != null) {
 			if (!program.SeriesTimerId) throw new Error(`SeriesTimerId missing for scheduled series ${program.Id}`);
 			await api.cancelLiveTvSeriesTimer(program.SeriesTimerId);
 		} else {
-			await api.createLiveTvSeriesTimer(program.Id);
+			await api.createLiveTvSeriesTimer(program.Id, flags);
 		}
-		await reloadPrograms();
+		await refreshRecordings();
 	};
 
 	// ------------------------------------------------------------------------------------------
@@ -835,6 +849,7 @@ export const createLiveTvGuideStore = (api, {sortBy = 'number', now = () => Date
 		toggleChannelFavorite,
 		toggleProgramRecording,
 		toggleSeriesRecording,
+		refreshRecordings,
 		scheduleBoundaryRefresh,
 		refreshAtQuarterHour,
 		refreshCarouselPrograms,

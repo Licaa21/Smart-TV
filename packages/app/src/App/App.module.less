@@ -64,6 +64,21 @@
 	font-display: swap;
 }
 
+// The serif the Reading Room book library sets its headings in.
+@font-face {
+	font-family: 'Literata';
+	src: url('../../resources/fonts/Literata-Regular.woff') format('woff');
+	font-weight: 400;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Literata';
+	src: url('../../resources/fonts/Literata-SemiBold.woff') format('woff');
+	font-weight: 600;
+	font-display: swap;
+}
+
 // Sandstone names its own face on its root, and its non-Latin rule outranks that, so both are
 // matched here. A script Roboto has no glyphs for falls back to Sandstone's faces for it.
 :global(html) :global(.sandstone-theme),

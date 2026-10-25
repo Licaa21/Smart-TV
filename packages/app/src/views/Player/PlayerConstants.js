@@ -37,11 +37,17 @@ export const SEGMENT_FETCH_TIMEOUT = 20000;
 // starts anyway and the subtitles show up once the renderer catches up.
 export const ASS_READY_WAIT = 15000;
 
-const MaterialIcon = ({path}) => (
-	<svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true" focusable="false">
+// The longest the Fetching subtitles indicator waits on an ASS track, since the renderer
+// has no way of saying the server never answered.
+export const ASS_FETCH_INDICATOR_LIMIT = 180000;
+
+const MaterialIcon = ({path, color, viewBox = '0 -960 960 960'}) => (
+	<svg viewBox={viewBox} fill="currentColor" style={color ? {color} : undefined} aria-hidden="true" focusable="false">
 		<path d={path} />
 	</svg>
 );
+
+export const LIVE_RED = '#f44336';
 
 export const IconPlay = () => (
 	<MaterialIcon path="M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Zm60-225Zm0 171 269-171-269-171v342Z" />
@@ -149,6 +155,37 @@ export const IconChannels = () => (
 
 export const IconGuide = () => (
 	<MaterialIcon path="M280-600v-80h560v80H280Zm0 160v-80h560v80H280Zm0 160v-80h560v80H280ZM160-600q-17 0-28.5-11.5T120-640q0-17 11.5-28.5T160-680q17 0 28.5 11.5T200-640q0 17-11.5 28.5T160-600Zm0 160q-17 0-28.5-11.5T120-480q0-17 11.5-28.5T160-520q17 0 28.5 11.5T200-480q0 17-11.5 28.5T160-440Zm0 160q-17 0-28.5-11.5T120-320q0-17 11.5-28.5T160-360q17 0 28.5 11.5T200-320q0 17-11.5 28.5T160-280Z" />
+);
+
+// Material Icons glyphs on a 24 point grid, where the rest of the player draws Material Symbols.
+const GlyphIcon = ({path, color}) => <MaterialIcon path={path} color={color} viewBox="0 0 24 24" />;
+
+export const IconLiveRewind = () => (
+	<GlyphIcon path="M11.02 16.08V7.92C11.02 7.12 10.08 6.66 9.42 7.12L3.66 11.2C3.09 11.58 3.09 12.42 3.66 12.8L9.42 16.88C10.08 17.34 11.02 16.88 11.02 16.08ZM12.66 12.8 18.42 16.88C19.08 17.34 20.02 16.88 20.02 16.08V7.92C20.02 7.12 19.08 6.66 18.42 7.12L12.66 11.2C12.09 11.58 12.09 12.42 12.66 12.8Z" />
+);
+
+export const IconLiveForward = () => (
+	<GlyphIcon path="M5.58 16.88 11.34 12.8C11.91 12.42 11.91 11.58 11.34 11.2L5.58 7.12C4.92 6.66 3.98 7.12 3.98 7.92V16.08C3.98 16.88 4.92 17.34 5.58 16.88ZM12.98 7.92V16.08C12.98 16.88 13.92 17.34 14.58 16.88L20.34 12.8C20.91 12.42 20.91 11.58 20.34 11.2L14.58 7.12C13.92 6.66 12.98 7.12 12.98 7.92Z" />
+);
+
+export const IconLivePlay = () => (
+	<GlyphIcon path="M8.02 6.8V17.2C8.02 17.95 8.86 18.47 9.56 18L17.67 12.84C18.28 12.47 18.28 11.53 17.67 11.16L9.56 6C8.86 5.53 8.02 6.05 8.02 6.8Z" />
+);
+
+export const IconLivePause = () => (
+	<GlyphIcon path="M8.02 18.98C9.09 18.98 9.98 18.09 9.98 17.02V6.98C9.98 5.91 9.09 5.02 8.02 5.02C6.89 5.02 6 5.91 6 6.98V17.02C6 18.09 6.89 18.98 8.02 18.98ZM14.02 6.98V17.02C14.02 18.09 14.91 18.98 15.98 18.98C17.11 18.98 18 18.09 18 17.02V6.98C18 5.91 17.11 5.02 15.98 5.02C14.91 5.02 14.02 5.91 14.02 6.98Z" />
+);
+
+export const IconLiveTv = ({color}) => (
+	<GlyphIcon color={color} path="M10.5 17.16 14.48 14.86C15.14 14.48 15.14 13.5 14.48 13.12L10.5 10.83C9.84 10.45 9 10.97 9 11.72V16.27C9 17.06 9.84 17.53 10.5 17.16ZM21 6H13.41L16.36 3.05C16.55 2.86 16.55 2.53 16.36 2.34C16.17 2.16 15.84 2.16 15.66 2.34L12 6L8.34 2.34C8.16 2.16 7.83 2.16 7.64 2.34C7.45 2.53 7.45 2.86 7.64 3.05L10.59 6H3C1.92 6 0.98 6.89 0.98 8.02V20.02C0.98 21.09 1.92 21.98 3 21.98H21C22.08 21.98 23.02 21.09 23.02 20.02V8.02C23.02 6.89 22.08 6 21 6ZM20.02 20.02H3.98C3.47 20.02 3 19.55 3 18.98V9C3 8.44 3.47 8.02 3.98 8.02H20.02C20.53 8.02 21 8.44 21 9V18.98C21 19.55 20.53 20.02 20.02 20.02Z" />
+);
+
+export const IconRecord = ({color}) => (
+	<GlyphIcon color={color} path="M3.98 12C3.98 7.59 7.59 3.98 12 3.98C16.41 3.98 20.02 7.59 20.02 12C20.02 16.41 16.41 20.02 12 20.02C7.59 20.02 3.98 16.41 3.98 12Z" />
+);
+
+export const IconSeriesRecord = ({color}) => (
+	<GlyphIcon color={color} path="M0.98 12C0.98 7.59 4.59 3.98 9 3.98C13.41 3.98 17.02 7.59 17.02 12C17.02 16.41 13.41 20.02 9 20.02C4.59 20.02 0.98 16.41 0.98 12ZM17.02 4.27V6.33C19.31 7.17 21 9.38 21 12C21 14.62 19.31 16.83 17.02 17.67V19.73C20.44 18.84 23.02 15.75 23.02 12C23.02 8.25 20.44 5.16 17.02 4.27Z" />
 );
 
 export const parseLyricsResponse = (response) => {

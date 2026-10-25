@@ -28,7 +28,7 @@ describe('detailSectionLayout', () => {
 	it('gives every Seerr piece a switch of its own', () => {
 		const seerr = DETAIL_SECTIONS.filter((section) => section.group === 'seerr').map((section) => section.id);
 		expect(seerr).toEqual(expect.arrayContaining([
-			'seerrGenresTags', 'seerrStats', 'seerrRecommendations', 'seerrSimilar',
+			'seerrGenresTags', 'seerrStats', 'seerrStreaming', 'seerrRecommendations', 'seerrSimilar',
 			'seerrCollection', 'seerrPersonAppearances', 'seerrPersonCrew'
 		]));
 	});

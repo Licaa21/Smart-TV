@@ -233,6 +233,19 @@ export const getLibraryStyleOptions = () => [
 	{ value: 'docked', label: $L('Docked') }
 ];
 
+export const getBookLibraryStyleOptions = () => [
+	{ value: 'classic', label: $L('Classic') },
+	{ value: 'readingRoom', label: $L('Reading Room') },
+	{ value: 'bookstore', label: $L('Bookstore') }
+];
+
+export const getKeyboardStyleOptions = () => [
+	{ value: 'native', label: $L('Native') },
+	{ value: 'classic', label: $L('Classic') },
+	{ value: 'glass', label: $L('Glass') },
+	{ value: 'docked', label: $L('Docked') }
+];
+
 export const getMusicLibraryStyleOptions = () => [
 	{ value: 'classic', label: $L('Classic') },
 	{ value: 'quickAccess', label: $L('Quick Access') },
@@ -467,7 +480,7 @@ export const getTrickplayModeOptions = () => [
 
 export const getZoomModeOptions = () => [
 	{ value: 'fit', label: $L('Fit') },
-	{ value: 'autoCrop', label: $L('Auto Crop') },
+	{ value: 'autoCrop', label: $L('Zoom to Fill') },
 	{ value: 'stretch', label: $L('Stretch') }
 ];
 

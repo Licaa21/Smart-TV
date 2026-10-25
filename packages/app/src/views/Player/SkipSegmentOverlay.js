@@ -31,7 +31,7 @@ const ringClasses = {ring: css.ring, svg: css.ringSvg, track: css.ringTrack, val
  * Offers to jump past a segment the server marked up. The ring drains for as long
  * as the segment has left to run, so the prompt going away is never a surprise.
  */
-const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, onSkip, spotlightId, controlsVisible = false}) => {
+const SkipSegmentOverlay = ({type, label, remainingSeconds, progress, countdownStyle, onSkip, spotlightId, controlsVisible = false}) => {
 	// It takes the remote while the controls are away, and leaves focus where it is while they're up.
 	useOverlayFocus(controlsVisible ? null : spotlightId);
 
@@ -72,7 +72,7 @@ const SkipSegmentOverlay = ({type, remainingSeconds, progress, countdownStyle, o
 			>
 				<SkipGlyph className={css.icon} />
 				<span className={css.label}>
-					{$L('Skip {segment}').replace('{segment}', $L(SEGMENT_LABELS[type] || SEGMENT_LABELS.intro))}
+					{label || $L('Skip {segment}').replace('{segment}', $L(SEGMENT_LABELS[type] || SEGMENT_LABELS.intro))}
 				</span>
 				{showTimer && !numberInRing && (
 					<span className={css.timer}>

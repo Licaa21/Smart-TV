@@ -21,6 +21,7 @@
 }
 
 .poster {
+	position: relative;
 	width: 100%;
 	border-radius: 12px;
 	overflow: hidden;
@@ -32,6 +33,24 @@
 	height: 100%;
 	object-fit: cover;
 	display: block;
+}
+
+.fill {
+	position: absolute;
+	top: 0;
+	left: 0;
+	filter: blur(20px) brightness(0.55);
+
+	// A blur on every card that needs one is too much for a weaker TV, so there the art sits on the
+	// card's own color instead.
+	:global(.perf-low) & {
+		display: none;
+	}
+}
+
+.contain {
+	position: relative;
+	object-fit: contain;
 }
 
 .fallback {

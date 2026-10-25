@@ -31,46 +31,75 @@ const loadPrefs = async () => {
 	return {
 		items: stored?.items && typeof stored.items === 'object' ? stored.items : {},
 		series: readSeries(stored?.series),
-		seriesAudio: readSeries(stored?.seriesAudio)
+		seriesAudio: readSeries(stored?.seriesAudio),
+		secondaryItems: stored?.secondaryItems && typeof stored.secondaryItems === 'object' ? stored.secondaryItems : {}
 	};
+};
+
+// Every save reads the whole record and writes it back, so two landing together, like a
+// primary pick that also clears the second track, would drop one. They take turns instead.
+let writeQueue = Promise.resolve();
+const updatePrefs = (change) => {
+	const run = writeQueue.then(async () => {
+		const prefs = await loadPrefs();
+		change(prefs);
+		await saveToStorage(STORAGE_KEY, prefs);
+	});
+	writeQueue = run.catch(() => {});
+	return run;
+};
+
+// Reinsert so the freshest item sits last, then trim the oldest once over the cap.
+const remember = (map, id, value) => {
+	delete map[id];
+	map[id] = value;
+	const ids = Object.keys(map);
+	if (ids.length > MAX_ITEMS) {
+		for (const old of ids.slice(0, ids.length - MAX_ITEMS)) {
+			delete map[old];
+		}
+	}
 };
 
 // `streams` is every subtitle track the episode offers, which is what tells the
 // pick apart from the others in its language.
 export const saveSubtitlePref = async (item, streamIndex, streams) => {
 	if (!item?.Id) return;
-	const prefs = await loadPrefs();
+	await updatePrefs((prefs) => {
+		remember(prefs.items, item.Id, streamIndex >= 0 ? streamIndex : OFF_INDEX);
 
-	// Reinsert so the freshest item sits last, then trim the oldest once over the cap.
-	delete prefs.items[item.Id];
-	prefs.items[item.Id] = streamIndex >= 0 ? streamIndex : OFF_INDEX;
-	const ids = Object.keys(prefs.items);
-	if (ids.length > MAX_ITEMS) {
-		for (const id of ids.slice(0, ids.length - MAX_ITEMS)) {
-			delete prefs.items[id];
+		if (item.SeriesId) {
+			const pref = createSeriesTrackPref(streams, streamIndex);
+			if (pref) prefs.series[item.SeriesId] = pref;
+			else delete prefs.series[item.SeriesId];
 		}
-	}
-
-	if (item.SeriesId) {
-		const pref = createSeriesTrackPref(streams, streamIndex);
-		if (pref) prefs.series[item.SeriesId] = pref;
-		else delete prefs.series[item.SeriesId];
-	}
-
-	await saveToStorage(STORAGE_KEY, prefs);
+	});
 };
 
 export const saveAudioPref = async (item, streamIndex, streams) => {
 	if (!item?.SeriesId) return;
+	await updatePrefs((prefs) => {
+		// Turning audio off isn't a thing, so a pick that names no track leaves the
+		// series without an opinion rather than storing one.
+		const pref = streamIndex >= 0 ? createSeriesTrackPref(streams, streamIndex) : null;
+		if (pref) prefs.seriesAudio[item.SeriesId] = pref;
+		else delete prefs.seriesAudio[item.SeriesId];
+	});
+};
+
+// The second track is only remembered per item, and off is remembered too so a track
+// turned off stays off on the next play.
+export const saveSecondarySubtitlePref = async (item, selection) => {
+	if (!item?.Id) return;
+	await updatePrefs((prefs) => {
+		remember(prefs.secondaryItems, item.Id, selection);
+	});
+};
+
+export const getItemSecondarySubtitlePref = async (itemId) => {
+	if (!itemId) return undefined;
 	const prefs = await loadPrefs();
-
-	// Turning audio off isn't a thing, so a pick that names no track leaves the
-	// series without an opinion rather than storing one.
-	const pref = streamIndex >= 0 ? createSeriesTrackPref(streams, streamIndex) : null;
-	if (pref) prefs.seriesAudio[item.SeriesId] = pref;
-	else delete prefs.seriesAudio[item.SeriesId];
-
-	await saveToStorage(STORAGE_KEY, prefs);
+	return prefs.secondaryItems[itemId];
 };
 
 export const getItemSubtitlePref = async (itemId) => {

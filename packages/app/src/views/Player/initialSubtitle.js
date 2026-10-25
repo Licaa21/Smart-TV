@@ -1,7 +1,7 @@
 import {getItemSubtitlePref, getSeriesSubtitlePref} from '../../services/subtitlePrefs';
 import {languageMatches, normalizeLanguageCode} from '../../utils/audioLanguage';
 import {fromServerStream, matchSeriesTrackIndex} from '../../utils/seriesTrackPrefs';
-import {streamTitleText} from '../../utils/streamTitle';
+import {isForcedTrack, streamTitleText} from '../../utils/streamTitle';
 import {isTextSubtitleCodec} from '../../utils/subtitleCodecs';
 
 const SPECIAL = /\b(commentary|commentaries|jump\s*scare)\b/;
@@ -12,7 +12,6 @@ const ASS_CODECS = ['ass', 'ssa'];
 
 const getCodec = (s) => String(s?.codec || s?.Codec || '').trim().toLowerCase();
 const getLanguage = (s) => s?.language || s?.Language || '';
-const getIsForced = (s) => s?.isForced === true || s?.IsForced === true;
 const getIsDefault = (s) => s?.isDefault === true || s?.IsDefault === true;
 const getIsHearingImpaired = (s) => s?.isHearingImpaired === true || s?.IsHearingImpaired === true;
 const getIsCommentary = (s) => s?.isCommentary === true || s?.IsCommentary === true;
@@ -45,14 +44,15 @@ const compare = (left, right) => (left === right ? 0 : (left ? -1 : 1));
  *
  * @param {Array} streams - the subtitle tracks to choose between
  * @param {string} [preferredLanguage]
- * @param {Object} [options] - fallbackLanguage, preferSdh, preferTextSubtitles,
- *   preferExternalSubtitles, subtitleMode, pgsDirectPlay and assDirectPlay
+ * @param {Object} [options] - fallbackLanguage, audioLanguage, preferSdh,
+ *   preferTextSubtitles, preferExternalSubtitles, subtitleMode, pgsDirectPlay
+ *   and assDirectPlay
  * @returns {Object|undefined} the track to start on
  */
 export const bestSubtitle = (streams, preferredLanguage, options = {}) => {
 	if (!streams?.length) return undefined;
 
-	const {fallbackLanguage, subtitleMode} = options;
+	const {fallbackLanguage, audioLanguage, subtitleMode} = options;
 	const preferSdh = options.preferSdh === true;
 	const preferText = options.preferTextSubtitles === true;
 	const preferExternal = options.preferExternalSubtitles === true;
@@ -61,24 +61,34 @@ export const bestSubtitle = (streams, preferredLanguage, options = {}) => {
 		assDirectPlay: options.assDirectPlay !== false
 	};
 
+	// A forced track only covers the foreign lines for someone who reads its
+	// language, so one in a language the viewer doesn't read is no help.
+	// Untagged ones stay in, since nothing says they're the wrong language.
+	const readable = [preferredLanguage, fallbackLanguage, audioLanguage].filter(normalizeLanguageCode);
+	const forcedFits = (stream) => {
+		const language = getLanguage(stream);
+		if (!readable.length || !normalizeLanguageCode(language)) return true;
+		return readable.some((wanted) => languageMatches(language, wanted));
+	};
+
 	let keep;
 	if (subtitleMode === 'forced') {
-		keep = (stream) => getIsForced(stream);
+		keep = (stream) => isForcedTrack(stream) && forcedFits(stream);
 	} else if (subtitleMode === 'flagged') {
 		// Neither language being present is what lets English in as a candidate,
 		// so the question is put to every track rather than to the shortlist.
 		const bothUnavailable =
 			!streams.some((stream) => languageMatches(getLanguage(stream), preferredLanguage)) &&
 			!streams.some((stream) => languageMatches(getLanguage(stream), fallbackLanguage));
-		keep = (stream) => getIsDefault(stream) ||
-			getIsForced(stream) ||
-			(bothUnavailable && languageMatches(getLanguage(stream), 'eng'));
+		keep = (stream) => (isForcedTrack(stream) ?
+			forcedFits(stream) :
+			getIsDefault(stream) || (bothUnavailable && languageMatches(getLanguage(stream), 'eng')));
 	} else {
 		keep = () => true;
 	}
 
 	const ordered = streams
-		.map((stream, position) => ({stream, position}))
+		.map((stream, position) => ({stream, position, forced: isForcedTrack(stream)}))
 		.filter((entry) => keep(entry.stream));
 	if (!ordered.length) return undefined;
 
@@ -109,7 +119,7 @@ export const bestSubtitle = (streams, preferredLanguage, options = {}) => {
 		// A forced track only carries the foreign dialogue, so neither preference
 		// below should lift it above a full track.
 		if (preferText || preferExternal) {
-			const byFull = compare(!getIsForced(left), !getIsForced(right));
+			const byFull = compare(!a.forced, !b.forced);
 			if (byFull) return byFull;
 		}
 
@@ -131,7 +141,7 @@ export const bestSubtitle = (streams, preferredLanguage, options = {}) => {
 
 		// Forced mode has already narrowed the list to forced tracks, so this only
 		// ever decides between full subtitles, where the forced one is the poorer read.
-		const byForced = compare(!getIsForced(left), !getIsForced(right));
+		const byForced = compare(!a.forced, !b.forced);
 		if (byForced) return byForced;
 
 		const byDefault = compare(getIsDefault(left), getIsDefault(right));
@@ -172,6 +182,7 @@ export const resolveInitialSubtitle = async (result, item, initialSubtitleIndex,
 	const streams = result?.subtitleStreams || [];
 	const pick = (subtitleMode) => bestSubtitle(streams, settings.subtitleLanguage, {
 		fallbackLanguage: settings.fallbackSubtitleLanguage,
+		audioLanguage: getLanguage(audioStream),
 		preferSdh: settings.preferSdhSubtitles === true,
 		preferTextSubtitles: settings.preferTextSubtitles === true,
 		preferExternalSubtitles: settings.preferExternalSubtitles === true,

@@ -29,6 +29,24 @@ export const makePickedRow = ({source, serverUrl, itemId, name}, enabled, order)
 	};
 };
 
+// A Seerr discover slider given a home row. Its section is the slider's id and its item the
+// slider's type, so a slider that was replaced by one of another type isn't mistaken for it.
+export const makeSeerrSliderRow = ({serverUrl, sliderId, sliderType, name}, enabled, order) => {
+	const server = withoutTrailingSlash(serverUrl);
+	return {
+		id: `pluginDynamic:seerr:${server}:${sliderId}:${sliderType}`,
+		name,
+		enabled,
+		order,
+		source: 'seerr',
+		serverUrl: server,
+		sliderId: String(sliderId),
+		sliderType: String(sliderType)
+	};
+};
+
+export const isSeerrSliderRow = (row) => Boolean(row && row.source === 'seerr' && row.sliderId);
+
 // A picked row answers to the switch of the list it came from, and another server's collections
 // only show while multi-server libraries is on
 export const isPickedRowShown = (row, settings, currentServerUrl) => {

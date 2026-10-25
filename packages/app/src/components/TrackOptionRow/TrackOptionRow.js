@@ -9,9 +9,9 @@ const SpottableButton = Spottable('button');
 // option and hollow on the rest, so the column stays aligned and the list reads
 // as a set of choices. A name wider than the dialog scrolls rather than being
 // cut off, which is the only way to read the long ones.
-const TrackOptionRow = ({label, detail, selected, dimmed = false, onClick, onKeyDown, spotlightId, ...rest}) => (
+const TrackOptionRow = ({label, detail, selected, dimmed = false, className, onClick, onKeyDown, spotlightId, ...rest}) => (
 	<SpottableButton
-		className={[css.trackOption, selected && css.selected, dimmed && css.dimmed].filter(Boolean).join(' ')}
+		className={[css.trackOption, selected && css.selected, dimmed && css.dimmed, className].filter(Boolean).join(' ')}
 		data-selected={selected ? 'true' : undefined}
 		onClick={onClick}
 		onKeyDown={onKeyDown}

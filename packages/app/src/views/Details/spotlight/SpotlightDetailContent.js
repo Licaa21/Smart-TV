@@ -49,7 +49,7 @@ const SpotlightDetailContent = (props) => {
 		isPerson, isEpisode, isSeries, isSeason, backdropUrl, posterUrl, logoUrl, onLogoError,
 		year, officialRating, seasonCount, genres = [], tagline, techBadges = [], techSize,
 		overviewBackRef, episodes = [], seriesEpisodes = [], birthDate, birthPlace,
-		effectiveApi, serverToken, seasons = [], similar = [], similarSource, extras = [], cast = [], crew = [],
+		effectiveApi, serverToken, seasons = [], similar = [], similarSource, reviews = [], onSelectReview, extras = [], cast = [], crew = [],
 		nextUp = [], collectionItems = [], missingCollectionItems = [], parentCollections = [],
 		albumTracks = [], artistAlbums = [], playlistItems = [], personMovies = [], personSeries = [],
 		filmography, loadMoreCollectionItems, collectionMenu,
@@ -136,7 +136,7 @@ const SpotlightDetailContent = (props) => {
 
 	const cardState = useMemo(() => ({
 		item, serverUrl: effectiveServerUrl, settings, showsSection, seerrOnly, mediaSource,
-		seasons, episodes, seriesEpisodes, similar, similarSource, extras, cast, crew, nextUp,
+		seasons, episodes, seriesEpisodes, similar, similarSource, reviews, extras, cast, crew, nextUp,
 		collectionItems, missingCollectionItems, parentCollections,
 		albumTracks, artistAlbums, playlistItems,
 		personMovies, personSeries, filmography: otherCredits,
@@ -148,17 +148,18 @@ const SpotlightDetailContent = (props) => {
 			similar: seerr.similarCards || [],
 			chipCount: seerr.pieces.chips ? seerrChipCount(seerr.details) : 0,
 			factCount: seerr.pieces.facts ? buildMediaFacts(seerr.details, seerr.mediaType).length : 0,
+			streamingCount: seerr.pieces.streaming ? seerr.streamingProviders.length : 0,
 			collection: seerr.collection,
 			seasonMarkers: settings.showSeerrAvailabilityBadges !== false ? seerr.seasonMarkers : null
 		},
 		fallbackImageUrl: cardFallbackImageUrl
 	}), [
-		item, effectiveServerUrl, settings, showsSection, seerrOnly, mediaSource, seasons, episodes, seriesEpisodes, similar, similarSource,
+		item, effectiveServerUrl, settings, showsSection, seerrOnly, mediaSource, seasons, episodes, seriesEpisodes, similar, similarSource, reviews,
 		extras, cast, crew, nextUp, collectionItems, missingCollectionItems, parentCollections,
 		albumTracks, artistAlbums, playlistItems, personMovies, personSeries, otherCredits,
 		seerrCredits, studioCards, canManagePlaylist, cardFallbackImageUrl,
 		seerr.recommendationCards, seerr.similarCards, seerr.details, seerr.mediaType, seerr.collection, seerr.seasonMarkers,
-		seerr.pieces.chips, seerr.pieces.facts
+		seerr.pieces.chips, seerr.pieces.facts, seerr.pieces.streaming, seerr.streamingProviders
 	]);
 
 	const cardActions = useMemo(() => ({
@@ -166,6 +167,7 @@ const SpotlightDetailContent = (props) => {
 		openSeerrItem: onSelectSeerrCard,
 		openPerson: onSelectPerson,
 		openStudio: onSelectStudio,
+		openReview: onSelectReview,
 		playFromChapter: handleChapterSelect,
 		playExtra: handleExtraSelect,
 		playTrack,
@@ -179,7 +181,7 @@ const SpotlightDetailContent = (props) => {
 		selectedAudioIndex,
 		selectedSubtitleIndex
 	}), [
-		onSelectItem, onSelectSeerrCard, onSelectPerson, onSelectStudio, handleChapterSelect,
+		onSelectItem, onSelectSeerrCard, onSelectPerson, onSelectStudio, onSelectReview, handleChapterSelect,
 		handleExtraSelect, playTrack, playlistMenu, onReorderPlaylistItem, onRemovePlaylistItem,
 		loadMoreCollectionItems, collectionMenu,
 		effectiveApi, settings, selectedAudioIndex, selectedSubtitleIndex
@@ -419,7 +421,7 @@ const SpotlightDetailContent = (props) => {
 				card={openCard}
 				serverUrl={effectiveServerUrl}
 				actions={cardActions}
-				seerr={{details: seerr.details, mediaType: seerr.mediaType, collection: seerr.collection, nav: seerrNav}}
+				seerr={{details: seerr.details, mediaType: seerr.mediaType, collection: seerr.collection, streaming: seerr.streamingProviders, nav: seerrNav}}
 				// Paging appends to the playlist list, which is the one that arrives a page at a
 				// time. The Movies and Shows grid is fetched whole, so it has nothing to ask for.
 				onNearEnd={openCardId === 'playlist_order' ? cardActions.loadMoreCollectionItems : null}

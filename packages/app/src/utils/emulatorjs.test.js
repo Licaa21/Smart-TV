@@ -576,3 +576,56 @@ describe('controller screen', () => {
 		expect(emu.controls[0][0].value2).toBe('BUTTON_1');
 	});
 });
+
+describe('battery saves', () => {
+	let ejs;
+	let files;
+	const gameManager = () => ({
+		FS: {
+			analyzePath: (path) => ({exists: path in files}),
+			mkdir: jest.fn((path) => { files[path] = 'dir'; }),
+			writeFile: jest.fn((path, bytes) => { files[path] = bytes; })
+		},
+		getSaveFilePath: () => '/data/saves/game.srm',
+		getSaveFile: () => files['/data/saves/game.srm'] || null,
+		loadSaveFiles: jest.fn(),
+		restart: jest.fn()
+	});
+
+	beforeEach(() => {
+		jest.resetModules();
+		ejs = require('./emulatorjs');
+		files = {};
+		window.EJS_emulator = {gameManager: gameManager()};
+	});
+
+	afterEach(() => {
+		delete window.EJS_emulator;
+	});
+
+	test('writes a different battery save into the core and restarts the game', () => {
+		const gm = window.EJS_emulator.gameManager;
+
+		ejs.applySram(new Uint8Array([1, 2]));
+
+		expect(gm.FS.mkdir.mock.calls.map(([path]) => path)).toEqual(['/data', '/data/saves']);
+		expect(Array.from(files['/data/saves/game.srm'])).toEqual([1, 2]);
+		expect(gm.loadSaveFiles).toHaveBeenCalled();
+		expect(gm.restart).toHaveBeenCalled();
+		expect(Array.from(ejs.getSram())).toEqual([1, 2]);
+	});
+
+	test('leaves the game alone when the battery save already matches', () => {
+		files['/data/saves/game.srm'] = new Uint8Array([1, 2]);
+		const gm = window.EJS_emulator.gameManager;
+
+		ejs.applySram(new Uint8Array([1, 2]));
+
+		expect(gm.FS.writeFile).not.toHaveBeenCalled();
+		expect(gm.restart).not.toHaveBeenCalled();
+	});
+
+	test('reads a core with no battery save as none', () => {
+		expect(ejs.getSram()).toBeNull();
+	});
+});

@@ -44,13 +44,28 @@ test('closing the reader saves a page it had not saved yet', () => {
 	expect(mockApi.setPlaybackPosition).toHaveBeenCalledWith('book1', 20000);
 });
 
-test('the last page marks the book read', async () => {
-	const {rerender} = renderHook(({page}) => useBookProgress(item, page, 12), {initialProps: {page: 10}});
-	rerender({page: 11});
+const settleOn = async (rerender, page) => {
+	rerender({page});
 	await act(async () => {
 		jest.advanceTimersByTime(2000);
 		await Promise.resolve();
 	});
+};
+
+test('the last page of a short book marks it read', async () => {
+	const {rerender} = renderHook(({page}) => useBookProgress(item, page, 12), {initialProps: {page: 9}});
+	await settleOn(rerender, 10);
+	expect(mockApi.setWatched).not.toHaveBeenCalled();
+	await settleOn(rerender, 11);
 	expect(mockApi.setPlaybackPosition).toHaveBeenCalledWith('book1', 110000);
+	expect(mockApi.setWatched).toHaveBeenCalledWith('book1', true);
+});
+
+test('98 percent of the way through marks a long book read', async () => {
+	const {rerender} = renderHook(({page}) => useBookProgress(item, page, 100), {initialProps: {page: 90}});
+	await settleOn(rerender, 96);
+	expect(mockApi.setWatched).not.toHaveBeenCalled();
+	await settleOn(rerender, 97);
+	expect(mockApi.setPlaybackPosition).toHaveBeenCalledWith('book1', 970000);
 	expect(mockApi.setWatched).toHaveBeenCalledWith('book1', true);
 });

@@ -86,19 +86,25 @@ const toCssColor = (value, opacityPercent) => {
 const SIZE_MAP = { small: 36, medium: 44, large: 52, xlarge: 60 };
 const POSITION_MAP = { bottom: 10, lower: 20, middle: 30, higher: 40 };
 
-export const getSubtitleOverlayStyle = (settings) => ({
-	bottom: settings.subtitlePosition === 'absolute'
-		? `${100 - settings.subtitlePositionAbsolute}%`
-		: `${POSITION_MAP[settings.subtitlePosition] || 10}%`,
-	opacity: (settings.subtitleOpacity || 100) / 100
-});
+// A second track on screen moves the first by shiftPercent, never past the bottom edge.
+export const getSubtitleOverlayStyle = (settings, shiftPercent = 0) => {
+	const bottom = settings.subtitlePosition === 'absolute'
+		? 100 - settings.subtitlePositionAbsolute
+		: POSITION_MAP[settings.subtitlePosition] || 10;
+	return {
+		bottom: `${Math.max(0, bottom + shiftPercent)}%`,
+		opacity: (settings.subtitleOpacity || 100) / 100
+	};
+};
+
+export const getSubtitleFontPx = (settings) => SIZE_MAP[settings?.subtitleSize] || 44;
 
 export const getSubtitleTextStyle = (settings) => {
 	const shadowColor = toCssColor(settings.subtitleShadowColor || '#000000', settings.subtitleShadowOpacity !== undefined ? settings.subtitleShadowOpacity : 100);
 	const blur = `${settings.subtitleShadowBlur || 0.1}em`;
 
 	return {
-		fontSize: `${SIZE_MAP[settings.subtitleSize] || 44}px`,
+		fontSize: `${getSubtitleFontPx(settings)}px`,
 		backgroundColor: toCssColor(settings.subtitleBackgroundColor || '#000000', settings.subtitleBackground !== undefined ? settings.subtitleBackground : 0),
 		color: toCssColor(settings.subtitleColor || '#ffffff', 100),
 		textShadow: `-2px -2px ${blur} ${shadowColor}, 2px -2px ${blur} ${shadowColor}, -2px 2px ${blur} ${shadowColor}, 2px 2px ${blur} ${shadowColor}, 0 0 ${blur} ${shadowColor}`

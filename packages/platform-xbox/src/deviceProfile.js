@@ -147,7 +147,8 @@ const buildDirectPlayProfiles = (caps) => {
 		{Container: 'mkv', Type: 'Video', VideoCodec: videoCodecs, AudioCodec: mkvAudioCodecs},
 		{Container: 'mov', Type: 'Video', VideoCodec: videoCodecs, AudioCodec: 'aac'},
 		...(caps.webm ? [{Container: 'webm', Type: 'Video', VideoCodec: videoCodecs, AudioCodec: 'opus,vorbis'}] : []),
-		...(caps.ts ? [{Container: 'ts', Type: 'Video', VideoCodec: videoCodecs, AudioCodec: audioCodecs}] : []),
+		// Emby names a live channel's container mpegts and matches names exactly
+		...(caps.ts ? [{Container: 'ts,mpegts', Type: 'Video', VideoCodec: videoCodecs, AudioCodec: audioCodecs}] : []),
 		{Container: 'mp3', Type: 'Audio'},
 		{Container: 'flac', Type: 'Audio'},
 		{Container: 'aac', Type: 'Audio'},
@@ -179,11 +180,13 @@ const SUBTITLE_PROFILES = [
 // instead of being burned in by the server
 const buildSubtitleProfiles = (caps) => SUBTITLE_PROFILES.map((profile) => (caps.nativePlayer && isBurnInSubtitleCodec(profile.Format) ? {...profile, Method: 'Embed'} : profile));
 
-// Every transcode is H.264 and AAC over HLS. The WebView gets stereo in TS segments,
+// Every transcode is AAC over HLS. The WebView gets H.264 and stereo in TS segments,
 // which hls.js plays wherever it has no HLS player of its own. The console player
-// gets up to 7.1 in fMP4 segments, since TS cant carry AAC past 5.1.
+// gets up to 7.1 in fMP4 segments, since TS cant carry AAC past 5.1. HEVC trails
+// H.264 there, so the server still encodes H.264 but can copy an HEVC video when
+// only the audio needs work.
 const buildTranscodingProfiles = (caps) => [
-	{Container: caps.nativePlayer ? 'mp4' : 'ts', Type: 'Video', AudioCodec: 'aac', VideoCodec: 'h264', Context: 'Streaming', Protocol: 'hls', MaxAudioChannels: caps.nativePlayer ? '8' : '2', MinSegments: '1', BreakOnNonKeyFrames: false},
+	{Container: caps.nativePlayer ? 'mp4' : 'ts', Type: 'Video', AudioCodec: 'aac', VideoCodec: caps.nativePlayer && caps.hevc ? 'h264,hevc' : 'h264', Context: 'Streaming', Protocol: 'hls', MaxAudioChannels: caps.nativePlayer ? '8' : '2', MinSegments: '1', BreakOnNonKeyFrames: false},
 	{Container: 'mp4', Type: 'Video', AudioCodec: 'aac', VideoCodec: 'h264', Context: 'Static'},
 	{Container: 'mp3', Type: 'Audio', AudioCodec: 'mp3', Context: 'Streaming', Protocol: 'http'},
 	{Container: 'aac', Type: 'Audio', AudioCodec: 'aac', Context: 'Streaming', Protocol: 'http'}
@@ -239,9 +242,11 @@ export const getJellyfinDeviceProfile = async () => {
 	};
 };
 
-// The transcodes are already H.264 and AAC, so the retry after a failed transcode
-// asks for the same thing.
-export const getH264FallbackProfile = () => getJellyfinDeviceProfile();
+// The retry after a failed transcode asks for H.264 alone.
+export const getH264FallbackProfile = async () => {
+	const profile = await getJellyfinDeviceProfile();
+	return {...profile, TranscodingProfiles: profile.TranscodingProfiles.map((entry) => (entry.Type === 'Video' ? {...entry, VideoCodec: 'h264'} : entry))};
+};
 
 export const getDeviceId = () => {
 	let deviceId = localStorage.getItem('moonfin_device_id');

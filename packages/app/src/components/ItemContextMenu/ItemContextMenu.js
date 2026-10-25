@@ -14,7 +14,7 @@ import AddToPlaylistModal from '../AddToPlaylistModal';
 import ChangeArtworkModal from '../ChangeArtworkModal';
 import IdentifyModal from '../IdentifyModal';
 import {iconViewBox} from '../icons/iconViewBox';
-import {itemMenuActions} from './itemMenuActions';
+import {hideFromResume, itemMenuActions} from './itemMenuActions';
 
 import css from './ItemContextMenu.module.less';
 
@@ -137,17 +137,16 @@ export const ItemMenuProvider = ({children, onPlay, onOpenItem, backRef}) => {
 			case 'watched':
 				await api.setWatched(item.Id, !userData.Played).catch(() => {});
 				break;
-			// Clearing the play state is what takes the resume point away with it.
 			case 'hideContinueWatching':
 				updateSetting('hiddenContinueWatchingItems', hiddenMapWith(settings.hiddenContinueWatchingItems, item.SeriesId || item.Id));
-				await api.setWatched(item.Id, false).catch(() => {});
+				await hideFromResume(api, item, item._serverType || getServerType());
 				break;
 			case 'hideNextUp':
 				updateSettings({
 					hiddenNextUpSeries: hiddenMapWith(settings.hiddenNextUpSeries, item.SeriesId),
 					hiddenContinueWatchingItems: hiddenMapWith(settings.hiddenContinueWatchingItems, item.SeriesId)
 				});
-				await api.setWatched(item.Id, false).catch(() => {});
+				await hideFromResume(api, item, item._serverType || getServerType());
 				break;
 			case 'favorite':
 				await api.setFavorite(item.Id, !userData.IsFavorite).catch(() => {});

@@ -60,6 +60,47 @@ describe('resolveInitialSubtitle', () => {
 		expect(picked).toBe(engForced);
 	});
 
+	test('forced mode turns subtitles off when every forced track is in a language nobody reads', async () => {
+		const streams = [
+			{index: 1, language: 'ces', isForced: true},
+			{index: 2, language: 'spa', isForced: true},
+			{index: 3, language: 'fra', isForced: true}
+		];
+		const settings = {subtitleMode: 'forced', subtitleLanguage: 'de'};
+		const picked = await resolveInitialSubtitle({subtitleStreams: streams}, item, undefined, settings, {language: 'deu'});
+		expect(picked).toBeNull();
+	});
+
+	test('forced mode takes a forced track in the audio language', async () => {
+		const spaForced = {index: 2, language: 'spa', isForced: true};
+		const streams = [{index: 1, language: 'ces', isForced: true}, spaForced];
+		const settings = {subtitleMode: 'forced', subtitleLanguage: 'de'};
+		const picked = await resolveInitialSubtitle({subtitleStreams: streams}, item, undefined, settings, {language: 'spa'});
+		expect(picked).toBe(spaForced);
+	});
+
+	test('forced mode keeps an untagged forced track', async () => {
+		const untagged = {index: 2, isForced: true};
+		const streams = [{index: 1, language: 'ces', isForced: true}, untagged];
+		const settings = {subtitleMode: 'forced', subtitleLanguage: 'de'};
+		const picked = await resolveInitialSubtitle({subtitleStreams: streams}, item, undefined, settings, {language: 'deu'});
+		expect(picked).toBe(untagged);
+	});
+
+	test('default mode leaves out forced tracks in a language nobody reads', async () => {
+		const streams = [{index: 1, language: 'ces', isForced: true, isDefault: true}];
+		const settings = {subtitleMode: 'default', subtitleLanguage: 'de'};
+		const picked = await resolveInitialSubtitle({subtitleStreams: streams}, item, undefined, settings, {language: 'deu'});
+		expect(picked).toBeNull();
+	});
+
+	test('a track only titled forced counts as forced', async () => {
+		const titled = {index: 10, language: 'eng', title: 'English (Forced)'};
+		const full = {index: 11, language: 'eng', displayTitle: 'English - SUBRIP'};
+		const picked = await resolveInitialSubtitle({subtitleStreams: [titled, full]}, item, undefined, {subtitleMode: 'always', subtitleLanguage: 'eng'});
+		expect(picked).toBe(full);
+	});
+
 	test('default mode follows the server resolved index', async () => {
 		const picked = await resolveInitialSubtitle(result({defaultSubtitleStreamIndex: 3}), item, undefined, {subtitleMode: 'default'});
 		expect(picked).toBe(spa);

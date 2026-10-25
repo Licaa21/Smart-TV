@@ -3,7 +3,7 @@ import $L from '@enact/i18n/$L';
 
 import MediaCard from '../../../components/MediaCard';
 import DetailTrackList from '../../../components/DetailTrackList';
-import {SeerrChips, SeerrFacts, SeerrCollectionBanner} from '../../../components/seerr/SeerrSections';
+import {SeerrChips, SeerrFacts, SeerrStreaming, SeerrCollectionBanner} from '../../../components/seerr/SeerrSections';
 import {getImageUrl} from '../../../utils/helpers';
 import {formatPlaybackDuration} from '../../../utils/playbackTimeLabels';
 import {castPhotoUrl} from '../detailsMedia';
@@ -11,6 +11,7 @@ import {SpottableDiv, RowContainer} from '../detailsSpottables';
 import {DETAIL_ICON_PATHS} from '../detailIcons';
 import {iconViewBox} from '../../../components/icons/iconViewBox';
 import ModernFileInformation from '../ModernFileInformation';
+import {ReviewCards} from '../ReviewCard';
 
 import css from './SpotlightGrids.module.less';
 
@@ -163,6 +164,12 @@ const SpotlightSection = ({section, serverUrl, actions, seerr, firstSpotlightId}
 			return <StudiosGrid studios={section.studios} onSelect={actions.openStudio} firstSpotlightId={firstSpotlightId} />;
 		case 'chapters':
 			return <ChaptersGrid item={section.item} serverUrl={serverUrl} onSelect={actions.playFromChapter} firstSpotlightId={firstSpotlightId} />;
+		case 'reviews':
+			return (
+				<RowContainer className={css.grid}>
+					<ReviewCards reviews={section.reviews} onSelect={actions.openReview} firstSpotlightId={firstSpotlightId} />
+				</RowContainer>
+			);
 		case 'tracks':
 			return (
 				<DetailTrackList
@@ -189,6 +196,12 @@ const SpotlightSection = ({section, serverUrl, actions, seerr, firstSpotlightId}
 			return (
 				<div className={css.factsRow}>
 					<SeerrFacts details={seerr?.details} mediaType={seerr?.mediaType} />
+				</div>
+			);
+		case 'seerrStreaming':
+			return (
+				<div className={css.factsRow}>
+					<SeerrStreaming providers={seerr?.streaming} />
 				</div>
 			);
 		case 'seerrCollection':

@@ -17,6 +17,7 @@ import {isBlocked as isContentBlocked, isBlockedNow, observeItem} from '../../se
 import {getActiveParentalFilter, withoutBlockedItems} from '../../services/parentalControls';
 import * as userDataSync from '../../services/userDataSync';
 import {useUserDataVersion} from '../../hooks/useUserDataSync';
+import {isStreamlessStaticSource, probedSources} from '../../utils/placeholderSource';
 
 // Everything the screen shows about one item. The item itself is fetched first and rendered
 // on its own, then the rows that hang off it fill in behind, because waiting for all of them
@@ -31,6 +32,16 @@ const seedFrom = (candidate, id) => (candidate && candidate.Id === id ? candidat
 // blocked its row copy waits for the check rather than flashing a title that's about to go.
 const seedIsDecided = (seed) => !getActiveParentalFilter().isActive || !seed.SeriesId ||
 	Boolean(seed.OfficialRating && String(seed.OfficialRating).trim());
+
+const PROBED_TYPES = ['Movie', 'Episode', 'Video', 'MusicVideo', 'Trailer'];
+
+// An Emby channel item comes with a placeholder source, so the screen shows the one the server
+// probes when it's asked without that.
+const withProbedSources = async (api, data) => {
+	if (!PROBED_TYPES.includes(data?.Type) || !isStreamlessStaticSource(data, data.MediaSources?.[0]?.Id)) return data;
+	const probed = probedSources(await api.getPlaybackInfo(data.Id, {AutoOpenLiveStream: false}).catch(() => null));
+	return probed.length ? {...data, MediaSources: probed} : data;
+};
 
 const seedToShow = (candidate, id) => {
 	const seed = seedFrom(candidate, id);
@@ -168,7 +179,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 
 			let data;
 			try {
-				data = await effectiveApi.getItemForDetail(itemId);
+				data = await withProbedSources(effectiveApi, await effectiveApi.getItemForDetail(itemId));
 			} catch (err) {
 				console.error('[Details] Error loading item', err);
 				setIsSeed(false);
@@ -367,9 +378,10 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				// Older servers have to ask every collection what it holds, so the rest isnt kept
 				// waiting on that.
 				const collectionsLookup = needsBoxSet ? findParentCollections(effectiveApi, data).catch(() => []) : Promise.resolve([]);
-				const [similarResult, extrasData] = await Promise.all([
+				const [similarResult, extrasData, partsData] = await Promise.all([
 					fetchSimilar(),
-					needsExtras ? effectiveApi.getSpecialFeatures(itemId).catch(() => null) : Promise.resolve(null)
+					needsExtras ? effectiveApi.getSpecialFeatures(itemId).catch(() => null) : Promise.resolve(null),
+					needsExtras && data.PartCount > 1 ? effectiveApi.getAdditionalParts(itemId).catch(() => null) : Promise.resolve(null)
 				]);
 
 				if (similarResult?.data) {
@@ -379,7 +391,10 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				// Recorded whether or not anything came back, so a section that holds its place
 				// while the answer is out knows when to stop holding it.
 				setSimilarLoaded(true);
-				if (extrasData) setExtras(tagWithServerInfo(withoutBlockedItems(extrasData.filter(e => e.Id !== itemId))));
+				const parts = (partsData?.Items || []).map((part) => ({...part, _additionalPart: true}));
+				if (extrasData || parts.length) {
+					setExtras(tagWithServerInfo(withoutBlockedItems([...parts, ...(extrasData || []).filter(e => e.Id !== itemId)])));
+				}
 				const collections = await collectionsLookup;
 				for (const boxSet of collections) {
 					const colData = await effectiveApi.getItems({
@@ -525,7 +540,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 
 	const refreshItem = useCallback(async () => {
 		try {
-			const data = await effectiveApi.getItemForDetail(itemId);
+			const data = await withProbedSources(effectiveApi, await effectiveApi.getItemForDetail(itemId));
 			if (data) {
 				setItem(tagWithServerInfo(data));
 			}

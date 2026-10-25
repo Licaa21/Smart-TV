@@ -1,13 +1,18 @@
 import {Component, memo} from 'react';
+import $L from '@enact/i18n/$L';
 import {Pause} from '@enact/spotlight/Pause';
 
 import {useSettings} from '../../context/SettingsContext';
 import {isXbox} from '../../platform';
-import {toCssColor, toCssColorWithAlpha, radiusToCss, shadowToCss} from '../../theme/themeSpec';
+import {toCssColor, toCssColorWithAlpha, toRgbTriplet, inkOn, radiusToCss, shadowToCss} from '../../theme/themeSpec';
 import {getPerfTier} from '../../utils/perfTier';
+import {getKeyboardStyleOptions} from '../../views/Settings/settingsOptions';
 import {
 	NUMERIC_LAYOUT,
 	NUMBER_PAD_LAYOUT,
+	DOCKED_NUMERIC_LAYOUT,
+	dockedFor,
+	keyBoxes,
 	lowerFor,
 	upperFor,
 	variantForLocale,
@@ -81,9 +86,54 @@ const KeyIcon = ({name, color}) => (
 	</svg>
 );
 
+// Outlined icons for the Glass and Docked styles, drawn as strokes in the key's own color.
+const LINE_ICON_PATHS = {
+	SHIFT: 'M12 4.5l-7.5 7.5h4.25v7.5h6.5V12h4.25z',
+	SHIFT_LOCKED: 'M12 3.5l-7.5 7.5h4.25v4.5h6.5V11h4.25zM8.75 19.5h6.5',
+	BACKSPACE: 'M9 5.5h10.5a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5H9L3 12zM12.5 9.5l5 5M17.5 9.5l-5 5',
+	CURSORL: 'M14.5 6l-6 6 6 6',
+	CURSORR: 'M9.5 6l6 6-6 6',
+	PASTE: 'M8 5h8a2 2 0 0 1 2 2v11.5a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM9.5 3.5h5v3h-5z',
+	IME: 'M5 6h14a2.5 2.5 0 0 1 2.5 2.5v7.5a2.5 2.5 0 0 1-2.5 2.5H5a2.5 2.5 0 0 1-2.5-2.5V8.5A2.5 2.5 0 0 1 5 6zM6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M8 14.5h8',
+	SEARCH: 'M17.5 11a6.5 6.5 0 1 1-13 0a6.5 6.5 0 1 1 13 0zM16 16l4.5 4.5',
+	CHECK: 'M5 12.5l4.5 4.5L19 7.5',
+	BACK: 'M10 6l-6 6 6 6M4 12h16'
+};
+
+const LineIcon = ({name, size, className}) => (
+	<svg
+		className={className || css.keyIcon}
+		width={size}
+		height={size}
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		strokeWidth="1.7"
+		strokeLinecap="round"
+		strokeLinejoin="round"
+	>
+		<path d={LINE_ICON_PATHS[name]} />
+	</svg>
+);
+
+const Hint = ({cap, children}) => (
+	<div className={css.hint}>
+		<span className={css.keycap}>{cap}</span>
+		{children}
+	</div>
+);
+
+const GLASS_FOCUS_FILL = '#F5F7FA';
+const GLASS_FOCUS_INK = '#0B0D12';
+const GLASS_GLOW = '0 20px 52px rgba(0, 0, 0, 0.55), 0 0 56px rgba(255, 255, 255, 0.16)';
+const GLASS_PANEL_SHADOW = '0 48px 120px rgba(0, 0, 0, 0.55)';
+const DOCK_SHADOW = '0 -60px 120px rgba(0, 0, 0, 0.5)';
+
 const buildPalette = (theme) => {
 	const b = theme.borders;
 	const c = theme.colors;
+	const accentRgb = toRgbTriplet(c.accent);
+	const accentLift = accentRgb.split(', ').map((part) => Math.round(Number(part) + (255 - Number(part)) * 0.55)).join(', ');
 	return {
 		panel: toCssColor(c.surface),
 		panelBorder: `${b.cardBorder.width}px solid ${toCssColor(b.cardBorder.color)}`,
@@ -98,7 +148,14 @@ const buildPalette = (theme) => {
 		chipBackground: toCssColor(b.chipBackground),
 		chipRadius: radiusToCss(b.chipRadius),
 		focusGlow: b.focusGlow.length ? b.focusGlow.map(shadowToCss).join(', ') : 'none',
-		accent: toCssColor(c.accent)
+		accent: toCssColor(c.accent),
+		accentInk: inkOn(c.accent) === '0, 0, 0' ? '#04131A' : '#FFFFFF',
+		accentText: `rgb(${accentLift})`,
+		accentWash: `rgba(${accentRgb}, 0.2)`,
+		accentSoft: `rgba(${accentRgb}, 0.14)`,
+		accentLine: `2px solid rgba(${accentRgb}, 0.38)`,
+		accentRing: `0 0 0 10px rgba(${accentRgb}, 0.18)`,
+		accentGlow: `0 24px 60px rgba(${accentRgb}, 0.28)`
 	};
 };
 
@@ -124,31 +181,65 @@ const keyContent = (label, selected, palette, width, shifted) => {
 	return label;
 };
 
+const glassKeyContent = (label, shifted, search) => {
+	if (label === 'SHIFT') return <LineIcon name={shifted ? 'SHIFT_LOCKED' : 'SHIFT'} size={40} />;
+	if (label === '123' || label === 'ABC') return <span className={css.glassWord}>{label}</span>;
+	if (label === 'SPACE') return <span className={css.glassSpace}>{$L('space')}</span>;
+	if (label === 'DONE') return <span className={css.glassWord}>{search ? $L('Search') : $L('Done')}</span>;
+	if (LINE_ICON_PATHS[label]) return <LineIcon name={label} size={label === 'BACKSPACE' ? 42 : 36} />;
+	return label;
+};
+
+const glassKeyColors = (label, selected, palette) => {
+	if (selected) return {background: GLASS_FOCUS_FILL, color: GLASS_FOCUS_INK};
+	if (label === 'DONE') return {background: palette.accentWash, color: palette.accentText};
+	if (label === 'SPACE') return {background: 'rgba(255, 255, 255, 0.035)', color: 'rgba(255, 255, 255, 0.45)'};
+	// Every action key has a name, and every key that types has one character
+	if (label.length > 1) return {background: 'rgba(255, 255, 255, 0.035)', color: 'rgba(255, 255, 255, 0.62)'};
+	return {background: 'rgba(255, 255, 255, 0.075)', color: 'rgba(255, 255, 255, 0.92)'};
+};
+
+const keyStyle = (glass, selected, width, marginRight, palette, glow, label) => {
+	const size = {
+		width: width > 0 ? width : undefined,
+		flex: width > 0 ? undefined : 1,
+		marginRight
+	};
+	if (glass) {
+		return {
+			...size,
+			...glassKeyColors(label, selected, palette),
+			boxShadow: selected ? glow : 'none',
+			transform: selected ? 'scale(1.12)' : 'none',
+			zIndex: selected ? 2 : undefined
+		};
+	}
+	return {
+		...size,
+		background: selected ? palette.selectedKey : palette.idleKey,
+		border: selected ? palette.selectedKeyBorder : palette.idleKeyBorder,
+		borderRadius: palette.chipRadius,
+		color: selected ? palette.textOnSelected : palette.textPrimary,
+		boxShadow: selected ? glow : 'none'
+	};
+};
+
 // A press only changes two keys, so each one renders on its own props and the
 // rest of the grid is left alone.
-const Key = memo(({label, row, col, selected, width, marginRight, palette, glow, shifted, hasAlternates, onClick, onHoldStart, onHoldEnd, children}) => (
+const Key = memo(({label, row, col, selected, width, marginRight, palette, glow, shifted, hasAlternates, glass, search, onClick, onHoldStart, onHoldEnd, children}) => (
 	<div
-		className={css.key}
+		className={glass ? `${css.key} ${css.glassKey}` : css.key}
 		data-row={row}
 		data-col={col}
 		data-key={label}
-		style={{
-			width: width > 0 ? width : undefined,
-			flex: width > 0 ? undefined : 1,
-			marginRight,
-			background: selected ? palette.selectedKey : palette.idleKey,
-			border: selected ? palette.selectedKeyBorder : palette.idleKeyBorder,
-			borderRadius: palette.chipRadius,
-			color: selected ? palette.textOnSelected : palette.textPrimary,
-			boxShadow: selected ? glow : 'none'
-		}}
+		style={keyStyle(glass, selected, width, marginRight, palette, glow, label)}
 		onClick={onClick}
 		onMouseDown={onHoldStart}
 		onMouseUp={onHoldEnd}
 		onMouseLeave={onHoldEnd}
 	>
-		{keyContent(label, selected, palette, width, shifted)}
-		{hasAlternates && (
+		{glass ? glassKeyContent(label, shifted, search) : keyContent(label, selected, palette, width, shifted)}
+		{hasAlternates && !glass && (
 			<div
 				className={css.alternatesDot}
 				style={{background: selected ? palette.textOnSelected : palette.textMuted, opacity: 0.55}}
@@ -158,11 +249,15 @@ const Key = memo(({label, row, col, selected, width, marginRight, palette, glow,
 	</div>
 ));
 
-const Chip = memo(({value, index, selected, palette, glow, onClick}) => (
+const Chip = memo(({value, index, selected, palette, glow, glass, search, onClick}) => (
 	<div
-		className={css.chip}
+		className={glass ? `${css.chip} ${css.glassChip}` : css.chip}
 		data-index={index}
-		style={{
+		style={glass ? {
+			background: selected ? GLASS_FOCUS_FILL : 'rgba(255, 255, 255, 0.06)',
+			color: selected ? GLASS_FOCUS_INK : 'rgba(255, 255, 255, 0.86)',
+			boxShadow: selected ? glow : 'none'
+		} : {
 			background: selected ? palette.selectedKey : palette.chipBackground,
 			border: selected ? palette.selectedKeyBorder : palette.idleKeyBorder,
 			borderRadius: palette.chipRadius,
@@ -171,9 +266,136 @@ const Chip = memo(({value, index, selected, palette, glow, onClick}) => (
 		}}
 		onClick={onClick}
 	>
-		{value}
+		{glass && search && <LineIcon name="SEARCH" size={26} className={css.chipIcon} />}
+		{glass ? <span className={css.chipText}>{value}</span> : value}
 	</div>
 ));
+
+// Each column is an offset and a width. Keys are placed by percent of these totals,
+// so the whole block scales with its box.
+const DOCK_GEOMETRY = {
+	columns: [[0, 72], [96, 52], [152, 52], [208, 52], [264, 52], [320, 52], [376, 52], [432, 52], [488, 52], [544, 52], [600, 52], [676, 148]],
+	width: 824,
+	rowHeight: 48,
+	rowStep: 54,
+	height: 210
+};
+
+const PAD_GEOMETRY = {
+	columns: [[0, 84], [90, 84], [180, 84]],
+	width: 264,
+	rowHeight: 48,
+	rowStep: 54,
+	height: 264
+};
+
+const percent = (value, total) => `${(value / total) * 100}%`;
+
+// Kept per box so a key's props stay the same between presses and only the keys
+// that change render again.
+const placeCache = new WeakMap();
+
+const placeBox = (geometry, box) => {
+	if (!placeCache.has(box)) {
+		const left = geometry.columns[box.col][0];
+		const last = geometry.columns[box.lastCol];
+		const top = box.row * geometry.rowStep;
+		placeCache.set(box, {
+			left: percent(left, geometry.width),
+			width: percent(last[0] + last[1] - left, geometry.width),
+			top: percent(top, geometry.height),
+			height: percent(box.lastRow * geometry.rowStep + geometry.rowHeight - top, geometry.height)
+		});
+	}
+	return placeCache.get(box);
+};
+
+const DOCK_RAIL_LABELS = {MODE_LOWER: 'abc', MODE_UPPER: 'ABC', MODE_NUM: '123'};
+
+const dockKeyContent = (label, kind, search) => {
+	if (kind === 'action') {
+		const done = label === 'DONE';
+		return (
+			<>
+				<LineIcon name={done ? (search ? 'SEARCH' : 'CHECK') : 'BACKSPACE'} size={48} className={css.dockActionIcon} />
+				{done ? (search ? $L('Search') : $L('Done')) : $L('Delete')}
+			</>
+		);
+	}
+	if (DOCK_RAIL_LABELS[label]) return DOCK_RAIL_LABELS[label];
+	if (label === 'SPACE') return $L('space');
+	// Only the number pad has Done as a plain cell, and it never searches
+	if (label === 'DONE') return <LineIcon name="CHECK" size={40} />;
+	if (LINE_ICON_PATHS[label]) return <LineIcon name={label} size={label === 'IME' ? 44 : 40} />;
+	return label;
+};
+
+const dockKeyClass = (label, kind, active) => {
+	if (kind === 'rail') return active ? `${css.dockKey} ${css.dockRail} ${css.dockRailActive}` : `${css.dockKey} ${css.dockRail}`;
+	if (kind === 'space') return `${css.dockKey} ${css.dockSpace}`;
+	if (kind === 'action') return `${css.dockKey} ${css.dockAction} ${label === 'DONE' ? css.dockDone : css.dockDelete}`;
+	return label.length > 1 ? `${css.dockKey} ${css.dockIconKey}` : css.dockKey;
+};
+
+const dockKeyStyle = (label, kind, place, selected, palette, glow) => {
+	const done = label === 'DONE';
+	const doneAction = done && kind === 'action';
+	let border;
+	if (selected && (doneAction || kind === 'space')) border = '2px solid transparent';
+	else if (doneAction) border = palette.accentLine;
+	let color;
+	if (selected) color = palette.accentInk;
+	else if (done) color = palette.accentText;
+	let background;
+	if (selected) background = palette.accent;
+	else if (doneAction) background = palette.accentSoft;
+	return {
+		...place,
+		background,
+		border,
+		color,
+		fontWeight: selected ? 600 : undefined,
+		boxShadow: selected ? glow : undefined,
+		zIndex: selected ? 2 : undefined
+	};
+};
+
+const DockKey = memo(({label, row, col, kind, place, selected, active, palette, glow, hasAlternates, search, onClick, onHoldStart, onHoldEnd, children}) => (
+	<div
+		className={dockKeyClass(label, kind, active)}
+		data-row={row}
+		data-col={col}
+		data-key={label}
+		style={dockKeyStyle(label, kind, place, selected, palette, glow)}
+		onClick={onClick}
+		onMouseDown={onHoldStart}
+		onMouseUp={onHoldEnd}
+		onMouseLeave={onHoldEnd}
+	>
+		{dockKeyContent(label, kind, search)}
+		{hasAlternates && !selected && <div className={css.dockDot} />}
+		{children}
+	</div>
+));
+
+// Where a step up or down lands. Cells still holding the same key are passed over,
+// so a key two rows tall takes one press to cross.
+const rowAfter = (layout, row, col, dRow) => {
+	const key = layout[row][Math.min(col, layout[row].length - 1)];
+	let next = row + dRow;
+	while (next >= 0 && next < layout.length && layout[next][Math.min(col, layout[next].length - 1)] === key) next += dRow;
+	return next;
+};
+
+// Where a step along a row lands, the next cell holding a different key, wrapping
+// around the row.
+const colAfter = (line, col, dCol) => {
+	let next = col;
+	do {
+		next = (next + dCol + line.length) % line.length;
+	} while (line[next] === line[col] && next !== col);
+	return next;
+};
 
 class TVKeyboardHost extends Component {
 	constructor(props) {
@@ -211,6 +433,10 @@ class TVKeyboardHost extends Component {
 		// Only when a row opens. Stepping along it leaves the box where it was, and
 		// measuring on every press costs a layout the sets here can feel.
 		if (this.state.popup && this.state.popup.options !== prevState.popup?.options) this.clampPopup();
+		if (this.state.session && prevProps.keyboardStyle !== this.props.keyboardStyle) {
+			this.measure();
+			this.revealAnchor();
+		}
 	}
 
 	componentWillUnmount() {
@@ -226,7 +452,8 @@ class TVKeyboardHost extends Component {
 			shifted: false,
 			numericPage: false,
 			row: 0,
-			col: 0,
+			// The docked rail sits in the first column, so typing starts one over from it
+			col: this.look() === 'docked' && options.purpose !== 'numeric' ? 1 : 0,
 			popup: null,
 			suggestions: [],
 			gridWidth: 0
@@ -316,10 +543,22 @@ class TVKeyboardHost extends Component {
 		return this.state.session?.purpose === 'numeric';
 	}
 
+	look() {
+		const {keyboardStyle} = this.props;
+		return keyboardStyle === 'glass' || keyboardStyle === 'docked' ? keyboardStyle : 'classic';
+	}
+
+	// The docked rail takes the first column, which the suggestions above it don't have.
+	railOffset() {
+		return this.look() === 'docked' && !this.usesNumberPad() ? 1 : 0;
+	}
+
 	layout() {
 		if (this.usesNumberPad()) return NUMBER_PAD_LAYOUT;
-		if (this.state.numericPage) return NUMERIC_LAYOUT;
+		const docked = this.look() === 'docked';
+		if (this.state.numericPage) return docked ? DOCKED_NUMERIC_LAYOUT : NUMERIC_LAYOUT;
 		const variant = variantForLocale(this.props.uiLanguage);
+		if (docked) return dockedFor(variant, this.state.shifted);
 		return this.state.shifted ? upperFor(variant) : lowerFor(variant);
 	}
 
@@ -442,7 +681,12 @@ class TVKeyboardHost extends Component {
 				this.switchPage();
 				break;
 			case 'IME':
-				this.requestSystemKeyboard();
+				this.openStylePicker();
+				break;
+			case 'MODE_LOWER':
+			case 'MODE_UPPER':
+			case 'MODE_NUM':
+				this.setState({shifted: key === 'MODE_UPPER', numericPage: key === 'MODE_NUM'});
 				break;
 			default:
 				this.insert(key);
@@ -482,9 +726,26 @@ class TVKeyboardHost extends Component {
 		this.setState({popup: {...popup, shift}});
 	}
 
-	commitAlternate(value) {
+	openStylePicker() {
+		const options = getKeyboardStyleOptions().map((option) => option.value);
+		this.setState({popup: {options, index: Math.max(options.indexOf(this.look()), 0), awaitRelease: false, shift: 0, picker: true}});
+	}
+
+	// Saving the style switches this keyboard too, since its look comes from the setting
+	pickStyle(style) {
+		this.props.updateSetting('keyboardStyle', style);
+		if (style === 'native') {
+			this.requestSystemKeyboard();
+			return;
+		}
+		this.setState({shifted: false, numericPage: false, row: 0, col: style === 'docked' ? 1 : 0});
+	}
+
+	commitPopup(value) {
+		const {popup} = this.state;
 		this.setState({popup: null});
-		this.insert(value);
+		if (popup?.picker) this.pickStyle(value);
+		else this.insert(value);
 	}
 
 	selectedKey() {
@@ -497,8 +758,9 @@ class TVKeyboardHost extends Component {
 
 	// Whether up has anywhere left to go inside the keyboard.
 	atTopRow() {
-		if (this.state.row === -1) return true;
-		return this.state.row === 0 && this.chips().length === 0;
+		const {row, col} = this.state;
+		if (row === -1) return true;
+		return this.chips().length === 0 && rowAfter(this.layout(), row, col, -1) < 0;
 	}
 
 	// Up from the top row is a way out for screens that name somewhere to go, so
@@ -517,6 +779,11 @@ class TVKeyboardHost extends Component {
 	shortcutKey(code) {
 		const keys = XBOX_SHORTCUTS[code];
 		if (!keys) return null;
+		// The docked rail stands in for shift and the page key, so their shortcuts still work there
+		if (this.railOffset()) {
+			if (keys[0] === 'SHIFT') return this.state.numericPage ? null : 'SHIFT';
+			if (keys[0] === '123') return '123';
+		}
 		const layout = this.layout();
 		return keys.find((key) => layout.some((line) => line.indexOf(key) >= 0)) || null;
 	}
@@ -533,29 +800,29 @@ class TVKeyboardHost extends Component {
 	move(dRow, dCol) {
 		const layout = this.layout();
 		const chips = this.chips();
+		const offset = this.railOffset();
 		this.setState((prev) => {
 			let {row, col} = prev;
 			if (row === -1) {
 				if (dRow > 0) {
 					row = 0;
-					col = Math.min(col, layout[0].length - 1);
+					col = Math.min(col + offset, layout[0].length - 1);
 				} else if (dCol !== 0 && chips.length) {
 					col = (col + dCol + chips.length) % chips.length;
 				}
 			} else if (dRow !== 0) {
-				const next = row + dRow;
+				const next = rowAfter(layout, row, col, dRow);
 				if (next < 0) {
 					if (chips.length) {
 						row = -1;
-						col = Math.min(col, chips.length - 1);
+						col = Math.min(Math.max(col - offset, 0), chips.length - 1);
 					}
 				} else if (next <= layout.length - 1) {
 					row = next;
 					col = Math.min(col, layout[next].length - 1);
 				}
 			} else {
-				const length = layout[row].length;
-				col = (col + dCol + length) % length;
+				col = colAfter(layout[row], col, dCol);
 			}
 			return {row, col, popup: null};
 		});
@@ -583,7 +850,7 @@ class TVKeyboardHost extends Component {
 			}
 			this.enterHeld = true;
 			if (popup) {
-				if (!popup.awaitRelease) this.commitAlternate(popup.options[popup.index]);
+				if (!popup.awaitRelease) this.commitPopup(popup.options[popup.index]);
 				return;
 			}
 			if (this.state.row === -1) {
@@ -726,40 +993,55 @@ class TVKeyboardHost extends Component {
 		this.activateChip(chips[Number(e.currentTarget.dataset.index)]);
 	};
 
-	handleAlternateClick = (e) => {
-		this.commitAlternate(e.currentTarget.dataset.value);
+	// The popup sits inside its key, so a click on it would press that key again
+	handlePopupClick = (e) => {
+		e.stopPropagation();
+		this.commitPopup(e.currentTarget.dataset.value);
 	};
 
-	renderPopup(palette) {
+	renderPopup(palette, look) {
 		const {popup} = this.state;
+		const classic = look === 'classic';
+		const styles = popup.picker ? getKeyboardStyleOptions() : null;
+		let className = classic ? css.alternatesPopup : `${css.alternatesPopup} ${css.popupPanel}`;
+		if (styles) className += ` ${css.stylePicker}`;
 		return (
 			<div
 				ref={this.setPopupRef}
-				className={css.alternatesPopup}
-				style={{
+				className={className}
+				style={classic ? {
 					background: palette.panel,
 					border: palette.panelBorder,
 					borderRadius: palette.panelRadius,
 					marginLeft: popup.shift
-				}}
+				} : {marginLeft: popup.shift}}
 			>
 				{popup.options.map((option, index) => {
 					const isSelected = index === popup.index;
+					let style = null;
+					if (classic) {
+						style = {
+							background: isSelected ? palette.selectedKey : 'transparent',
+							border: isSelected ? palette.selectedKeyBorder : '1px solid transparent',
+							borderRadius: palette.chipRadius,
+							color: isSelected ? palette.textOnSelected : palette.textMuted,
+							boxShadow: isSelected ? palette.focusGlow : 'none'
+						};
+					} else if (isSelected) {
+						style = look === 'glass'
+							? {background: GLASS_FOCUS_FILL, color: GLASS_FOCUS_INK}
+							: {background: palette.accent, color: palette.accentInk};
+					}
 					return (
 						<div
 							key={option}
-							className={css.alternateOption}
+							className={classic ? css.alternateOption : `${css.alternateOption} ${css.popupOption}`}
 							data-value={option}
-							style={{
-								background: isSelected ? palette.selectedKey : 'transparent',
-								border: isSelected ? palette.selectedKeyBorder : '1px solid transparent',
-								borderRadius: palette.chipRadius,
-								color: isSelected ? palette.textOnSelected : palette.textMuted,
-								boxShadow: isSelected ? palette.focusGlow : 'none'
-							}}
-							onClick={this.handleAlternateClick}
+							style={style}
+							onClick={this.handlePopupClick}
 						>
-							{option}
+							{styles ? styles[index].label : option}
+							{styles && option === look && <LineIcon name="CHECK" size={32} className={css.pickerCheck} />}
 						</div>
 					);
 				})}
@@ -767,12 +1049,14 @@ class TVKeyboardHost extends Component {
 		);
 	}
 
-	renderGrid(palette, glow) {
+	renderGrid(palette, glow, look) {
 		const layout = this.layout();
 		const uniform = this.usesNumberPad();
-		const {row, col, popup, gridWidth, shifted} = this.state;
+		const {row, col, popup, gridWidth, shifted, session} = this.state;
 		const base = gridWidth > 0 ? gridWidth / maxRowSpan(layout, uniform) : 0;
 		const spacing = base * KEY_GAP_FACTOR;
+		const glass = look === 'glass';
+		const search = session.purpose === 'search';
 		return (
 			<div className={css.grid} ref={this.setGridRef}>
 				{layout.map((line, rowIndex) => (
@@ -792,11 +1076,13 @@ class TVKeyboardHost extends Component {
 									glow={glow}
 									shifted={key === 'SHIFT' && shifted}
 									hasAlternates={!!alternatesFor(key)}
+									glass={glass}
+									search={glass && key === 'DONE' && search}
 									onClick={this.handleKeyClick}
 									onHoldStart={this.handleKeyHoldStart}
 									onHoldEnd={this.handleKeyHoldEnd}
 								>
-									{popup && isSelected ? this.renderPopup(palette) : null}
+									{popup && isSelected ? this.renderPopup(palette, look) : null}
 								</Key>
 							);
 						})}
@@ -806,24 +1092,162 @@ class TVKeyboardHost extends Component {
 		);
 	}
 
-	renderChips(palette, glow) {
+	renderChips(palette, glow, look) {
 		const chips = this.chips();
-		if (!chips.length) return null;
-		const {row, col} = this.state;
+		const glass = look === 'glass';
+		// The accents hint keeps the Glass header up even with nothing to suggest
+		if (!chips.length && (!glass || this.usesNumberPad())) return null;
+		const {row, col, session} = this.state;
 		const activeIndex = row === -1 ? Math.min(col, chips.length - 1) : -1;
+		const search = glass && session.purpose === 'search';
+		const chipNodes = chips.map((chip, index) => (
+			<Chip
+				key={`${chip.value}-${index}`}
+				value={chip.value}
+				index={index}
+				selected={index === activeIndex}
+				palette={palette}
+				glow={glow}
+				glass={glass}
+				search={search}
+				onClick={this.handleChipClick}
+			/>
+		));
+		if (!glass) return <div className={css.chipBar}>{chipNodes}</div>;
 		return (
-			<div className={css.chipBar}>
-				{chips.map((chip, index) => (
-					<Chip
-						key={`${chip.value}-${index}`}
-						value={chip.value}
-						index={index}
-						selected={index === activeIndex}
-						palette={palette}
-						glow={glow}
-						onClick={this.handleChipClick}
-					/>
-				))}
+			<div className={css.glassHeader}>
+				<div className={css.glassChips}>{chipNodes}</div>
+				<Hint cap="OK">{$L('hold for accents')}</Hint>
+			</div>
+		);
+	}
+
+	// The dock can cover the field, so it shows the text itself. The ghost finishes
+	// the first suggestion that starts with what has been typed and would replace it.
+	renderEcho(palette, numberPad, chips) {
+		const {session, textState} = this.state;
+		const shown = session.password ? textState.text.replace(/[\s\S]/g, '•') : textState.text;
+		const after = shown.slice(textState.cursor);
+		let ghost = '';
+		if (!session.password && !after && shown) {
+			const typed = shown.toLowerCase();
+			const match = chips.find((chip) => (chip.submitOnTap || chip.replaceOnTap) &&
+				chip.value.length > shown.length && chip.value.toLowerCase().indexOf(typed) === 0);
+			if (match) ghost = match.value.slice(shown.length);
+		}
+		return (
+			<div className={css.echoRow}>
+				<div className={css.echo}>
+					<span className={css.echoLine}>
+						{shown.slice(0, textState.cursor)}
+						<span className={css.caret} style={{background: palette.accent}} />
+						{after}
+						{ghost && <span className={css.ghost}>{ghost}</span>}
+					</span>
+				</div>
+				{!numberPad && (
+					<div className={css.dockHints}>
+						<Hint cap="OK">{$L('hold for accents')}</Hint>
+						<Hint cap={<LineIcon name="BACK" size={22} />}>{$L('close')}</Hint>
+					</div>
+				)}
+			</div>
+		);
+	}
+
+	renderSuggestions(palette, chips) {
+		if (!chips.length) return null;
+		const {row, col, textState} = this.state;
+		const activeIndex = row === -1 ? Math.min(col, chips.length - 1) : -1;
+		const typed = textState.text.toLowerCase();
+		return (
+			<div className={css.suggestions}>
+				{chips.map((chip, index) => {
+					const selected = index === activeIndex;
+					const at = typed ? chip.value.toLowerCase().indexOf(typed) : -1;
+					return (
+						<div
+							key={`${chip.value}-${index}`}
+							className={selected ? `${css.suggestion} ${css.suggestionFocused}` : css.suggestion}
+							data-index={index}
+							style={selected ? {background: palette.accent, color: palette.accentInk} : null}
+							onClick={this.handleChipClick}
+						>
+							{at < 0 ? chip.value : (
+								<>
+									{chip.value.slice(0, at)}
+									<span className={css.match}>{chip.value.slice(at, at + typed.length)}</span>
+									{chip.value.slice(at + typed.length)}
+								</>
+							)}
+						</div>
+					);
+				})}
+			</div>
+		);
+	}
+
+	renderDockKeys(palette, glow, numberPad) {
+		const layout = this.layout();
+		const geometry = numberPad ? PAD_GEOMETRY : DOCK_GEOMETRY;
+		const {row, col, popup, shifted, numericPage, session} = this.state;
+		const mode = numericPage ? 'MODE_NUM' : (shifted ? 'MODE_UPPER' : 'MODE_LOWER');
+		const search = session.purpose === 'search';
+		const lastCol = layout[0].length - 1;
+		return (
+			<div className={numberPad ? css.dockPad : css.dockGrid}>
+				{keyBoxes(layout).map((box) => {
+					const selected = row >= box.row && row <= box.lastRow && col >= box.col && col <= box.lastCol;
+					let kind = 'cell';
+					if (!numberPad) {
+						if (box.col === 0) kind = 'rail';
+						else if (box.col === lastCol) kind = 'action';
+						else if (box.key === 'SPACE') kind = 'space';
+					}
+					return (
+						<DockKey
+							key={`${box.row}-${box.col}`}
+							label={box.key}
+							row={box.row}
+							col={box.col}
+							kind={kind}
+							place={placeBox(geometry, box)}
+							selected={selected}
+							active={box.key === mode}
+							palette={palette}
+							glow={glow}
+							hasAlternates={!!alternatesFor(box.key)}
+							search={search && box.key === 'DONE'}
+							onClick={this.handleKeyClick}
+							onHoldStart={this.handleKeyHoldStart}
+							onHoldEnd={this.handleKeyHoldEnd}
+						>
+							{popup && selected ? this.renderPopup(palette, 'docked') : null}
+						</DockKey>
+					);
+				})}
+			</div>
+		);
+	}
+
+	renderDocked(palette, high) {
+		const numberPad = this.usesNumberPad();
+		const chips = this.chips();
+		const glow = high ? `${palette.accentRing}, ${palette.accentGlow}` : palette.accentRing;
+		return (
+			<div className={`${css.overlay} ${css.dockOverlay}`} onClick={this.handleOverlayClick}>
+				<div
+					className={css.dock}
+					ref={this.setPanelRef}
+					style={{boxShadow: high ? DOCK_SHADOW : 'none'}}
+					onClick={this.handlePanelClick}
+				>
+					<div className={numberPad ? css.dockPadContent : css.dockContent}>
+						{this.renderEcho(palette, numberPad, chips)}
+						{this.renderSuggestions(palette, chips)}
+						{this.renderDockKeys(palette, glow, numberPad)}
+					</div>
+				</div>
 			</div>
 		);
 	}
@@ -832,9 +1256,28 @@ class TVKeyboardHost extends Component {
 		const {session} = this.state;
 		if (!session) return null;
 		const palette = this.getPalette();
-		// The glow is a blurred shadow, which the lower tiers skip as the cards do
-		const glow = getPerfTier() === 'high' ? palette.focusGlow : 'none';
+		const look = this.look();
+		// Glows and shadows are blurred, which the lower tiers skip as the cards do
+		const high = getPerfTier() === 'high';
+		if (look === 'docked') return this.renderDocked(palette, high);
 		const narrow = this.usesNumberPad();
+		if (look === 'glass') {
+			const glassGlow = high ? GLASS_GLOW : 'none';
+			return (
+				<div className={`${css.overlay} ${css.glassOverlay}`} onClick={this.handleOverlayClick}>
+					<div
+						className={`${css.panel} ${css.glassPanel} ${narrow ? css.glassPanelNarrow : ''}`}
+						ref={this.setPanelRef}
+						style={{boxShadow: high ? GLASS_PANEL_SHADOW : 'none'}}
+						onClick={this.handlePanelClick}
+					>
+						{this.renderChips(palette, glassGlow, look)}
+						{this.renderGrid(palette, glassGlow, look)}
+					</div>
+				</div>
+			);
+		}
+		const glow = high ? palette.focusGlow : 'none';
 		return (
 			<div className={css.overlay} onClick={this.handleOverlayClick}>
 				<div
@@ -843,8 +1286,8 @@ class TVKeyboardHost extends Component {
 					style={{background: palette.panel, border: palette.panelBorder, borderRadius: palette.panelRadius}}
 					onClick={this.handlePanelClick}
 				>
-					{this.renderChips(palette, glow)}
-					{this.renderGrid(palette, glow)}
+					{this.renderChips(palette, glow, look)}
+					{this.renderGrid(palette, glow, look)}
 				</div>
 			</div>
 		);
@@ -852,8 +1295,8 @@ class TVKeyboardHost extends Component {
 }
 
 const TVKeyboard = () => {
-	const {settings, activeTheme} = useSettings();
-	return <TVKeyboardHost uiLanguage={settings.uiLanguage} theme={activeTheme} />;
+	const {settings, activeTheme, updateSetting} = useSettings();
+	return <TVKeyboardHost uiLanguage={settings.uiLanguage} theme={activeTheme} keyboardStyle={settings.keyboardStyle} updateSetting={updateSetting} />;
 };
 
 export default TVKeyboard;

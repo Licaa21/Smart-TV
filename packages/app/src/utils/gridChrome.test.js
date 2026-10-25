@@ -1,6 +1,6 @@
 import Spotlight from '@enact/spotlight';
 
-import {capitalize, createGridKeyDown, createPanelKeyDown, createRowsLeftKeyDown, createToolbarKeyDown, cycleValue, filterByStartLetter, stopPropagation} from './gridChrome';
+import {capitalize, createGridKeyDown, createPanelKeyDown, createRowsLeftKeyDown, createToolbarKeyDown, cycleValue, filterByStartLetter, pageGrid, stopPropagation} from './gridChrome';
 import {KEYS} from './keys';
 
 jest.mock('@enact/spotlight', () => ({__esModule: true, default: {focus: jest.fn()}}));
@@ -303,5 +303,31 @@ describe('filterByStartLetter', () => {
 		expect(filterByStartLetter(accented, 'O')).toEqual([{Name: 'Øster'}]);
 		expect(filterByStartLetter(accented, 'L')).toEqual([{Name: 'Łódź'}]);
 		expect(filterByStartLetter(accented, '#')).toEqual([{Name: '東京'}]);
+	});
+});
+
+describe('pageGrid', () => {
+	// Ten columns of 95 items, with two whole rows on screen and a third cut off.
+	const grid = {count: 95, columns: 10, stride: 304, cardTop: 10, cardHeight: 284, viewport: 754};
+
+	test('forward moves focus a page down its column and scrolls the cut off row to the top', () => {
+		expect(pageGrid({...grid, from: 3, direction: 1, scrollTop: 0})).toEqual({target: 23, scrollTop: 608});
+	});
+
+	test('back does the reverse', () => {
+		expect(pageGrid({...grid, from: 23, direction: -1, scrollTop: 608})).toEqual({target: 3, scrollTop: 0});
+	});
+
+	test('a short last row takes focus to the last item', () => {
+		expect(pageGrid({...grid, from: 77, direction: 1, scrollTop: 1824})).toEqual({target: 94, scrollTop: 2432});
+	});
+
+	test('nothing moves at either end', () => {
+		expect(pageGrid({...grid, from: 3, direction: -1, scrollTop: 0})).toBeNull();
+		expect(pageGrid({...grid, from: 94, direction: 1, scrollTop: 2128})).toBeNull();
+	});
+
+	test('a screen too short for a whole card still pages a row', () => {
+		expect(pageGrid({...grid, viewport: 200, from: 3, direction: 1, scrollTop: 0})).toEqual({target: 13, scrollTop: 304});
 	});
 });

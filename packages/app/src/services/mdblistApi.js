@@ -90,8 +90,11 @@ export const getContentType = (item) => {
 export const getTmdbId = (item) => {
 	if (!item) return null;
 	const providerIds = item.ProviderIds;
-	if (!providerIds) return null;
-	return providerIds.Tmdb || providerIds.tmdb || null;
+	const tmdbId = providerIds && (providerIds.Tmdb || providerIds.tmdb);
+	if (tmdbId) return tmdbId;
+	// A Seerr card's own id is its TMDB id. One that isn't a number came from IMDb and has none.
+	if (item._seerr) return /^\d+$/.test(String(item._seerrRaw?.mediaId)) ? String(item._seerrRaw.mediaId) : null;
+	return null;
 };
 
 const seriesTmdbIdCache = {};
@@ -161,7 +164,7 @@ const isNegativelyCached = (key) => {
 export const fetchRatings = async (serverUrl, item, options = {}) => {
 	const contentType = getContentType(item);
 	let tmdbId = getTmdbId(item);
-	if (!tmdbId && item?.Type === 'Series' && (item.Id || item.SeriesId)) {
+	if (!tmdbId && item?.Type === 'Series' && !item._seerr && (item.Id || item.SeriesId)) {
 		tmdbId = await resolveSeriesTmdbId(item);
 	}
 
