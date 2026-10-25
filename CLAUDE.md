@@ -11,8 +11,8 @@ use. It is not a project for everyone. Three changes are proposed upstream: the 
 The rules that matter most, each explained further down:
 
 1. **Ask before every change.** Questions come first, with options and a recommendation. See "Working rules".
-2. **Before any coding on `implement`, bring `daily` into it** (`git fetch origin` then `git merge origin/daily` in `implement/`), so the work starts on what is new, upstream's changes and earlier merge fixes included.
-3. **Never commit to `main` or `daily`**, except the README and ignore rules on `main`. Work goes on `implement`.
+2. **Before any coding on `implement`, bring upstream into `daily` first, and only then `daily` into `implement`.** Never pull from `daily` alone, since it may be behind upstream. The steps are in step 0 of "How changes flow".
+3. **Never commit to `main` or `daily`**, except the README and ignore rules on `main` and the upstream merges of step 0 (merge commits and conflict fixes). Work goes on `implement`.
 4. **Build only in `daily/`**, with `bash fork-tools/build-daily-wgt.sh`.
 5. **A change is done only when** lint and tests are clean, the code review found nothing real, every string has a
    Romanian one, and this file and the README are up to date.
@@ -57,7 +57,7 @@ ode_modules`.
 
 ## How changes flow
 
-0. Before any coding on `implement`, bring `daily` into it: `git fetch origin`, then `git merge origin/daily` in `implement/` (a fast-forward when `implement` has nothing new, a merge when it does). `daily` holds `main` (upstream) and `implement` together and any conflict already fixed, so the work starts on what is new. Do it again at the start of each piece of work, not once.
+0. Before any coding on `implement`: bring upstream into `daily` first, then `daily` into `implement`. Never pull from `daily` alone, since it may be behind upstream. In `main/`, `git fetch upstream` and `git merge upstream/main`; in `daily/`, merge `main` into it (`bash fork-tools/update-daily.sh` does both and also merges `implement`), solve the conflicts there, ask the user when something needs their idea, run the merge checklist below (with its code review of the conflict resolutions) when upstream brought something new, and push. Only then, in `implement/`, `git fetch origin` and `git merge origin/daily` (a fast-forward when `implement` has nothing new, a merge when it does), so the work starts on what upstream added and on every conflict already fixed. Do it again at the start of each piece of work, not once. When upstream has nothing new, `daily` is already current and the pull is a fast-forward.
 1. Upstream moves. `main` takes it (`git merge upstream/main`, never rewritten).
 2. The fork's changes are committed on `implement`, in `implement/`. Never on `daily`, never on `main` (apart from the
    README and ignore rules).
