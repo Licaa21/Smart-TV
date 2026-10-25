@@ -284,6 +284,18 @@ The Moonbase plugin has a fork of its own, Licaa21/Plugin, in `E:VSCode Projects
 3. Remove the client's own key: the `tmdbApiKey` setting (`defaultSettings.js`, the sync in `SettingsContext.js`, the `tmdbPanel` row in `settingsSchema.js` and `TmdbKeyPanel.js`), its strings (English and Romanian) and tests, and the places that pass `settings.tmdbApiKey` along (`useBrowseData.js`, `browseRowLoaders.js`).
 4. Tests for the calls and the fallback, lint, the Romanian check, the code review, a look at a Seerr title and season in the browser on the real server, then a build when the user wants one. Update item 3 of "When the user says Moonbase (the plugin) updated" and the README line about the TMDB key.
 
+### Talking to the plugin fork's chat
+
+When the plugin fork's chat is open at the same time (`ListAgents` shows it as a peer session, named `implement-...`, and `SendMessage` reaches it; confirm by asking its working folder first), the two chats talk directly instead of through the user:
+
+1. Short factual messages: status, a question, an answer, a path.
+2. Never ask the other chat to do what needs the user's approval or what a session's own permissions would block. The user keeps the go for a plugin release (`-Publish`), for installing it on the server and restarting Jellyfin, and for any change to the route contract in the plugin's CLAUDE.md ("What the TV client expects").
+3. Reports that are for the user go to the user. What the user must decide goes to the user, not to the other chat.
+4. Reply with `SendMessage` to the `from` address of the message received. No polling and no "are you done?".
+5. A plugin fact (a route shape, a version, a release state) is asked of the plugin chat; a client fact (what this app reads, a path here) is answered here.
+
+The plugin chat works in `E:VSCode ProjectsMoonfin Plugin Forkimplement`. Never `git add -A` or commit in that folder from here: its working tree holds the other chat's unfinished work (that happened once and put its work in the wrong commit).
+
 ## When the user says Moonbase (the plugin) updated
 
 The fork works around things the Moonbase plugin (Moonfin-Client/Plugin) does not do yet. When the user says a new release is
