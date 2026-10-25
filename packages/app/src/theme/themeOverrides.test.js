@@ -252,6 +252,21 @@ describe('per-surface accents', () => {
 			expect(withHandRule(lines, '.btnWrapper:focus .btnAction .btnIcon')).toContain('rgba(0, 0, 0, 0.92)');
 		});
 
+		it('draws the check of a watched button in the focused ink since the focused fill is the pick itself, white or dark', () => {
+			// A dark pick gets the light ink and a white one the dark ink. The stylesheet's own replay of the accent comes first and the hand rule after it, so the last one is what shows
+			const last = (lines, needle) => lines.filter((line) => line.includes(needle)).pop();
+			const white = rulesFor({details: '#ffffff'});
+			expect(last(white, '.btnWrapper:focus .btnAction .watched')).toContain('color: rgba(0, 0, 0, 0.92)');
+			expect(white.filter((line) => line.includes('.watched {') && !line.includes(':focus')).pop()).toContain('color: rgb(255, 255, 255)');
+			const blue = rulesFor({details: '#123456'});
+			expect(last(blue, '.btnWrapper:focus .btnAction .watched')).toContain('color: rgba(255, 255, 255, 0.92)');
+		});
+
+		it('leaves the check of a watched button in the theme accent while no details accent is picked', () => {
+			const focused = rulesFor({}).filter((line) => line.includes('.btnWrapper:focus .btnAction .watched')).pop();
+			expect(focused).toContain(toCssColor(moonfin.colors.accent));
+		});
+
 		it('keeps the focused fill and the rest of Settings apart, so each takes only its own pick', () => {
 			const focusOnly = rulesFor({settingsFocus: '#ffffff'});
 			expect(focusRule(focusOnly, '.themeCard:focus')).toContain('background: rgb(255, 255, 255)');
