@@ -56,7 +56,8 @@ const MakdBanner = memo(({
 		captionLanguage: settings.uiLanguage,
 		api,
 		getItemServerUrl,
-		onEnded: handleTrailerEnded
+		onEnded: handleTrailerEnded,
+		hidesChrome: featuredFocused
 	});
 
 	useEffect(() => {

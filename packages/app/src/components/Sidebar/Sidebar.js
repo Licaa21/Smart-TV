@@ -64,7 +64,8 @@ const Sidebar = ({
 	onMessages,
 	onFriends,
 	music,
-	onOpenMusic
+	onOpenMusic,
+	hideForTrailer
 }) => {
 	const {settings, activeTheme} = useSettings();
 	const {isEnabled: seerrEnabled, displayName} = useSeerr();
@@ -131,7 +132,7 @@ const Sidebar = ({
 
 	return (
 		<SidebarContainer
-			className={`${css.sidebar} ${expanded ? css.expanded : ''}`}
+			className={`${css.sidebar} ${expanded ? css.expanded : ''} ${hideForTrailer ? css.trailerHidden : ''}`}
 			style={navStyle}
 			onKeyDown={handleNavKeyDown}
 			onMouseEnter={handlers.onMouseEnter}

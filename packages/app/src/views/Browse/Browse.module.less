@@ -1723,24 +1723,42 @@
 		padding-top: 0;
 		// The bar keeps focus and the pointer until Down moves into the rows.
 		pointer-events: none;
+		transition: opacity 0.25s ease;
 
 		> :first-child {
 			margin-top: 0;
 		}
 	}
 
+	// The trailer has the whole screen too, since the rows step aside while it plays.
 	.featuredBackdrop,
 	.makdBackdrop,
 	.makdGradient,
+	.trailerContainer,
 	.galleryGlow {
 		bottom: auto;
 		height: 100vh;
+	}
+
+	.rowsHidden {
+		opacity: 0;
 	}
 
 	// Kept clear of the carousel arrows, which come down to the middle of the shorter bar.
 	.featuredContent {
 		left: 106px;
 		right: 106px;
+		transition: bottom 0.25s ease, left 0.25s ease, right 0.25s ease;
+	}
+
+	.featuredContentDropped {
+		left: 36px;
+		right: 36px;
+	}
+
+	&.sidebarOffset .featuredContentDropped {
+		left: 104px;
+		right: 104px;
 	}
 
 	.makdTextWithLogo,

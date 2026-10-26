@@ -281,6 +281,7 @@ const AppContent = (props) => {
 		else if (signingIn || user?.Id !== musicUserRef.current) remoteControl.runPlayerCommand('stop');
 	}, [backgroundMusic, user?.Id, panelIndex]);
 	const [trailerPreviewActive, setTrailerPreviewActive] = useState(false);
+	const [trailerHidesChrome, setTrailerHidesChrome] = useState(false);
 	const [panelHistory, setPanelHistory] = useState([]);
 	const [seerrBrowse, setSeerrBrowse] = useState(null);
 	const [seerrPerson, setSeerrPerson] = useState(null);
@@ -352,7 +353,10 @@ const AppContent = (props) => {
 	}, [showScreensaver]);
 
 	useEffect(() => {
-		const handleTrailerPreview = (e) => setTrailerPreviewActive(!!e.detail?.active);
+		const handleTrailerPreview = (e) => {
+			setTrailerPreviewActive(!!e.detail?.active);
+			setTrailerHidesChrome(!!e.detail?.hidesChrome);
+		};
 		window.addEventListener('moonfin:trailerPreview', handleTrailerPreview);
 		return () => window.removeEventListener('moonfin:trailerPreview', handleTrailerPreview);
 	}, []);
@@ -1710,6 +1714,7 @@ const AppContent = (props) => {
 					onFriends={handleOpenFriends}
 					music={navMusic}
 					onOpenMusic={handleOpenMusic}
+					hideForTrailer={trailerHidesChrome}
 				/>
 			) : showNavBar ? (
 				<NavBar
@@ -1731,6 +1736,7 @@ const AppContent = (props) => {
 					onFriends={handleOpenFriends}
 					music={navMusic}
 					onOpenMusic={handleOpenMusic}
+					hideForTrailer={trailerHidesChrome}
 				/>
 			) : null}
 			<ItemMenuProvider onPlay={handlePlayFromMenu} onOpenItem={handleSelectItem} backRef={itemMenuBackRef}>
@@ -1994,6 +2000,7 @@ const AppContent = (props) => {
 							onBlurItemThemeMusic={themeMusic.cancelDelayed}
 							onLeaveThemeMusic={themeMusic.stopThemeMusic}
 							onHoldThemeMusic={themeMusic.holdThemeMusic}
+							trailerHidesChrome={trailerHidesChrome}
 						/>
 					</HomeLayer>
 				)}

@@ -22,7 +22,7 @@ const LOCAL_TRAILER_STREAM_PARAMS = {
 // Shared trailer preview engine for the home banners. Resolves a local or
 // youtube trailer for the current item, plays a muted preview into a container
 // the caller renders, and reveals it after a short delay.
-export default function useTrailerPreview({currentItem, isVisible, enabled, preferMuted, volume, showCaptions = false, captionLanguage = '', api, getItemServerUrl, onEnded}) {
+export default function useTrailerPreview({currentItem, isVisible, enabled, preferMuted, volume, showCaptions = false, captionLanguage = '', api, getItemServerUrl, onEnded, hidesChrome = false}) {
 	const [trailerActive, setTrailerActive] = useState(false);
 	// Set from the playing event, a few seconds before trailerActive reveals the video, so the
 	// banners can hold their carousel while the trailer is already audible.
@@ -484,13 +484,15 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 
 	// A playing trailer is the screen doing something, but it takes no key
 	// presses, so the inactivity timer would sit there counting down and cut it
-	// off. Announce it so the screensaver holds off until it ends.
+	// off. Announce it so the screensaver holds off until it ends. A full screen bar
+	// also clears the navigation and the peeking row away while it has focus.
+	const chromeHidden = trailerActive && hidesChrome;
 	useEffect(() => {
-		window.dispatchEvent(new CustomEvent('moonfin:trailerPreview', {detail: {active: trailerActive}}));
+		window.dispatchEvent(new CustomEvent('moonfin:trailerPreview', {detail: {active: trailerActive, hidesChrome: chromeHidden}}));
 		return () => {
 			window.dispatchEvent(new CustomEvent('moonfin:trailerPreview', {detail: {active: false}}));
 		};
-	}, [trailerActive]);
+	}, [trailerActive, chromeHidden]);
 
 	useEffect(() => {
 		const handleVisibility = () => {

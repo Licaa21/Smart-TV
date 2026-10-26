@@ -49,7 +49,8 @@ const NavBar = ({
 	onMessages,
 	onFriends,
 	music,
-	onOpenMusic
+	onOpenMusic,
+	hideForTrailer
 }) => {
 	const {settings, activeTheme} = useSettings();
 	const {isEnabled: seerrEnabled, displayName} = useSeerr();
@@ -131,7 +132,7 @@ const NavBar = ({
 
 	return (
 		<NavContainer
-			className={settings.navbarAlwaysExpanded ? `${css.topNav} ${css.alwaysExpanded}` : css.topNav}
+			className={`${css.topNav} ${settings.navbarAlwaysExpanded ? css.alwaysExpanded : ''} ${hideForTrailer ? css.trailerHidden : ''}`}
 			onKeyDown={handleNavKeyDown}
 			spotlightId="navbar"
 		>
