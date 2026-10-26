@@ -90,7 +90,7 @@ let lastFocusedCardIndex = -1;
 
 // The poster cards are Home's own, in whichever style Home is set to, so they follow its card size,
 // image type and focus behaviour. Each is handed what Seerr sent and shaped like a library item here.
-const HomeCard = memo(function HomeCard({entry, index, isRequest, mediaType, modern, serverUrl, isFocused, warm, onSelect, onFocusItem, onFocused}) {
+const HomeCard = memo(function HomeCard({entry, index, isRequest, mediaType, modern, serverUrl, isFocused, warmRank, onSelect, onFocusItem, onFocused}) {
 	const item = useMemo(() => (isRequest ? {
 		...normalizeRequestItem(entry),
 		// One title can carry more than one request, and each keeps a card of its own
@@ -132,7 +132,7 @@ const HomeCard = memo(function HomeCard({entry, index, isRequest, mediaType, mod
 			serverUrl={serverUrl}
 			cardType="portrait"
 			isFocused={isFocused}
-			warmFocusArt={warm}
+			warmRank={warmRank}
 			onFocused={onFocused}
 			onSelect={handleSelect}
 			onFocusItem={handleFocusItem}
@@ -239,7 +239,7 @@ const DiscoverRow = memo(function DiscoverRow({
 	const [focusedId, setFocusedId] = useState(null);
 	// Where focus is in the row, for the cards that fetch their wide art ahead of it
 	const {settings: {rememberRowCard}} = useSettings();
-	const {noteFocus, noteBlur, warms} = useWarmRow(rowIndex, rememberRowCard);
+	const {noteFocus, noteBlur, rankOf} = useWarmRow(rowIndex, rememberRowCard);
 	const [focusedIndex, setFocusedIndex] = useState(-1);
 	const handleBlur = useCallback((e) => {
 		if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
@@ -316,7 +316,7 @@ const DiscoverRow = memo(function DiscoverRow({
 						modern={modern}
 						serverUrl={serverUrl}
 						isFocused={focusedId === `seerr-request-${entry.id}`}
-						warm={warms(index, focusedIndex)}
+						warmRank={rankOf(index, focusedIndex)}
 						onSelect={onSelectItem}
 						onFocusItem={handleCardFocus}
 						onFocused={setFocusedId}
@@ -350,14 +350,14 @@ const DiscoverRow = memo(function DiscoverRow({
 						modern={modern}
 						serverUrl={serverUrl}
 						isFocused={focusedId === `seerr-${entry.media_type || entry.mediaType || (entry.title ? 'movie' : 'tv')}-${entry.id}`}
-						warm={warms(index, focusedIndex)}
+						warmRank={rankOf(index, focusedIndex)}
 						onSelect={onSelectItem}
 						onFocusItem={handleCardFocus}
 						onFocused={setFocusedId}
 					/>
 				));
 		}
-	}, [config.type, config.mediaType, items, visibleItems, onSelectItem, onSelectGenre, onSelectNetwork, onSelectStudio, onOpenShortcut, onFocusItem, handleCardFocus, focusedId, focusedIndex, warms, modern, serverUrl]);
+	}, [config.type, config.mediaType, items, visibleItems, onSelectItem, onSelectGenre, onSelectNetwork, onSelectStudio, onOpenShortcut, onFocusItem, handleCardFocus, focusedId, focusedIndex, rankOf, modern, serverUrl]);
 
 	return (
 		<div

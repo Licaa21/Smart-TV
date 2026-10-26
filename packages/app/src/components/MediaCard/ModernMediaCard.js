@@ -14,6 +14,7 @@ import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
 import {isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
+import {hasArt, rememberArt, prefetchArt} from './artPrefetch';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
 
@@ -61,25 +62,20 @@ const expandTransition = (speed) => {
 	return ms ? `width ${ms}ms ${EXPAND_CURVE}` : 'none';
 };
 
-// Wide art that has already come in, so a card focused after its art arrived opens straight away.
-const ART_MEMORY = 200;
-const loadedArt = new Set();
-const rememberArt = (url) => {
-	loadedArt.delete(url);
-	loadedArt.add(url);
-	if (loadedArt.size > ART_MEMORY) loadedArt.delete(loadedArt.values().next().value);
+// Plugin thumbs that came back with nothing, for any card of the same title to go to its backdrop at once. The
+// plugin has none for a title it can't place, an IMDb id with no TMDB one for instance. Remembered for a while
+// only, since a busy or restarting plugin fails thumbs it has.
+const FAILED_THUMBS_MAX = 500;
+const FAILED_THUMB_MS = 5 * 60 * 1000;
+const failedThumbs = new Map();
+const rememberFailedThumb = (url) => {
+	failedThumbs.delete(url);
+	failedThumbs.set(url, Date.now());
+	if (failedThumbs.size > FAILED_THUMBS_MAX) failedThumbs.delete(failedThumbs.keys().next().value);
 };
-
-// Fetches the art into the cache ahead of the card that will wear it. Returns what drops the request, for
-// art no one is going to want after all.
-const loadArt = (url) => {
-	const art = new window.Image();
-	art.onload = () => rememberArt(url);
-	art.src = url;
-	return () => {
-		art.onload = null;
-		art.src = '';
-	};
+const thumbFailedBefore = (url) => {
+	const at = failedThumbs.get(url);
+	return at !== undefined && Date.now() - at < FAILED_THUMB_MS;
 };
 
 // The art a card shows, at rest or focused.
@@ -237,7 +233,7 @@ const ModernMediaCard = ({
 	detailsWidth,
 	isLibraryRow = false,
 	rowImageType,
-	warmFocusArt = false,
+	warmRank = -1,
 	menuOptions
 }) => {
 	const {settings} = useSettings();
@@ -283,10 +279,15 @@ const ModernMediaCard = ({
 	// for it, and a thumb that fails to load hands over to the plain backdrop.
 	const [failedThumb, setFailedThumb] = useState(null);
 	// Cards about to be fetched for work the thumb out too, since it is what the title will grow into
-	const wantsSeerrWide = (isFocused || warmFocusArt) && isUnownedSeerrTitle(item);
+	const wantsSeerrWide = (isFocused || warmRank >= 0) && isUnownedSeerrTitle(item);
 	useTmdbThumbsAvailable(wantsSeerrWide);
 	const seerrThumb = wantsSeerrWide ? seerrThumbUrl(item) : null;
-	const seerrWide = wantsSeerrWide ? seerrWideArtUrl(item, failedThumb) : null;
+	const thumbFailed = Boolean(seerrThumb) && (failedThumb === seerrThumb || thumbFailedBefore(seerrThumb));
+	const seerrWide = wantsSeerrWide ? seerrWideArtUrl(item, thumbFailed ? seerrThumb : null) : null;
+	const failThumb = useCallback((url) => {
+		rememberFailedThumb(url);
+		setFailedThumb(url);
+	}, []);
 
 	const useSeriesThumbnails = settings.useSeriesThumbnails;
 	const restingUrl = useMemo(() => cardImageUrl(item, false, {itemServerUrl, isStaticMyMedia, rowArtwork, useSeriesThumbnails}),
@@ -369,23 +370,36 @@ const ModernMediaCard = ({
 		setArrivedUrl(focusUrl);
 	}, [focusUrl]);
 
-	// The cards around the focused one fetch their wide art ahead, so moving about opens each card at once.
-	const warmsArt = warmFocusArt && !deferImage && swapsArt;
+	// The cards around the focused one fetch their wide art ahead, nearest first, so moving about opens each card
+	// at once. The rank is how near the card is to focus and moves as focus does.
+	const warmsArt = warmRank >= 0 && !deferImage && swapsArt;
+	const warmRankRef = useRef(warmRank);
+	warmRankRef.current = warmRank;
+	const prefetchRef = useRef(null);
 	useEffect(() => {
-		if (!warmsArt || loadedArt.has(focusUrl)) return undefined;
-		const stop = loadArt(focusUrl);
-		// A thumb is made by the plugin on request, so one asked for is let finish whoever needs it
-		return seerrThumb ? undefined : stop;
-	}, [warmsArt, focusUrl, seerrThumb]);
+		if (!warmsArt || hasArt(focusUrl)) return undefined;
+		// A thumb the plugin has none of hands over to the backdrop before the card is ever focused
+		const request = prefetchArt(focusUrl, warmRankRef.current, () => {
+			if (seerrThumb && focusUrl === seerrThumb) failThumb(seerrThumb);
+		});
+		prefetchRef.current = request;
+		return () => {
+			prefetchRef.current = null;
+			request.cancel();
+		};
+	}, [warmsArt, focusUrl, seerrThumb, failThumb]);
+	useEffect(() => {
+		prefetchRef.current?.setRank(warmRank);
+	}, [warmRank]);
 
 	const expanded = isFocused && canRenderExpanded;
 	const overlaysArt = expanded && swapsArt;
-	const wideArrived = arrivedUrl === focusUrl || loadedArt.has(focusUrl);
+	const wideArrived = arrivedUrl === focusUrl || hasArt(focusUrl);
 	const imageUrl = isFocused && !overlaysArt ? focusUrl : restingUrl;
 
 	const handleImageError = useCallback(() => {
-		if (seerrThumb && focusUrl === seerrThumb) setFailedThumb(seerrThumb);
-	}, [focusUrl, seerrThumb]);
+		if (seerrThumb && focusUrl === seerrThumb) failThumb(seerrThumb);
+	}, [focusUrl, seerrThumb, failThumb]);
 
 	const extendedSectionWidth = Math.max(detailsWidth || 0, expandedWidth);
 

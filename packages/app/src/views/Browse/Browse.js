@@ -823,6 +823,8 @@ const Browse = ({
 			setBrowseMode('rows');
 		}
 		if (typeof rowIndex !== 'number') return;
+		// Every kind of row says it holds focus, the tile and button rows too, so the card rows around them fetch
+		announceFocusedRow(rowIndex);
 		const rowChanged = rowIndex !== lastFocusedRowRef.current;
 		lastFocusedRowRef.current = rowIndex;
 		if (rowChanged) {
