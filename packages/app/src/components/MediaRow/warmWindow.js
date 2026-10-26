@@ -26,8 +26,8 @@ export const cardPosition = (card) => (card && card.parentNode
 
 // The row focus is in, told to every row so those near it can fetch. Rows that don't change
 // side don't render again. Before any row has focus it is -1, the media bar's place above the first row.
-// ponytail: shared by every screen and told only by Modern rows and Seerr Discover's, so those screens, and a
-// tile row in between, can mislead Home's rows, which only costs them some fetches.
+// Home tells it for every kind of row (tile and button rows too), Seerr Discover and Search through their rows.
+// ponytail: shared by every screen, so another screen's rows can mislead Home's, which only costs them some fetches.
 let focusedRow = -1;
 const listeners = new Set();
 
