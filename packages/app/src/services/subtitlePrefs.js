@@ -32,6 +32,7 @@ const loadPrefs = async () => {
 		items: stored?.items && typeof stored.items === 'object' ? stored.items : {},
 		series: readSeries(stored?.series),
 		seriesAudio: readSeries(stored?.seriesAudio),
+		itemAudio: stored?.itemAudio && typeof stored.itemAudio === 'object' ? stored.itemAudio : {},
 		secondaryItems: stored?.secondaryItems && typeof stored.secondaryItems === 'object' ? stored.secondaryItems : {}
 	};
 };
@@ -77,8 +78,10 @@ export const saveSubtitlePref = async (item, streamIndex, streams) => {
 };
 
 export const saveAudioPref = async (item, streamIndex, streams) => {
-	if (!item?.SeriesId) return;
+	if (!item?.Id) return;
 	await updatePrefs((prefs) => {
+		if (streamIndex >= 0) remember(prefs.itemAudio, item.Id, streamIndex);
+		if (!item.SeriesId) return;
 		// Turning audio off isn't a thing, so a pick that names no track leaves the
 		// series without an opinion rather than storing one.
 		const pref = streamIndex >= 0 ? createSeriesTrackPref(streams, streamIndex) : null;
@@ -106,6 +109,12 @@ export const getItemSubtitlePref = async (itemId) => {
 	if (!itemId) return undefined;
 	const prefs = await loadPrefs();
 	return Object.prototype.hasOwnProperty.call(prefs.items, itemId) ? prefs.items[itemId] : undefined;
+};
+
+export const getItemAudioPref = async (itemId) => {
+	if (!itemId) return undefined;
+	const prefs = await loadPrefs();
+	return Object.prototype.hasOwnProperty.call(prefs.itemAudio, itemId) ? prefs.itemAudio[itemId] : undefined;
 };
 
 export const getSeriesSubtitlePref = async (seriesId) => {

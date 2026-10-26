@@ -67,9 +67,14 @@ export const permittedFromPolicy = (policy) => {
 	return allowed.length === 0 ? null : allowed;
 };
 
+// Synced picks come back with dashes while the policy lists ids without them, so both are
+// compared bare.
+export const bareId = (id) => String(id).replace(/-/g, '').toLowerCase();
+
 export const keepPermitted = (ids, permitted) => {
 	if (!permitted) return [...(ids || [])];
-	return (ids || []).filter((id) => permitted.indexOf(id) >= 0);
+	const allowed = permitted.map(bareId);
+	return (ids || []).filter((id) => allowed.indexOf(bareId(id)) >= 0);
 };
 
 // The libraries to search, or null when one sweep of the server is still right.

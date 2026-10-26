@@ -253,23 +253,28 @@
 	align-items: center;
 	justify-content: center;
 	box-sizing: border-box;
-	min-width: 52px;
-	height: 46px;
-	padding: 0 12px;
+	width: 56px;
+	height: 56px;
+	border: 3px solid transparent;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.7);
+	cursor: pointer;
+	transition: transform 0.12s ease;
 
 	svg {
-		width: 26px;
-		height: 26px;
+		width: 34px;
+		height: 34px;
 		fill: currentColor;
 	}
 
 	&:focus {
 		border-color: currentColor;
+		outline: none;
+		transform: scale(1.05);
 	}
 }
 
-.cancelBtnPlain {
-	background: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.08);
+.cancelBtn {
 	color: var(--theme-text-primary, #ffffff);
 }
 
@@ -377,6 +382,7 @@
 .tileTitle {
 	width: 100%;
 	font-size: 20px;
+	line-height: 28px;
 	font-weight: 600;
 	color: var(--theme-text-primary, #ffffff);
 	white-space: nowrap;
@@ -403,13 +409,14 @@
 .tileDate {
 	width: 100%;
 	font-size: 16px;
+	line-height: 22px;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-// The name sits under its own label, so a long one gets the tile's full width rather than being
-// cut out of a sentence.
+// When any name is too long for one line, every tile puts it under its own label so a long
+// name gets the tile's full width rather than being cut out of a sentence.
 .tileBy,
 .tileRequester {
 	color: rgba(var(--theme-on-surface-rgb, 255, 255, 255), 0.6);
@@ -425,12 +432,15 @@
 }
 
 .tileActions {
+	position: absolute;
+	left: 12px;
+	right: 12px;
+	bottom: 20px;
+	z-index: 1;
 	display: -webkit-box;
 	display: -webkit-flex;
 	display: flex;
-	margin-top: 10px;
-
-	> * + * {
-		margin-left: 0.5rem;
-	}
+	-webkit-box-pack: justify;
+	-webkit-justify-content: space-between;
+	justify-content: space-between;
 }

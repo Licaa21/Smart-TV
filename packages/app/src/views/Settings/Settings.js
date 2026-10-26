@@ -74,6 +74,7 @@ import DiagnosticsView from './DiagnosticsView';
 import LibrariesView from './LibrariesView';
 import LibraryOrderView from './LibraryOrderView';
 import MediaBarSourceView from './MediaBarSourceView';
+import {mediaBarExternalListOptions} from '../Browse/featuredExternal';
 import SeerrAccountPanel from './SeerrAccountPanel';
 import RommAccountPanel from './RommAccountPanel';
 import MoonbasePanel from './MoonbasePanel';
@@ -258,7 +259,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 				const subcats = getSubcategories(cv.id); // eslint-disable-line no-use-before-define
 				Spotlight.focus(subcats.length > 0 ? `subcat-${subcats[0].id}` : 'category-view');
 			} else if (cv.view === 'options') {
-				const idx = cv.options?.findIndex((o) => o.value === settings[cv.settingKey]);
+				const idx = cv.options?.findIndex((o) => o.value === cv.value);
 				Spotlight.focus(idx >= 0 ? `opt-${idx}` : 'opt-0');
 			} else if (cv.view === 'themes') {
 				const selectedId = availableThemes.find((t) => t.id === activeThemeId)?.id;
@@ -300,6 +301,8 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 				Spotlight.focus('media-bar-libraries-view');
 			} else if (cv.view === 'mediaBarCollections') {
 				Spotlight.focus('media-bar-collections-view');
+			} else if (cv.view === 'mediaBarExternalLists') {
+				Spotlight.focus('media-bar-external-lists-view');
 			} else if (cv.view === 'screensaverLibraries') {
 				Spotlight.focus('screensaver-libraries-view');
 			} else if (cv.view === 'screensaverCollections') {
@@ -853,9 +856,10 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	}, [hiddenDetailSections, updateSetting]);
 
 	const {
-		mediaBarLibraries, mediaBarCollections, tempMediaBarLibraryIds, tempMediaBarCollectionIds,
-		mediaBarSourcesLoading, openMediaBarLibraries, openMediaBarCollections,
-		toggleMediaBarLibrary, toggleMediaBarCollection, saveMediaBarLibraries, saveMediaBarCollections
+		mediaBarLibraries, mediaBarCollections, tempMediaBarLibraryIds, tempMediaBarCollectionIds, tempMediaBarExternalLists,
+		mediaBarSourcesLoading, openMediaBarLibraries, openMediaBarCollections, openMediaBarExternalLists,
+		toggleMediaBarLibrary, toggleMediaBarCollection, toggleMediaBarExternalList,
+		saveMediaBarLibraries, saveMediaBarCollections, saveMediaBarExternalLists
 	} = useMediaBarSources({api, settings, updateSettings, pushView, popView});
 
 	const {
@@ -1109,8 +1113,9 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			const first = settings[ACCENT_ALL_KEYS[0]];
 			return ACCENT_ALL_KEYS.every((accentKey) => settings[accentKey] === first) ? first : undefined;
 		}
-		return settings[key];
-	}, [currentView.settingKey, activeThemeId, settings]);
+		// A row that works its own value out (Media Preview) is marked by that value
+		return currentView.onSelect ? currentView.value : settings[key];
+	}, [currentView.settingKey, currentView.onSelect, currentView.value, activeThemeId, settings]);
 
 	const settingsCtx = useMemo(() => ({
 		settings,
@@ -1157,6 +1162,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			openExcludedGenres,
 			openMediaBarLibraries,
 			openMediaBarCollections,
+			openMediaBarExternalLists,
 			openScreensaverLibraries,
 			openScreensaverCollections,
 			openScreensaverGenres,
@@ -1170,6 +1176,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			resetRatingsSettings,
 			toggleExperimentalTruehd,
 			setSetting: updateSetting,
+			setSettings: updateSettings,
 			refreshPlugin,
 			runSetupAgain: onRunSetupWizard,
 			// The probe page ships with the Xbox build, and its report goes to the server
@@ -1177,11 +1184,11 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			openDeviceProbe: canProbeDevice ? openDeviceProbe : null
 		}
 	}), [
-		settings, capabilities, seerr, achievements, romm, seerrLabel, isSeerr, serverUrl, ratingsResetArmed, resetRatingsSettings, toggleExperimentalTruehd, updateSetting, refreshPlugin,
+		settings, capabilities, seerr, achievements, romm, seerrLabel, isSeerr, serverUrl, ratingsResetArmed, resetRatingsSettings, toggleExperimentalTruehd, updateSetting, updateSettings, refreshPlugin,
 		serverVersion, availableThemes, activeTheme, activeThemeId, openAccentAll, openAudioCodecs, openThemes, openThemeStore, openHomeRows,
 		openDetailButtons, openOsdButtons, openDetailMetadata, openDetailSections, openDiagnostics,
 		signInPin, toggleSignInPin, changeSignInPin, removeSignInPin, openKidsMode, openLibraries, openLibraryOrder, openParentalControls, openSubtitleDownloadLanguages, openTranscodeAudioCodecs, openQrLink, openRatingSources, openRowImageTypes, openExcludedGenres, openMediaBarLibraries,
-		openMediaBarCollections, openScreensaverLibraries, openScreensaverCollections, openScreensaverGenres,
+		openMediaBarCollections, openMediaBarExternalLists, openScreensaverLibraries, openScreensaverCollections, openScreensaverGenres,
 		openImdbLists, openSeasonalRow, openExternalTmdbLists, openExternalCalendars,
 		openExternalCustomRows, openSeerrHomeRows, openScreen, onRunSetupWizard, canProbeDevice
 	]);
@@ -1228,8 +1235,13 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	}, [pushView, currentView.id]);
 
 	const selectOptionValue = useCallback((value) => {
+		if (currentView.onSelect) {
+			currentView.onSelect(value);
+			popView();
+			return;
+		}
 		handleOptionSelect(currentView.settingKey, value);
-	}, [handleOptionSelect, currentView.settingKey]);
+	}, [handleOptionSelect, popView, currentView]);
 
 	const showMoreLogs = useCallback(() => {
 		setLogRenderLimit((prev) => prev + LOG_RENDER_STEP);
@@ -1727,6 +1739,24 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 					onToggleSelection={toggleMediaBarCollection}
 					onCancel={popView}
 					onSave={saveMediaBarCollections}
+				/>
+			)}
+			{viewName === 'mediaBarExternalLists' && (
+				<MediaBarSourceView
+					viewSpotlightId='media-bar-external-lists-view'
+					title={$L('External Lists')}
+					description={$L('Choose which IMDb, TMDB and custom lists the media bar also draws from.')}
+					loading={false}
+					items={mediaBarExternalListOptions(settings.customHomeRows, seerr.pluginInfo?.tmdbAvailable === true)}
+					itemIdKey='Id'
+					itemNameKey='Name'
+					selectedIds={tempMediaBarExternalLists}
+					itemSpotlightPrefix='media-bar-external-list'
+					cancelSpotlightId='media-bar-external-list-cancel'
+					saveSpotlightId='media-bar-external-list-save'
+					onToggleSelection={toggleMediaBarExternalList}
+					onCancel={popView}
+					onSave={saveMediaBarExternalLists}
 				/>
 			)}
 			{viewName === 'screensaverLibraries' && (

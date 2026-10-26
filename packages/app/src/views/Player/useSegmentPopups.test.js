@@ -383,4 +383,29 @@ describe('the skip prompt over the controls, on a seek and under the remote', ()
 		expect(consumed).toBe(false);
 		document.body.removeChild(button);
 	});
+
+	test('knows when focus sits anywhere inside the seek bar', () => {
+		expect(isSeekbarFocused()).toBe(false);
+		focusSeekbar();
+		expect(isSeekbarFocused()).toBe(true);
+		focusPrompt();
+		expect(isSeekbarFocused()).toBe(false);
+	});
+
+	test('with the controls up, Up from the seek bar goes to it and Up from anywhere else is left alone', () => {
+		const {result, showControls} = setupPrompt({controlsVisible: true});
+		at(result, 61);
+
+		const other = document.createElement('button');
+		document.body.appendChild(other);
+		other.focus();
+		expect(press(result, UP)).toBe(false);
+		expect(showControls).not.toHaveBeenCalled();
+		expect(Spotlight.focus).not.toHaveBeenCalled();
+
+		focusSeekbar();
+		expect(press(result, UP)).toBe(true);
+		expect(showControls).toHaveBeenCalledTimes(1);
+		expect(Spotlight.focus).toHaveBeenCalledWith('skip-segment-btn');
+	});
 });

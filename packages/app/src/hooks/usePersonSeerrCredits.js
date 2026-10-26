@@ -1,6 +1,7 @@
-import {useState, useEffect, useMemo} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 
 import {useSeerr} from '../context/SeerrContext';
+import {useSettings} from '../context/SettingsContext';
 import * as seerrApi from '../services/seerrApi';
 import {prepareCredits, knownForBackdropPath, knownForKey, libraryRanking} from '../utils/personCredits';
 import {normalizeMediaItem} from '../utils/seerrHomeRows';
@@ -13,6 +14,7 @@ const EMPTY = [];
  */
 const usePersonSeerrCredits = (tmdbId) => {
 	const {isEnabled} = useSeerr();
+	const {settings: {personPageGroupItems: group, personPageSortOption: sortOption}} = useSettings();
 	const [credits, setCredits] = useState(null);
 
 	useEffect(() => {
@@ -35,10 +37,18 @@ const usePersonSeerrCredits = (tmdbId) => {
 	// The most popular first, with the title the backdrop comes from ahead of them all.
 	const pinKey = useMemo(() => (credits ? knownForKey(credits.cast, credits.crew) : null), [credits]);
 	const ranking = useMemo(() => libraryRanking(credits), [credits]);
+	const appearances = useMemo(
+		() => (credits ? prepareCredits(credits.cast, {isCrew: false, group, sortOption, pinKey}).map(normalizeMediaItem) : EMPTY),
+		[credits, group, sortOption, pinKey]
+	);
+	const crewCredits = useMemo(
+		() => (credits ? prepareCredits(credits.crew, {isCrew: true, group, sortOption, pinKey}).map(normalizeMediaItem) : EMPTY),
+		[credits, group, sortOption, pinKey]
+	);
 
 	return {
-		appearances: credits ? prepareCredits(credits.cast, {isCrew: false, group: true, sortOption: 'popularity', pinKey}).map(normalizeMediaItem) : EMPTY,
-		crewCredits: credits ? prepareCredits(credits.crew, {isCrew: true, group: true, sortOption: 'popularity', pinKey}).map(normalizeMediaItem) : EMPTY,
+		appearances,
+		crewCredits,
 		// For the library's own rows on the same page, which take their order from what Seerr says of the same titles
 		ranking,
 		// the cast first, then the crew work of a person who only directs or writes, as the Seerr person screen does

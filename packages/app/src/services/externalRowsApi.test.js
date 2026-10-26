@@ -1,4 +1,4 @@
-import {fetchCustomRow, fetchSeasonalRow, constructSourceUrl, __resetExternalRowCache} from './externalRowsApi';
+import {fetchCustomRow, fetchSeasonalRow, fetchTmdbDetails, constructSourceUrl, __resetExternalRowCache} from './externalRowsApi';
 import {fetchWithTimeout} from '../utils/fetchTimeout';
 
 jest.mock('../utils/fetchTimeout', () => ({fetchWithTimeout: jest.fn()}));
@@ -131,6 +131,32 @@ describe('externalRowsApi', () => {
 
 			const [calledUrl] = fetchWithTimeout.mock.calls[0];
 			expect(calledUrl).toContain('country=CA');
+		});
+	});
+
+	describe('fetchTmdbDetails', () => {
+		it('asks by TMDB id and keeps the answer', async () => {
+			fetchWithTimeout.mockResolvedValue(mockJsonResponse({overview: 'Hope', rating: 8.7}));
+
+			const details = await fetchTmdbDetails({type: 'movie', tmdbId: '278', imdbId: 'tt0111161'});
+			expect(details).toEqual({overview: 'Hope', rating: 8.7});
+			expect(fetchWithTimeout.mock.calls[0][0]).toBe('http://server/Moonfin/Tmdb/Details?type=movie&tmdbId=278');
+			expect(fetchWithTimeout.mock.calls[0][1].headers.Authorization).toBe('MediaBrowser Token="test-token"');
+
+			await fetchTmdbDetails({type: 'movie', tmdbId: '278'});
+			expect(fetchWithTimeout).toHaveBeenCalledTimes(1);
+		});
+
+		it('falls back to the IMDb id and reads a 404 as no details', async () => {
+			fetchWithTimeout.mockResolvedValue(mockJsonResponse(null, 404));
+
+			expect(await fetchTmdbDetails({type: 'tv', imdbId: 'tt0903747'})).toBeNull();
+			expect(fetchWithTimeout.mock.calls[0][0]).toBe('http://server/Moonfin/Tmdb/Details?type=tv&imdbId=tt0903747');
+		});
+
+		it('asks nothing without an id', async () => {
+			expect(await fetchTmdbDetails({type: 'movie'})).toBeNull();
+			expect(fetchWithTimeout).not.toHaveBeenCalled();
 		});
 	});
 

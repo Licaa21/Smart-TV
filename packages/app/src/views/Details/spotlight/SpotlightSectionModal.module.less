@@ -47,6 +47,24 @@
 	.descender-room();
 }
 
+.headerAction {
+	flex-shrink: 0;
+	margin-left: auto;
+	padding: 8px 18px;
+	border: 2px solid transparent;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.08);
+	color: #fff;
+	font-size: 17px;
+	font-weight: 600;
+	outline: none;
+
+	&:focus {
+		background: rgba(255, 255, 255, 0.16);
+		border-color: var(--theme-focus-border-color, #ffffff);
+	}
+}
+
 .body {
 	flex: 1;
 	padding: 16px 24px 24px;

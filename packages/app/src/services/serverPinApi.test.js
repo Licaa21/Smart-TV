@@ -1,6 +1,6 @@
 import {
 	PIN_LOCKED, PIN_NONE, PIN_UNAVAILABLE, PIN_VALID, PIN_WRONG,
-	getServerPinStatus, removeServerPin, setServerPin, verifyServerPin
+	getServerPinStatus, removeServerPin, removeServerPinFor, setServerPin, verifyServerPin
 } from './serverPinApi';
 import {platformFetch} from './secureFetch';
 
@@ -73,5 +73,24 @@ describe('setServerPin and removeServerPin', () => {
 		platformFetch.mockResolvedValueOnce(reply(403, {error: 'Forbidden'}));
 		await expect(removeServerPin(account, '0000')).resolves.toEqual({result: PIN_UNAVAILABLE});
 		expect(platformFetch.mock.calls[0][1].method).toBe('DELETE');
+	});
+});
+
+describe('removeServerPinFor', () => {
+	it("clears another account's PIN by its id", async () => {
+		platformFetch.mockResolvedValueOnce(reply(200, {enabled: false}));
+		await expect(removeServerPinFor(account, 'u1')).resolves.toEqual({result: PIN_VALID});
+		const [url, options] = platformFetch.mock.calls[0];
+		expect(url).toBe('http://server/Moonfin/Users/u1/Pin');
+		expect(options.method).toBe('DELETE');
+	});
+
+	it('takes any other answer, or none at all, as unavailable', async () => {
+		platformFetch.mockResolvedValueOnce(reply(403, {error: 'Forbidden'}));
+		await expect(removeServerPinFor(account, 'u1')).resolves.toEqual({result: PIN_UNAVAILABLE});
+		platformFetch.mockResolvedValueOnce(reply(404, {error: 'No PIN is set'}));
+		await expect(removeServerPinFor(account, 'u1')).resolves.toEqual({result: PIN_UNAVAILABLE});
+		platformFetch.mockRejectedValueOnce(new Error('offline'));
+		await expect(removeServerPinFor(account, 'u1')).resolves.toEqual({result: PIN_UNAVAILABLE});
 	});
 });

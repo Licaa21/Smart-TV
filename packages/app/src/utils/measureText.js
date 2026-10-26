@@ -15,7 +15,7 @@ const fontFamily = () => {
 	return family;
 };
 
-const measureTextWidth = (text, fontSize) => {
+export const measureTextWidth = (text, fontSize) => {
 	const key = `${fontSize}|${text}`;
 	if (widths.has(key)) return widths.get(key);
 	if (!context && typeof document !== 'undefined') {

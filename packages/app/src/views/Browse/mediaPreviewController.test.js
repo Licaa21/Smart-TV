@@ -40,6 +40,8 @@ jest.mock('../../services/jellyfinApi', () => ({
 	getTokenParam: () => 'ApiKey'
 }));
 jest.mock('../../services/deviceProfile', () => ({getDeviceCapabilities: jest.fn()}));
+jest.mock('../../services/seerrApi', () => ({moonfinPing: jest.fn()}));
+jest.mock('../../services/externalRowsApi', () => ({fetchTmdbDetails: jest.fn()}));
 jest.mock('../../utils/perfTier', () => ({getPerfTier: () => 'high'}));
 // The platform module is reached through a dynamic import, so it's stood in for
 // with a real jsdom element and a cleanup the tests can watch.
@@ -51,9 +53,18 @@ jest.mock('@moonfin/platform-webos/video', () => {
 	};
 }, {virtual: true});
 jest.mock('hls.js', () => ({__esModule: true, default: MockHls}));
+// YouTube is never asked, the resolved stream is handed back by each test.
+jest.mock('../../services/youtubeTrailer', () => ({
+	...jest.requireActual('../../services/youtubeTrailer'),
+	fetchVideoStream: jest.fn(),
+	nativeManifestSkipped: () => false
+}));
 
 import {cleanupVideoElement, getSharedVideoElement} from '@moonfin/platform-webos/video';
 import {PREVIEW_DWELL_MS, PREVIEW_OPEN_TIMEOUT_MS, PREVIEW_PLAY_CAP_MS} from '../../services/mediaPreviewSource';
+import {fetchVideoStream} from '../../services/youtubeTrailer';
+import {moonfinPing} from '../../services/seerrApi';
+import {fetchTmdbDetails} from '../../services/externalRowsApi';
 import {claimSharedVideo, ownsSharedVideo, releaseSharedVideo} from '../../utils/sharedVideoOwner';
 import {createMediaPreviewController} from './mediaPreviewController';
 
@@ -122,8 +133,11 @@ const startPreview = async (item = movie()) => {
 	await dwell();
 };
 
+// The card only shows the video once the position moves on from where playing was heard.
 const play = () => {
 	video.onplaying();
+	video.currentTime += 0.25;
+	video.ontimeupdate();
 };
 
 const onAnnounce = (e) => {
@@ -221,6 +235,7 @@ describe('the dwell', () => {
 	test('a card that can\'t be previewed starts nothing', async () => {
 		controller.schedule('media-row-seerr', movie({_seerr: true}));
 		controller.schedule('media-row-box', {Id: 'box', Type: 'BoxSet'});
+		controller.schedule('media-row-season', {Id: 'season', Type: 'Season', SeriesId: 'show'});
 		await dwell();
 
 		expect(api.getItemMediaInfo).not.toHaveBeenCalled();
@@ -314,6 +329,19 @@ describe('attaching', () => {
 });
 
 describe('playing', () => {
+	test('playing alone keeps the artwork up until the position moves', async () => {
+		await startPreview();
+		video.onplaying();
+		video.ontimeupdate();
+
+		expect(phases).toEqual(['attached']);
+		expect(announced).toEqual([]);
+
+		jest.advanceTimersByTime(PREVIEW_OPEN_TIMEOUT_MS);
+		expect(controller.getCurrent()).toBeNull();
+		expect(phases).toEqual(['attached', 'idle']);
+	});
+
 	test('reveals the card, sizes the video to cover the frame and holds the screensaver off', async () => {
 		await startPreview();
 		play();
@@ -363,6 +391,7 @@ describe('stopping', () => {
 		expect(video.style.height).toBe('100%');
 		expect(frame.contains(video)).toBe(false);
 		expect(video.onplaying).toBeNull();
+		expect(video.ontimeupdate).toBeNull();
 		expect(video.onerror).toBeNull();
 		expect(ownsSharedVideo('preview')).toBe(false);
 		const playSessionId = /PlaySessionId=([0-9a-f]{32})/.exec(hls.url)[1];
@@ -470,5 +499,195 @@ describe('stopping', () => {
 		expect(controller.getCurrent()).toBeNull();
 		expect(frame.contains(video)).toBe(false);
 		expect(announced).toEqual([true, false]);
+	});
+});
+
+describe('trailer preview', () => {
+	const MANIFEST = 'https://manifest.googlevideo.com/api/manifest/hls_variant/id/index.m3u8';
+	const youTube = (id) => [{Name: 'Trailer', Url: `https://www.youtube.com/watch?v=${id}`}];
+
+	beforeEach(() => {
+		controller.dispose();
+		api.getLocalTrailers = jest.fn().mockResolvedValue([]);
+		api.getItem = jest.fn().mockResolvedValue({Id: 'film', RemoteTrailers: []});
+		fetchVideoStream.mockReset();
+		makeController({getSettings: () => ({episodePreviewEnabled: true, mediaPreviewMode: 'trailer'})});
+	});
+
+	test('a trailer on the server plays through the clip\'s stream from the top, and its encode is stopped', async () => {
+		api.getLocalTrailers.mockResolvedValue([{Id: 'trailer-1'}]);
+		api.getItemMediaInfo.mockResolvedValue(target('trailer-1'));
+
+		await startPreview(movie({RemoteTrailers: youTube('aaaaaaaaaaa')}));
+
+		expect(api.getLocalTrailers).toHaveBeenCalledWith('film');
+		expect(api.getItemMediaInfo).toHaveBeenCalledWith('trailer-1');
+		expect(fetchVideoStream).not.toHaveBeenCalled();
+		const hls = MockHls.instances[0];
+		expect(hls.url).toContain('http://server/Videos/trailer-1/master.m3u8?');
+		expect(hls.config.startPosition).toBe(-1);
+
+		play();
+		expect(phases).toEqual(['attached', 'playing']);
+
+		controller.stop('blur');
+		const playSessionId = /PlaySessionId=([0-9a-f]{32})/.exec(hls.url)[1];
+		expect(api.stopActiveEncodings).toHaveBeenCalledWith(playSessionId);
+	});
+
+	test('YouTube plays next, on hls.js with H.264 and the original soundtrack, and leaves the server alone', async () => {
+		fetchVideoStream.mockResolvedValue({url: MANIFEST, audioLanguage: 'en', client: 'VISIONOS'});
+
+		await startPreview(movie({RemoteTrailers: youTube('bbbbbbbbbbb')}));
+
+		expect(fetchVideoStream).toHaveBeenCalledWith('bbbbbbbbbbb', false, '', false);
+		expect(api.getItemMediaInfo).not.toHaveBeenCalled();
+		const hls = MockHls.instances[0];
+		expect(hls.url).toBe(MANIFEST);
+		expect(hls.config.videoPreference).toEqual({videoCodec: 'avc1'});
+		expect(hls.config.audioPreference).toEqual({lang: 'en'});
+		expect(hls.config.startPosition).toBe(-1);
+		expect(phases).toEqual(['attached']);
+
+		play();
+		expect(phases).toEqual(['attached', 'playing']);
+		expect(holds).toEqual([true]);
+
+		controller.stop('blur');
+		expect(api.stopActiveEncodings).not.toHaveBeenCalled();
+		expect(hls.destroyed).toBe(true);
+		expect(holds).toEqual([true, false]);
+	});
+
+	test('an episode plays its show\'s trailer', async () => {
+		api.getItem.mockResolvedValue({Id: 'show', RemoteTrailers: youTube('ccccccccccc')});
+		fetchVideoStream.mockResolvedValue({url: MANIFEST});
+
+		await startPreview({Id: 'ep', Type: 'Episode', SeriesId: 'show'});
+
+		expect(api.getLocalTrailers).toHaveBeenCalledWith('show');
+		expect(api.getItem).toHaveBeenCalledWith('show');
+		expect(fetchVideoStream).toHaveBeenCalledWith('ccccccccccc', false, '', false);
+		expect(MockHls.instances[0].url).toBe(MANIFEST);
+	});
+
+	test('no trailer, or one YouTube won\'t hand over, plays nothing rather than the clip', async () => {
+		await startPreview();
+
+		expect(api.getNextUp).not.toHaveBeenCalled();
+		expect(api.getItemMediaInfo).not.toHaveBeenCalled();
+		expect(MockHls.instances).toHaveLength(0);
+		expect(phases).toEqual(['idle']);
+		expect(controller.getCurrent()).toBeNull();
+
+		phases.length = 0;
+		fetchVideoStream.mockResolvedValue(null);
+		await startPreview(movie({RemoteTrailers: youTube('ddddddddddd')}));
+
+		expect(fetchVideoStream).toHaveBeenCalledTimes(1);
+		expect(MockHls.instances).toHaveLength(0);
+		expect(phases).toEqual(['idle']);
+		expect(holds).toEqual([true, false, true, false]);
+	});
+
+	test('a trailer plays past the clip\'s cap to its end, then the card goes back to its artwork', async () => {
+		fetchVideoStream.mockResolvedValue({url: MANIFEST});
+		await startPreview(movie({RemoteTrailers: youTube('ggggggggggg')}));
+		play();
+
+		jest.advanceTimersByTime(PREVIEW_PLAY_CAP_MS * 4);
+		expect(controller.getCurrent()).toEqual({key: KEY, phase: 'playing'});
+
+		video.onended();
+		expect(controller.getCurrent()).toBeNull();
+		expect(phases).toEqual(['attached', 'playing', 'idle']);
+		expect(announced).toEqual([true, false]);
+	});
+
+	test('Seerr tiles, shortcuts, calendar cards and videos stay without a preview', async () => {
+		moonfinPing.mockResolvedValue({tmdbDetailsSupported: true});
+		controller.schedule('media-row-genre', {Id: 'seerr-genre-movie-28', Type: 'Genre', _seerr: true, _seerrType: 'genre', _seerrMediaType: 'movie'});
+		controller.schedule('media-row-shortcut', {Id: 'seerr-shortcut-discover', _seerr: true, _seerrType: 'shortcut'});
+		controller.schedule('media-row-calendar', {Id: 'cal-sonarr-5', Type: 'Series', ProviderIds: {Tmdb: '5'}, _external: true, _seerr: true, _seerrType: 'item', _seerrMediaType: 'tv', _calendarDate: '2026-11-01'});
+		controller.schedule('media-row-video', {Id: 'clip', Type: 'Video'});
+		await dwell();
+
+		expect(moonfinPing).not.toHaveBeenCalled();
+		expect(api.getLocalTrailers).not.toHaveBeenCalled();
+		expect(api.getItem).not.toHaveBeenCalled();
+		expect(controller.getCurrent()).toBeNull();
+	});
+});
+
+describe('outside titles', () => {
+	const MANIFEST = 'https://manifest.googlevideo.com/api/manifest/hls_variant/id/index.m3u8';
+	const seerrTitle = {Id: 'seerr-movie-603', Type: 'Movie', _seerr: true, _seerrType: 'item', _seerrMediaType: 'movie', _seerrRaw: {mediaId: 603, mediaType: 'movie'}};
+	const listTitle = {Id: 'ext-tmdb-1399', Type: 'Series', ProviderIds: {Tmdb: '1399'}, _external: true, _seerr: true, _seerrType: 'item', _seerrMediaType: 'tv', _seerrRaw: {mediaId: 1399, mediaType: 'tv'}};
+
+	beforeEach(() => {
+		api.getLocalTrailers = jest.fn();
+		api.getItem = jest.fn();
+		fetchVideoStream.mockReset();
+		fetchVideoStream.mockResolvedValue({url: MANIFEST});
+		moonfinPing.mockReset();
+		moonfinPing.mockResolvedValue({tmdbDetailsSupported: true});
+		fetchTmdbDetails.mockReset();
+		fetchTmdbDetails.mockResolvedValue({trailerUrl: 'https://www.youtube.com/watch?v=hhhhhhhhhhh'});
+	});
+
+	const expectTrailerOnly = async (item) => {
+		await startPreview(item);
+
+		expect(fetchVideoStream).toHaveBeenCalledWith('hhhhhhhhhhh', false, '', false);
+		expect(MockHls.instances[0].url).toBe(MANIFEST);
+		play();
+		expect(phases).toEqual(['attached', 'playing']);
+		jest.advanceTimersByTime(PREVIEW_PLAY_CAP_MS * 2);
+		expect(controller.getCurrent()).toEqual({key: KEY, phase: 'playing'});
+
+		controller.stop('blur');
+		expect(api.getNextUp).not.toHaveBeenCalled();
+		expect(api.getItemMediaInfo).not.toHaveBeenCalled();
+		expect(api.getLocalTrailers).not.toHaveBeenCalled();
+		expect(api.getItem).not.toHaveBeenCalled();
+		expect(api.stopActiveEncodings).not.toHaveBeenCalled();
+	};
+
+	test('a Seerr title plays its TMDB trailer in full while the mode is Media Preview', async () => {
+		controller.dispose();
+		makeController({getSettings: () => ({episodePreviewEnabled: true, mediaPreviewMode: 'media'})});
+
+		await expectTrailerOnly(seerrTitle);
+		expect(fetchTmdbDetails).toHaveBeenCalledWith({type: 'movie', tmdbId: 603, imdbId: undefined});
+	});
+
+	test('an outside list title plays its TMDB trailer in Trailer Preview too', async () => {
+		controller.dispose();
+		makeController({getSettings: () => ({episodePreviewEnabled: true, mediaPreviewMode: 'trailer'})});
+
+		await expectTrailerOnly(listTitle);
+		expect(fetchTmdbDetails).toHaveBeenCalledWith({type: 'tv', tmdbId: 1399, imdbId: undefined});
+	});
+
+	test('no TMDB details from the plugin, or none with a trailer, plays nothing', async () => {
+		moonfinPing.mockResolvedValue({tmdbDetailsSupported: false});
+		await startPreview(seerrTitle);
+		expect(fetchTmdbDetails).not.toHaveBeenCalled();
+
+		moonfinPing.mockResolvedValue({tmdbDetailsSupported: true});
+		fetchTmdbDetails.mockResolvedValue({overview: 'no trailer'});
+		await startPreview(listTitle);
+
+		expect(fetchVideoStream).not.toHaveBeenCalled();
+		expect(MockHls.instances).toHaveLength(0);
+		expect(phases).toEqual(['idle', 'idle']);
+	});
+
+	test('turning previews off keeps outside titles from playing too', async () => {
+		controller.setEnabled(false);
+		await startPreview(seerrTitle);
+
+		expect(moonfinPing).not.toHaveBeenCalled();
+		expect(controller.getCurrent()).toBeNull();
 	});
 });

@@ -1,7 +1,7 @@
 import {useState, useEffect, useCallback, useRef, memo} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import Spotlight from '@enact/spotlight';
-import {getImageUrl, getBackdropId} from '../../utils/helpers';
+import {getImageUrl, getFeaturedBackdropUrl} from '../../utils/helpers';
 import {KEYS} from '../../utils/keys';
 import useTrailerPreview from './useTrailerPreview';
 import css from './Browse.module.less';
@@ -43,12 +43,10 @@ const AyaBanner = memo(({
 	const safeIndex = Math.min(activeIndex, Math.max(0, featuredItems.length - 1));
 	const currentFeatured = featuredItems[safeIndex];
 
-	const backdropUrlOf = useCallback((item) => {
-		const backdropId = getBackdropId(item);
-		return backdropId ? getImageUrl(getItemServerUrl(item), backdropId, 'Backdrop', BACKDROP_OPTS) : null;
-	}, [getItemServerUrl]);
+	const backdropUrlOf = useCallback((item) => getFeaturedBackdropUrl(getItemServerUrl(item), item, BACKDROP_OPTS), [getItemServerUrl]);
 
 	const logoUrlOf = useCallback((item) => {
+		if (item?._external) return item.LogoUrl || null;
 		if (!item?.ImageTags?.Logo) return null;
 		return getImageUrl(getItemServerUrl(item), item.Id, 'Logo', LOGO_OPTS);
 	}, [getItemServerUrl]);
@@ -59,7 +57,7 @@ const AyaBanner = memo(({
 
 	const {trailerContainerRef, trailerHolding} = useTrailerPreview({
 		currentItem: currentFeatured,
-		isVisible: isVisible && browseVisible,
+		isVisible: isVisible && browseVisible && featuredFocused,
 		enabled: settingsLoaded && settings.featuredTrailerPreview,
 		preferMuted: settings.featuredTrailerMuted,
 		volume: settings.trailerVolume,

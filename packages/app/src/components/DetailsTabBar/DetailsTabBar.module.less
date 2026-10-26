@@ -1,16 +1,21 @@
+// A bar with more tabs than fit scrolls inside its own outline instead of running off the screen.
 .tabBar {
+	position: relative;
+	display: inline-block;
+	max-width: 100%;
+	overflow: hidden;
+	vertical-align: top;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.08);
+	scroll-behavior: smooth;
+}
+
+.track {
 	display: inline-flex;
 	flex-direction: row;
 	flex-wrap: nowrap;
 	align-items: center;
 	padding: 4px;
-	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.08);
-	// A show with dozens of seasons would run off the screen, so the bar stops at the edge and slides along under
-	// focus instead, keepFocusInView doing the sliding.
-	max-width: 100%;
-	box-sizing: border-box;
-	overflow-x: hidden;
 }
 
 // The segments butt up against each other so the selected one reads as a thumb
@@ -55,7 +60,9 @@
 // A bar one level under another, such as the seasons under a section's own tabs, set smaller so the two do not
 // read as equals.
 .compact {
-	padding: 3px;
+	.track {
+		padding: 3px;
+	}
 
 	.tab {
 		height: 44px;

@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState, memo} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, memo} from 'react';
 import {Row, Column} from '@enact/ui/Layout';
 import {Panel, Header} from '@enact/sandstone/Panels';
 import Spinner from '@enact/sandstone/Spinner';
@@ -30,6 +30,8 @@ import {
 	isRequestDownloading
 } from '../../utils/seerrStatus';
 import {uiLocale} from '../../utils/uiLocale';
+import {KEYS} from '../../utils/keys';
+import {measureTextWidth} from '../../utils/measureText';
 import css from './SeerrRequests.module.less';
 
 // The stylesheet sizes a row in rem, so the list has to be told its height in the
@@ -54,16 +56,19 @@ const useRootFontSize = (uiScale) => {
 const SpottableDiv = Spottable('div');
 const PillContainer = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'div');
 
-// The requests grid. A tile is a whole 2:3 poster over a caption that reserves
-// room for the fullest case, a pending request and its action row, so posters
-// stay level across a row.
+// The requests grid. A tile is a whole 2:3 poster over a caption of one height,
+// so posters stay level across a row.
 const TILE_WIDTH = 232;
 const TILE_PADDING = 8;
 // A whole 2:3 poster of the width left inside the tile's own padding.
 const TILE_POSTER_HEIGHT = (TILE_WIDTH - TILE_PADDING * 2) * 1.5;
-// Title, status slot, the requester's label and name on lines of their own, date,
-// and the action row a pending request adds.
-const TILE_CAPTION_HEIGHT = 242;
+// Title, status slot, "Requested by name" on one line, and the date.
+const TILE_CAPTION_HEIGHT = 142;
+// Added when a requester has to go under its label.
+const TILE_REQUESTER_LINE = 22;
+const TILE_REQUESTER_FONT = 16;
+// The narrowest caption the grid can give, inside the tile and caption padding.
+const TILE_TEXT_WIDTH = TILE_WIDTH - TILE_PADDING * 2 - 12;
 const TILE_GAP = 24;
 
 // Timestamps arrive as ISO strings, so the set's own locale formats them.
@@ -123,20 +128,48 @@ const TabPill = memo(function TabPill({label, count, selected, onSelect, value})
 	);
 });
 
-// Two labeled buttons don't fit across a tile, so its actions are icons.
+// Two labeled buttons don't fit across a tile, so its actions are round icons on the poster.
 const TILE_ACTION_ICONS = {
 	approve: 'M16.59 7.58L10 14.17l-3.59-3.58L5 12l5 5 8-8zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z',
 	decline: 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.59-13L12 10.59 8.41 7 7 8.41 10.59 12 7 15.59 8.41 17 12 13.41 15.59 17 17 15.59 13.41 12 17 8.41z',
-	retry: 'M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z'
+	retry: 'M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z',
+	cancel: 'M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z'
 };
 
+// The request either side of a tile in the same row, if there is one.
+const tileBeside = (tile, step) => {
+	const index = Number(tile.getAttribute('data-spotlight-id').slice('request-'.length));
+	const next = document.querySelector(`[data-spotlight-id="request-${index + step}"]`);
+	return next && next.getBoundingClientRect().top === tile.getBoundingClientRect().top ? next : null;
+};
+
+// Spotlight sees a tile's own buttons as the nearest stop either side of it. The grid moves between
+// requests itself, so this walks the buttons: along them, back out to the tile, and past the last
+// one to the next request. At the start of a row left stays put instead of dropping into a button.
+const handleTileKeyDown = (e) => {
+	if (e.keyCode !== KEYS.LEFT && e.keyCode !== KEYS.RIGHT) return;
+	const tile = e.currentTarget;
+	const stops = [tile, ...Array.from(tile.querySelectorAll('.spottable'))];
+	const at = stops.indexOf(e.target);
+	if (stops.length < 2 || at < 0) return;
+	e.preventDefault();
+	e.stopPropagation();
+	const target = e.keyCode === KEYS.RIGHT
+		? stops[at + 1] || tileBeside(tile, 1)
+		: (at > 0 ? stops[at - 1] : tileBeside(tile, -1));
+	if (target) Spotlight.focus(target);
+};
+
+const requestedByLine = (requester) => $L('Requested by {name}').replace('{name}', requester);
+const requesterName = (request) => request.requestedBy?.displayName || $L('Unknown');
+
 const TileActionIcon = ({className, path, label, onClick}) => (
-	<SpottableDiv className={`${css.actionBtn} ${css.iconBtn} ${className}`} onClick={onClick} aria-label={label}>
+	<SpottableDiv className={`${css.iconBtn} ${className}`} onClick={onClick} aria-label={label}>
 		<svg viewBox="0 0 24 24" aria-hidden="true"><path d={path} /></svg>
 	</SpottableDiv>
 );
 
-const RequestItem = memo(function RequestItem({request, index, canManage, myUserId, onSelect, onAction, ...rest}) {
+const RequestItem = memo(function RequestItem({request, index, canManage, myUserId, splitRequester, onSelect, onAction, ...rest}) {
 	const media = request.media;
 	// w342 like the other Seerr screens. w185 is too soft once the grid enlarges it.
 	const posterUrl = media?.posterPath
@@ -147,7 +180,7 @@ const RequestItem = memo(function RequestItem({request, index, canManage, myUser
 	const isFailed = request.status === REQUEST_STATUS.FAILED;
 	const downloadSummary = getRequestDownloadSummary(request);
 	const isOwn = request.requestedBy?.id != null && request.requestedBy.id === myUserId;
-	const requester = request.requestedBy?.displayName || $L('Unknown');
+	const requester = requesterName(request);
 	const isMovie = request.type === 'movie' || media?.mediaType === 'movie';
 
 	const handleClick = useCallback(() => {
@@ -192,6 +225,7 @@ const RequestItem = memo(function RequestItem({request, index, canManage, myUser
 			className={css.tile}
 			data-spotlight-id={`request-${index}`}
 			onClick={handleClick}
+			onKeyDown={handleTileKeyDown}
 			onFocus={handleFocus}
 			onBlur={handleBlur}
 		>
@@ -203,17 +237,6 @@ const RequestItem = memo(function RequestItem({request, index, canManage, myUser
 				)}
 				<SeerrMediaTypeBadge mediaType={isMovie ? 'movie' : 'tv'} suffix={request.is4k ? '4K' : null} className={css.tileBadge} />
 				<div className={`${css.tileStripe} ${css[`stripe_${statusInfo.color}`] || css.stripe_approved}`} />
-			</div>
-			<div className={css.tileCaption}>
-				<LoopMarquee className={css.tileTitle} text={media?.title || media?.name || $L('Unknown')} active={focused} />
-				<div className={css.tileStatus}>
-					{downloadSummary
-						? <SeerrDownloadProgress summary={downloadSummary} compact />
-						: <SeerrStatusChip label={statusInfo.label} color={statusInfo.color} />}
-				</div>
-				<div className={css.tileBy}>{$L('Requested by')}</div>
-				<div className={css.tileRequester}>{requester}</div>
-				{date && <div className={css.tileDate}>{date}</div>}
 				{isPending && canManage && (
 					<div className={css.tileActions}>
 						<TileActionIcon className={css.approveBtn} path={TILE_ACTION_ICONS.approve} label={$L('Approve')} onClick={handleApprove} />
@@ -222,9 +245,7 @@ const RequestItem = memo(function RequestItem({request, index, canManage, myUser
 				)}
 				{isPending && !canManage && isOwn && (
 					<div className={css.tileActions}>
-						<SpottableDiv className={`${css.actionBtn} ${css.cancelBtnPlain}`} onClick={handleCancel}>
-							{$L('Cancel')}
-						</SpottableDiv>
+						<TileActionIcon className={css.cancelBtn} path={TILE_ACTION_ICONS.cancel} label={$L('Cancel')} onClick={handleCancel} />
 					</div>
 				)}
 				{isFailed && canManage && (
@@ -232,6 +253,23 @@ const RequestItem = memo(function RequestItem({request, index, canManage, myUser
 						<TileActionIcon className={css.retryBtn} path={TILE_ACTION_ICONS.retry} label={$L('Retry')} onClick={handleRetry} />
 					</div>
 				)}
+			</div>
+			<div className={css.tileCaption}>
+				<LoopMarquee className={css.tileTitle} text={media?.title || media?.name || $L('Unknown')} active={focused} />
+				<div className={css.tileStatus}>
+					{downloadSummary
+						? <SeerrDownloadProgress summary={downloadSummary} compact />
+						: <SeerrStatusChip label={statusInfo.label} color={statusInfo.color} />}
+				</div>
+				{splitRequester ? (
+					<>
+						<div className={css.tileBy}>{$L('Requested by')}</div>
+						<div className={css.tileRequester}>{requester}</div>
+					</>
+				) : (
+					<div className={css.tileBy}>{requestedByLine(requester)}</div>
+				)}
+				{date && <div className={css.tileDate}>{date}</div>}
 			</div>
 		</SpottableDiv>
 	);
@@ -571,6 +609,11 @@ const SeerrRequests = ({onSelectItem, onClose, initialTab = 'requests', backHand
 
 	const items = tab === 'requests' ? requests : issues;
 
+	// Decided once for the whole grid, so every caption matches the one height the grid reserves.
+	const splitRequester = useMemo(() => requests.some((request) =>
+		measureTextWidth(requestedByLine(requesterName(request)), TILE_REQUESTER_FONT) > TILE_TEXT_WIDTH
+	), [requests]);
+
 	// The list tags each item with a data-index and reads it back off whatever
 	// gains focus to work out how far to scroll, so it has to reach the element.
 	const renderItem = useCallback(({index, ...itemProps}) => {
@@ -589,6 +632,7 @@ const SeerrRequests = ({onSelectItem, onClose, initialTab = 'requests', backHand
 					index={index}
 					canManage={canManage}
 					myUserId={myUserId}
+					splitRequester={splitRequester}
 					onSelect={handleSelect}
 					onAction={handleRequestAction}
 				/>
@@ -606,7 +650,7 @@ const SeerrRequests = ({onSelectItem, onClose, initialTab = 'requests', backHand
 				onToggleStatus={handleToggleIssueStatus}
 			/>
 		);
-	}, [items, tab, hasMore, loadMore, canManage, canManageIssuesPerm, myUserId,
+	}, [items, tab, hasMore, loadMore, canManage, canManageIssuesPerm, myUserId, splitRequester,
 		handleSelect, handleRequestAction, handleOpenIssue, handleToggleIssueStatus]);
 
 	const renderContent = () => {
@@ -646,7 +690,10 @@ const SeerrRequests = ({onSelectItem, onClose, initialTab = 'requests', backHand
 				<VirtualGridList
 					dataSize={items.length}
 					itemRenderer={renderItem}
-					itemSize={{minWidth: TILE_WIDTH, minHeight: TILE_POSTER_HEIGHT + TILE_CAPTION_HEIGHT + TILE_PADDING * 2}}
+					itemSize={{
+						minWidth: TILE_WIDTH,
+						minHeight: TILE_POSTER_HEIGHT + TILE_CAPTION_HEIGHT + (splitRequester ? TILE_REQUESTER_LINE : 0) + TILE_PADDING * 2
+					}}
 					spacing={TILE_GAP}
 					spotlightId="hub-list"
 				/>

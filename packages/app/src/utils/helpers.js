@@ -1,5 +1,6 @@
 import {buildQueryString} from './urlCompat';
 import {uiLocale} from './uiLocale';
+import {parseServerDate} from './serverDate';
 
 export const formatDuration = (ticks) => {
 	if (!ticks) return '';
@@ -13,9 +14,8 @@ export const formatDuration = (ticks) => {
 };
 
 export const formatDate = (dateString) => {
-	if (!dateString) return '';
-	const date = new Date(dateString);
-	return date.toLocaleDateString(uiLocale());
+	const date = parseServerDate(dateString);
+	return date ? date.toLocaleDateString(uiLocale()) : '';
 };
 
 export const getImageUrl = (serverUrl, itemId, imageType = 'Primary', options = {}) => {
@@ -51,6 +51,11 @@ export const getBackdropId = (item) => {
 	}
 	return null;
 };
+
+// A media bar slide from an outside list brings its own backdrop, since the server has none.
+export const getFeaturedBackdropUrl = (serverUrl, item, options) => (item?._external
+	? item._externalBackdropUrl || null
+	: getImageUrl(serverUrl, getBackdropId(item), 'Backdrop', options));
 
 // Check if item has a Primary image and return the item ID to use
 export const getPrimaryImageId = (item) => {

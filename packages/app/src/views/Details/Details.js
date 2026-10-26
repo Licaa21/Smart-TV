@@ -9,6 +9,8 @@ import {useSettings} from '../../context/SettingsContext';
 import {useSeerr} from '../../context/SeerrContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import * as jellyfinApi from '../../services/jellyfinApi';
+import {saveAudioPref, saveSubtitlePref} from '../../services/subtitlePrefs';
+import {fromServerStream} from '../../utils/seriesTrackPrefs';
 import ModernDetailContent from './ModernDetailContent';
 import DetailSkeleton from './DetailSkeleton';
 import {formatDuration, getImageUrl, getBackdropId, getLogoUrl} from '../../utils/helpers';
@@ -54,8 +56,8 @@ import TrailerPicker from './TrailerPicker';
 import ReviewDialog from './ReviewDialog';
 import PersonalRatingDialog from '../../components/PersonalRatingDialog';
 import {clampRating, clearedRatingPatch, isRatableItemType, normalizeRatingStyle, numericRatingPatch, thumbRatingPatch} from '../../utils/personalRating';
-import {personDateLines, splitFilmography} from '../../utils/personCredits';
-import {mergeCollectionWithMissing} from './seerrMissingCollectionItems';
+import {personCalendarDate, personDateLines, splitFilmography} from '../../utils/personCredits';
+import {mergeCollectionWithMissing, mergeMissingByReleaseOrder} from './seerrMissingCollectionItems';
 import ClassicDetailScreen from './ClassicDetailScreen';
 import SpotlightDetailContent from './spotlight/SpotlightDetailContent';
 import NouveauDetailContent from './nouveau/NouveauDetailContent';
@@ -72,6 +74,8 @@ import css from './Details.module.less';
 // Every style past Classic takes the same contract, so the setting only decides which of them
 // draws the screen.
 const DETAIL_CONTENT = {v3: SpotlightDetailContent, v4: NouveauDetailContent, v5: MinimalistDetailContent};
+// The missing titles already ride in the list a collection's page is handed.
+const NO_ITEMS = [];
 
 const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectItem: onSelectItemProp, onSelectPerson, onSelectStudio, onItemDeleted, autoPlay, onAutoPlayed, seerrNav, backHandlerRef, onOpenSetting, settingsOpen}) => {
 	const {api, serverUrl, user} = useAuth();
@@ -605,21 +609,31 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	const playLongPress = useLongPress(offersStreamOptions ? modals.handleAdvancedPlay : null, handlePlay);
 	const resumeLongPress = useLongPress(offersStreamOptions ? modals.handleAdvancedResume : null, handleResume);
 
+	// A pick made here is remembered for the title, and an episode's for its series as well.
+	const pickedStreams = useCallback((type) => {
+		const source = item?.MediaSources?.[selectedVersionIndex] || item?.MediaSources?.[0];
+		return source?.MediaStreams?.filter((stream) => stream.Type === type) || [];
+	}, [item, selectedVersionIndex]);
+
 	const handleSelectAudio = useCallback((e) => {
 		const index = parseInt(e.currentTarget.dataset.index, 10);
 		if (isNaN(index)) return;
 		audioChosenRef.current = true;
 		setSelectedAudioIndex(index);
+		const streams = pickedStreams('Audio');
+		if (streams[index]) saveAudioPref(item, streams[index].Index, streams.map(fromServerStream));
 		closeModal();
-	}, [closeModal, setSelectedAudioIndex]);
+	}, [closeModal, setSelectedAudioIndex, pickedStreams, item]);
 
 	const handleSelectSubtitle = useCallback((e) => {
 		const index = parseInt(e.currentTarget.dataset.index, 10);
 		if (isNaN(index)) return;
 		subtitleChosenRef.current = true;
 		setSelectedSubtitleIndex(index);
+		const streams = pickedStreams('Subtitle');
+		saveSubtitlePref(item, streams[index] ? streams[index].Index : -1, streams.map(fromServerStream));
 		closeModal();
-	}, [closeModal, setSelectedSubtitleIndex]);
+	}, [closeModal, setSelectedSubtitleIndex, pickedStreams, item]);
 
 	const handleOpenRemoteSubtitleSearch = useCallback(async () => {
 		if (!item?.Id) return;
@@ -1065,18 +1079,27 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	const hasPlaybackPosition = item.UserData?.PlaybackPositionTicks > 0;
 	const resumeTimeText = hasPlaybackPosition ? formatDuration(item.UserData.PlaybackPositionTicks) : '';
 
-	// Modern and Classic list each collection with its missing titles merged in.
+	const showsMissingTitles = settings.seerrShowMissingCollectionItems !== false;
+	// Modern and Classic list each collection led by the collection itself, so there's a way into
+	// it, with its missing titles merged in.
 	const collectionSections = shownParentCollections.map((collection) => ({
 		id: collection.id,
 		name: collection.name,
-		items: mergeCollectionWithMissing(collection.items, collection.missingItems)
+		items: [
+			collection.boxSetItem,
+			...(showsMissingTitles ? mergeCollectionWithMissing(collection.items || [], collection.missingItems) : (collection.items || []))
+		].filter(Boolean)
 	}));
+	// A collection's own page slots its missing titles in by release date in every style.
+	const shownCollectionItems = isBoxSet && showsMissingTitles
+		? mergeMissingByReleaseOrder(collectionItems, missingCollectionItems)
+		: collectionItems;
 
-	const filmography = isPerson ? splitFilmography(similar, showsSection) : null;
+	const filmography = isPerson ? splitFilmography(similar, showsSection, settings.personPageSortOption) : null;
 	const personMovies = filmography?.movies || [];
 	const personSeries = filmography?.series || [];
 	const personDates = isPerson ? personDateLines(item.PremiereDate, item.EndDate) : [];
-	const birthDate = isPerson && item.PremiereDate ? new Date(item.PremiereDate) : null;
+	const birthDate = isPerson ? personCalendarDate(item.PremiereDate) : null;
 	const birthPlace = isPerson && showsSection('birthplace') && item.ProductionLocations?.length > 0 ? item.ProductionLocations[0] : '';
 
 	const backdrop = (
@@ -1154,7 +1177,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	);
 
 	if (settings.detailScreenStyle !== 'v1') {
-		const DetailContent = DETAIL_CONTENT[settings.detailScreenStyle] || ModernDetailContent;
+		// Spotlight, Minimalist and Nouveau have no track list, so a playlist always gets Modern's.
+		const DetailContent = (item.Type !== 'Playlist' && DETAIL_CONTENT[settings.detailScreenStyle]) || ModernDetailContent;
 		return (
 			<div className={css.page}>
 				<DetailContent
@@ -1207,7 +1231,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 					cast={detailCast}
 					crew={detailCrew}
 					nextUp={shownNextUp}
-					collectionItems={collectionItems}
+					collectionItems={shownCollectionItems}
 					collectionSections={collectionSections}
 					albumTracks={albumTracks}
 					artistAlbums={artistAlbums}
@@ -1254,7 +1278,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 					similarLoaded={shownSimilarLoaded}
 					reviews={reviews.reviews}
 					onSelectReview={reviews.handleSelectReview}
-					missingCollectionItems={missingCollectionItems}
+					missingCollectionItems={NO_ITEMS}
 					parentCollections={shownParentCollections}
 					loadMoreCollectionItems={loadMoreCollectionItems}
 					collectionMenu={collectionMenu}
@@ -1483,7 +1507,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				episodeRatings={episodeRatings}
 				nextUp={shownNextUp}
 				nextEpisode={shownNextEpisode}
-				collectionItems={collectionItems}
+				collectionItems={shownCollectionItems}
 				extras={shownExtras}
 				cast={detailCast}
 				crew={detailCrew}

@@ -13,6 +13,8 @@ export const TV_CANVAS_SCALE = 1.45;
 
 // How fast a long program description scrolls, 55 ms per canvas point.
 export const DESCRIPTION_MS_PER_PIXEL = 55 / TV_CANVAS_SCALE;
+// The quick channel changer's description scrolls half as fast.
+export const CAROUSEL_DESCRIPTION_MS_PER_PIXEL = 110 / TV_CANVAS_SCALE;
 
 // ---------------------------------------------------------------------------
 // Channels

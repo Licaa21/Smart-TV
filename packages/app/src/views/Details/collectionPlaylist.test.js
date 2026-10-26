@@ -69,6 +69,18 @@ describe('buildCollectionIndex', () => {
 		expect(api.getEpisodes).toHaveBeenCalledWith('s1');
 	});
 
+	it('plays an episode filed on its own, and only once when its series is there too', async () => {
+		const api = {
+			getItems: jest.fn().mockResolvedValue({Items: [
+				{Id: 'e9', Type: 'Episode', Name: 'Pilot'},
+				{Id: 's1', Type: 'Series', Name: 'Show'},
+				{Id: 'e1', Type: 'Episode', Name: 'Ep 1'}
+			]}),
+			getEpisodes: jest.fn().mockResolvedValue({Items: [{Id: 'e1', Type: 'Episode'}, {Id: 'e2', Type: 'Episode'}]})
+		};
+		expect(await buildCollectionIndex(api, 'box')).toEqual(['e9', 'e1', 'e2']);
+	});
+
 	it('carries on when a series refuses to list its episodes', async () => {
 		const api = {
 			getItems: jest.fn().mockResolvedValue({Items: [{Id: 'm1', Type: 'Movie', Name: 'M'}, {Id: 's1', Type: 'Series'}]}),

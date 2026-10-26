@@ -146,6 +146,9 @@ export const usePlayerButtons = ({
 	return {topButtons, bottomButtons};
 };
 
+// The row shows the offset the strip it opens is set to.
+const offsetLabel = (offset) => (offset ? `${offset > 0 ? '+' : ''}${offset.toFixed(1)}s` : $L('None'));
+
 // Mirrors the height clamp .mediaLogo sets in css (10vh, floor 70px, ceiling
 // 160px) so the two stay in lockstep - this is what a logo renders at before
 // any width-driven shrinking kicks in.
@@ -640,7 +643,7 @@ const PlayerControls = ({
 								entries={subtitleEntries}
 								rows={subtitleRows}
 								actions={[
-									{label: $L('Offset'), spotlightId: 'btn-subtitle-offset', onClick: handleOpenSubtitleOffset},
+									{label: $L('Offset'), detail: offsetLabel(subtitleOffset), spotlightId: 'btn-subtitle-offset', onClick: handleOpenSubtitleOffset},
 									{label: $L('Appearance'), spotlightId: 'btn-subtitle-appearance', onClick: handleOpenSubtitleSettings},
 									...(canDownloadRemoteSubtitles ? [{label: $L('Download subtitles...'), detail: $L('Search using the OpenSubtitles plugin'), spotlightId: 'btn-subtitle-download', onClick: handleOpenRemoteSubtitleSearch}] : []),
 									{label: $L('Cancel'), dimmed: true, onClick: closeModal}
@@ -698,7 +701,7 @@ const PlayerControls = ({
 								/>
 							))}
 							<TrackDivider />
-							<TrackOptionRow label={$L('Offset')} spotlightId="btn-secondary-subtitle-offset" onClick={handleOpenSecondarySubtitleOffset} />
+							<TrackOptionRow label={$L('Offset')} detail={offsetLabel(secondarySubtitleOffset)} spotlightId="btn-secondary-subtitle-offset" onClick={handleOpenSecondarySubtitleOffset} />
 							<TrackOptionRow label={$L('Appearance')} spotlightId="btn-secondary-subtitle-appearance" onClick={handleOpenSecondarySubtitleSettings} />
 							<TrackDivider />
 							<TrackOptionRow label={$L('Cancel')} dimmed onClick={closeModal} />

@@ -4,7 +4,7 @@ import $L from '@enact/i18n/$L';
 import * as playback from '../../services/playback';
 import serverLogger from '../../services/serverLogger';
 import {fetchTmdbSeasonRatings, resolveSeriesTmdbId, isRatingSourceAllowed} from '../../services/mdblistApi';
-import {getSeriesAudioPref} from '../../services/subtitlePrefs';
+import {getItemAudioPref, getSeriesAudioPref} from '../../services/subtitlePrefs';
 import {fromServerAudio, selectPreferredAudioStream} from '../../utils/audioTrackSelection';
 import {fromServerStream, matchSeriesTrackIndex} from '../../utils/seriesTrackPrefs';
 import {detailsSubtitlePosition} from '../Player/initialSubtitle';
@@ -205,15 +205,15 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			const ms = data.MediaSources?.[0];
 			if (ms) {
 				const initAudioStreams = ms.MediaStreams?.filter(s => s.Type === 'Audio') || [];
-				// The track playback will start on, picked the way the player picks it: a track
-				// remembered for the series, then the audio language and codec order from
-				// Settings, and only when neither names one the server's own default.
-				const seriesAudioPref = data.SeriesId && settingsRef.current?.rememberSeriesAudio !== false
-					? await getSeriesAudioPref(data.SeriesId)
-					: undefined;
-				const matchedAudio = seriesAudioPref
-					? matchSeriesTrackIndex(initAudioStreams.map(fromServerStream), seriesAudioPref)
-					: null;
+				// The track playback will start on, picked the way the player picks it: a track remembered for the
+				// title or its series, then the audio language and codec order from Settings, and only when
+				// neither names one the server's own default.
+				const rememberAudio = settingsRef.current?.rememberSeriesAudio !== false;
+				const itemAudioPref = rememberAudio ? await getItemAudioPref(data.Id) : undefined;
+				const seriesAudioPref = data.SeriesId && rememberAudio ? await getSeriesAudioPref(data.SeriesId) : undefined;
+				const matchedAudio = initAudioStreams.some((s) => s.Index === itemAudioPref)
+					? itemAudioPref
+					: (seriesAudioPref ? matchSeriesTrackIndex(initAudioStreams.map(fromServerStream), seriesAudioPref) : null);
 				const rememberedAudioPos = matchedAudio !== null && matchedAudio >= 0
 					? initAudioStreams.findIndex(s => s.Index === matchedAudio)
 					: -1;
@@ -351,7 +351,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				const needsSimilar = data.Type !== 'Person' && data.Type !== 'BoxSet' &&
 					data.Type !== 'MusicAlbum' && data.Type !== 'MusicArtist' && data.Type !== 'Playlist';
 				const needsExtras = data.Type === 'Movie' || data.Type === 'Episode' || data.Type === 'Video';
-				const needsBoxSet = data.Type === 'Movie' || data.Type === 'Video';
+				const needsBoxSet = data.Type === 'Movie' || data.Type === 'Video' || data.Type === 'Series';
 
 				// Moonfin is only asked where the server said it can score, since
 				// otherwise every open pays a failed request before the stock row.

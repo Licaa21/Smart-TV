@@ -1,7 +1,10 @@
 import {buildQueryString} from '../utils/urlCompat';
 import {selectPreferredAudioStream} from '../utils/audioTrackSelection';
 import {getPerfTier} from '../utils/perfTier';
+import {isUnownedSeerrTitle} from '../utils/tmdbThumb';
+import {fetchTmdbDetails} from './externalRowsApi';
 import {createApiForServer, getApiKey, getServerType, getServerUrl, getTokenParam} from './jellyfinApi';
+import {moonfinPing} from './seerrApi';
 
 // What a home row card plays when it has been focused for a moment: a short, low
 // bitrate transcode of the title itself. Everything here is pure so the rules can
@@ -14,16 +17,27 @@ export const previewDwellMs = () => (getPerfTier() === 'low' ? LOW_TIER_DWELL_MS
 export const PREVIEW_OPEN_TIMEOUT_MS = 10000;
 export const PREVIEW_PLAY_CAP_MS = 30000;
 
-const PREVIEW_TYPES = ['Series', 'Movie', 'Episode', 'Video', 'MusicVideo'];
+const PREVIEW_TYPES = {
+	media: ['Series', 'Movie', 'Episode', 'Video', 'MusicVideo'],
+	trailer: ['Movie', 'Series', 'Episode', 'Season']
+};
 const DEFAULT_START_S = 180;
 const SHORT_RUNTIME_S = 900;
 const TICKS_PER_SECOND = 10000000;
 
-// Library titles only. Seerr and outside list cards have nothing on the server to
-// play, and the shortcut tiles aren't titles at all.
-export const supportsMediaPreview = (item) =>
-	!!item && !!item.Id && PREVIEW_TYPES.includes(item.Type) &&
-	!item._seerr && !item._external && !item.isLibraryTile && !item.isRecordingsShortcut;
+// A Seerr, outside list or seasonal suggestion title. It has nothing on the server to play,
+// so it only ever plays its trailer. Genre, studio and network tiles, shortcuts and calendar
+// cards carry the same marks but aren't titles.
+export const isOutsideTitle = (item) => isUnownedSeerrTitle(item) && !item._calendarDate;
+
+// Library titles, plus outside titles for a trailer. The shortcut tiles aren't titles at all.
+// Without a mode it answers for either kind, which is all a card needs to know before the
+// controller picks.
+export const supportsMediaPreview = (item, mode) => {
+	if (isOutsideTitle(item)) return mode !== 'media';
+	return !!item && !!item.Id && !item._seerr && !item._external && !item.isLibraryTile && !item.isRecordingsShortcut &&
+		(mode ? PREVIEW_TYPES[mode] : [...PREVIEW_TYPES.media, ...PREVIEW_TYPES.trailer]).includes(item.Type);
+};
 
 // Previews are kept off the sets that can't carry a second decoder comfortably:
 // Tizen 3.0 and older, webOS 4 and older, and any set the viewer put in the low
@@ -76,6 +90,57 @@ export const resolvePreviewTarget = async (api, item) => {
 	if (!target) target = fallback;
 	if (!target?.MediaSources?.[0]) return null;
 	return target;
+};
+
+// A film or show plays its own trailer, and an episode or season plays its show's.
+export const trailerSubjectId = (item) => {
+	if (item?.Type === 'Movie' || item?.Type === 'Series') return item.Id;
+	if (item?.Type === 'Episode' || item?.Type === 'Season') return item.SeriesId || null;
+	return null;
+};
+
+// An outside title's trailer is the one TMDB lists for it, through Moonbase, when the plugin
+// can look titles up there.
+const outsideTrailerSource = async (item, extractYouTubeId) => {
+	const {serverUrl, token} = previewServerOf(item);
+	const ping = await moonfinPing(serverUrl, token).catch(() => null);
+	if (!ping || ping.tmdbDetailsSupported !== true) return null;
+	const details = await fetchTmdbDetails({
+		type: item._seerrMediaType,
+		tmdbId: item._seerrRaw?.mediaId ?? item.ProviderIds?.Tmdb,
+		imdbId: item._seerrRaw?.imdbId ?? item.ProviderIds?.Imdb
+	});
+	const youTubeId = details?.trailerUrl ? extractYouTubeId({RemoteTrailers: [{Url: details.trailerUrl}]}) : null;
+	return youTubeId ? {youTubeId} : null;
+};
+
+// A trailer on the server comes first, as a target the clip's own stream plays. The
+// first YouTube trailer comes next, as an id for the caller to resolve, since the
+// resolver is loaded on demand. Null when there is neither.
+export const resolveTrailerSource = async (api, item, extractYouTubeId) => {
+	if (isOutsideTitle(item)) return outsideTrailerSource(item, extractYouTubeId);
+	const subjectId = trailerSubjectId(item);
+	if (!subjectId) return null;
+	let local = null;
+	try {
+		const trailers = await api.getLocalTrailers(subjectId);
+		const list = Array.isArray(trailers?.Items) ? trailers.Items : trailers;
+		local = Array.isArray(list) ? list.find((trailer) => trailer?.Id) : null;
+	} catch (e) {
+		local = null;
+	}
+	const target = local ? await resolvePreviewTarget(api, local) : null;
+	if (target) return {target};
+	let subject = subjectId === item.Id && Array.isArray(item.RemoteTrailers) ? item : null;
+	if (!subject) {
+		try {
+			subject = await api.getItem(subjectId);
+		} catch (e) {
+			return null;
+		}
+	}
+	const youTubeId = extractYouTubeId(subject);
+	return youTubeId ? {youTubeId} : null;
 };
 
 // Where the clip starts: the resume position when there is one, otherwise three

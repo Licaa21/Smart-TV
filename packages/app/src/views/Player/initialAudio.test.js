@@ -1,31 +1,49 @@
 import {resolveSeriesAudio} from './initialAudio';
-import {getSeriesAudioPref} from '../../services/subtitlePrefs';
+import {getItemAudioPref, getSeriesAudioPref} from '../../services/subtitlePrefs';
 
-jest.mock('../../services/subtitlePrefs', () => ({getSeriesAudioPref: jest.fn()}));
+jest.mock('../../services/subtitlePrefs', () => ({
+	getItemAudioPref: jest.fn(),
+	getSeriesAudioPref: jest.fn()
+}));
 
-const streams = [
-	{index: 4, language: 'jpn', codec: 'flac', channels: 2},
-	{index: 6, language: 'eng', codec: 'ac3', channels: 6}
-];
-const episode = {Id: 'e1', SeriesId: 'show'};
+const eng = {index: 1, language: 'eng'};
+const jpn = {index: 2, language: 'jpn'};
+const streams = [eng, jpn];
+const episode = {Id: 'ep1', SeriesId: 'show'};
 
 beforeEach(() => {
-	getSeriesAudioPref.mockReset();
-	getSeriesAudioPref.mockResolvedValue({language: 'eng', codec: 'ac3', channels: 6});
+	getItemAudioPref.mockResolvedValue(undefined);
+	getSeriesAudioPref.mockResolvedValue(undefined);
 });
 
 describe('resolveSeriesAudio', () => {
-	test('gives back the track remembered for the series', async () => {
-		expect((await resolveSeriesAudio(episode, streams))?.index).toBe(6);
+	test('the track picked on this title wins over the one kept for its series', async () => {
+		getItemAudioPref.mockResolvedValue(1);
+		getSeriesAudioPref.mockResolvedValue({language: 'jpn', title: '', relativeIndex: 0});
+		expect(await resolveSeriesAudio(episode, streams)).toBe(eng);
 	});
 
-	test('leaves the choice to the language settings once remembering is turned off', async () => {
-		expect(await resolveSeriesAudio(episode, streams, false)).toBeNull();
+	test('a movie gets back the track picked on it', async () => {
+		getItemAudioPref.mockResolvedValue(2);
+		expect(await resolveSeriesAudio({Id: 'movie'}, streams)).toBe(jpn);
+	});
+
+	test('the series pick answers when the title has none, or one it no longer carries', async () => {
+		getSeriesAudioPref.mockResolvedValue({language: 'jpn', title: '', relativeIndex: 0});
+		expect(await resolveSeriesAudio(episode, streams)).toBe(jpn);
+		getItemAudioPref.mockResolvedValue(7);
+		expect(await resolveSeriesAudio(episode, streams)).toBe(jpn);
+	});
+
+	test('a movie with nothing remembered is left to the language preferences', async () => {
+		expect(await resolveSeriesAudio({Id: 'movie'}, streams)).toBeNull();
 		expect(getSeriesAudioPref).not.toHaveBeenCalled();
 	});
 
-	test('has nothing for an item without a series or tracks', async () => {
-		expect(await resolveSeriesAudio({Id: 'm1'}, streams)).toBeNull();
-		expect(await resolveSeriesAudio(episode, [])).toBeNull();
+	test('leaves the choice to the language settings once remembering is turned off', async () => {
+		getItemAudioPref.mockResolvedValue(1);
+		expect(await resolveSeriesAudio(episode, streams, false)).toBeNull();
+		expect(getItemAudioPref).not.toHaveBeenCalled();
+		expect(getSeriesAudioPref).not.toHaveBeenCalled();
 	});
 });

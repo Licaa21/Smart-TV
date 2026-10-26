@@ -7,6 +7,7 @@ import {buildDirectPlayReasonItems} from '../../utils/directPlayReasons';
 import {bookFileName, bookFormatLine, fileName, fileSizeLine, videoLines} from './nouveau/nouveauFooterFields';
 import useDetailPlaybackInfo from './useDetailPlaybackInfo';
 import {uiLocale} from '../../utils/uiLocale';
+import {parseServerDate} from '../../utils/serverDate';
 
 import css from './ModernFileInformation.module.less';
 
@@ -19,8 +20,8 @@ const COLLAPSED_TRACKS = 2;
 // Shown in local time, since the server sends UTC and an evening west of UTC would read as the
 // next day.
 const addedOn = (dateCreated) => {
-	const date = dateCreated ? new Date(dateCreated) : null;
-	if (!date || isNaN(date.getTime())) return null;
+	const date = parseServerDate(dateCreated);
+	if (!date) return null;
 	return date.toLocaleDateString(uiLocale(), {year: 'numeric', month: 'short', day: 'numeric'});
 };
 

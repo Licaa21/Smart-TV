@@ -1,6 +1,7 @@
 import {
-	PIN_ACCEPTED, PIN_REJECTED, dropSignInPin, isSignInPinEnabled, refreshSignInPin, signInPinFor, storeSignInPin,
-	verifySignInPin
+	PIN_ACCEPTED, PIN_REJECTED, dropSignInPin, forgottenPinUsername, isSignInPinEnabled, markPinForgotten,
+	noteProvedSignIn, refreshSignInPin, resetForgottenPin, signInPinFor, storeSignInPin, takeForgottenPin,
+	takeProvedSignIn, verifySignInPin
 } from './signInPin';
 import {hashPin} from './pinLockout';
 import * as serverPin from '../services/serverPinApi';
@@ -11,7 +12,8 @@ jest.mock('../services/serverPinApi', () => ({
 	getServerPinStatus: jest.fn(),
 	verifyServerPin: jest.fn(),
 	setServerPin: jest.fn(),
-	removeServerPin: jest.fn()
+	removeServerPin: jest.fn(),
+	removeServerPinFor: jest.fn()
 }));
 
 const account = {serverUrl: 'http://server', accessToken: 'token', serverType: 'jellyfin'};
@@ -138,5 +140,51 @@ describe('storeSignInPin and dropSignInPin', () => {
 	it("keeps a server PIN it couldn't remove there", async () => {
 		serverPin.removeServerPin.mockResolvedValue({result: serverPin.PIN_UNAVAILABLE});
 		expect(await dropSignInPin(synced, account, '1234')).toEqual({refused: 'Unable to connect to server'});
+	});
+});
+
+describe('Forgot PIN', () => {
+	it('keeps the forgotten mark for one account on one server and hands it over once', () => {
+		markPinForgotten('http://Server/', 'u1', 'alice');
+		expect(takeForgottenPin('http://server', 'u2')).toBe(false);
+		expect(takeForgottenPin('http://other', 'u1')).toBe(false);
+		expect(takeForgottenPin('http://server', 'u1')).toBe(true);
+		expect(takeForgottenPin('http://server', 'u1')).toBe(false);
+	});
+
+	it('names the account to sign in to on the server the PIN was forgotten on', () => {
+		markPinForgotten('http://server', 'u1', 'alice');
+		expect(forgottenPinUsername('http://SERVER/')).toBe('alice');
+		expect(forgottenPinUsername('http://server2')).toBeNull();
+		takeForgottenPin('http://server', 'u1');
+		expect(forgottenPinUsername('http://server')).toBeNull();
+	});
+
+	it('answers for a proved sign in once, and only for the account that signed in', () => {
+		noteProvedSignIn('http://server', 'u1');
+		expect(takeProvedSignIn('http://server', 'u2')).toBe(false);
+		noteProvedSignIn('http://server/', 'u1');
+		expect(takeProvedSignIn('http://server', 'u1')).toBe(true);
+		expect(takeProvedSignIn('http://server', 'u1')).toBe(false);
+	});
+
+	it('clears a PIN only this TV knows without asking the server', async () => {
+		expect(await resetForgottenPin(local, account, 'u1')).toEqual({record: signInPinFor({}, 'u1')});
+		expect(serverPin.removeServerPinFor).not.toHaveBeenCalled();
+	});
+
+	it('clears a server PIN through the administrator route', async () => {
+		serverPin.removeServerPinFor.mockResolvedValue({result: serverPin.PIN_VALID});
+		const {record} = await resetForgottenPin(synced, account, 'u1');
+		expect(isSignInPinEnabled(record)).toBe(false);
+		expect(serverPin.removeServerPinFor).toHaveBeenCalledWith(account, 'u1');
+	});
+
+	it('keeps a server PIN the server would not clear, and says to ask an administrator', async () => {
+		serverPin.removeServerPinFor.mockResolvedValue({result: serverPin.PIN_UNAVAILABLE});
+		expect(await resetForgottenPin(synced, account, 'u1')).toEqual({refused: expect.stringContaining('administrator')});
+		serverPin.removeServerPinFor.mockClear();
+		expect(await resetForgottenPin(synced, null, 'u1')).toEqual({refused: expect.stringContaining('administrator')});
+		expect(serverPin.removeServerPinFor).not.toHaveBeenCalled();
 	});
 });

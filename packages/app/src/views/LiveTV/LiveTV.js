@@ -106,8 +106,8 @@ const focusWhenMounted = (spotlightId, {attempts = 12, defer = false} = {}) => {
 const buildDateOptions = () => {
 	const options = [];
 	const today = new Date();
-	today.setHours(0, 0, 0, 0);
-	for (let i = -7; i <= 14; i++) options.push(new Date(today.getTime() + i * 86400000));
+	// Stepped by calendar day, since a day across a daylight saving change isn't 24 hours.
+	for (let i = -7; i <= 14; i++) options.push(new Date(today.getFullYear(), today.getMonth(), today.getDate() + i));
 	return options;
 };
 
@@ -712,6 +712,7 @@ const LiveTV = ({onPlayChannel, onRecordings, backHandlerRef}) => {
 		} else if (code === KEYS.LEFT) {
 			consume();
 			onNavigationKey();
+			focusWhenMounted(chipSpotlightId(0));
 		}
 	}, [focusChannelRow, focusProgramFromChannel, focusWindowBar, rowsPerViewport]);
 

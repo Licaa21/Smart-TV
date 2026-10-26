@@ -2,7 +2,8 @@ import {useState, useEffect, useCallback, useRef, memo} from 'react';
 import {isMdblistEnabled} from '../../services/mdblistApi';
 import Spottable from '@enact/spotlight/Spottable';
 import Spotlight from '@enact/spotlight';
-import {getImageUrl, getBackdropId, formatDuration} from '../../utils/helpers';
+import {getImageUrl, getFeaturedBackdropUrl, formatDuration} from '../../utils/helpers';
+import {seerrThumbUrl} from '../../utils/tmdbThumb';
 import RatingsRow from '../../components/RatingsRow';
 import {KEYS} from '../../utils/keys';
 import css from './Browse.module.less';
@@ -14,11 +15,15 @@ const MAX_DOTS = 7;
 
 const SpottableDiv = Spottable('div');
 
-const backdropUrl = (serverUrl, item) => getImageUrl(serverUrl, getBackdropId(item), 'Backdrop', {maxWidth: 1920, quality: 85});
+const backdropUrl = (serverUrl, item) => getFeaturedBackdropUrl(serverUrl, item, {maxWidth: 1920, quality: 85});
 
-const bannerUrl = (serverUrl, item) => (item.ImageTags?.Banner
-	? getImageUrl(serverUrl, item.Id, 'Banner', {maxWidth: 1280, tag: item.ImageTags.Banner})
-	: null);
+// A title from an outside list has no server banner, so the plugin's titled TMDB thumb stands in.
+const bannerUrl = (serverUrl, item) => {
+	if (item._external) return seerrThumbUrl(item);
+	return item.ImageTags?.Banner
+		? getImageUrl(serverUrl, item.Id, 'Banner', {maxWidth: 1280, tag: item.ImageTags.Banner})
+		: null;
+};
 
 const buildMeta = (item) => {
 	const parts = [];
@@ -74,7 +79,7 @@ const BannerBar = memo(({
 				if (art) {
 					preloadImage(art);
 				} else {
-					if (getBackdropId(item)) preloadImage(backdropUrl(getItemServerUrl(item), item));
+					preloadImage(backdropUrl(getItemServerUrl(item), item));
 					if (item.LogoUrl) preloadImage(item.LogoUrl);
 				}
 			}

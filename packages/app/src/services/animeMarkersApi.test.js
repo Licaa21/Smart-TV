@@ -55,3 +55,43 @@ test('a row of series cards asks once when the feature is off', async () => {
 	expect(results).toEqual([null, null, null]);
 	expect(off.request).toHaveBeenCalledTimes(1);
 });
+
+test('audio labels stay full until the plugin asks for short ones', async () => {
+	const first = launch(null, {...answer, labelStyle: 'short'});
+	expect(first.api.animeLabelStyle()).toBe('full');
+	await first.api.fetchSeriesMarkers('s1');
+	expect(first.api.animeLabelStyle()).toBe('short');
+});
+
+test('an answer that names no label style keeps the last one, and one it doesn\'t know reads as full', async () => {
+	const {api, request} = launch(null, {...answer, labelStyle: 'short'});
+	await api.fetchSeriesMarkers('s1');
+	request.mockImplementationOnce(() => Promise.resolve({ok: true, json: () => Promise.resolve(answer)}));
+	await api.fetchSeriesMarkers('s2');
+	expect(api.animeLabelStyle()).toBe('short');
+	request.mockImplementationOnce(() => Promise.resolve({ok: true, json: () => Promise.resolve({...answer, labelStyle: 'tiny'})}));
+	await api.fetchSeriesMarkers('s3');
+	expect(api.animeLabelStyle()).toBe('full');
+});
+
+test('a series kept from the last launch brings its label style back', async () => {
+	const first = launch(null, {...answer, labelStyle: 'short'});
+	await first.api.fetchSeriesMarkers('s1');
+	jest.advanceTimersByTime(3000);
+	await flush();
+	const [, kept] = first.storage.saveToStorage.mock.calls[0];
+
+	const next = launch(kept);
+	await next.api.fetchSeriesMarkers('s1');
+	expect(next.request).not.toHaveBeenCalled();
+	expect(next.api.animeLabelStyle()).toBe('short');
+});
+
+test('the lookup for single items notes the label style too', async () => {
+	const {api} = launch(null, {enabled: true, items: {i1: {audio: 'Dubbed'}}, labelStyle: 'short'});
+	const asked = api.fetchItemMarkers(['i1']);
+	jest.advanceTimersByTime(80);
+	await asked;
+	expect(api.audioForItem('i1')).toBe('Dubbed');
+	expect(api.animeLabelStyle()).toBe('short');
+});

@@ -68,6 +68,18 @@ describe('nouveauSectionOrder', () => {
 			.toEqual(['additionalParts', 'extras', 'details']);
 		expect(nouveauSectionOrder({type: 'Movie', similarLoaded: true})).not.toContain('additionalParts');
 	});
+
+	it('puts the collections a title belongs to after its extras and ahead of discovery', () => {
+		expect(nouveauSectionOrder({type: 'Movie', extraCount: 1, parentCollectionCount: 2}))
+			.toEqual(['extras', 'parentCollections', 'discovery', 'details']);
+		expect(nouveauSectionOrder({type: 'Movie', extraCount: 1})).not.toContain('parentCollections');
+	});
+
+	it('leaves a box set to its own collection rather than the ones it belongs to', () => {
+		const sections = nouveauSectionOrder({type: 'BoxSet', parentCollectionCount: 1});
+		expect(sections).toContain('collection');
+		expect(sections).not.toContain('parentCollections');
+	});
 });
 
 describe('shouldIncludeDiscovery', () => {

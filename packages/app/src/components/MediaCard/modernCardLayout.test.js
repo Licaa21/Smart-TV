@@ -105,12 +105,14 @@ describe('Modern card labels and titles', () => {
 });
 
 describe('modernRowSpacing', () => {
-	test('turns the padding slider into the space below a row', () => {
+	test('turns the padding slider into the space below a row, every stop changing it', () => {
 		expect(modernRowSpacing({})).toBe(0);
 		expect(modernRowSpacing({modernHomeRowsPadding: 420})).toBe(0);
 		expect(modernRowSpacing({modernHomeRowsPadding: 500})).toBe(66);
 		expect(modernRowSpacing({modernHomeRowsPadding: 560})).toBe(126);
-		expect(modernRowSpacing({modernHomeRowsPadding: 360})).toBe(0);
+		expect(modernRowSpacing({modernHomeRowsPadding: 400})).toBe(-11);
+		expect(modernRowSpacing({modernHomeRowsPadding: 380})).toBe(-23);
+		expect(modernRowSpacing({modernHomeRowsPadding: 360})).toBe(-34);
 	});
 
 	test('leaves full screen rows to pace themselves', () => {
