@@ -31,10 +31,10 @@ describe('personal rating action', () => {
 		expect(personalRatingLabel('numeric', {Rating: 0})).toBe('Rated');
 	});
 
-	it('draws the star for every style and whatever rating is behind it', () => {
+	it('draws the thumb for every style and whatever rating is behind it', () => {
 		for (const style of ['thumbs', 'stars', 'numeric']) {
-			expect(personalRatingIconPath(style, {})).toBe(RATING_ICON_PATHS.star);
-			expect(personalRatingIconPath(style, {Likes: false, Rating: 3})).toBe(RATING_ICON_PATHS.star);
+			expect(personalRatingIconPath(style, {})).toBe(RATING_ICON_PATHS.thumbUp);
+			expect(personalRatingIconPath(style, {Likes: false, Rating: 3})).toBe(RATING_ICON_PATHS.thumbUp);
 		}
 	});
 });
