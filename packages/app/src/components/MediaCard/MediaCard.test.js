@@ -40,7 +40,7 @@ jest.mock('../../hooks/useItemMenuHold', () => () => ({}));
 
 const POSTER = 'https://image.tmdb.org/t/p/w342/poster.jpg';
 const BACKDROP = 'https://image.tmdb.org/t/p/w1280/backdrop.jpg';
-const THUMB = 'http://server/Moonfin/Tmdb/Thumb?type=movie&tmdbId=603&ApiKey=token';
+const THUMB = 'http://server/Moonfin/Tmdb/Thumb?type=movie&tmdbId=603&size=w780&ApiKey=token';
 
 // A Seerr row title the way normalizeMediaItem leaves it.
 const seerrMovie = (overrides = {}) => ({

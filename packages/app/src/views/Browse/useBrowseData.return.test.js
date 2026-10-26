@@ -8,8 +8,8 @@ jest.mock('react/jsx-dev-runtime', () => {
 	const React = require('react');
 	return {
 		Fragment: React.Fragment,
-		jsxDEV: (type, {children, ...props}, key, isStaticChildren) => {
-			const config = key === undefined ? props : {...props, key};
+		jsxDEV: (type, {children, ...rest}, key, isStaticChildren) => {
+			const config = key === undefined ? rest : {...rest, key};
 			if (children === undefined) return React.createElement(type, config);
 			return isStaticChildren ? React.createElement(type, config, ...children) : React.createElement(type, config, children);
 		}

@@ -9,7 +9,7 @@ import SeerrIcon from '../icons/SeerrIcon';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
-import {isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
+import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
 
 import css from './MediaCard.module.less';
@@ -127,8 +127,8 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 	const [failedThumb, setFailedThumb] = useState(null);
 	const wantsSeerrWide = imageType === 'thumb' && (cardType === 'portrait' || cardType === 'landscape') && isUnownedSeerrTitle(item);
 	useTmdbThumbsAvailable(wantsSeerrWide);
-	const seerrThumb = wantsSeerrWide ? seerrThumbUrl(item) : null;
-	const seerrWide = wantsSeerrWide ? toAbsoluteImageUrl(seerrWideArtUrl(item, failedThumb), itemServerUrl) : null;
+	const seerrThumb = wantsSeerrWide ? seerrThumbUrl(item, CARD_THUMB_SIZE) : null;
+	const seerrWide = wantsSeerrWide ? toAbsoluteImageUrl(seerrWideArtUrl(item, failedThumb, CARD_THUMB_SIZE), itemServerUrl) : null;
 	const isBanner = imageType === 'banner' && cardType !== 'square' && cardType !== 'circle';
 	// An episode is the one item the series switch speaks for, so its picture is
 	// picked here instead of taking whatever wide art the row asked for. A banner

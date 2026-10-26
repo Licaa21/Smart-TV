@@ -44,7 +44,7 @@ jest.mock('../../hooks/useItemMenuHold', () => () => ({}));
 
 const POSTER = 'https://image.tmdb.org/t/p/w342/poster.jpg';
 const BACKDROP = 'https://image.tmdb.org/t/p/w1280/backdrop.jpg';
-const THUMB = 'http://server/Moonfin/Tmdb/Thumb?type=tv&tmdbId=1396&ApiKey=token';
+const THUMB = 'http://server/Moonfin/Tmdb/Thumb?type=tv&tmdbId=1396&size=w780&ApiKey=token';
 
 // A Seerr row show the way normalizeMediaItem leaves it.
 const seerrShow = (overrides = {}) => ({
@@ -155,7 +155,8 @@ describe('ModernMediaCard growing on focus', () => {
 		expect(shown()).toContain('/Images/Primary');
 		expect(wide().getAttribute('src')).toContain('/Images/Thumb');
 		expect(faded()).toBe(false);
-		expect(loads).toHaveLength(0);
+		// the focused card asks for its own art first
+		expect(loads).toHaveLength(1);
 
 		fireEvent.load(wide());
 		expect(faded()).toBe(true);
@@ -205,15 +206,16 @@ describe('ModernMediaCard growing on focus', () => {
 
 	it('moves on to the plain backdrop when the thumb fetched ahead comes back with nothing, for every card of the title', () => {
 		const missing = () => seerrShow({Id: 'seerr-tv-4242', _seerrRaw: {mediaId: 4242, mediaType: 'tv'}});
-		const MISSING_THUMB = 'http://server/Moonfin/Tmdb/Thumb?type=tv&tmdbId=4242&ApiKey=token';
+		const MISSING_THUMB = 'http://server/Moonfin/Tmdb/Thumb?type=tv&tmdbId=4242&size=w780&ApiKey=token';
 		render(<ModernMediaCard item={missing()} serverUrl="http://server" warmRank={1} />);
 		expect(loads[0].src).toBe(MISSING_THUMB);
 		act(() => loads[0].onerror());
 		expect(loads[1].src).toBe(BACKDROP);
 
-		// another card of the same title goes straight to the backdrop
+		// another card of the same title goes straight to the backdrop, which is already on its way
 		render(<ModernMediaCard item={missing()} serverUrl="http://server" warmRank={1} />);
-		expect(loads[2].src).toBe(BACKDROP);
+		expect(loads).toHaveLength(2);
+		expect(loads.filter((art) => art.src === MISSING_THUMB)).toHaveLength(1);
 	});
 
 	it('fetches nothing ahead while the row holds its images back', () => {

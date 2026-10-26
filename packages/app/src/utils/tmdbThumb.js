@@ -36,9 +36,12 @@ export const isUnownedSeerrTitle = (item) => Boolean(item?._seerr) &&
 	(!item._seerrType || item._seerrType === 'item') &&
 	(item._seerrMediaType === 'movie' || item._seerrMediaType === 'tv');
 
+// The size a card asks the plugin for: a card is about 520 px wide, so the 780 px picture and not the 1280 px one.
+export const CARD_THUMB_SIZE = 'w780';
+
 // Image tags can't send auth headers, so the token rides in the query. An IMDb id only
 // counts when there is no TMDB id.
-export const seerrThumbUrl = (item) => {
+export const seerrThumbUrl = (item, size = null) => {
 	if (!thumbsAvailable || !isUnownedSeerrTitle(item)) return null;
 	const tmdbId = item._seerrRaw?.mediaId ?? item.ProviderIds?.Tmdb;
 	const imdbId = item._seerrRaw?.imdbId ?? item.ProviderIds?.Imdb;
@@ -53,15 +56,18 @@ export const seerrThumbUrl = (item) => {
 	// The sets that load TMDB images over http, since https to TMDB can fail there, ask the
 	// plugin to send them to TMDB over http too.
 	const scheme = isWebOS() || isLegacyTizen() ? '&scheme=http' : '';
-	return `${server}/Moonfin/Tmdb/Thumb?type=${item._seerrMediaType}&${id}${scheme}&${getTokenParam()}=${encodeURIComponent(token)}`;
+	// A card asks for a smaller picture than the 1280 px one a banner takes. A plugin without the size parameter leaves
+	// it out of the question and answers as before.
+	const sized = size ? `&size=${size}` : '';
+	return `${server}/Moonfin/Tmdb/Thumb?type=${item._seerrMediaType}&${id}${sized}${scheme}&${getTokenParam()}=${encodeURIComponent(token)}`;
 };
 
 // The wide picture such a title shows, the plugin thumb first and the plain backdrop when
 // the plugin can't make one. failedUrl is a thumb that already failed to load, so a title
 // the plugin has nothing for falls back instead of staying broken.
-export const seerrWideArtUrl = (item, failedUrl = null) => {
+export const seerrWideArtUrl = (item, failedUrl = null, size = null) => {
 	if (!isUnownedSeerrTitle(item)) return null;
-	const thumb = seerrThumbUrl(item);
+	const thumb = seerrThumbUrl(item, size);
 	if (thumb && thumb !== failedUrl) return thumb;
 	return item._externalBackdropUrl || null;
 };

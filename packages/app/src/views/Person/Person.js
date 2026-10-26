@@ -95,7 +95,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson,
 	const syncedItems = useUserDataList(items);
 	const {movies, series, guestAppearances, musicVideos} = useMemo(() => {
 		const split = splitFilmography(syncedItems, showsSection, settings.personPageSortOption);
-		if (settings.personPageSortOption !== 'popularity') return split;
+		if ((settings.personPageSortOption || 'popularity') !== 'popularity') return split;
 		// The most popular first, by what Seerr says of the same titles, and the one the backdrop comes from ahead of them
 		return {
 			movies: rankLibraryItems(split.movies, ranking),

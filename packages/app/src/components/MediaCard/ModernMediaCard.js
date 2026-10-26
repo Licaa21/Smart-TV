@@ -13,8 +13,8 @@ import {externalArtwork} from '../../utils/externalArtwork';
 import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
-import {isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
-import {hasArt, rememberArt, prefetchArt} from './artPrefetch';
+import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
+import {hasArt, rememberArt, artSource, artState, touchArt, prefetchArt, noteArtFocus, noteArtArrived} from './artPrefetch';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
 
@@ -281,9 +281,9 @@ const ModernMediaCard = ({
 	// Cards about to be fetched for work the thumb out too, since it is what the title will grow into
 	const wantsSeerrWide = (isFocused || warmRank >= 0) && isUnownedSeerrTitle(item);
 	useTmdbThumbsAvailable(wantsSeerrWide);
-	const seerrThumb = wantsSeerrWide ? seerrThumbUrl(item) : null;
+	const seerrThumb = wantsSeerrWide ? seerrThumbUrl(item, CARD_THUMB_SIZE) : null;
 	const thumbFailed = Boolean(seerrThumb) && (failedThumb === seerrThumb || thumbFailedBefore(seerrThumb));
-	const seerrWide = wantsSeerrWide ? seerrWideArtUrl(item, thumbFailed ? seerrThumb : null) : null;
+	const seerrWide = wantsSeerrWide ? seerrWideArtUrl(item, thumbFailed ? seerrThumb : null, CARD_THUMB_SIZE) : null;
 	const failThumb = useCallback((url) => {
 		rememberFailedThumb(url);
 		setFailedThumb(url);
@@ -365,37 +365,69 @@ const ModernMediaCard = ({
 	// art is in, and the art then fades in over it. A card whose art was fetched ahead has it at once.
 	const swapsArt = canRenderExpanded && Boolean(restingUrl && focusUrl) && focusUrl !== restingUrl;
 	const [arrivedUrl, setArrivedUrl] = useState(null);
+	// Set when the card was focused before its art was there, to tell the report how long it took
+	const lateSinceRef = useRef(0);
 	const handleWideLoad = useCallback(() => {
-		rememberArt(focusUrl);
+		// A held copy is remembered by being held; only art loaded the plain way is noted here
+		if (artSource(focusUrl) === focusUrl) rememberArt(focusUrl);
 		setArrivedUrl(focusUrl);
+		if (lateSinceRef.current) {
+			noteArtArrived(focusUrl, Date.now() - lateSinceRef.current);
+			lateSinceRef.current = 0;
+		}
 	}, [focusUrl]);
+	// A request for the art ended, and the card has something to draw, or to ask the network for
+	const [, setArtTick] = useState(0);
+	const onArtDone = useCallback(() => setArtTick((n) => n + 1), []);
+	// A thumb the plugin has none of (a 404), or one that would not load, hands over to the backdrop before the card
+	// is ever focused. Any other answer may pass.
+	const onArtFail = useCallback((status) => {
+		if (seerrThumb && focusUrl === seerrThumb && (status === 404 || status === 0)) failThumb(seerrThumb);
+	}, [seerrThumb, focusUrl, failThumb]);
 
 	// The cards around the focused one fetch their wide art ahead, nearest first, so moving about opens each card
 	// at once. The rank is how near the card is to focus and moves as focus does.
-	const warmsArt = warmRank >= 0 && !deferImage && swapsArt;
-	const warmRankRef = useRef(warmRank);
-	warmRankRef.current = warmRank;
+	const rank = isFocused ? 0 : warmRank;
+	const warmsArt = rank >= 0 && !deferImage && swapsArt;
+	const rankRef = useRef(rank);
+	rankRef.current = rank;
 	const prefetchRef = useRef(null);
 	useEffect(() => {
 		if (!warmsArt || hasArt(focusUrl)) return undefined;
-		// A thumb the plugin has none of hands over to the backdrop before the card is ever focused
-		const request = prefetchArt(focusUrl, warmRankRef.current, () => {
-			if (seerrThumb && focusUrl === seerrThumb) failThumb(seerrThumb);
-		});
+		const request = prefetchArt(focusUrl, rankRef.current, onArtFail, onArtDone);
 		prefetchRef.current = request;
 		return () => {
 			prefetchRef.current = null;
 			request.cancel();
 		};
-	}, [warmsArt, focusUrl, seerrThumb, failThumb]);
+	}, [warmsArt, focusUrl, onArtFail, onArtDone]);
 	useEffect(() => {
-		prefetchRef.current?.setRank(warmRank);
-	}, [warmRank]);
+		prefetchRef.current?.setRank(rank);
+	}, [rank]);
 
 	const expanded = isFocused && canRenderExpanded;
 	const overlaysArt = expanded && swapsArt;
 	const wideArrived = arrivedUrl === focusUrl || hasArt(focusUrl);
 	const imageUrl = isFocused && !overlaysArt ? focusUrl : restingUrl;
+
+	// The report is told whether the art was there when the card was focused, and how long it took when it was not
+	const countedFocusRef = useRef(false);
+	useEffect(() => {
+		if (!isFocused || !overlaysArt || !focusUrl) {
+			lateSinceRef.current = 0;
+			countedFocusRef.current = false;
+			return undefined;
+		}
+		if (!countedFocusRef.current) {
+			countedFocusRef.current = true;
+			lateSinceRef.current = noteArtFocus(focusUrl) ? 0 : Date.now();
+		}
+		touchArt(focusUrl);
+		// A held copy that was let go since it was fetched is fetched again, when nothing is already asking for it.
+		if (deferImage || hasArt(focusUrl) || artState(focusUrl) !== 'none') return undefined;
+		const request = prefetchArt(focusUrl, 0, onArtFail, onArtDone);
+		return () => request.cancel();
+	}, [isFocused, overlaysArt, focusUrl, deferImage, onArtFail, onArtDone]);
 
 	const handleImageError = useCallback(() => {
 		if (seerrThumb && focusUrl === seerrThumb) failThumb(seerrThumb);
@@ -448,7 +480,7 @@ const ModernMediaCard = ({
 						{overlaysArt && (
 							<img
 								className={wideArrived ? `${css.image} ${css.imageWide} ${css.imageWideIn}` : `${css.image} ${css.imageWide}`}
-								src={deferImage ? undefined : focusUrl}
+								src={deferImage ? undefined : (artSource(focusUrl) || undefined)}
 								alt=""
 								width={cardWidth}
 								height={imageHeight}
