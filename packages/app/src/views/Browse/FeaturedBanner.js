@@ -10,6 +10,7 @@ import useTrailerPreview from './useTrailerPreview';
 import css from './Browse.module.less';
 import {carouselIntervalMs} from '../../utils/carouselTiming';
 import {useScreensaverActive} from '../../hooks/useScreensaverActive';
+import {rem} from '../../utils/rootScale';
 
 const FEATURED_GENRES_LIMIT = 3;
 const PRELOAD_ADJACENT_SLIDES = 2;
@@ -19,6 +20,7 @@ const SpottableButton = Spottable('button');
 
 const FeaturedBanner = memo(({
 	isVisible,
+	rowPeek = 0,
 	browseVisible = true,
 	featuredItems,
 	serverUrl,
@@ -60,7 +62,8 @@ const FeaturedBanner = memo(({
 		captionLanguage: settings.uiLanguage,
 		api,
 		getItemServerUrl,
-		onEnded: handleTrailerEnded
+		onEnded: handleTrailerEnded,
+		hidesChrome: featuredFocused
 	});
 
 	useEffect(() => {
@@ -202,6 +205,10 @@ const FeaturedBanner = memo(({
 
 	if (!isVisible || !currentFeatured) return null;
 
+	// With the peek row out of the way the compact card drops back to where it sits
+	// without a peek, so it covers less of the trailer.
+	const contentDropped = rowPeek > 0 && trailerActive && featuredFocused;
+
 	return (
 		<div className={css.featuredBanner}>
 			<SpottableDiv
@@ -257,7 +264,10 @@ const FeaturedBanner = memo(({
 					)}
 				</div>
 
-				<div className={css.featuredContent}>
+				<div
+					className={`${css.featuredContent} ${contentDropped ? css.featuredContentDropped : ''}`}
+					style={contentDropped ? {bottom: rem(52 - rowPeek)} : undefined}
+				>
 					<div className={css.featuredInfoBox} style={uiPanelStyle}>
 						<div className={css.featuredMeta}>
 							{currentFeatured.ProductionYear && (

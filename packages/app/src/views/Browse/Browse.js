@@ -85,7 +85,8 @@ const Browse = ({
 	onUnfocusItemThemeMusic,
 	onLeaveThemeMusic,
 	onHoldThemeMusic,
-	backHandlerRef
+	backHandlerRef,
+	trailerHidesChrome
 }) => {
 	const {api, serverUrl, accessToken, hasMultipleServers, user} = useAuth();
 	const {settings, activeTheme, loaded: settingsLoaded} = useSettings();
@@ -985,6 +986,7 @@ const Browse = ({
 					) : (
 						<FeaturedBanner
 							isVisible={browseMode === 'featured'}
+							rowPeek={rowPeek}
 							browseVisible={isVisible}
 							featuredItems={featuredItems}
 							serverUrl={serverUrl}
@@ -1015,7 +1017,7 @@ const Browse = ({
 				<MediaPreviewContext.Provider value={mediaPreview}>
 				<div
 					ref={contentRowsRef}
-					className={`${css.contentRows} ${browseMode === 'rows' ? css.rowsMode : ''} ${rowsClipClass}`}
+					className={`${css.contentRows} ${browseMode === 'rows' ? css.rowsMode : ''} ${rowsClipClass} ${rowPeek && trailerHidesChrome ? css.rowsHidden : ''}`}
 					onFocus={handleContentFocus}
 					onBlur={handleRowsBlur}
 					style={rowPeek ? {height: rem(rowPeek)} : undefined}
