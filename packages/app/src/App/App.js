@@ -1,6 +1,9 @@
 import {useState, useCallback, useEffect, useLayoutEffect, useMemo, lazy, Suspense, useRef} from 'react';
 import {isKidsMode, blockedPanels, allowedPanel} from '../utils/kidsMode';
-import {PIN_ACCEPTED, isSignInPinEnabled, refreshSignInPin, signInPinMessage, verifySignInPin} from '../utils/signInPin';
+import {
+	PIN_ACCEPTED, isSignInPinEnabled, markPinForgotten, refreshSignInPin, resetForgottenPin, signInPinMessage, takeForgottenPin,
+	takeProvedSignIn, verifySignInPin
+} from '../utils/signInPin';
 import ThemeDecorator from '@enact/sandstone/ThemeDecorator';
 import {Panels, Panel} from '@enact/sandstone/Panels';
 import Spottable from '@enact/spotlight/Spottable';
@@ -304,6 +307,13 @@ const AppContent = (props) => {
 	const [pinPassed, setPinPassed] = useState(null);
 	const [pinChecked, setPinChecked] = useState(null);
 	const [pinVerifying, setPinVerifying] = useState(false);
+	// Whether the check under way follows a sign in with the account's password or Quick Connect,
+	// which lets Forgot PIN clear the PIN, and whether Forgot PIN is what sent the viewer to sign in.
+	const pinProofRef = useRef({session: null, proved: false, forgotten: false});
+	// Signing out ends the check, so signing back in to the same account starts a new one.
+	useEffect(() => {
+		if (!isAuthenticated) setPinCheckCount((count) => count + 1);
+	}, [isAuthenticated]);
 	const [setupWizardActive, setSetupWizardActive] = useState(false);
 	const setupWizardBackRef = useRef(null);
 	const cleanupHandlersRef = useRef(null);
@@ -312,6 +322,8 @@ const AppContent = (props) => {
 	const detailsItemStackRef = useRef([]);
 	// Play from a card's menu opens the item's screen, which starts it once it knows what to play.
 	const [detailsAutoPlay, setDetailsAutoPlay] = useState(false);
+	// A Smart Hub tile that opened the app, held until there's someone signed in to open it for.
+	const [deepLink, setDeepLink] = useState(null);
 	const [seerrCollection, setSeerrCollection] = useState(null);
 	const prevUserIdRef = useRef(null);
 	const [photoViewerItem, setPhotoViewerItem] = useState(null);
@@ -408,16 +420,33 @@ const AppContent = (props) => {
 		setPinCodeInput('');
 		setPinCodeError('');
 		if (!pinSession) return undefined;
+		if (pinProofRef.current.session !== pinSession) {
+			const proved = takeProvedSignIn(pinAccount?.serverUrl, userId);
+			const forgotten = takeForgottenPin(pinAccount?.serverUrl, userId);
+			pinProofRef.current = {session: pinSession, proved, forgotten: forgotten && proved};
+		}
 		let cancelled = false;
 		const before = latestSignInPin();
-		refreshSignInPin(before, pinAccount).then((next) => {
+		refreshSignInPin(before, pinAccount).then(async (next) => {
 			if (cancelled) return;
 			if (next !== before) saveSignInPin(next);
-			if (!isSignInPinEnabled(next)) setPinPassed(pinSession);
+			if (isSignInPinEnabled(next) && pinProofRef.current.forgotten) {
+				pinProofRef.current.forgotten = false;
+				const outcome = await resetForgottenPin(next, pinAccount, userId);
+				if (cancelled) return;
+				if (outcome.record) {
+					saveSignInPin(outcome.record);
+					setPinPassed(pinSession);
+				} else {
+					setPinCodeError(outcome.refused);
+				}
+			} else if (!isSignInPinEnabled(next)) {
+				setPinPassed(pinSession);
+			}
 			setPinChecked(pinSession);
 		});
 		return () => { cancelled = true; };
-	}, [pinSession, pinAccount, latestSignInPin, saveSignInPin]);
+	}, [pinSession, pinAccount, userId, latestSignInPin, saveSignInPin]);
 
 	useEffect(() => {
 		if (isAuthenticated && serverUrl && accessToken) {
@@ -974,6 +1003,21 @@ const AppContent = (props) => {
 	}, [handleSelectItem]);
 
 	const handleAutoPlayed = useCallback(() => setDetailsAutoPlay(false), []);
+
+	useEffect(() => {
+		const onDeepLink = (e) => setDeepLink(e.detail || null);
+		window.addEventListener('moonfin:deepLink', onDeepLink);
+		return () => window.removeEventListener('moonfin:deepLink', onDeepLink);
+	}, []);
+
+	// The tiles are Continue Watching and Next Up, so they go where those cards go on Home. A tile
+	// left from another server is dropped.
+	useEffect(() => {
+		if (!deepLink?.id || !isAuthenticated || !settingsLoaded || !user || pinPending || timesUp) return;
+		setDeepLink(null);
+		if (deepLink.serverId && user.ServerId && deepLink.serverId !== user.ServerId) return;
+		handleSelectItem({Id: deepLink.id, Type: deepLink.type === 'episode' ? 'Episode' : 'Movie'}, settings.continueWatchingDefaultAction === 'play');
+	}, [deepLink, isAuthenticated, settingsLoaded, user, pinPending, timesUp, handleSelectItem, settings.continueWatchingDefaultAction]);
 
 	const handleViewPhoto = useCallback((item, siblings) => {
 		setPhotoViewerItem(item);
@@ -1572,6 +1616,29 @@ const AppContent = (props) => {
 		Spotlight.focus('[data-spotlight-id="app-pin-input"]');
 	}, [pinVerifying, pinSession, pinCodeInput, pinAccount, latestSignInPin, saveSignInPin]);
 
+	// Right after signing in with the password or Quick Connect the PIN just clears. Otherwise the
+	// account goes back to its sign in, and the PIN clears once that proves who it is.
+	const handleForgotPin = useCallback(async () => {
+		if (pinVerifying || !pinSession) return;
+		if (pinProofRef.current.session === pinSession && pinProofRef.current.proved) {
+			const session = pinSession;
+			setPinVerifying(true);
+			const outcome = await resetForgottenPin(latestSignInPin(), pinAccount, userId);
+			setPinVerifying(false);
+			if (outcome.record) {
+				saveSignInPin(outcome.record);
+				setPinPassed(session);
+			} else {
+				setPinCodeError(outcome.refused);
+			}
+			return;
+		}
+		markPinForgotten(pinAccount?.serverUrl, userId, user?.Name);
+		leaveSession();
+		setPanelHistory([]);
+		setPanelIndex(PANELS.LOGIN);
+	}, [pinVerifying, pinSession, pinAccount, userId, user, latestSignInPin, saveSignInPin, leaveSession]);
+
 	const handlePinInputKeyDown = useCallback((e) => {
 		const code = e.keyCode || e.which;
 		if (code === 13 || e.key === 'Enter') {
@@ -1638,6 +1705,13 @@ const AppContent = (props) => {
 								spotlightId='app-pin-submit'
 							>
 								{$L('Unlock')}
+							</SpottableButton>
+							<SpottableButton
+								className={`${css.pinButton} ${css.pinButtonQuiet}`}
+								onClick={handleForgotPin}
+								spotlightId='app-pin-forgot'
+							>
+								{$L('Forgot PIN?')}
 							</SpottableButton>
 						</div>
 					</div>
@@ -1808,7 +1882,7 @@ const AppContent = (props) => {
 						</Panel>
 						<Panel>
 							{panelIndex === PANELS.PERSON && (
-								<Person personId={selectedPerson?.Id} onSelectItem={handleSelectItem} onSelectSeerrItem={handleSelectSeerrItem} onSelectSeerrPerson={handleSelectSeerrPerson} />
+								<Person personId={selectedPerson?.Id} onSelectItem={handleSelectItem} onSelectSeerrItem={handleSelectSeerrItem} onSelectSeerrPerson={handleSelectSeerrPerson} backHandlerRef={backHandlerRef} />
 							)}
 						</Panel>
 						<Panel>

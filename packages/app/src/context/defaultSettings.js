@@ -98,6 +98,8 @@ export const defaultSettings = {
 	displayAudioArtists: true,
 	displayAudioAlbums: true,
 	audioSortOption: 'name',
+	personPageSortOption: 'alphabetical',
+	personPageGroupItems: false,
 	customHomeRows: [],
 	recentlyReleasedSeriesType: 'series',
 	mergeRadarrSonarrCalendars: false,
@@ -160,6 +162,7 @@ export const defaultSettings = {
 	mediaBarSourceType: 'library',
 	mediaBarLibraryIds: [],
 	mediaBarCollectionIds: [],
+	mediaBarExternalLists: [],
 	unifiedLibraryMode: false,
 	useMoonfinPlugin: false,
 	// The plugin profile this device syncs with. Empty follows the TV profile. It's a choice
@@ -247,6 +250,7 @@ export const defaultSettings = {
 	useSeriesThumbnails: false,
 	// The server keys, as the other clients store them, so they sync as they are.
 	episodePreviewEnabled: false,
+	mediaPreviewMode: 'media',
 	previewAudioEnabled: true,
 	previewVolume: 100,
 	homeRowsPosterSize: 'default',

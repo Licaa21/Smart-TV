@@ -2,9 +2,13 @@ jest.mock('../services/externalRowsApi', () => ({
 	fetchCustomRow: jest.fn(),
 	constructSourceUrl: jest.fn()
 }));
+jest.mock('./fetchTimeout', () => ({fetchWithTimeout: jest.fn()}));
+jest.mock('./uiLocale', () => ({uiLocale: () => 'en-US'}));
 
 import {fetchCustomRow, constructSourceUrl} from '../services/externalRowsApi';
-import {buildSeasonalRow, fetchExternalPresetRow, validateCustomRow} from './externalHomeRows';
+import seerrApi from '../services/seerrApi';
+import {fetchWithTimeout} from './fetchTimeout';
+import {buildSeasonalRow, fetchCalendarRows, fetchExternalPresetRow, validateCustomRow} from './externalHomeRows';
 
 const listUrl = 'https://mdblist.com/lists/user/list';
 const row = {source: 'mdblist', type: 'user_list', params: {username: 'user', listname: 'list'}};
@@ -109,5 +113,36 @@ describe('buildSeasonalRow', () => {
 		const rowData = buildSeasonalRow(payload({items: [], suggestions: [{...suggestion, officialRating: null}]}));
 
 		expect(rowData.items[0].OfficialRating).toBeNull();
+	});
+});
+
+describe('fetchCalendarRows', () => {
+	const settings = {radarrCalendarShowCinema: true, radarrCalendarShowDate: true};
+	const movie = (tmdbId, title, inCinemas) => ({tmdbId, title, inCinemas, images: []});
+
+	beforeEach(() => {
+		jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-27T12:00:00Z'));
+		jest.spyOn(seerrApi, 'getRadarrSettings').mockResolvedValue([{hostname: 'radarr', port: 7878, apiKey: 'key'}]);
+	});
+	afterEach(() => jest.restoreAllMocks());
+
+	const radarrRow = async (movies) => {
+		fetchWithTimeout.mockResolvedValue({ok: true, json: () => Promise.resolve(movies)});
+		const [calendar] = await fetchCalendarRows(settings, {radarrEnabled: true});
+		return calendar;
+	};
+
+	it('keeps a movie on the row through its release day and drops it after', async () => {
+		const calendar = await radarrRow([
+			movie(1, 'Out today', '2026-10-27T00:00:00Z'),
+			movie(2, 'Out yesterday', '2026-10-26T00:00:00Z'),
+			movie(3, 'Out tomorrow', '2026-10-28T00:00:00Z')
+		]);
+		expect(calendar.items.map((item) => item.Name)).toEqual(['Out today', 'Out tomorrow']);
+	});
+
+	it('labels a release with the day Radarr gives, wherever the TV is', async () => {
+		const calendar = await radarrRow([movie(1, 'Out today', '2026-10-27T00:00:00Z')]);
+		expect(calendar.items[0].Subtitle).toBe('Cinema: Oct 27');
 	});
 });

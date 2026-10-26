@@ -6,6 +6,7 @@ import {withoutBlockedItems} from '../../services/parentalControls';
 import MediaRow from '../../components/MediaRow';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import PersonDetailShell from '../../components/PersonDetailShell';
+import PersonDisplayDialog from '../Details/PersonDisplayDialog';
 import usePersonSeerrCredits from '../../hooks/usePersonSeerrCredits';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import {getImageUrl} from '../../utils/helpers';
@@ -14,11 +15,13 @@ import {sectionVisibility} from '../../utils/detailSectionLayout';
 
 import css from './Person.module.less';
 
+const TUNE_ICON = 'M3 17.02V18.98H9V17.02H3ZM3 5.02V6.98H12.98V5.02H3ZM12.98 21V18.98H21V17.02H12.98V15H11.02V21H12.98ZM6.98 9V11.02H3V12.98H6.98V15H9V9H6.98ZM21 12.98V11.02H11.02V12.98H21ZM15 9H17.02V6.98H21V5.02H17.02V3H15V9Z';
+
 // Same shell as SeerrPerson (a TMDB-only person). This one has a Jellyfin
 // person record and its own library filmography, so it adds a favorite
 // button and a way to jump to the Seerr side. The backdrop, portrait,
 // overview and tab bar all come from the shared PersonDetailShell.
-const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}) => {
+const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson, backHandlerRef}) => {
 	const {api, serverUrl} = useAuth();
 	const {settings} = useSettings();
 	// The detail sections setting reaches this page too, since it stands in for the Details
@@ -27,6 +30,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	const [person, setPerson] = useState(null);
 	const [items, setItems] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [showDisplay, setShowDisplay] = useState(false);
 
 	useEffect(() => {
 		const loadPerson = async () => {
@@ -72,8 +76,26 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 		if (tmdbId) onSelectSeerrPerson?.(tmdbId, person?.Name);
 	}, [tmdbId, person, onSelectSeerrPerson]);
 
+	const openDisplay = useCallback(() => setShowDisplay(true), []);
+	const closeDisplay = useCallback(() => setShowDisplay(false), []);
+
+	useEffect(() => {
+		if (!backHandlerRef || !showDisplay) return undefined;
+		const handler = () => {
+			closeDisplay();
+			return true;
+		};
+		backHandlerRef.current = handler;
+		return () => {
+			if (backHandlerRef.current === handler) backHandlerRef.current = null;
+		};
+	}, [backHandlerRef, showDisplay, closeDisplay]);
+
 	const syncedItems = useUserDataList(items);
-	const {movies, series, guestAppearances, musicVideos} = useMemo(() => splitFilmography(syncedItems, showsSection), [syncedItems, showsSection]);
+	const {movies, series, guestAppearances, musicVideos} = useMemo(
+		() => splitFilmography(syncedItems, showsSection, settings.personPageSortOption),
+		[syncedItems, showsSection, settings.personPageSortOption]
+	);
 
 	const backdropCandidates = useMemo(() => {
 		const urls = [];
@@ -149,7 +171,7 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	const showSeerrButton = Boolean(tmdbId && seerrEnabled && onSelectSeerrPerson);
 
 	const favoriteIcon = (
-		<svg className={`${css.favoriteIcon} ${person.UserData?.IsFavorite ? css.favorited : ''}`} viewBox="0 -960 960 960" fill="currentColor">
+		<svg className={`${css.actionIcon} ${person.UserData?.IsFavorite ? css.favorited : ''}`} viewBox="0 -960 960 960" fill="currentColor">
 			<path d="m480-120-58-52q-101-91-167-157T150-447.5Q111-500 95.5-544T80-634q0-94 63-157t157-63q52 0 99 22t81 62q34-40 81-62t99-22q94 0 157 63t63 157q0 46-15.5 90T810-447.5Q771-395 705-329T538-172l-58 52Z" />
 		</svg>
 	);
@@ -160,18 +182,27 @@ const Person = ({personId, onSelectItem, onSelectSeerrItem, onSelectSeerrPerson}
 	if (showSeerrButton) {
 		actions.push({key: 'seerr', label: $L('Seerr'), icon: null, onClick: handleOpenSeerr});
 	}
+	actions.push({
+		key: 'display',
+		label: $L('Display'),
+		icon: <svg className={css.actionIcon} viewBox="0 0 24 24" fill="currentColor"><path d={TUNE_ICON} /></svg>,
+		onClick: openDisplay
+	});
 
 	return (
-		<PersonDetailShell
-			backdropUrl={randomBackdrop}
-			imageUrl={imageUrl}
-			placeholderInitial={person.Name?.[0]}
-			name={person.Name}
-			metaLines={[...dateLines, birthPlace].filter(Boolean)}
-			overview={showsSection('biography') ? person.Overview : null}
-			actions={actions}
-			tabs={tabs}
-		/>
+		<>
+			<PersonDetailShell
+				backdropUrl={randomBackdrop}
+				imageUrl={imageUrl}
+				placeholderInitial={person.Name?.[0]}
+				name={person.Name}
+				metaLines={[...dateLines, birthPlace].filter(Boolean)}
+				overview={showsSection('biography') ? person.Overview : null}
+				actions={actions}
+				tabs={tabs}
+			/>
+			{showDisplay && <PersonDisplayDialog onClose={closeDisplay} />}
+		</>
 	);
 };
 

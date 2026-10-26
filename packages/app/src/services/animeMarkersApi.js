@@ -55,6 +55,13 @@ const itemFeatureOff = () => featureOff() || (itemFeatureOffAt > 0 && (Date.now(
 
 const normalizeId = (id) => String(id || '').replace(/-/g, '').toLowerCase();
 
+// The admin picks full labels (Subbed) or short ones (Sub), and every answer from the plugin says which.
+let labelStyle = 'full';
+const noteLabelStyle = (body) => {
+	if (body && 'labelStyle' in body) labelStyle = body.labelStyle === 'short' ? 'short' : 'full';
+};
+export const animeLabelStyle = () => labelStyle;
+
 const isNegativelyCached = (key) => {
 	const at = negativeCache[key];
 	if (!at) return false;
@@ -95,6 +102,7 @@ export const fetchSeriesMarkers = async (seriesId, options = {}) => {
 			const saved = entries[storedKey];
 			if (saved && (Date.now() - saved.fetchedAt) < STORED_TTL_MS) {
 				seriesCache[key] = saved;
+				noteLabelStyle(saved.data);
 				return saved.data;
 			}
 			if (ahead) {
@@ -142,7 +150,8 @@ export const fetchSeriesMarkers = async (seriesId, options = {}) => {
 				if (entry?.audio) seasons[normalizeId(id)] = entry.audio;
 			});
 
-			const data = {episodes, seasons};
+			noteLabelStyle(body);
+			const data = {episodes, seasons, labelStyle};
 			seriesCache[key] = {fetchedAt: Date.now(), data};
 			entries[storedKey] = seriesCache[key];
 			saveStored();
@@ -212,6 +221,7 @@ const flushItemBatch = async () => {
 			return;
 		}
 
+		noteLabelStyle(body);
 		const items = body?.items || {};
 		Object.keys(items).forEach(id => {
 			const audio = items[id]?.audio;

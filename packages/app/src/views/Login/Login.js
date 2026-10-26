@@ -15,6 +15,7 @@ import {KEYS} from '../../utils/keys';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
 import {subscribeTvKeyboardVisibility} from '../../components/TVKeyboard/keyboardBus';
 import {MaterialIcon, ServerTypeIcon} from './loginIcons';
+import {forgottenPinUsername, noteProvedSignIn} from '../../utils/signInPin';
 
 import css from './Login.module.less';
 
@@ -201,7 +202,7 @@ const Login = ({
 		if (!quickConnect) focusLater(credentialFocusTarget(user));
 	}, [stopQuickConnect]);
 
-	const openServer = useCallback(async (target, {forceSignIn = false} = {}) => {
+	const openServer = useCallback(async (target, {forceSignIn = false, signInAs = null} = {}) => {
 		jellyfinApi.setServer(target.url);
 		jellyfinApi.setServerType(target.serverType || 'jellyfin');
 
@@ -210,7 +211,7 @@ const Login = ({
 		setStatus(null);
 
 		if (forceSignIn) {
-			goToSignIn(target, null);
+			goToSignIn(target, signInAs);
 			return;
 		}
 
@@ -359,7 +360,12 @@ const Login = ({
 			return;
 		}
 
-		if (inDialog) setDialog(null);
+		// From the add dialog the server is shown first, so the address can be corrected before signing in.
+		if (inDialog) {
+			setDialog({kind: 'add', step: 'found', server: result.server});
+			focusLater('add-continue-btn');
+			return;
+		}
 		openServer(result.server);
 	}, [probeServer, openServer]);
 
@@ -393,6 +399,12 @@ const Login = ({
 
 		const lastServerId = activeServerInfo?.serverId;
 		const known = uniqueServers.find((entry) => entry.serverId === lastServerId);
+		// Forgot PIN lands on that account's sign in, since only its password clears the PIN.
+		const forgottenName = known ? forgottenPinUsername(known.url) : null;
+		if (forgottenName) {
+			openServer(known, {forceSignIn: true, signInAs: {name: forgottenName, hasPassword: true}});
+			return;
+		}
 		if (known) {
 			openServer(known);
 			return;
@@ -482,6 +494,7 @@ const Login = ({
 			stopQuickConnect();
 			setStatus(isAdding ? $L('Adding user...') : $L('Signing in...'));
 			const authResult = await jellyfinApi.api.authenticateQuickConnect(secret);
+			noteProvedSignIn(jellyfinApi.getServerUrl(), authResult.User?.Id);
 			const result = await loginWithToken(jellyfinApi.getServerUrl(), authResult, {
 				serverName: server?.name,
 				serverType: server?.serverType,
@@ -607,9 +620,24 @@ const Login = ({
 		focusLater('add-server-btn');
 	}, []);
 
+	const showAddressStep = useCallback(() => {
+		setDialogError(null);
+		setDialog({kind: 'add', step: 'address'});
+		focusLater('add-address-input');
+	}, []);
+
+	const openAddDialog = useCallback(() => {
+		setAddressValue('');
+		setDialogError(null);
+		setDialog({kind: 'add', step: 'choose'});
+		focusLater('add-choice-address');
+	}, []);
+
 	const handleBack = useCallback(() => {
 		if (dialog) {
-			closeDialog();
+			if (dialog.step === 'found') showAddressStep();
+			else if (dialog.step === 'address' && !isConnecting) openAddDialog();
+			else if (!isConnecting) closeDialog();
 			return true;
 		}
 		if (step === 'embyconnect-servers') {
@@ -643,7 +671,7 @@ const Login = ({
 			return true;
 		}
 		return false;
-	}, [dialog, closeDialog, step, users.length, isAdding, goToServers, stopQuickConnect, cancelAddServerFlow, onServerAdded]);
+	}, [dialog, closeDialog, showAddressStep, openAddDialog, isConnecting, step, users.length, isAdding, goToServers, stopQuickConnect, cancelAddServerFlow, onServerAdded]);
 
 	useEffect(() => {
 		if (!backHandlerRef) return undefined;
@@ -659,12 +687,16 @@ const Login = ({
 	const handleUsernameChange = useCallback((e) => setUsername(e.target.value), []);
 	const handlePasswordChange = useCallback((e) => setPassword(e.target.value), []);
 
-	const openAddDialog = useCallback(() => {
-		setAddressValue('');
-		setDialogError(null);
-		setDialog({kind: 'add'});
-		focusLater('add-address-input');
-	}, []);
+	const chooseEmbyConnect = useCallback(() => {
+		setDialog(null);
+		handleEmbyConnectStart();
+	}, [handleEmbyConnectStart]);
+
+	const continueToServer = useCallback(() => {
+		const found = dialog?.server;
+		setDialog(null);
+		if (found) openServer(found);
+	}, [dialog, openServer]);
 
 	const submitAddress = useCallback(() => {
 		if (!addressValue.trim() || isConnecting) return;
@@ -804,16 +836,6 @@ const Login = ({
 			>
 				<MaterialIcon name="add" className={css.outlineButtonIcon} />
 				{$L('Add Server')}
-			</SpottableButton>,
-			<SpottableButton
-				key="emby"
-				data-spotlight-id="emby-connect-btn"
-				className={css.outlineButton}
-				onClick={handleEmbyConnectStart}
-				disabled={isConnecting}
-			>
-				<ServerTypeIcon serverType="emby" className={css.outlineButtonIcon} />
-				{$L('Emby Connect')}
 			</SpottableButton>
 		];
 
@@ -1131,11 +1153,73 @@ const Login = ({
 	);
 
 	const renderDialog = () => {
+		if (dialog?.kind === 'add' && dialog.step === 'choose') {
+			return (
+				<div className={css.dialogScrim}>
+					<DialogArea className={css.dialog}>
+						<h2 className={css.dialogTitle}>{$L('Add Server')}</h2>
+						<p className={css.dialogNote}>{$L('Choose how you\'d like to connect.')}</p>
+						<SpottableDiv data-spotlight-id="add-choice-address" className={css.tile} onClick={showAddressStep}>
+							<MaterialIcon name="dns" className={css.tileIcon} />
+							<div className={css.tileBody}>
+								<div className={css.tileName}>{$L('Server Address')}</div>
+								<div className={css.tileDetail}>{$L('Jellyfin or Emby on your network or online')}</div>
+							</div>
+						</SpottableDiv>
+						{renderTile({
+							key: 'emby',
+							spotlightId: 'add-choice-emby',
+							serverType: 'emby',
+							name: $L('Emby Connect'),
+							detail: $L('Sign in with your Emby Connect account'),
+							onClick: chooseEmbyConnect
+						})}
+					</DialogArea>
+				</div>
+			);
+		}
+
+		if (dialog?.kind === 'add' && dialog.step === 'found') {
+			const found = dialog.server;
+			return (
+				<div className={css.dialogScrim}>
+					<DialogArea className={css.dialog}>
+						<h2 className={css.dialogTitle}>{$L('Server found')}</h2>
+						<div className={css.tile}>
+							<ServerTypeIcon serverType={found.serverType} className={css.tileIcon} />
+							<div className={css.tileBody}>
+								<div className={css.tileName}>{found.name}</div>
+								<div className={css.tileDetail}>{found.version ? `${found.url} • ${found.version}` : found.url}</div>
+							</div>
+						</div>
+						<p className={css.dialogNote}>{$L('Continue to choose who\'s signing in.')}</p>
+						<div className={css.dialogActions}>
+							<SpottableButton
+								data-spotlight-id="add-other-address-btn"
+								className={`${css.outlineButton} ${css.dialogButton}`}
+								onClick={showAddressStep}
+							>
+								{$L('Use a different address')}
+							</SpottableButton>
+							<SpottableButton
+								data-spotlight-id="add-continue-btn"
+								className={`${css.outlineButton} ${css.dialogButton}`}
+								onClick={continueToServer}
+							>
+								{$L('Continue')}
+							</SpottableButton>
+						</div>
+					</DialogArea>
+				</div>
+			);
+		}
+
 		if (dialog?.kind === 'add') {
 			return (
 				<div className={css.dialogScrim}>
 					<DialogArea className={css.dialog}>
 						<h2 className={css.dialogTitle}>{$L('Connect to Server')}</h2>
+						<p className={css.dialogNote}>{$L('The same address you\'d open in a browser, including the port.')}</p>
 						<div className={css.inputWithIcon}>
 							<MaterialIcon name="dns" className={css.inputIcon} />
 							<SpottableInput
@@ -1152,15 +1236,17 @@ const Login = ({
 							/>
 						</div>
 						{dialogError && <div className={css.fieldError}>{dialogError}</div>}
-						{status && <div className={css.statusLine}>{status}</div>}
+						{status
+							? <div className={css.statusLine}>{status}</div>
+							: !dialogError && <div className={css.statusLine}>{$L('Works with Jellyfin and Emby.')}</div>}
 						<div className={css.dialogActions}>
 							<SpottableButton
 								data-spotlight-id="add-cancel-btn"
 								className={`${css.outlineButton} ${css.dialogButton}`}
-								onClick={closeDialog}
+								onClick={openAddDialog}
 								disabled={isConnecting}
 							>
-								{$L('Cancel')}
+								{$L('Back')}
 							</SpottableButton>
 							<SpottableButton
 								data-spotlight-id="add-connect-btn"

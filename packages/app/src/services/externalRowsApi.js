@@ -96,6 +96,33 @@ export const fetchCustomRow = async ({source, type, params = {}}, options = {}) 
 	}
 };
 
+// What TMDB holds for a title the server doesn't have, through Moonbase. Null when the plugin
+// has nothing for it, which it says with a 404. An IMDb id is only used without a TMDB id.
+export const fetchTmdbDetails = async ({type, tmdbId, imdbId}) => {
+	const baseUrl = getServerUrl();
+	let id = null;
+	if (tmdbId) id = `tmdbId=${encodeURIComponent(tmdbId)}`;
+	else if (imdbId) id = `imdbId=${encodeURIComponent(imdbId)}`;
+	if (!baseUrl || !id) return null;
+
+	const key = `${cacheScope()}|details:${type}:${id}`;
+	const cached = cache[key];
+	if (cached && (Date.now() - cached.fetchedAt) < CACHE_TTL_MS) return cached.details;
+	const headers = {'Authorization': getAuthHeader()};
+
+	try {
+		const url = `${baseUrl}/Moonfin/Tmdb/Details?type=${type === 'tv' ? 'tv' : 'movie'}&${id}`;
+		const response = await mediaServerQueue.run(() => fetchWithTimeout(url, {headers}, 10000));
+		if (!response.ok && response.status !== 404) return null;
+		const details = response.ok ? await response.json() : null;
+		cache[key] = {details, fetchedAt: Date.now()};
+		return details;
+	} catch (err) {
+		console.warn('[ExternalRows] Details fetch failed:', err);
+		return null;
+	}
+};
+
 // The seasonal row Moonbase built for this user. Owned movies arrive as library items and
 // suggestions in the custom row shape. A holiday of null means there is no row today.
 export const fetchSeasonalRow = async ({country} = {}) => {

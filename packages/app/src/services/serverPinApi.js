@@ -94,3 +94,13 @@ export const removeServerPin = async (account, currentPin) => {
 		return unavailable;
 	}
 };
+
+// Clears any account's PIN without it, which the plugin only lets an administrator do.
+export const removeServerPinFor = async (account, userId) => {
+	try {
+		const {status} = await request(account, 'DELETE', `Users/${encodeURIComponent(userId)}/Pin`);
+		return status === 200 ? {result: PIN_VALID} : unavailable;
+	} catch (e) {
+		return unavailable;
+	}
+};

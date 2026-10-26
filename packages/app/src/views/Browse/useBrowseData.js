@@ -11,11 +11,13 @@ import browseReducer, {browseInitialState, mergeRowsById} from './browseReducer'
 import {BROWSE_ROW_LOADERS, buildLoaderContext, loadDeferredSections, loadSinceYouWatched} from './browseRowLoaders';
 import {genericCollectionLabel, mergeRecentRows} from '../../utils/mergeRecentRows';
 import {normalizeLatestMediaItems} from '../../utils/latestMediaRowNormalizer';
-import {EXCLUDED_COLLECTION_TYPES, filterItemsByExcludedGenres} from './browseFilters';
+import {EXCLUDED_COLLECTION_TYPES, filterItemsByExcludedGenres, matchesContentType} from './browseFilters';
 import {featuredConfigKey} from './featuredConfig';
+import {withExternalSlides} from './featuredExternal';
 import {readFeaturedSources} from './featuredSources';
 import {shuffleArray} from '../Details/detailsMedia';
 import {withoutBlockedItems} from '../../services/parentalControls';
+import {activeSyncProfile} from '../../context/SettingsContext';
 import {
 	CACHE_TTL_LIBRARIES, CACHE_TTL_VOLATILE, VOLATILE_REFRESH_COOLDOWN_MS,
 	cancelPendingCacheSave, clearBrowseCache, clearMemoryCache, isCacheValid, loadBrowseCache, memoryCache, saveBrowseCache
@@ -85,21 +87,32 @@ const useBrowseData = ({
 		const libraryIds = await retainPermitted(api, s.mediaBarLibraryIds || []);
 		const collectionIds = s.mediaBarCollectionIds || [];
 		const hasSourceFilter = (sourceType === 'collection' && collectionIds.length > 0) || libraryIds.length > 0;
+		// Kids Mode hides every outside list on Home, and the lists come through the plugin.
+		const externalIds = s.useMoonfinPlugin && !isKidsMode(s) ? s.mediaBarExternalLists || [] : [];
+		const mixInExternal = (picked) => withExternalSlides(picked, externalIds, s, {serverUrl, accessToken});
 
 		try {
 			let items = [];
+			const count = s.featuredItemCount;
 
-			if (s.useMoonfinPlugin) {
-				const mediaBarResult = await seerrApi.getMoonfinMediaBar(serverUrl, accessToken, 'tv');
+			// Lists picked on their own fill the bar alone. When they come back empty the bar
+			// falls back to what it shows with nothing picked.
+			if (externalIds.length > 0 && !hasSourceFilter) {
+				items = await mixInExternal([]);
+			}
+
+			if (items.length === 0 && s.useMoonfinPlugin) {
+				// The plugin answers from the synced picks, so it has to read the profile this TV syncs with.
+				const mediaBarResult = await seerrApi.getMoonfinMediaBar(serverUrl, accessToken, activeSyncProfile(s.syncProfile));
 				if (mediaBarResult?.Items?.length) {
 					items = mediaBarResult.Items;
 				}
 			}
 
 			if (items.length === 0) {
-				const count = s.featuredItemCount;
 				// What the bar can show: a title with a backdrop that no setting keeps off it.
 				const isUsable = (item) => item.Type !== 'BoxSet' && item.BackdropImageTags?.length > 0 &&
+					matchesContentType(item, s.featuredContentType) &&
 					filterItemsByExcludedGenres([item], s.excludedGenres).length > 0 && withoutBlockedItems([item]).length > 0;
 				const pickFrom = (pool) => shuffleArray(pool.filter(isUsable)).slice(0, count);
 				if (sourceType === 'collection' && collectionIds.length > 0) {
@@ -114,14 +127,18 @@ const useBrowseData = ({
 				}
 			}
 
+			if (externalIds.length > 0 && hasSourceFilter) {
+				items = await mixInExternal(items);
+			}
+
 			if (items.length > 0) {
 				const filteredItems = filterItemsByExcludedGenres(
-					items.filter(item => item.Type !== 'BoxSet'),
+					items.filter(item => item.Type !== 'BoxSet' && matchesContentType(item, s.featuredContentType)),
 					s.excludedGenres
 				);
 				const featuredWithLogos = filteredItems.map(item => ({
 					...item,
-					LogoUrl: getLogoUrl(getItemServerUrl(item), item, {maxWidth: 800, quality: 90})
+					LogoUrl: item.LogoUrl || getLogoUrl(getItemServerUrl(item), item, {maxWidth: 800, quality: 90})
 				}));
 				publish(featuredWithLogos);
 				return featuredWithLogos;

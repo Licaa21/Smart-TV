@@ -227,6 +227,12 @@ export const getHomeRowsStyleOptions = () => [
 	{ value: 'v1', label: $L('Classic') }
 ];
 
+export const getMediaPreviewModeOptions = () => [
+	{ value: 'off', label: $L('Off') },
+	{ value: 'media', label: $L('Media Preview') },
+	{ value: 'trailer', label: $L('Trailer Preview') }
+];
+
 export const getLibraryStyleOptions = () => [
 	{ value: 'classic', label: $L('Classic') },
 	{ value: 'modern', label: $L('Modern') },

@@ -6,11 +6,16 @@ jest.mock('./jellyfinApi', () => ({
 	getTokenParam: (type) => (type === 'emby' ? 'api_key' : 'ApiKey')
 }));
 jest.mock('../utils/perfTier', () => ({getPerfTier: jest.fn()}));
+jest.mock('./seerrApi', () => ({moonfinPing: jest.fn()}));
+jest.mock('./externalRowsApi', () => ({fetchTmdbDetails: jest.fn()}));
 
 import {createApiForServer} from './jellyfinApi';
 import {getPerfTier} from '../utils/perfTier';
+import {moonfinPing} from './seerrApi';
+import {fetchTmdbDetails} from './externalRowsApi';
 import {
 	buildMediaPreviewUrl,
+	isOutsideTitle,
 	mediaPreviewAllowedOnDevice,
 	newPlaySessionId,
 	pickPreviewAudioIndex,
@@ -20,8 +25,11 @@ import {
 	previewServerOf,
 	previewStartSeconds,
 	resolvePreviewTarget,
-	supportsMediaPreview
+	resolveTrailerSource,
+	supportsMediaPreview,
+	trailerSubjectId
 } from './mediaPreviewSource';
+import {extractYouTubeId} from './youtubeTrailer';
 
 const TICK = 10000000;
 
@@ -48,20 +56,61 @@ const paramsOf = (url) => {
 	return params;
 };
 
+const seerrTitle = (extra = {}) => ({
+	Id: 'seerr-movie-603', Type: 'Movie', _seerr: true, _seerrType: 'item', _seerrMediaType: 'movie', _seerrRaw: {mediaId: 603, mediaType: 'movie'}, ...extra
+});
+const listTitle = (extra = {}) => ({
+	Id: 'ext-imdb-tt0944947', Type: 'Series', ProviderIds: {Imdb: 'tt0944947'}, _external: true, _seerr: true, _seerrType: 'item', _seerrMediaType: 'tv',
+	_seerrRaw: {imdbId: 'tt0944947', title: 'Game of Thrones', mediaType: 'tv'}, ...extra
+});
+
 describe('supportsMediaPreview', () => {
-	test.each(['Series', 'Movie', 'Episode', 'Video', 'MusicVideo'])('takes a library %s', (Type) => {
-		expect(supportsMediaPreview({Id: 'a', Type})).toBe(true);
+	test.each(['Series', 'Movie', 'Episode', 'Video', 'MusicVideo'])('takes a library %s for a clip', (Type) => {
+		expect(supportsMediaPreview({Id: 'a', Type}, 'media')).toBe(true);
 	});
 
-	test.each(['Season', 'BoxSet', 'Audio', 'MusicAlbum', 'Genre', 'CollectionFolder', 'Person'])('leaves a %s alone', (Type) => {
+	test.each(['Movie', 'Series', 'Episode', 'Season'])('takes a library %s for a trailer', (Type) => {
+		expect(supportsMediaPreview({Id: 'a', Type}, 'trailer')).toBe(true);
+	});
+
+	test('a season only has a trailer and a video or music video only has a clip', () => {
+		expect(supportsMediaPreview({Id: 'a', Type: 'Season'}, 'media')).toBe(false);
+		expect(supportsMediaPreview({Id: 'a', Type: 'Video'}, 'trailer')).toBe(false);
+		expect(supportsMediaPreview({Id: 'a', Type: 'MusicVideo'}, 'trailer')).toBe(false);
+		expect(supportsMediaPreview({Id: 'a', Type: 'Season'})).toBe(true);
+		expect(supportsMediaPreview({Id: 'a', Type: 'Video'})).toBe(true);
+	});
+
+	test.each(['BoxSet', 'Audio', 'MusicAlbum', 'Genre', 'CollectionFolder', 'Person'])('leaves a %s alone', (Type) => {
 		expect(supportsMediaPreview({Id: 'a', Type})).toBe(false);
 	});
 
-	test('skips Seerr, outside list and shortcut cards', () => {
-		expect(supportsMediaPreview({Id: 'a', Type: 'Movie', _seerr: true})).toBe(false);
-		expect(supportsMediaPreview({Id: 'a', Type: 'Movie', _external: true})).toBe(false);
-		expect(supportsMediaPreview({Id: 'a', Type: 'Movie', isLibraryTile: true})).toBe(false);
-		expect(supportsMediaPreview({Id: 'a', Type: 'Movie', isRecordingsShortcut: true})).toBe(false);
+	test.each([undefined, 'media', 'trailer'])('skips Seerr, outside list and shortcut cards (%s)', (mode) => {
+		expect(supportsMediaPreview({Id: 'a', Type: 'Movie', _seerr: true}, mode)).toBe(false);
+		expect(supportsMediaPreview({Id: 'a', Type: 'Movie', _external: true}, mode)).toBe(false);
+		expect(supportsMediaPreview({Id: 'a', Type: 'Episode', _external: true, _calendarDate: '2026-11-01'}, mode)).toBe(false);
+		expect(supportsMediaPreview({Id: 'a', Type: 'Movie', isLibraryTile: true}, mode)).toBe(false);
+		expect(supportsMediaPreview({Id: 'a', Type: 'Movie', isRecordingsShortcut: true}, mode)).toBe(false);
+	});
+
+	test('a Seerr, outside list or seasonal suggestion title only ever plays a trailer', () => {
+		[seerrTitle(), listTitle()].forEach((item) => {
+			expect(isOutsideTitle(item)).toBe(true);
+			expect(supportsMediaPreview(item)).toBe(true);
+			expect(supportsMediaPreview(item, 'trailer')).toBe(true);
+			expect(supportsMediaPreview(item, 'media')).toBe(false);
+		});
+	});
+
+	test('tiles, shortcuts and calendar cards with the same marks play nothing', () => {
+		const calendar = listTitle({Id: 'cal-radarr-5', _calendarDate: '2026-11-01T00:00:00Z'});
+		const genre = {Id: 'seerr-genre-movie-28', Type: 'Genre', _seerr: true, _seerrType: 'genre', _seerrMediaType: 'movie'};
+		const studio = {Id: 'seerr-studio-2', _seerr: true, _seerrType: 'studio'};
+		const shortcut = {Id: 'seerr-shortcut-discover', _seerr: true, _seerrType: 'shortcut'};
+		[calendar, genre, studio, shortcut].forEach((item) => {
+			expect(isOutsideTitle(item)).toBe(false);
+			[undefined, 'media', 'trailer'].forEach((mode) => expect(supportsMediaPreview(item, mode)).toBe(false));
+		});
 	});
 
 	test('needs an item with an id', () => {
@@ -293,6 +342,123 @@ describe('resolvePreviewTarget', () => {
 	test('nothing without an item', async () => {
 		expect(await resolvePreviewTarget(api, null)).toBeNull();
 		expect(api.getItemMediaInfo).not.toHaveBeenCalled();
+	});
+});
+
+describe('trailerSubjectId', () => {
+	test('a film or show has its own trailer, an episode or season borrows its show\'s', () => {
+		expect(trailerSubjectId({Id: 'film', Type: 'Movie'})).toBe('film');
+		expect(trailerSubjectId({Id: 'show', Type: 'Series'})).toBe('show');
+		expect(trailerSubjectId({Id: 'ep', Type: 'Episode', SeriesId: 'show'})).toBe('show');
+		expect(trailerSubjectId({Id: 'season', Type: 'Season', SeriesId: 'show'})).toBe('show');
+	});
+
+	test('anything else has none', () => {
+		expect(trailerSubjectId({Id: 'ep', Type: 'Episode'})).toBeNull();
+		expect(trailerSubjectId({Id: 'v', Type: 'Video'})).toBeNull();
+		expect(trailerSubjectId(null)).toBeNull();
+	});
+});
+
+describe('resolveTrailerSource', () => {
+	const youTube = (id) => ({Name: 'Trailer', Url: `https://www.youtube.com/watch?v=${id}`});
+	const trailerItem = (Id) => ({Id, Type: 'Trailer', MediaSources: [{Id: `${Id}-src`, MediaStreams: []}]});
+	let api;
+
+	beforeEach(() => {
+		api = {
+			getLocalTrailers: jest.fn().mockResolvedValue([]),
+			getItemMediaInfo: jest.fn((Id) => Promise.resolve(trailerItem(Id))),
+			getItem: jest.fn(),
+			getNextUp: jest.fn()
+		};
+	});
+
+	test('a trailer on the server comes before YouTube', async () => {
+		api.getLocalTrailers.mockResolvedValue([{Id: 'local-1'}]);
+
+		const source = await resolveTrailerSource(api, {Id: 'film', Type: 'Movie', RemoteTrailers: [youTube('aaaaaaaaaaa')]}, extractYouTubeId);
+
+		expect(api.getLocalTrailers).toHaveBeenCalledWith('film');
+		expect(api.getItemMediaInfo).toHaveBeenCalledWith('local-1');
+		expect(source).toEqual({target: trailerItem('local-1')});
+	});
+
+	test('Emby\'s wrapped list is read too', async () => {
+		api.getLocalTrailers.mockResolvedValue({Items: [{Id: 'local-2'}]});
+
+		expect(await resolveTrailerSource(api, {Id: 'film', Type: 'Movie'}, extractYouTubeId)).toEqual({target: trailerItem('local-2')});
+	});
+
+	test('YouTube comes next, from the card when it carries the trailers', async () => {
+		const source = await resolveTrailerSource(api, {Id: 'film', Type: 'Movie', RemoteTrailers: [{Url: 'https://example.com/t.mp4'}, youTube('bbbbbbbbbbb')]}, extractYouTubeId);
+
+		expect(source).toEqual({youTubeId: 'bbbbbbbbbbb'});
+		expect(api.getItem).not.toHaveBeenCalled();
+	});
+
+	test('a card without its trailers fetches the title, and a failed local lookup still reaches YouTube', async () => {
+		api.getLocalTrailers.mockRejectedValue(new Error('offline'));
+		api.getItem.mockResolvedValue({Id: 'show', RemoteTrailers: [youTube('ccccccccccc')]});
+
+		expect(await resolveTrailerSource(api, {Id: 'show', Type: 'Series'}, extractYouTubeId)).toEqual({youTubeId: 'ccccccccccc'});
+		expect(api.getItem).toHaveBeenCalledWith('show');
+	});
+
+	test('an episode plays its show\'s trailer, not its own', async () => {
+		api.getItem.mockResolvedValue({Id: 'show', RemoteTrailers: [youTube('ddddddddddd')]});
+
+		const source = await resolveTrailerSource(api, {Id: 'ep', Type: 'Episode', SeriesId: 'show', RemoteTrailers: [youTube('eeeeeeeeeee')]}, extractYouTubeId);
+
+		expect(api.getLocalTrailers).toHaveBeenCalledWith('show');
+		expect(api.getItem).toHaveBeenCalledWith('show');
+		expect(source).toEqual({youTubeId: 'ddddddddddd'});
+	});
+
+	test('no trailer anywhere means nothing, and the clip is never asked for', async () => {
+		api.getItem.mockResolvedValue({Id: 'film', RemoteTrailers: []});
+
+		expect(await resolveTrailerSource(api, {Id: 'film', Type: 'Movie'}, extractYouTubeId)).toBeNull();
+		expect(await resolveTrailerSource(api, {Id: 'film', Type: 'Movie', RemoteTrailers: []}, extractYouTubeId)).toBeNull();
+		expect(api.getNextUp).not.toHaveBeenCalled();
+		expect(api.getItemMediaInfo).not.toHaveBeenCalled();
+	});
+
+	test('an outside title plays the TMDB trailer from Moonbase and asks the server about no item', async () => {
+		moonfinPing.mockResolvedValue({tmdbDetailsSupported: true});
+		fetchTmdbDetails.mockResolvedValue({trailerUrl: 'https://www.youtube.com/watch?v=fffffffffff'});
+
+		expect(await resolveTrailerSource(api, seerrTitle(), extractYouTubeId)).toEqual({youTubeId: 'fffffffffff'});
+		expect(fetchTmdbDetails).toHaveBeenLastCalledWith({type: 'movie', tmdbId: 603, imdbId: undefined});
+
+		expect(await resolveTrailerSource(api, listTitle(), extractYouTubeId)).toEqual({youTubeId: 'fffffffffff'});
+		expect(fetchTmdbDetails).toHaveBeenLastCalledWith({type: 'tv', tmdbId: undefined, imdbId: 'tt0944947'});
+
+		expect(api.getLocalTrailers).not.toHaveBeenCalled();
+		expect(api.getItem).not.toHaveBeenCalled();
+		expect(api.getItemMediaInfo).not.toHaveBeenCalled();
+	});
+
+	test('an outside title plays nothing without the plugin\'s TMDB details or a trailer in them', async () => {
+		fetchTmdbDetails.mockClear();
+		moonfinPing.mockResolvedValue({tmdbDetailsSupported: false});
+		expect(await resolveTrailerSource(api, seerrTitle(), extractYouTubeId)).toBeNull();
+		moonfinPing.mockRejectedValue(new Error('no plugin'));
+		expect(await resolveTrailerSource(api, seerrTitle(), extractYouTubeId)).toBeNull();
+		expect(fetchTmdbDetails).not.toHaveBeenCalled();
+
+		moonfinPing.mockResolvedValue({tmdbDetailsSupported: true});
+		fetchTmdbDetails.mockResolvedValue({overview: 'no trailer'});
+		expect(await resolveTrailerSource(api, seerrTitle(), extractYouTubeId)).toBeNull();
+		fetchTmdbDetails.mockResolvedValue(null);
+		expect(await resolveTrailerSource(api, seerrTitle(), extractYouTubeId)).toBeNull();
+		expect(api.getLocalTrailers).not.toHaveBeenCalled();
+	});
+
+	test('a card with no show to borrow from asks nothing', async () => {
+		expect(await resolveTrailerSource(api, {Id: 'ep', Type: 'Episode'}, extractYouTubeId)).toBeNull();
+		expect(await resolveTrailerSource(api, {Id: 'v', Type: 'Video'}, extractYouTubeId)).toBeNull();
+		expect(api.getLocalTrailers).not.toHaveBeenCalled();
 	});
 });
 

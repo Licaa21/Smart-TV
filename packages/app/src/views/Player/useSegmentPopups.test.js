@@ -2,7 +2,7 @@ import {renderHook, act} from '@testing-library/react';
 
 import Spotlight from '@enact/spotlight';
 
-import useSegmentPopups from './useSegmentPopups';
+import useSegmentPopups, {isSeekbarFocused} from './useSegmentPopups';
 
 // The framework's focus needs its own copy of React, so a stand in answers for it.
 jest.mock('@enact/spotlight', () => ({__esModule: true, default: {focus: jest.fn(() => false)}}));
@@ -116,6 +116,14 @@ describe('the skip prompt', () => {
 		button.tabIndex = 0;
 		document.body.appendChild(button);
 		button.focus();
+	};
+	// Stands in for the seek bar, with focus on a knob inside it.
+	const focusSeekbar = () => {
+		const bar = document.createElement('div');
+		bar.setAttribute('data-spotlight-id', 'progress-bar');
+		bar.innerHTML = '<div tabindex="0"></div>';
+		document.body.appendChild(bar);
+		bar.firstChild.focus();
 	};
 
 	test('comes up on the way into a segment and clears the controls away', () => {
@@ -278,6 +286,31 @@ describe('the skip prompt', () => {
 		expect(press(result, RIGHT)).toBe(false);
 		row.lastChild.focus();
 		expect(press(result, RIGHT)).toBe(true);
+		expect(Spotlight.focus).toHaveBeenCalledWith('skip-segment-btn');
+	});
+
+	test('knows when focus sits anywhere inside the seek bar', () => {
+		expect(isSeekbarFocused()).toBe(false);
+		focusSeekbar();
+		expect(isSeekbarFocused()).toBe(true);
+		focusPrompt();
+		expect(isSeekbarFocused()).toBe(false);
+	});
+
+	test('with the controls up, Up from the seek bar goes to it and Up from anywhere else is left alone', () => {
+		const {result, showControls} = setupPrompt({controlsVisible: true});
+		at(result, 61);
+
+		const other = document.createElement('button');
+		document.body.appendChild(other);
+		other.focus();
+		expect(press(result, UP)).toBe(false);
+		expect(showControls).not.toHaveBeenCalled();
+		expect(Spotlight.focus).not.toHaveBeenCalled();
+
+		focusSeekbar();
+		expect(press(result, UP)).toBe(true);
+		expect(showControls).toHaveBeenCalledTimes(1);
 		expect(Spotlight.focus).toHaveBeenCalledWith('skip-segment-btn');
 	});
 });

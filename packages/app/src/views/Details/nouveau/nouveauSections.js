@@ -6,6 +6,8 @@
 
 export const SECTION_EPISODES = 'episodes';
 export const SECTION_COLLECTION = 'collection';
+// The collections a movie or show belongs to, a rail each.
+export const SECTION_PARENT_COLLECTIONS = 'parentCollections';
 export const SECTION_CHAPTERS = 'chapters';
 export const SECTION_PARTS = 'additionalParts';
 export const SECTION_EXTRAS = 'extras';
@@ -62,7 +64,8 @@ export const nouveauSectionOrder = (state = {}) => {
 		extraCount = 0,
 		actorCount = 0,
 		directorCount = 0,
-		reviewCount = 0
+		reviewCount = 0,
+		parentCollectionCount = 0
 	} = state;
 
 	const sections = [];
@@ -71,6 +74,7 @@ export const nouveauSectionOrder = (state = {}) => {
 	if (shouldIncludeChapters(chapterCount)) sections.push(SECTION_CHAPTERS);
 	if (partCount > 0) sections.push(SECTION_PARTS);
 	if (shouldIncludeExtras(extraCount)) sections.push(SECTION_EXTRAS);
+	if (parentCollectionCount > 0 && !shouldIncludeCollection(type)) sections.push(SECTION_PARENT_COLLECTIONS);
 	if (shouldIncludeDiscovery(state)) sections.push(SECTION_DISCOVERY);
 	if (reviewCount > 0) sections.push(SECTION_REVIEWS);
 	if (shouldIncludePeople({actorCount, directorCount})) sections.push(SECTION_PEOPLE);

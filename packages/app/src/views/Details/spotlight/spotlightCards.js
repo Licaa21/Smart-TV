@@ -625,6 +625,8 @@ class CardBuilder {
 			subtitle: countLabel(playlistItems.length, $L('1 item'), $L('{count} items')),
 			imageUrl: spotlightLandscapeImageUrl(serverUrl, playlistItems[0], {fallbackUrl: fallbackImageUrl}),
 			icon: CARD_ICONS.playlistOrder,
+			// A collection's order can be sorted from the modal it opens.
+			headerAction: this.s.playlistSort ? {label: this.s.playlistSort.label, onClick: this.s.playlistSort.open} : null,
 			sections: [{
 				kind: 'tracks',
 				title: $L('Playlist Order'),

@@ -312,6 +312,7 @@ describe('SYNCABLE_KEYS', () => {
 
 	test('includes the media preview switches', () => {
 		expect(SYNCABLE_KEYS).toContain('episodePreviewEnabled');
+		expect(SYNCABLE_KEYS).toContain('mediaPreviewMode');
 		expect(SYNCABLE_KEYS).toContain('previewAudioEnabled');
 	});
 });
@@ -413,9 +414,17 @@ describe('the keyboard style', () => {
 });
 
 describe('the media preview switches', () => {
-	test('default to off with sound on', () => {
+	test('default to off with sound on, landing on Media Preview once turned on', () => {
 		expect(defaultSettings.episodePreviewEnabled).toBe(false);
+		expect(defaultSettings.mediaPreviewMode).toBe('media');
 		expect(defaultSettings.previewAudioEnabled).toBe(true);
+	});
+
+	test('the mode travels under its own key beside the switch', () => {
+		const keys = ['episodePreviewEnabled', 'mediaPreviewMode'];
+		expect(localToProfile({...defaultSettings, episodePreviewEnabled: true, mediaPreviewMode: 'trailer'}, keys))
+			.toEqual({episodePreviewEnabled: true, mediaPreviewMode: 'trailer'});
+		expect(profileToLocal({episodePreviewEnabled: true, mediaPreviewMode: 'trailer'}).mediaPreviewMode).toBe('trailer');
 	});
 
 	test('travel under the server keys as they are', () => {

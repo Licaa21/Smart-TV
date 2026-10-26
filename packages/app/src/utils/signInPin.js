@@ -2,7 +2,7 @@ import $L from '@enact/i18n/$L';
 
 import {
 	PIN_LOCKED, PIN_NONE, PIN_UNAVAILABLE, PIN_VALID, PIN_WRONG,
-	getServerPinStatus, removeServerPin, setServerPin, verifyServerPin
+	getServerPinStatus, removeServerPin, removeServerPinFor, setServerPin, verifyServerPin
 } from '../services/serverPinApi';
 import {clearedLockout, hashPin, isPinShaped, lockoutRemaining, registerFailedAttempt, tooManyAttempts} from './pinLockout';
 
@@ -103,6 +103,50 @@ export const dropSignInPin = async (record, account, currentPin) => {
 	if (account && record.server) {
 		const refused = refusal(await removeServerPin(account, currentPin), record);
 		if (refused) return {refused};
+	}
+	return {record: NO_PIN};
+};
+
+// Forgot PIN sends the viewer back to sign in to the account, and only a sign in with its password
+// or Quick Connect may then clear the PIN. Picking an account the TV already holds proves nothing.
+let forgotten = null;
+let proved = null;
+
+const accountKey = (serverUrl, userId) => `${String(serverUrl || '').replace(/\/+$/, '').toLowerCase()}|${userId}`;
+
+export const markPinForgotten = (serverUrl, userId, username) => {
+	forgotten = {key: accountKey(serverUrl, userId), username};
+};
+
+// The account Login should ask the password of, when Forgot PIN sent the viewer there.
+export const forgottenPinUsername = (serverUrl) => (forgotten && forgotten.key.indexOf(accountKey(serverUrl, '')) === 0 ? forgotten.username : null);
+
+export const noteProvedSignIn = (serverUrl, userId) => {
+	proved = accountKey(serverUrl, userId);
+};
+
+// Read once, by the PIN check that follows the sign in, so a later return to the app needs a
+// fresh one.
+export const takeProvedSignIn = (serverUrl, userId) => {
+	const match = proved === accountKey(serverUrl, userId);
+	proved = null;
+	return match;
+};
+
+export const takeForgottenPin = (serverUrl, userId) => {
+	const match = forgotten?.key === accountKey(serverUrl, userId);
+	if (match) forgotten = null;
+	return match;
+};
+
+// Clears a PIN the viewer forgot, after a sign in that proved who they are. A PIN on the server can
+// only be cleared there by an administrator, so for anyone else it stays and this says so.
+export const resetForgottenPin = async (record, account, userId) => {
+	if (record.server) {
+		const verdict = account ? await removeServerPinFor(account, userId) : {result: PIN_UNAVAILABLE};
+		if (verdict.result !== PIN_VALID) {
+			return {refused: $L('The PIN on the server couldn\'t be cleared. If it\'s still set, ask a server administrator to remove it.')};
+		}
 	}
 	return {record: NO_PIN};
 };

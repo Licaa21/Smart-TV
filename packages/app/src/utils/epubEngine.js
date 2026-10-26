@@ -18,7 +18,9 @@ const themeRules = (s) => {
 		body: {
 			'font-family': s.font + imp,
 			'font-size': s.size + 'px' + imp,
-			'line-height': s.lineHeight + imp
+			'line-height': s.lineHeight + imp,
+			'font-weight': s.bold ? '600' : 'normal',
+			'text-align': s.justify ? 'justify' : 'initial'
 		},
 		'body, body *:not(a)': {
 			color: s.fg + imp,
@@ -69,16 +71,31 @@ const quiet = (promise) => {
 	if (promise && promise.catch) promise.catch(() => {});
 };
 
+// The table of contents flattened in reading order, each entry with the spine section it opens.
+const flattenToc = (book, entries, depth = 0, out = []) => {
+	(entries || []).forEach((entry) => {
+		const section = entry.href ? book.spine.get(entry.href) : null;
+		out.push({label: String(entry.label || '').trim(), href: entry.href, depth, index: section ? section.index : -1});
+		flattenToc(book, entry.subitems, depth + 1, out);
+	});
+	return out;
+};
+
 // Opens the book in element and resolves once the first page shows. onRelocated
-// gets {cfi, percentage, atEnd, minutesLeft}, with percentage and minutes null
-// until the location index is built.
-export const openEpub = ({ePub, element, buffer, cfi, fraction, style, onRelocated, onKey}) => {
+// gets {cfi, index, percentage, atEnd, minutesLeft}, with percentage and minutes
+// null until the location index is built.
+export const openEpub = ({ePub, element, buffer, cfi, fraction, style: initialStyle, onRelocated, onKey}) => {
 	const book = ePub(buffer);
+	let style = initialStyle;
 	let rendition = null;
 	let sectionEnds = null;
 	let locationsReady = null;
 	let destroyed = false;
 	let lastWheel = 0;
+	let lastCfi = null;
+	// Where a restyle reopens the book. Kept across restyles in a row so they don't drift.
+	let anchorCfi = null;
+	let restyleTimer = null;
 
 	const rtl = () => book.package.metadata.direction === 'rtl';
 
@@ -106,8 +123,10 @@ export const openEpub = ({ePub, element, buffer, cfi, fraction, style, onRelocat
 	const relocated = (loc) => {
 		if (destroyed || !loc || !loc.start || !loc.start.cfi) return;
 		const indexed = book.locations.length() > 0;
+		lastCfi = loc.start.cfi;
 		onRelocated({
 			cfi: loc.start.cfi,
+			index: loc.start.index,
 			atEnd: !!loc.atEnd,
 			percentage: indexed ? book.locations.percentageFromCfi(loc.start.cfi) : null,
 			minutesLeft: indexed ? minutesLeft(loc.start.cfi, loc.start.index) : null
@@ -116,6 +135,7 @@ export const openEpub = ({ePub, element, buffer, cfi, fraction, style, onRelocat
 
 	const turn = (forward) => {
 		if (!rendition) return;
+		anchorCfi = null;
 		if (forward) {
 			quiet(rendition.next());
 			return;
@@ -197,6 +217,21 @@ export const openEpub = ({ePub, element, buffer, cfi, fraction, style, onRelocat
 		});
 	};
 
+	const display = (target) => {
+		if (!rendition) return;
+		anchorCfi = null;
+		quiet(rendition.display(target));
+	};
+
+	const restyle = (next) => {
+		style = next;
+		anchorCfi = anchorCfi || lastCfi;
+		clearTimeout(restyleTimer);
+		restyleTimer = setTimeout(() => {
+			if (!destroyed) quiet(render(anchorCfi || undefined));
+		}, 250);
+	};
+
 	element.addEventListener('wheel', onWheel);
 
 	return book.ready.then(() => {
@@ -219,8 +254,19 @@ export const openEpub = ({ePub, element, buffer, cfi, fraction, style, onRelocat
 			next: () => turn(true),
 			prev: () => turn(false),
 			turnToward,
+			display,
+			restyle,
+			toc: () => flattenToc(book, book.navigation && book.navigation.toc),
+			// Needs the location index, so it does nothing until percentages show.
+			displayFraction: (value) => {
+				if (book.locations.length() === 0) return;
+				const at = new ePub.CFI(book.locations.cfiFromPercentage(value));
+				at.collapse(true);
+				display(at.toString());
+			},
 			destroy: () => {
 				destroyed = true;
+				clearTimeout(restyleTimer);
 				element.removeEventListener('wheel', onWheel);
 				if (rendition) rendition.destroy();
 				book.destroy();

@@ -19,6 +19,7 @@ const BACK_AFTER_DISMISS_MS = 500;
 
 const SKIP_PROMPT_ID = 'skip-segment-btn';
 export const isSkipPromptFocused = () => Boolean(document.activeElement?.closest?.(`[data-spotlight-id="${SKIP_PROMPT_ID}"]`));
+export const isSeekbarFocused = () => Boolean(document.activeElement?.closest?.('[data-spotlight-id="progress-bar"]'));
 
 // Right from the last button of the controls row reaches the prompt.
 const onLastControlsButton = () => {
@@ -418,6 +419,13 @@ const useSegmentPopups = ({
 			if (onPrompt && isLeft) {
 				consume();
 				if (controlsVisible) onFocusSeekbar?.();
+				return true;
+			}
+			// The prompt sits just above the seek bar, so Up is how the remote gets back to it.
+			if (isUp && controlsVisible && isSeekbarFocused()) {
+				consume();
+				showControls();
+				Spotlight.focus(SKIP_PROMPT_ID);
 				return true;
 			}
 			if (onPrompt && isRight) {

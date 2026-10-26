@@ -9,6 +9,7 @@ import {
 	usableCredits,
 	groupCredits,
 	sortCredits,
+	sortFilmography,
 	prepareCredits
 } from './personCredits';
 
@@ -140,6 +141,22 @@ describe('credits', () => {
 		expect(sortCredits(list, 'releaseDateDesc').map((c) => c.id)).toEqual([2, 1]);
 	});
 
+	test('a shared date falls back to the title, reversed with the dates', () => {
+		const list = [
+			credit({id: 1, title: 'Beta', releaseDate: '2001-01-01'}),
+			credit({id: 2, title: 'Alpha', releaseDate: '2001-01-01'})
+		];
+
+		expect(sortCredits(list, 'releaseDateAsc').map((c) => c.id)).toEqual([2, 1]);
+		expect(sortCredits(list, 'releaseDateDesc').map((c) => c.id)).toEqual([1, 2]);
+	});
+
+	test('a movie and a show sharing an id are not joined', () => {
+		const list = [credit({id: 7, mediaType: 'movie'}), credit({id: 7, mediaType: 'tv', title: 'A Show'})];
+
+		expect(groupCredits(list)).toHaveLength(2);
+	});
+
 	test('preparing a row filters, groups when asked, and sorts', () => {
 		const list = [
 			credit({id: 1, title: 'Beta', character: 'One'}),
@@ -149,6 +166,27 @@ describe('credits', () => {
 
 		expect(prepareCredits(list).map((c) => c.character)).toEqual(['One', 'Two']);
 		expect(prepareCredits(list, {group: true}).map((c) => c.character)).toEqual(['One, Two']);
+	});
+});
+
+describe('sortFilmography', () => {
+	const items = [
+		{Id: 'a', Name: 'Zebra', PremiereDate: '2001-05-01T00:00:00Z'},
+		{Id: 'b', Name: 'apple', ProductionYear: 2010},
+		{Id: 'c', Name: 'Middle'}
+	];
+
+	test('sorted by name, or by premiere date or year with undated titles last', () => {
+		expect(sortFilmography(items, 'alphabetical').map((i) => i.Id)).toEqual(['b', 'c', 'a']);
+		expect(sortFilmography(items, 'releaseDateAsc').map((i) => i.Id)).toEqual(['a', 'b', 'c']);
+		expect(sortFilmography(items, 'releaseDateDesc').map((i) => i.Id)).toEqual(['b', 'a', 'c']);
+	});
+
+	test('splitting the filmography keeps the order asked for', () => {
+		const movies = [{Id: 'm1', Type: 'Movie', Name: 'B', ProductionYear: 2000}, {Id: 'm2', Type: 'Movie', Name: 'A', ProductionYear: 2020}];
+
+		expect(splitFilmography(movies, undefined, 'releaseDateDesc').movies.map((i) => i.Id)).toEqual(['m2', 'm1']);
+		expect(splitFilmography(movies).movies.map((i) => i.Id)).toEqual(['m2', 'm1']);
 	});
 });
 

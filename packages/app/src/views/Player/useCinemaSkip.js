@@ -1,6 +1,8 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
+import Spotlight from '@enact/spotlight';
 import {KEYS, isBackKey} from '../../utils/keys';
 import {isPreroll, nextInQueue} from '../../utils/cinemaMode';
+import {isSeekbarFocused, isSkipPromptFocused} from './useSegmentPopups';
 
 // The button stays up for this much of the pre-roll, so only one longer than that gets it.
 const SHOW_FOR_SECONDS = 10;
@@ -59,6 +61,15 @@ const useCinemaSkip = ({item, videoQueue, enabled, duration, controlsVisible, ac
 		if (!wanted && !controlsVisible && e.keyCode === KEYS.RIGHT) {
 			shownFromRef.current = null;
 			setWanted(true);
+			return consume();
+		}
+		// With the controls up the button sits just above the seek bar, and Up and Down move between them.
+		if (wanted && controlsVisible && e.keyCode === KEYS.UP && isSeekbarFocused()) {
+			Spotlight.focus('skip-segment-btn');
+			return consume();
+		}
+		if (wanted && controlsVisible && e.keyCode === KEYS.DOWN && isSkipPromptFocused()) {
+			Spotlight.focus('progress-bar');
 			return consume();
 		}
 		return false;

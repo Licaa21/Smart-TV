@@ -2,27 +2,49 @@ import $L from '@enact/i18n/$L';
 
 import {SHOWS_EVERYTHING} from './detailSectionLayout';
 import {uiLocale} from './uiLocale';
+import {parseServerDate} from './serverDate';
 
 // A birthday is a calendar date, not a moment. Both servers send it anchored to
 // UTC, so reading it back in the viewer's zone moves it a day earlier for
 // anyone west of it. The parts are taken as written and rebuilt locally.
-const parseDate = (value) => {
-	if (!value) return null;
-	const parsed = new Date(value);
-	if (isNaN(parsed.getTime())) return null;
-	return new Date(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
+export const personCalendarDate = (value) => {
+	const parsed = parseServerDate(value);
+	return parsed ? new Date(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()) : null;
+};
+
+const sortByOption = (list, sortOption, titleOf, dateOf) => {
+	const sorted = (Array.isArray(list) ? list : []).slice();
+	const byTitle = (a, b) => titleOf(a).toLowerCase().localeCompare(titleOf(b).toLowerCase());
+
+	if (sortOption === 'alphabetical') {
+		sorted.sort(byTitle);
+		return sorted;
+	}
+
+	// A title with no date on file sorts to the end either way, so the row never
+	// opens on something that cant be placed.
+	const direction = sortOption === 'releaseDateAsc' ? 1 : -1;
+	sorted.sort((a, b) => {
+		const dateA = dateOf(a);
+		const dateB = dateOf(b);
+		if (!dateA && !dateB) return byTitle(a, b);
+		if (!dateA) return 1;
+		if (!dateB) return -1;
+		return direction * ((dateA - dateB) || byTitle(a, b));
+	});
+	return sorted;
 };
 
 export const formatPersonDate = (value) => {
-	const date = parseDate(value);
+	const date = personCalendarDate(value);
 	if (!date) return null;
 	return date.toLocaleDateString(uiLocale(), {year: 'numeric', month: 'long', day: 'numeric'});
 };
 
 export const personAge = (birthValue, deathValue) => {
-	const birth = parseDate(birthValue);
+	const birth = personCalendarDate(birthValue);
 	if (!birth) return null;
-	const end = parseDate(deathValue) || new Date();
+	const end = personCalendarDate(deathValue) || new Date();
 	let age = end.getFullYear() - birth.getFullYear();
 	const monthDiff = end.getMonth() - birth.getMonth();
 	if (monthDiff < 0 || (monthDiff === 0 && end.getDate() < birth.getDate())) age -= 1;
@@ -47,13 +69,19 @@ export const personDateLines = (birthValue, deathValue) => {
 	return lines;
 };
 
+const itemDate = (item) => parseServerDate(item.PremiereDate) || (item.ProductionYear ? new Date(item.ProductionYear, 0, 1) : null);
+
+// Orders a person's library titles by the person page sort option. Titles with no date sink to
+// the end whichever way the dates run.
+export const sortFilmography = (items, sortOption = 'alphabetical') => sortByOption(items, sortOption, (item) => item.Name || '', itemDate);
+
 // The filmography comes back as one list, and each kind of work gets its own
 // row. An episode of a series the person is billed on is already covered by
 // that series, so only the rest count as a guest appearance. Guest appearances
 // and music videos each have a switch in the detail sections setting, and a
 // hidden one comes back empty.
-export const splitFilmography = (items, showsSection = SHOWS_EVERYTHING) => {
-	const all = Array.isArray(items) ? items : [];
+export const splitFilmography = (items, showsSection = SHOWS_EVERYTHING, sortOption = 'alphabetical') => {
+	const all = sortFilmography(Array.isArray(items) ? items : [], sortOption);
 	const movies = all.filter((item) => item.Type === 'Movie');
 	const series = all.filter((item) => item.Type === 'Series');
 	const musicVideos = showsSection('musicVideos') ? all.filter((item) => item.Type === 'MusicVideo') : [];
@@ -99,9 +127,11 @@ export const groupCredits = (credits, isCrew = false) => {
 	const byId = new Map();
 
 	for (const credit of list) {
-		const existing = byId.get(credit.id);
+		// A movie and a show can share a TMDB id, so the type is part of the key.
+		const key = `${credit.mediaType || credit.media_type || ''}:${credit.id}`;
+		const existing = byId.get(key);
 		if (existing) existing.push(credit);
-		else byId.set(credit.id, [credit]);
+		else byId.set(key, [credit]);
 	}
 
 	const grouped = [];
@@ -127,28 +157,8 @@ export const groupCredits = (credits, isCrew = false) => {
 	return grouped;
 };
 
-export const sortCredits = (credits, sortOption = 'alphabetical') => {
-	const sorted = (Array.isArray(credits) ? credits : []).slice();
-	const byTitle = (a, b) => creditTitle(a).toLowerCase().localeCompare(creditTitle(b).toLowerCase());
-
-	if (sortOption === 'alphabetical') {
-		sorted.sort(byTitle);
-		return sorted;
-	}
-
-	// A title with no date on file sorts to the end either way, so the row never
-	// opens on something that cant be placed.
-	const ascending = sortOption === 'releaseDateAsc';
-	sorted.sort((a, b) => {
-		const dateA = parseDate(creditDate(a));
-		const dateB = parseDate(creditDate(b));
-		if (!dateA && !dateB) return byTitle(a, b);
-		if (!dateA) return 1;
-		if (!dateB) return -1;
-		return ascending ? dateA - dateB : dateB - dateA;
-	});
-	return sorted;
-};
+export const sortCredits = (credits, sortOption = 'alphabetical') =>
+	sortByOption(credits, sortOption, creditTitle, (credit) => personCalendarDate(creditDate(credit)));
 
 export const prepareCredits = (credits, {isCrew = false, group = false, sortOption = 'alphabetical'} = {}) => {
 	const usable = usableCredits(credits, isCrew);

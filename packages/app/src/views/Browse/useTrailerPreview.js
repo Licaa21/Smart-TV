@@ -126,7 +126,8 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 		if (!item?.Id) return [];
 
 		const initialTrailers = Array.isArray(item.RemoteTrailers) ? item.RemoteTrailers : [];
-		if (initialTrailers.length > 0) return initialTrailers;
+		// A slide from an outside list isn't on the server, so what it came with is all there is.
+		if (initialTrailers.length > 0 || item._external) return initialTrailers;
 
 		try {
 			const serverApi = item._serverUrl && item._serverAccessToken
@@ -141,7 +142,7 @@ export default function useTrailerPreview({currentItem, isVisible, enabled, pref
 	}, [api]);
 
 	const getLocalTrailerStreamUrlForItem = useCallback(async (item) => {
-		if (!item?.Id) return null;
+		if (!item?.Id || item._external) return null;
 
 		try {
 			const serverApi = item._serverUrl && item._serverAccessToken

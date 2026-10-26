@@ -36,20 +36,22 @@ const renderDescriptorRow = (row, ctx, index, deps) => {
 		case KIND.OPTION: {
 			const options = row.options(ctx);
 			const title = text(row.label);
+			const value = row.value ? row.value(ctx) : settings[row.key];
+			const onSelect = row.onSelect ? (picked) => row.onSelect(ctx, picked) : null;
 			return (
 				<OptionRow
 					key={row.key}
 					settingKey={row.key}
 					title={title}
 					desc={text(row.desc)}
-					caption={getChipLabel(options, settings[row.key], text(row.fallback))}
+					caption={getChipLabel(options, value, text(row.fallback))}
 					swatch={row.swatch ? row.swatch(ctx) : null}
 					padded={row.padded}
 					valueAsSubtitle={row.valueAsSubtitle}
 					colorTile={row.colorTile ? row.colorTile(ctx) : null}
 					plainIcon={row.plainIcon}
 					icon={text(row.icon)}
-					onOpen={() => pushView({view: 'options', title, options, settingKey: row.key, returnFocusTo: `setting-${row.key}`})}
+					onOpen={() => pushView({view: 'options', title, options, settingKey: row.key, value, onSelect, returnFocusTo: `setting-${row.key}`})}
 				/>
 			);
 		}

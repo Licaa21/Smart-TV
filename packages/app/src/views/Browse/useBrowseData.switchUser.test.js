@@ -10,6 +10,7 @@ jest.mock('../../services/storage', () => ({
 }));
 jest.mock('../../services/connectionPool', () => ({}));
 jest.mock('../../services/seerrApi', () => ({}));
+jest.mock('../../context/SettingsContext', () => ({activeSyncProfile: () => 'tv'}));
 jest.mock('../../services/jellyfinApi', () => ({
 	HOME_ROW_ITEM_FIELDS: '',
 	getServerUrl: () => 'http://server',

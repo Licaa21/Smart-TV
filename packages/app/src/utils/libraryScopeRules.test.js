@@ -47,6 +47,11 @@ describe('keepPermitted', () => {
 		expect(keepPermitted(['a', 'b', 'c'], ['a', 'c'])).toEqual(['a', 'c']);
 		expect(keepPermitted([], ['a'])).toEqual([]);
 	});
+
+	test('matches a synced pick written with dashes to the policy id without them', () => {
+		const picked = 'f137a2dd-21bb-c1b9-9aa5-c0f6bf02a805';
+		expect(keepPermitted([picked], ['f137a2dd21bbc1b99aa5c0f6bf02a805'])).toEqual([picked]);
+	});
 });
 
 describe('scopeLibraries', () => {

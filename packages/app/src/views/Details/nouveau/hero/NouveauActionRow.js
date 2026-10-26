@@ -30,7 +30,7 @@ const NouveauActionRow = (props) => {
 	const {
 		settings, seerrOnly, isPerson, isBook, isReadableBook,
 		hasPlaybackPosition, resumeTimeText,
-		handlePlay, handleResume,
+		handlePlay, handleResume, onOpenPersonDisplay,
 		menuBackRef, onNavigateUp, onNavigateDown, onFocusRow
 	} = props;
 
@@ -105,6 +105,16 @@ const NouveauActionRow = (props) => {
 		? kidsModeButtons(offeredButtons, true)
 		: arrange(offeredButtons, {order: settings[DETAIL_ORDER_KEY], hidden: settings[DETAIL_HIDDEN_KEY]});
 
+	// A person's display options sit beside the heart, outside the set the viewer arranges.
+	const favoriteAt = customizable.findIndex((btn) => btn.id === 'favorite') + 1;
+	const rowButtonsShown = onOpenPersonDisplay
+		? [
+			...customizable.slice(0, favoriteAt),
+			{id: 'personDisplay', render: () => <ActionButton path={DETAIL_ICON_PATHS.tune} label={$L('Display')} onClick={onOpenPersonDisplay} />},
+			...customizable.slice(favoriteAt)
+		]
+		: customizable;
+
 	// A person has nothing to play, so their row is circles alone.
 	const showsResume = !seerrOnly && !isPerson && hasPlaybackPosition && !isBook;
 	const showsPlay = !seerrOnly && !isPerson && (isBook ? isReadableBook : true);
@@ -136,7 +146,7 @@ const NouveauActionRow = (props) => {
 		: [];
 
 	const prefLimit = settings?.detailButtonsMaxVisible ?? 0;
-	const {inline, overflow} = splitNouveauActions([...restart, ...customizable], prefLimit);
+	const {inline, overflow} = splitNouveauActions([...restart, ...rowButtonsShown], prefLimit);
 
 	const handleRowFocus = useCallback((ev) => {
 		handleScrollerFocus(ev);

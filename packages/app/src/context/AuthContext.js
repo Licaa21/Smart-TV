@@ -13,6 +13,7 @@ import * as remoteControl from '../services/remoteControl';
 
 import {clearProxiedImageCache} from '../hooks/useProxiedImage';
 import {parseUrl} from '../utils/urlCompat';
+import {noteProvedSignIn} from '../utils/signInPin';
 
 const REVALIDATE_INTERVAL = 5 * 60 * 1000;
 const BACKOFF_DELAYS = [5000, 10000, 20000];
@@ -182,6 +183,7 @@ export const AuthProvider = ({children}) => {
 		const result = await jellyfinApi.api.authenticateByName(username, password);
 
 		jellyfinApi.setAuth(result.User.Id, result.AccessToken);
+		if (password) noteProvedSignIn(server, result.User.Id);
 
 		// Use provided server name or extract from URL
 		let finalServerName = sName;

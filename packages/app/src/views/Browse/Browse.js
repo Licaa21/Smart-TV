@@ -1,6 +1,6 @@
 import {useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo} from 'react';
 import {isKidsMode, kidsModeRows, mergesContinueWatchingNextUp} from '../../utils/kidsMode';
-import {withoutBlocked} from '../../utils/parentalFilter';
+import {withoutBlockedOrUnrated} from '../../utils/parentalFilter';
 import {isPickedRow, isPickedRowShown} from '../../utils/pickedRows';
 import useParentalFilter from '../../hooks/useParentalFilter';
 import {useUserDataRows} from '../../hooks/useUserDataSync';
@@ -209,10 +209,10 @@ const Browse = ({
 	};
 
 	// Filtered here rather than where the bar loads, so slides cached before a rating was blocked
-	// drop out too.
+	// drop out too. Slides from outside lists are held to the stricter rule their Home rows follow.
 	const {parentalFilter} = useParentalFilter();
 	const featuredItems = useMemo(
-		() => withoutBlocked(loadedFeaturedItems, parentalFilter),
+		() => withoutBlockedOrUnrated(loadedFeaturedItems, parentalFilter, false),
 		[loadedFeaturedItems, parentalFilter]
 	);
 
@@ -785,7 +785,7 @@ const Browse = ({
 							settings={settings}
 							settingsLoaded={settingsLoaded}
 							getItemServerUrl={getItemServerUrl}
-							onSelectItem={handleSelectItem}
+							onSelectItem={handleSelectExternalItem}
 							onNavigateDown={handleNavigateDownFromFeatured}
 							onFeaturedFocus={handleFeaturedFocusCallback}
 							onAmbientItemChange={setFocusedItemForBackdrop}
@@ -800,7 +800,7 @@ const Browse = ({
 							settings={settings}
 							settingsLoaded={settingsLoaded}
 							getItemServerUrl={getItemServerUrl}
-							onSelectItem={handleSelectItem}
+							onSelectItem={handleSelectExternalItem}
 							onNavigateDown={handleNavigateDownFromFeatured}
 							onFeaturedFocus={handleFeaturedFocusCallback}
 						/>
@@ -810,7 +810,7 @@ const Browse = ({
 							featuredItems={featuredItems}
 							settings={settings}
 							getItemServerUrl={getItemServerUrl}
-							onSelectItem={handleSelectItem}
+							onSelectItem={handleSelectExternalItem}
 							onNavigateDown={handleNavigateDownFromFeatured}
 							onFeaturedFocus={handleFeaturedFocusCallback}
 						/>
@@ -821,7 +821,7 @@ const Browse = ({
 							featuredItems={featuredItems}
 							settings={settings}
 							getItemServerUrl={getItemServerUrl}
-							onSelectItem={handleSelectItem}
+							onSelectItem={handleSelectExternalItem}
 							onNavigateDown={handleNavigateDownFromFeatured}
 							onFeaturedFocus={handleFeaturedFocusCallback}
 						/>
@@ -835,7 +835,7 @@ const Browse = ({
 							settings={settings}
 							settingsLoaded={settingsLoaded}
 							getItemServerUrl={getItemServerUrl}
-							onSelectItem={handleSelectItem}
+							onSelectItem={handleSelectExternalItem}
 							onNavigateDown={handleNavigateDownFromFeatured}
 							onFeaturedFocus={handleFeaturedFocusCallback}
 						/>
@@ -850,7 +850,7 @@ const Browse = ({
 							settings={settings}
 							settingsLoaded={settingsLoaded}
 							getItemServerUrl={getItemServerUrl}
-							onSelectItem={handleSelectItem}
+							onSelectItem={handleSelectExternalItem}
 							onNavigateDown={handleNavigateDownFromFeatured}
 							onFeaturedFocus={handleFeaturedFocusCallback}
 							uiPanelStyle={uiPanelStyle}

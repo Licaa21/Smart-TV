@@ -17,8 +17,8 @@ describe('featuredConfigKey', () => {
 
 	// An unset list and an empty one are the same bar.
 	test('an unset list reads the same as an empty one', () => {
-		const unset = {...base, mediaBarLibraryIds: undefined, mediaBarCollectionIds: undefined, excludedGenres: undefined};
-		const empty = {...base, mediaBarLibraryIds: [], mediaBarCollectionIds: [], excludedGenres: []};
+		const unset = {...base, mediaBarLibraryIds: undefined, mediaBarCollectionIds: undefined, excludedGenres: undefined, mediaBarExternalLists: undefined};
+		const empty = {...base, mediaBarLibraryIds: [], mediaBarCollectionIds: [], excludedGenres: [], mediaBarExternalLists: []};
 		expect(featuredConfigKey(unset)).toBe(featuredConfigKey(empty));
 	});
 
@@ -39,7 +39,9 @@ describe('featuredConfigKey', () => {
 		['featuredItemCount', {featuredItemCount: 40}],
 		['mediaBarLibraryIds', {mediaBarLibraryIds: ['lib2']}],
 		['mediaBarCollectionIds', {mediaBarCollectionIds: ['col1']}],
-		['excludedGenres', {excludedGenres: ['Horror']}]
+		['excludedGenres', {excludedGenres: ['Horror']}],
+		['mediaBarExternalLists', {mediaBarExternalLists: ['imdb_top_250_movies']}],
+		['kidsModeEnabled', {kidsModeEnabled: true}]
 	])('%s changes the key', (_label, change) => {
 		expect(featuredConfigKey({...base, ...change})).not.toBe(featuredConfigKey(base));
 	});

@@ -13,7 +13,7 @@ const INDEX_SCAN_BATCH = 8;
 
 const PAGE_SIZE = 50;
 
-const PLAYABLE_TYPES = new Set(['Movie', 'Audio', 'Video', 'MusicVideo']);
+const PLAYABLE_TYPES = new Set(['Movie', 'Episode', 'Audio', 'Video', 'MusicVideo']);
 
 // All an entry keeps: enough to sort by, and the id to fetch with.
 export const indexEntryFor = (item) => ({
@@ -74,10 +74,13 @@ export const buildCollectionIndex = async (api, collectionId) => {
 		batch.forEach((show, j) => episodes.set(show.Id, lists[j]?.Items || []));
 	}
 
-	return members.flatMap((item) => {
+	// An episode filed on its own and again through its series plays once.
+	const ids = members.flatMap((item) => {
 		if (item?.Type === 'Series') return episodes.get(item.Id);
 		return PLAYABLE_TYPES.has(item?.Type) ? [item] : [];
 	}).map((item) => item.Id);
+	const seen = new Set();
+	return ids.filter((id) => !seen.has(id) && seen.add(id));
 };
 
 // Reads the next run of ids. Progress is counted in index positions rather than items

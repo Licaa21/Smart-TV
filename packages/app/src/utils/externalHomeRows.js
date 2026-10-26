@@ -168,7 +168,7 @@ export const fetchExternalPresetRow = async (rowId, options = {}) => {
 	if (!cfg) return [];
 	const items = await fetchCustomRow({source: cfg.source, type: cfg.type, params: {}}, options);
 	const type = chartItemType(cfg.type);
-	return items.slice(0, HOME_ROW_LIMIT).map((it) => normalizeExternalItem(type ? {...it, type} : it, rowId, cfg.source));
+	return items.slice(0, options.limit || HOME_ROW_LIMIT).map((it) => normalizeExternalItem(type ? {...it, type} : it, rowId, cfg.source));
 };
 
 // Fetches a user configured custom row. `row` is the stored config
@@ -176,7 +176,7 @@ export const fetchExternalPresetRow = async (rowId, options = {}) => {
 export const fetchCustomHomeRow = async (row, options = {}) => {
 	const items = await fetchCustomRow({source: row.source, type: row.type, params: row.params}, options);
 	const sorted = applySorting(items, row.sortBy, row.sortOrder);
-	return sorted.slice(0, HOME_ROW_LIMIT).map((it) => {
+	return sorted.slice(0, options.limit || HOME_ROW_LIMIT).map((it) => {
 		const norm = normalizeExternalItem(it, row.id, row.source);
 		if (row.showUserRatings === false) norm.UserRating = null;
 		return norm;
@@ -270,6 +270,11 @@ const formatCalendarDate = (dateStr) => {
 	return d.toLocaleDateString(uiLocale(), {month: 'short', day: 'numeric'});
 };
 
+// Radarr gives a release as midnight UTC on its day, which is the day before anywhere west of
+// UTC, so the day is read as it's written.
+const releaseDay = (date) => new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const arrGet = async (url) => {
 	try {
 		const res = await fetchWithTimeout(url, {}, 5000);
@@ -302,7 +307,9 @@ const fetchRadarrItems = async (settings) => {
 		if (settings.radarrCalendarShowCinema && m.inCinemas) dates.push(m.inCinemas);
 		if (settings.radarrCalendarShowDigital && m.digitalRelease) dates.push(m.digitalRelease);
 		if (settings.radarrCalendarShowPhysical && m.physicalRelease) dates.push(m.physicalRelease);
-		const upcoming = dates.map((d) => new Date(d)).filter((d) => !Number.isNaN(d.getTime()) && d >= new Date());
+		// A release stays on the row through its own day.
+		const since = Date.now() - DAY_MS;
+		const upcoming = dates.map((d) => new Date(d)).filter((d) => !Number.isNaN(d.getTime()) && d.getTime() > since);
 		if (!upcoming.length) continue;
 		const soonest = upcoming.sort((a, b) => a - b)[0];
 		const tmdbId = m.tmdbId ? String(m.tmdbId) : null;
@@ -318,7 +325,7 @@ const fetchRadarrItems = async (settings) => {
 			releaseType = $L('Physical: ');
 		}
 
-		const dateStr = settings.radarrCalendarShowDate ? formatCalendarDate(soonest.toISOString()) : '';
+		const dateStr = settings.radarrCalendarShowDate ? formatCalendarDate(releaseDay(soonest)) : '';
 		const subtitle = dateStr ? `${releaseType}${dateStr}` : '';
 		const fanart = m.images?.find((i) => i.coverType === 'fanart');
 

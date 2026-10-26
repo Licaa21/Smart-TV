@@ -21,10 +21,14 @@ export const modernCardMetrics = ({posterSize, platform, isSquareItem, isStatic}
 };
 
 // The space below each modern row. The other clients size the padding slider in their own
-// units, so the stored value lands here as a margin. Full screen rows pace themselves.
-export const modernRowSpacing = (settings) => (settings?.fullScreenRows
-	? null
-	: Math.max(0, Math.min(Math.max((settings?.modernHomeRowsPadding ?? 420) - 400, -40), 200) - 34));
+// units, so the stored value lands here as a margin. Below the default it pulls the next row
+// closer in smaller steps, so every stop changes the spacing and the lowest still clears the
+// captions of the row above. Full screen rows pace themselves.
+export const modernRowSpacing = (settings) => {
+	if (settings?.fullScreenRows) return null;
+	const offset = Math.min(Math.max((settings?.modernHomeRowsPadding ?? 420) - 400, -40), 200);
+	return offset < 20 ? Math.round((offset - 20) * 34 / 60) : Math.max(0, offset - 34);
+};
 
 export const getEpisodeLabels = (item) => {
 	if (!item) return null;

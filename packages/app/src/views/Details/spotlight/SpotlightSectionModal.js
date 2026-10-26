@@ -154,6 +154,11 @@ const SpotlightSectionModal = ({card, serverUrl, actions, seerr, onNearEnd}) => 
 						</svg>
 					)}
 					<span className={css.headerTitle}>{card.modalTitle || card.title}</span>
+					{card.headerAction && (
+						<SpottableDiv className={css.headerAction} onClick={card.headerAction.onClick}>
+							{card.headerAction.label}
+						</SpottableDiv>
+					)}
 				</div>
 				<Scroller className={css.body} direction="vertical" horizontalScrollbar="hidden" verticalScrollbar="hidden" onScroll={handleScroll} cbScrollTo={handleScrollTo}>
 					<div className={css.scrollContent} ref={contentRef}>

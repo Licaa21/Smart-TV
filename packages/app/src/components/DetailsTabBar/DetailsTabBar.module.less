@@ -1,11 +1,21 @@
+// A bar with more tabs than fit scrolls inside its own outline instead of running off the screen.
 .tabBar {
+	position: relative;
+	display: inline-block;
+	max-width: 100%;
+	overflow: hidden;
+	vertical-align: top;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.08);
+	scroll-behavior: smooth;
+}
+
+.track {
 	display: inline-flex;
 	flex-direction: row;
 	flex-wrap: nowrap;
 	align-items: center;
 	padding: 4px;
-	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.08);
 }
 
 // The segments butt up against each other so the selected one reads as a thumb

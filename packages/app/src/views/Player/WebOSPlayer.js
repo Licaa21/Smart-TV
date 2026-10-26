@@ -944,6 +944,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					initialStartPositionTicks != null ? initialStartPositionTicks : ((!isLiveTV && resume !== false) ? savedPosition : 0),
 					isInGroup ? null : settings
 				);
+				// The PlaybackInfo below already opens this item's session, so a stop sent while it
+				// loads reports from here rather than where the last item ended.
+				positionRef.current = startPosition;
 				console.log('[Player] Start position:', {
 					resume,
 					savedPosition,

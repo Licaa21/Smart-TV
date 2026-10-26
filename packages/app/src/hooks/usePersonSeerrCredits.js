@@ -1,6 +1,7 @@
-import {useState, useEffect} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 
 import {useSeerr} from '../context/SeerrContext';
+import {useSettings} from '../context/SettingsContext';
 import * as seerrApi from '../services/seerrApi';
 import {prepareCredits} from '../utils/personCredits';
 import {normalizeMediaItem} from '../utils/seerrHomeRows';
@@ -13,6 +14,7 @@ const EMPTY = [];
  */
 const usePersonSeerrCredits = (tmdbId) => {
 	const {isEnabled} = useSeerr();
+	const {settings: {personPageGroupItems: group, personPageSortOption: sortOption}} = useSettings();
 	const [credits, setCredits] = useState(null);
 
 	useEffect(() => {
@@ -29,11 +31,16 @@ const usePersonSeerrCredits = (tmdbId) => {
 		return () => { cancelled = true; };
 	}, [tmdbId, isEnabled]);
 
-	return {
-		appearances: credits ? prepareCredits(credits.cast, {isCrew: false}).map(normalizeMediaItem) : EMPTY,
-		crewCredits: credits ? prepareCredits(credits.crew, {isCrew: true}).map(normalizeMediaItem) : EMPTY,
-		seerrEnabled: isEnabled
-	};
+	const appearances = useMemo(
+		() => (credits ? prepareCredits(credits.cast, {isCrew: false, group, sortOption}).map(normalizeMediaItem) : EMPTY),
+		[credits, group, sortOption]
+	);
+	const crewCredits = useMemo(
+		() => (credits ? prepareCredits(credits.crew, {isCrew: true, group, sortOption}).map(normalizeMediaItem) : EMPTY),
+		[credits, group, sortOption]
+	);
+
+	return {appearances, crewCredits, seerrEnabled: isEnabled};
 };
 
 export default usePersonSeerrCredits;

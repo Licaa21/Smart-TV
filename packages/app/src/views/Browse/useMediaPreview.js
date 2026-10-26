@@ -2,6 +2,7 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {getPlatform, isLegacyTizen} from '../../platform';
 import {getDeviceCapabilities} from '../../services/deviceProfile';
 import {mediaPreviewAllowedOnDevice} from '../../services/mediaPreviewSource';
+import {mediaPreviewMode} from '../../utils/mediaPreviewMode';
 import {createMediaPreviewController} from './mediaPreviewController';
 
 // Owns the card preview controller for the home rows. It follows the setting and
@@ -52,7 +53,7 @@ export default function useMediaPreview({api, settings, isVisible, browseMode, o
 		webosVersion,
 		performanceMode: settings.performanceMode
 	});
-	const enabled = !!settings.episodePreviewEnabled && deviceAllowed && isVisible && browseMode === 'rows' && !screensaverActive;
+	const enabled = mediaPreviewMode(settings) !== 'off' && deviceAllowed && isVisible && browseMode === 'rows' && !screensaverActive;
 
 	useEffect(() => {
 		controller.setEnabled(enabled);
