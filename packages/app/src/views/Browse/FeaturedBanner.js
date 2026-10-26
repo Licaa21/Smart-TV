@@ -221,8 +221,6 @@ const FeaturedBanner = memo(({
 
 				<div className={css.trailerContainer} ref={trailerContainerRef} />
 
-				<div className={css.featuredGradient} />
-
 				{featuredItems.length > 1 && (
 					<>
 						{settings.navbarPosition !== 'left' && (

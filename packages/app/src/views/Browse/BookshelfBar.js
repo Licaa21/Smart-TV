@@ -41,6 +41,7 @@ const Spine = ({item, index, onSelect}) => {
 
 const BookshelfBar = memo(({
 	isVisible,
+	rowPeek = 0,
 	featuredItems,
 	settings,
 	getItemServerUrl,
@@ -172,6 +173,8 @@ const BookshelfBar = memo(({
 	const leftItems = featuredItems.slice(leftStart, safeIndex);
 	const rightItems = featuredItems.slice(safeIndex + 1, safeIndex + 1 + SPINES_PER_SIDE);
 	const posterUrl = getImageUrl(getItemServerUrl(currentFeatured), currentFeatured.Id, 'Primary', POSTER_OPTS);
+	// The shelf is sized in vh, so it shrinks as a whole to the height the peek leaves it.
+	const shelfScale = rowPeek ? `scale(${(1080 - rowPeek) / 1080})` : null;
 
 	return (
 		<div className={css.bookshelfBanner}>
@@ -183,7 +186,7 @@ const BookshelfBar = memo(({
 				onFocus={handleFocus}
 				onBlur={handleBlur}
 			>
-				<div className={css.bookshelfRow}>
+				<div className={css.bookshelfRow} style={shelfScale ? {transform: shelfScale, WebkitTransform: shelfScale} : undefined}>
 					<div className={`${css.bookshelfSide} ${css.bookshelfSideLeft}`}>
 						{leftItems.map((item, i) => (
 							<Spine key={item.Id || (leftStart + i)} item={item} index={leftStart + i} onSelect={select} />

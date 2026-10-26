@@ -494,12 +494,6 @@ const MoonfinBar = ({items, t}) => {
 	return (
 		<div style={{position: 'relative', width: '100%', height: '100%'}}>
 			<Artwork url={item.backdropUrl} t={t} />
-			<div
-				style={{
-					...ABS_FILL,
-					background: `linear-gradient(to bottom, ${t.overlayA(0.3)} 0%, ${t.overlayA(0.1)} 40%, ${t.overlayA(0.8)} 100%)`
-				}}
-			/>
 			<div style={{position: 'absolute', top: 56, left: 40}}>
 				<LogoOrTitle
 					item={item}

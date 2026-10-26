@@ -12,6 +12,7 @@ import useTrailerPreview from './useTrailerPreview';
 import css from './Browse.module.less';
 import {carouselIntervalMs} from '../../utils/carouselTiming';
 import {useScreensaverActive} from '../../hooks/useScreensaverActive';
+import {rem} from '../../utils/rootScale';
 
 const GALLERY_GENRES_LIMIT = 3;
 const GALLERY_CAST_LIMIT = 5;
@@ -26,6 +27,7 @@ const padIndex = (n) => String(n + 1).padStart(2, '0');
 
 const GalleryBanner = memo(({
 	isVisible,
+	rowPeek = 0,
 	browseVisible = true,
 	featuredItems,
 	api,
@@ -220,6 +222,8 @@ const GalleryBanner = memo(({
 	if (!isVisible || !currentFeatured) return null;
 
 	const glowStyle = {'--gallery-glow-rgb': genreGlowRgb(currentFeatured.Genres)};
+	// The idle title runs along 66 percent of the panel's inside, which is 918 tall until the peek takes its share.
+	const idleTitleStyle = rowPeek ? {maxWidth: rem(0.66 * (918 - rowPeek))} : undefined;
 
 	return (
 		<div className={css.galleryBanner}>
@@ -257,7 +261,7 @@ const GalleryBanner = memo(({
 									<span className={css.galleryIndex}>{padIndex(absoluteIndex)}</span>
 									<span className={css.galleryLine} />
 									<div className={css.galleryTitleWrap}>
-										<span className={css.galleryVerticalTitle}>{item.Name}</span>
+										<span className={css.galleryVerticalTitle} style={idleTitleStyle}>{item.Name}</span>
 									</div>
 									<span className={css.galleryLine} />
 								</div>
