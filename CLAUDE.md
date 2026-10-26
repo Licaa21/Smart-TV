@@ -314,6 +314,13 @@ The plugin chat works in `E:VSCode ProjectsMoonfin Plugin Forkimplement`. Never 
 - **On a merge:** keep the lookup in `useDetailsTrailer.js`, the `rowConfigs` use in `visibleRows` of `SeerrDiscover.js`, and upstream's PIN code as it comes.
 - **Files:** `views/Details/useDetailsTrailer.js`, `views/SeerrDiscover/SeerrDiscover.js`, `App/App.js`.
 
+### 15. The Rate button is always the star
+
+- **Upstream:** the details Rate button draws a thumb for the Like/Dislike style, the numbers icon for the numeric style and a star for the star style, and the thumb follows the rating given (`personalRatingIconPath(style, userData)`, 0a2afcaf).
+- **The fork keeps:** the star in every style, on every detail screen. The style still changes the label and the dialog the button opens.
+- **On a merge:** keep `personalRatingIconPath` returning the star, and its test.
+- **Files:** `views/Details/personalRatingAction.js` and its test, `DetailActionButtons.js`, `detailActions.js`.
+
 ## When the user says Moonbase (the plugin) updated
 
 The fork works around things the Moonbase plugin (Moonfin-Client/Plugin) does not do yet. When the user says a new release is
