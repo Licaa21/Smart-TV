@@ -6,12 +6,9 @@ import {displayRatingLikes, personalRatingOf, starRatingLabel} from '../../utils
 // What the rating button says and draws, which depends on both the chosen style
 // and whatever rating the server already holds.
 
-export const personalRatingIconPath = (style, userData) => {
-	if (style !== 'thumbs') {
-		return style === 'numeric' ? RATING_ICON_PATHS.numbers : RATING_ICON_PATHS.star;
-	}
-	return displayRatingLikes(userData) === false ? RATING_ICON_PATHS.thumbDown : RATING_ICON_PATHS.thumbUp;
-};
+// The button wears the star whatever the style, so it reads as the same Rate button on every detail screen. The style
+// only changes the words and the dialog it opens.
+export const personalRatingIconPath = () => RATING_ICON_PATHS.star;
 
 export const personalRatingLabel = (style, userData) => {
 	const rating = personalRatingOf(userData);

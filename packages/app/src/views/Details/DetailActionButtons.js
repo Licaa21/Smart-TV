@@ -219,7 +219,7 @@ const DetailActionButtons = ({
 		{id: 'personalRating', when: showsPersonalRating, render: () => (
 			<SpottableDiv className={css.btnWrapper} onClick={onOpenRatingDialog} spotlightId="details-rating-btn">
 				<div className={css.btnAction}>
-					<BtnIcon path={personalRatingIconPath(personalRatingStyle, item.UserData)}/>
+					<BtnIcon path={personalRatingIconPath()}/>
 				</div>
 				<span className={css.btnLabel}>{personalRatingLabel(personalRatingStyle, item.UserData)}</span>
 			</SpottableDiv>
