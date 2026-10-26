@@ -282,7 +282,8 @@ const ModernMediaCard = ({
 	// A focused Seerr or outside list title grows into the titled thumb the plugin picks
 	// for it, and a thumb that fails to load hands over to the plain backdrop.
 	const [failedThumb, setFailedThumb] = useState(null);
-	const wantsSeerrWide = isFocused && isUnownedSeerrTitle(item);
+	// Cards about to be fetched for work the thumb out too, since it is what the title will grow into
+	const wantsSeerrWide = (isFocused || warmFocusArt) && isUnownedSeerrTitle(item);
 	useTmdbThumbsAvailable(wantsSeerrWide);
 	const seerrThumb = wantsSeerrWide ? seerrThumbUrl(item) : null;
 	const seerrWide = wantsSeerrWide ? seerrWideArtUrl(item, failedThumb) : null;
@@ -369,11 +370,13 @@ const ModernMediaCard = ({
 	}, [focusUrl]);
 
 	// The cards around the focused one fetch their wide art ahead, so moving about opens each card at once.
-	const warmsArt = warmFocusArt && !deferImage && swapsArt && !isUnownedSeerrTitle(item);
+	const warmsArt = warmFocusArt && !deferImage && swapsArt;
 	useEffect(() => {
 		if (!warmsArt || loadedArt.has(focusUrl)) return undefined;
-		return loadArt(focusUrl);
-	}, [warmsArt, focusUrl]);
+		const stop = loadArt(focusUrl);
+		// A thumb is made by the plugin on request, so one asked for is let finish whoever needs it
+		return seerrThumb ? undefined : stop;
+	}, [warmsArt, focusUrl, seerrThumb]);
 
 	const expanded = isFocused && canRenderExpanded;
 	const overlaysArt = expanded && swapsArt;

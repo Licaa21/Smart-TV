@@ -1,4 +1,6 @@
-import {warmsWideArt, announceFocusedRow, isNearFocusedRow, watchFocusedRow} from './warmWindow';
+import {renderHook, act} from '@testing-library/react';
+
+import {warmsWideArt, announceFocusedRow, isNearFocusedRow, watchFocusedRow, useWarmRow, cardPosition} from './warmWindow';
 
 const warmed = (count, state) => Array.from({length: count}, (_, i) => i).filter((i) => warmsWideArt(i, state));
 
@@ -53,5 +55,51 @@ describe('the focused row', () => {
 		stop();
 		announceFocusedRow(5);
 		expect(heard).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('useWarmRow', () => {
+	beforeEach(() => announceFocusedRow(-1));
+	const warmedBy = (warms, focusedIndex) => Array.from({length: 14}, (_, i) => i).filter((i) => warms(i, focusedIndex));
+
+	it('follows the way focus moves along the row', () => {
+		const {result} = renderHook(() => useWarmRow(3, true));
+		act(() => result.current.noteFocus(6));
+		act(() => result.current.noteFocus(7));
+		expect(warmedBy(result.current.warms, 7)).toEqual([6, 7, 8, 9, 10, 11, 12]);
+		act(() => result.current.noteFocus(6));
+		expect(warmedBy(result.current.warms, 6)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+	});
+
+	it('does not take entering the row for a move', () => {
+		const {result} = renderHook(() => useWarmRow(3, true));
+		act(() => result.current.noteFocus(8));
+		act(() => result.current.noteBlur());
+		act(() => result.current.noteFocus(0));
+		expect(warmedBy(result.current.warms, 0)).toEqual([0, 1, 2, 3, 4, 5]);
+	});
+
+	it('fetches the first cards when a row beside the focused one is asked', () => {
+		const {result} = renderHook(() => useWarmRow(3, true));
+		expect(warmedBy(result.current.warms, -1)).toEqual([]);
+		act(() => announceFocusedRow(2));
+		expect(warmedBy(result.current.warms, -1)).toEqual([0, 1, 2, 3, 4]);
+	});
+
+	it('forgets the card it was left on when the setting says to start at the first', () => {
+		const {result} = renderHook(() => useWarmRow(3, false));
+		act(() => result.current.noteFocus(9));
+		act(() => result.current.noteBlur());
+		act(() => announceFocusedRow(4));
+		expect(warmedBy(result.current.warms, -1)).toEqual([0, 1, 2, 3, 4]);
+	});
+});
+
+describe('cardPosition', () => {
+	it('counts the cards only, not the helper nodes beside some of them', () => {
+		document.body.innerHTML = '<div><div class="spottable"></div><div style="display: none"></div><div class="spottable"></div><div style="display: none"></div><div class="spottable"></div></div>';
+		const cards = document.querySelectorAll('.spottable');
+		expect([...cards].map(cardPosition)).toEqual([0, 1, 2]);
+		expect(cardPosition(null)).toBe(-1);
 	});
 });

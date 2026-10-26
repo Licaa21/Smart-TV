@@ -9,7 +9,7 @@ import {useSettings} from '../../context/SettingsContext';
 import {getPlatform} from '../../platform';
 import {modernCardMetrics} from '../MediaCard/modernCardLayout';
 import PlaceholderRow from './PlaceholderRow';
-import {warmsWideArt, announceFocusedRow, isNearFocusedRow, watchFocusedRow} from './warmWindow';
+import {useWarmRow, cardPosition} from './warmWindow';
 
 import css from './ModernMediaRow.module.less';
 
@@ -56,16 +56,7 @@ const ModernMediaRow = ({
 	const [focusedItemId, setFocusedItemId] = useState(null);
 	const [details, setDetails] = useState(null);
 	const platform = useRef(getPlatform()).current;
-	// The card focus was last on and the way it was moving, for the cards that fetch their wide art ahead
-	const lastIndexRef = useRef(-1);
-	const directionRef = useRef(1);
-	const inRowRef = useRef(false);
-	const [near, setNear] = useState(() => isNearFocusedRow(rowIndex));
-	useEffect(() => {
-		const sync = () => setNear(isNearFocusedRow(rowIndex));
-		sync();
-		return watchFocusedRow(sync);
-	}, [rowIndex]);
+	const {noteFocus, noteBlur, warms} = useWarmRow(rowIndex, settings.rememberRowCard);
 
 	const keyPrefix = rowId || title || rowIndex || '';
 	const itemCount = items?.length || 0;
@@ -107,15 +98,12 @@ const ModernMediaRow = ({
 
 	const handleFocus = useCallback((e) => {
 		onFocus?.(rowIndex);
-		announceFocusedRow(rowIndex);
 		// The next cards are drawn as focus nears the end of those that are.
 		const grownCard = e.target.closest('.spottable');
-		if (grownCard && grownCard.parentNode && items && items.length > 0) {
-			const grownIndex = Array.prototype.indexOf.call(grownCard.parentNode.children, grownCard);
-			// Entering the row says nothing about the way focus is moving in it
-			if (inRowRef.current && grownIndex !== lastIndexRef.current) directionRef.current = grownIndex > lastIndexRef.current ? 1 : -1;
-			inRowRef.current = true;
-			lastIndexRef.current = grownIndex;
+		// Some cards come with a hidden helper node beside them, so the position is among the cards only
+		const grownIndex = cardPosition(grownCard);
+		noteFocus(grownIndex);
+		if (grownIndex >= 0 && items && items.length > 0) {
 			setShownCount((current) => {
 				const count = Math.min(items.length, current === null ? initialRowCount(items.length) : current);
 				const grown = grownRowCount(count, grownIndex, items.length);
@@ -123,12 +111,8 @@ const ModernMediaRow = ({
 			});
 		}
 
-		const card = e.target.closest('.spottable');
 		// A row that pages asks for more once focus is among its last few cards.
-		if (onLoadMore && card && card.parentNode) {
-			const index = Array.prototype.indexOf.call(card.parentNode.children, card);
-			if (index >= 0 && index >= itemCount - 3) onLoadMore(rowId);
-		}
+		if (onLoadMore && grownIndex >= 0 && grownIndex >= itemCount - 3) onLoadMore(rowId);
 
 		// A hovered card already sits under the cursor, so nudging the lane
 		// would only slide it away from the pointer.
@@ -138,7 +122,7 @@ const ModernMediaRow = ({
 		}
 
 		const scroller = scrollerRef.current;
-		if (card && scroller) {
+		if (grownCard && scroller) {
 			if (scrollTimeoutRef.current) {
 				window.cancelAnimationFrame(scrollTimeoutRef.current);
 			}
@@ -146,7 +130,7 @@ const ModernMediaRow = ({
 			// under it get the rest of the row. The last cards can't scroll that far
 			// and keep what's left.
 			scrollTimeoutRef.current = window.requestAnimationFrame(() => {
-				const cards = Array.prototype.filter.call(card.parentNode.children, (el) => el.classList.contains('spottable'));
+				const cards = Array.prototype.filter.call(grownCard.parentNode.children, (el) => el.classList.contains('spottable'));
 				if (!scrollerLayoutRef.current) {
 					const style = window.getComputedStyle(scroller);
 					scrollerLayoutRef.current = {
@@ -162,27 +146,26 @@ const ModernMediaRow = ({
 				// Widths come from the cards' styles rather than their boxes, since the
 				// card that just lost focus is still shrinking back.
 				let cardStart = 0;
-				for (let i = 0; i < cards.length && cards[i] !== card; i++) {
+				for (let i = 0; i < cards.length && cards[i] !== grownCard; i++) {
 					cardStart += parseFloat(cards[i].style.width) + layout.gap;
 				}
 				scroller.scrollLeft = cardStart;
 				const cardLeft = layout.paddingLeft + cardStart - scroller.scrollLeft;
 				setDetails({
-					spotlightId: card.getAttribute('data-spotlight-id'),
+					spotlightId: grownCard.getAttribute('data-spotlight-id'),
 					width: layout.width - layout.paddingRight - cardLeft
 				});
 			});
 		}
-	}, [onFocus, rowIndex, items, onLoadMore, itemCount, rowId]);
+	}, [onFocus, rowIndex, items, onLoadMore, itemCount, rowId, noteFocus]);
 
 	const handleBlur = useCallback((e) => {
 		const nextTarget = e.relatedTarget;
 		const rowNode = document.querySelector(`[data-row-index="${rowIndex}"]`) || rowElementRef.current;
 		if (rowNode && nextTarget && typeof rowNode.contains === 'function' && rowNode.contains(nextTarget)) return;
-		inRowRef.current = false;
-		directionRef.current = 1;
+		noteBlur();
 		setFocusedItemId(null);
-	}, [rowIndex]);
+	}, [rowIndex, noteBlur]);
 
 	const handleFocusedChange = useCallback((itemId) => {
 		setFocusedItemId(itemId || null);
@@ -254,12 +237,6 @@ const ModernMediaRow = ({
 	if (!items || items.length === 0) return null;
 
 	const focusedIndex = focusedItemId ? items.findIndex((item) => item.Id === focusedItemId) : -1;
-	const warm = {
-		focusedIndex,
-		direction: directionRef.current,
-		neighbour: near,
-		restIndex: settings.rememberRowCard === false ? -1 : lastIndexRef.current
-	};
 
 	return (
 		<RowContainer
@@ -297,7 +274,7 @@ const ModernMediaRow = ({
 								detailsWidth={details?.spotlightId === spotlightId ? details.width : undefined}
 								isLibraryRow={rowId === 'library-tiles'}
 								rowImageType={rowImageType}
-								warmFocusArt={warmsWideArt(index, warm)}
+								warmFocusArt={warms(index, focusedIndex)}
 								menuOptions={menuOptions}
 							/>
 						);
