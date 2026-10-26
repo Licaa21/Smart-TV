@@ -72,6 +72,11 @@ describe('seerrThumbUrl', () => {
 		expect(seerrThumbUrl(seerrMovie())).toBe('http://server:8096/Moonfin/Tmdb/Thumb?type=movie&tmdbId=603&scheme=http&ApiKey=token');
 	});
 
+	it('asks for a size when the card does, and leaves it out otherwise', () => {
+		expect(seerrThumbUrl(seerrMovie(), 'w780')).toBe('http://server:8096/Moonfin/Tmdb/Thumb?type=movie&tmdbId=603&size=w780&ApiKey=token');
+		expect(seerrThumbUrl(seerrMovie())).toBe('http://server:8096/Moonfin/Tmdb/Thumb?type=movie&tmdbId=603&ApiKey=token');
+	});
+
 	it('falls back to the IMDb id when there is no TMDB id', () => {
 		expect(seerrThumbUrl(imdbShow)).toBe('http://server:8096/Moonfin/Tmdb/Thumb?type=tv&imdbId=tt0903747&ApiKey=token');
 	});

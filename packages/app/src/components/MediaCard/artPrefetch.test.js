@@ -1,4 +1,4 @@
-import {hasArt, prefetchArt} from './artPrefetch';
+import {hasArt, artSource, artState, touchArt, prefetchArt, noteArtFocus, noteArtArrived, setArtLogSink} from './artPrefetch';
 
 describe('prefetchArt', () => {
 	const RealImage = window.Image;
@@ -81,5 +81,240 @@ describe('prefetchArt', () => {
 		request.cancel();
 		expect(art.onerror).toBeNull();
 		expect(failed).not.toHaveBeenCalled();
+	});
+});
+
+describe('prefetchArt reading the art as a blob', () => {
+	const realFetch = window.fetch;
+	const RealImage = window.Image;
+	const realCreate = URL.createObjectURL;
+	const realRevoke = URL.revokeObjectURL;
+	let handles;
+	let pending;
+	let plainLoads;
+	let nextBlob;
+
+	const ask = (...args) => {
+		const request = prefetchArt(...args);
+		handles.push(request);
+		return request;
+	};
+	// A fetch that answers when the test says so
+	const answer = (index, body) => pending[index].resolve(body);
+	const flush = () => Promise.resolve().then(() => Promise.resolve()).then(() => Promise.resolve());
+
+	beforeEach(() => {
+		handles = [];
+		pending = [];
+		plainLoads = [];
+		nextBlob = 0;
+		window.fetch = jest.fn((url, options) => new Promise((resolve, reject) => {
+			const entry = {url, options, resolve, reject};
+			pending.push(entry);
+			if (options.signal) options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), {name: 'AbortError'})));
+		}));
+		window.Image = function FakeImage () {
+			const art = {};
+			plainLoads.push(art);
+			return art;
+		};
+		URL.createObjectURL = jest.fn(() => `blob:art/${nextBlob++}`);
+		URL.revokeObjectURL = jest.fn();
+	});
+	afterEach(() => {
+		handles.forEach((request) => request.cancel());
+		window.fetch = realFetch;
+		window.Image = RealImage;
+		URL.createObjectURL = realCreate;
+		URL.revokeObjectURL = realRevoke;
+		setArtLogSink(null);
+		jest.useRealTimers();
+	});
+
+	const ok = (size = 1000) => ({ok: true, status: 200, blob: () => Promise.resolve({size})});
+
+	it('holds what came in and hands the card a local address, which is nothing until then', async () => {
+		const url = 'http://server/Moonfin/Tmdb/Thumb?tmdbId=1&ApiKey=secret';
+		const done = jest.fn();
+		ask(url, 0, null, done);
+		expect(window.fetch).toHaveBeenCalledWith(url, expect.objectContaining({credentials: 'omit'}));
+		expect(artSource(url)).toBeNull();
+		expect(artState(url)).toBe('running');
+
+		answer(0, ok());
+		await flush();
+		expect(artSource(url)).toMatch(/^blob:art\//);
+		expect(hasArt(url)).toBe(true);
+		expect(artState(url)).toBe('held');
+		expect(done).toHaveBeenCalledTimes(1);
+	});
+
+	it('tells of a 404 and sends the card to the network for it', async () => {
+		const url = 'http://server/Moonfin/Tmdb/Thumb?tmdbId=2';
+		const failed = jest.fn();
+		ask(url, 0, failed);
+		answer(0, {ok: false, status: 404});
+		await flush();
+		expect(failed).toHaveBeenCalledWith(404);
+		expect(artSource(url)).toBe(url);
+		expect(hasArt(url)).toBe(false);
+	});
+
+	it('loads an address that may not be read the plain way instead', async () => {
+		const url = 'http://other/art-3.jpg';
+		ask(url, 0);
+		pending[0].reject(new TypeError('Failed to fetch'));
+		await flush();
+		expect(plainLoads).toHaveLength(1);
+		expect(plainLoads[0].src).toBe(url);
+		plainLoads[0].onload();
+		expect(hasArt(url)).toBe(true);
+		expect(artSource(url)).toBe(url);
+	});
+
+	it('lets a request go that does not answer in time, and the card asks the network itself', async () => {
+		jest.useFakeTimers();
+		const url = 'http://server/art-4.jpg';
+		const failed = jest.fn();
+		ask(url, 0, failed);
+		jest.advanceTimersByTime(15000);
+		await flush();
+		expect(failed).toHaveBeenCalledWith(-1);
+		expect(artSource(url)).toBe(url);
+		expect(artState(url)).toBe('none');
+	});
+
+	it('drops a request that is under way', async () => {
+		const url = 'http://server/art-5.jpg';
+		const failed = jest.fn();
+		const request = ask(url, 0, failed);
+		request.cancel();
+		await flush();
+		expect(failed).not.toHaveBeenCalled();
+		expect(artState(url)).toBe('none');
+		expect(artSource(url)).toBeNull();
+	});
+
+	it('tells the report what the focused card found, without the address', () => {
+		const lines = [];
+		setArtLogSink((message, context) => lines.push([message, context]));
+		const url = 'http://server/Moonfin/Tmdb/Thumb?tmdbId=99&ApiKey=secret';
+		expect(noteArtFocus(url)).toBe(false);
+		expect(lines[0][0]).toBe('Wide art not ready at focus');
+		expect(lines[0][1]).toEqual(expect.objectContaining({kind: 'thumb', state: 'none'}));
+		expect(JSON.stringify(lines)).not.toContain('secret');
+		noteArtArrived(url, 420);
+		expect(lines[1]).toEqual(['Wide art arrived late', {kind: 'thumb', ms: 420}]);
+	});
+
+	it('loads every picture of a host the plain way once a few could not be read, and a lone failure only that picture', async () => {
+		ask('http://nocors.test/one.jpg', 0);
+		pending[0].reject(new TypeError('Failed to fetch'));
+		await flush();
+		expect(plainLoads).toHaveLength(1);
+		// the host is still read as a blob after one failure
+		ask('http://nocors.test/two.jpg', 0);
+		expect(window.fetch).toHaveBeenCalledTimes(2);
+		pending[1].reject(new TypeError('Failed to fetch'));
+		await flush();
+		ask('http://nocors.test/three.jpg', 0);
+		pending[2].reject(new TypeError('Failed to fetch'));
+		await flush();
+		ask('http://nocors.test/four.jpg', 0);
+		expect(window.fetch).toHaveBeenCalledTimes(3);
+		expect(plainLoads).toHaveLength(4);
+		expect(artSource('http://nocors.test/five.jpg')).toBe('http://nocors.test/five.jpg');
+	});
+
+	it('lets a picture that is loaded the plain way and does not answer go too', async () => {
+		jest.useFakeTimers();
+		const url = 'http://slow.test/plain.jpg';
+		ask(url, 0);
+		answer(0, {ok: false, status: 502});
+		await flush();
+		const failed = jest.fn();
+		ask(url, 0, failed);
+		expect(plainLoads).toHaveLength(1);
+		jest.advanceTimersByTime(15000);
+		expect(failed).toHaveBeenCalledWith(-1);
+	});
+
+	it('keeps the picture the focused card draws when too much is held', async () => {
+		jest.useFakeTimers();
+		const urls = ['http://keep.test/a.jpg', 'http://keep.test/b.jpg', 'http://keep.test/c.jpg'];
+		ask(urls[0], 0);
+		answer(0, ok(12 * 1024 * 1024));
+		await flush();
+		touchArt(urls[0]);
+		ask(urls[1], 1);
+		ask(urls[2], 2);
+		answer(1, ok(12 * 1024 * 1024));
+		answer(2, ok(12 * 1024 * 1024));
+		await flush();
+		await flush();
+		expect(artSource(urls[0])).toMatch(/^blob:art\//);
+		expect(artSource(urls[1])).toBeNull();
+	});
+
+	it('gives the oldest picture up, and takes its address back a while later, once too much is held', async () => {
+		jest.useFakeTimers();
+		const sizes = [12, 12, 12].map((mb) => mb * 1024 * 1024);
+		const urls = ['http://server/big-a.jpg', 'http://server/big-b.jpg', 'http://server/big-c.jpg'];
+		urls.forEach((url, i) => {
+			ask(url, i);
+		});
+		sizes.forEach((size, i) => answer(i, ok(size)));
+		await flush();
+		await flush();
+		expect(artSource(urls[2])).toMatch(/^blob:art\//);
+		expect(artSource(urls[0])).toBe(null);
+		// a card still loading from it is not cut off at once
+		expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+		jest.advanceTimersByTime(10000);
+		expect(URL.revokeObjectURL).toHaveBeenCalled();
+	});
+});
+
+describe('prefetchArt sharing a request', () => {
+	const RealImage = window.Image;
+	let started;
+	let handles;
+	beforeEach(() => {
+		started = [];
+		handles = [];
+		window.Image = function FakeImage () {
+			const art = {};
+			started.push(art);
+			return art;
+		};
+	});
+	afterEach(() => {
+		handles.forEach((request) => request.cancel());
+		window.Image = RealImage;
+	});
+	const ask = (...args) => {
+		const request = prefetchArt(...args);
+		handles.push(request);
+		return request;
+	};
+
+	it('makes one request for a picture two cards ask for, and drops it when the last asker lets go', () => {
+		const first = ask('http://art/shared.jpg', 5);
+		const second = ask('http://art/shared.jpg', 1);
+		expect(started).toHaveLength(1);
+		first.cancel();
+		expect(started[0].src).toBe('http://art/shared.jpg');
+		second.cancel();
+		expect(started[0].src).toBe('');
+	});
+
+	it('goes at the nearest rank of those asking', () => {
+		['a', 'b', 'c', 'd'].forEach((name) => ask(`http://art/busy-${name}.jpg`, 1));
+		ask('http://art/other.jpg', 9);
+		const shared = ask('http://art/wanted.jpg', 20);
+		ask('http://art/wanted.jpg', 2);
+		shared.setRank(30);
+		started[0].onload();
+		expect(started[4].src).toBe('http://art/wanted.jpg');
 	});
 });

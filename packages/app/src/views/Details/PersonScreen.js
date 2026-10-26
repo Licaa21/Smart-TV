@@ -19,16 +19,18 @@ const TabsContainer = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'di
 
 const PersonScreen = ({item, serverUrl, settings, showsSection, filmography, personDates, birthPlace, onSelectItem, onSelectSeerrItem}) => {
 	const {appearances, crewCredits, ranking} = usePersonSeerrCredits(item.ProviderIds?.Tmdb);
-	// The most popular first, by what Seerr says of the same titles, and the one the backdrop comes from ahead of them
+	// With Popularity chosen, the most popular first, by what Seerr says of the same titles, and the one the backdrop
+	// comes from ahead of them. Any other sort stands as the filmography came.
 	const {movies, series, guestAppearances, musicVideos} = useMemo(() => {
 		const split = filmography || {movies: [], series: [], guestAppearances: [], musicVideos: []};
+		if ((settings?.personPageSortOption || 'popularity') !== 'popularity') return split;
 		return {
 			movies: rankLibraryItems(split.movies, ranking),
 			series: rankLibraryItems(split.series, ranking),
 			guestAppearances: rankLibraryItems(split.guestAppearances, ranking),
 			musicVideos: rankLibraryItems(split.musicVideos, ranking)
 		};
-	}, [filmography, ranking]);
+	}, [filmography, ranking, settings?.personPageSortOption]);
 
 	const handleSeerrSelect = useCallback((c) => {
 		if (c?._seerrRaw) onSelectSeerrItem?.(c._seerrRaw);
