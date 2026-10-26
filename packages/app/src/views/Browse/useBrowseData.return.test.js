@@ -3,6 +3,19 @@ import {renderHook, waitFor} from '@testing-library/react';
 import useBrowseData from './useBrowseData';
 import {clearMemoryCache, memoryCache} from './browseCache';
 
+// The CLI ships a second copy of React, so the components' JSX goes through the copy under test.
+jest.mock('react/jsx-dev-runtime', () => {
+	const React = require('react');
+	return {
+		Fragment: React.Fragment,
+		jsxDEV: (type, {children, ...props}, key, isStaticChildren) => {
+			const config = key === undefined ? props : {...props, key};
+			if (children === undefined) return React.createElement(type, config);
+			return isStaticChildren ? React.createElement(type, config, ...children) : React.createElement(type, config, children);
+		}
+	};
+});
+
 jest.mock('../../services/storage', () => ({
 	getFromStorage: async () => null,
 	saveToStorage: async () => {},

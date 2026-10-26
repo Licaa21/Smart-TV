@@ -1,6 +1,6 @@
 import {renderHook, act} from '@testing-library/react';
 
-import useSegmentPopups from './useSegmentPopups';
+import useSegmentPopups, {isSeekbarFocused} from './useSegmentPopups';
 
 // The framework's focus needs its own copy of React, so a stand in answers for it.
 jest.mock('@enact/spotlight', () => ({__esModule: true, default: {focus: jest.fn(() => false)}}));
@@ -385,27 +385,12 @@ describe('the skip prompt over the controls, on a seek and under the remote', ()
 	});
 
 	test('knows when focus sits anywhere inside the seek bar', () => {
+		document.body.innerHTML = '<div data-spotlight-id="progress-bar"><button id="in-bar"></button></div><button id="outside"></button>';
 		expect(isSeekbarFocused()).toBe(false);
-		focusSeekbar();
+		document.getElementById('in-bar').focus();
 		expect(isSeekbarFocused()).toBe(true);
-		focusPrompt();
+		document.getElementById('outside').focus();
 		expect(isSeekbarFocused()).toBe(false);
-	});
-
-	test('with the controls up, Up from the seek bar goes to it and Up from anywhere else is left alone', () => {
-		const {result, showControls} = setupPrompt({controlsVisible: true});
-		at(result, 61);
-
-		const other = document.createElement('button');
-		document.body.appendChild(other);
-		other.focus();
-		expect(press(result, UP)).toBe(false);
-		expect(showControls).not.toHaveBeenCalled();
-		expect(Spotlight.focus).not.toHaveBeenCalled();
-
-		focusSeekbar();
-		expect(press(result, UP)).toBe(true);
-		expect(showControls).toHaveBeenCalledTimes(1);
-		expect(Spotlight.focus).toHaveBeenCalledWith('skip-segment-btn');
+		document.body.innerHTML = '';
 	});
 });

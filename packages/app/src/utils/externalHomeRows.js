@@ -26,7 +26,7 @@ export const getTmdbPresets = () => [
 	{id: 'tmdb_trending_all_weekly', title: $L('Trending All (Weekly)'), type: 'trending/all/week'}
 ];
 
-const getImdbPresets = () => [
+export const getImdbPresets = () => [
 	{id: 'imdb-top250-movies', title: $L('IMDb Top 250 Movies'), type: 'imdb_top_250_movies'},
 	{id: 'imdb-top250-tv', title: $L('IMDb Top 250 TV Shows'), type: 'imdb_top_250_tv_shows'},
 	{id: 'imdb-popular-movies', title: $L('IMDb Most Popular Movies'), type: 'imdb_most_popular_movies'},

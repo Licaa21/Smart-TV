@@ -24,6 +24,9 @@ export const isSkipPromptFocused = () => {
 	return Boolean(active && active.closest && active.closest(`[data-spotlight-id="${SKIP_PROMPT_ID}"]`));
 };
 
+// Focus anywhere inside the seek bar, which the controls hold under the prompt.
+export const isSeekbarFocused = () => Boolean(document.activeElement?.closest?.('[data-spotlight-id="progress-bar"]'));
+
 /**
  * Drives the skip prompt for any segment the server marked up, plus the credits
  * and next episode prompts that follow an episode into the one after it.

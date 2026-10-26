@@ -1,7 +1,7 @@
 import {getImageUrl, moonfinPing} from '../../services/seerrApi';
 import {fetchTmdbDetails} from '../../services/externalRowsApi';
 import {getActiveParentalFilter} from '../../services/parentalControls';
-import {IMDB_PRESETS, TMDB_PRESETS, fetchCustomHomeRow, fetchExternalPresetRow} from '../../utils/externalHomeRows';
+import {getImdbPresets, getTmdbPresets, fetchCustomHomeRow, fetchExternalPresetRow} from '../../utils/externalHomeRows';
 import {withoutBlockedOrUnrated} from '../../utils/parentalFilter';
 import {shuffleArray} from '../Details/detailsMedia';
 import {matchesContentType} from './browseFilters';
@@ -10,8 +10,8 @@ import {matchesContentType} from './browseFilters';
 // the IMDb charts by chart name, the TMDB charts by their home row id, then the viewer's own
 // lists. The TMDB charts need a TMDB key on the server.
 export const mediaBarExternalListOptions = (customRows = [], tmdbAvailable = false) => [
-	...IMDB_PRESETS.map((preset) => ({Id: preset.type, Name: preset.title})),
-	...(tmdbAvailable ? TMDB_PRESETS.map((preset) => ({Id: preset.id, Name: preset.title})) : []),
+	...getImdbPresets().map((preset) => ({Id: preset.type, Name: preset.title})),
+	...(tmdbAvailable ? getTmdbPresets().map((preset) => ({Id: preset.id, Name: preset.title})) : []),
 	...customRows.map((row) => ({Id: row.id, Name: row.name}))
 ];
 
@@ -21,7 +21,7 @@ const fetchList = (id, customRows, language) => {
 	const options = {language, limit: Infinity};
 	const custom = customRows.find((row) => row.id === id);
 	if (custom) return fetchCustomHomeRow(custom, options);
-	const imdb = IMDB_PRESETS.find((preset) => preset.type === id);
+	const imdb = getImdbPresets().find((preset) => preset.type === id);
 	return fetchExternalPresetRow(imdb ? imdb.id : id, options);
 };
 
