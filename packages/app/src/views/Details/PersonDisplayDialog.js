@@ -20,11 +20,12 @@ const PersonDisplayDialog = ({onClose}) => {
 			title={$L('Display Options')}
 			heading={$L('Sort By')}
 			options={[
+				{id: 'popularity', label: $L('Popularity')},
 				{id: 'alphabetical', label: $L('Alphabetical')},
 				{id: 'releaseDateAsc', label: $L('Release Date (Ascending)')},
 				{id: 'releaseDateDesc', label: $L('Release Date (Descending)')}
 			]}
-			active={settings.personPageSortOption || 'alphabetical'}
+			active={settings.personPageSortOption || 'popularity'}
 			onSelect={handleSort}
 			onClose={onClose}
 		>
