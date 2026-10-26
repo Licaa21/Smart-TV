@@ -262,7 +262,7 @@ export const SYNCABLE_KEYS = [
 	'imdbMostPopularTvShowsEnabled', 'imdbLowestRatedMoviesEnabled', 'imdbTopEnglishMoviesEnabled',
 	'sinceYouWatchedSource', 'sinceYouWatchedSourceItem', 'sinceYouWatchedSourceType', 'sinceYouWatchedIncludeWatched',
 	'rewatchIncludeMovies', 'rewatchIncludeShows', 'rewatchIncludeCollections', 'rewatchSortBy',
-	'navbarPosition', 'featuredBarStyle', 'featuredContentType', 'featuredItemCount',
+	'navbarPosition', 'featuredBarStyle', 'mediaBarRowPeek', 'featuredContentType', 'featuredItemCount',
 	'featuredTrailerPreview', 'featuredTrailerMuted', 'trailerVolume', 'mediaBarTrailerCaptions', 'unifiedLibraryMode', 'seasonalTheme', 'seasonalDensity',
 	'seasonalRowEnabled', 'seasonalRowCountry', 'seasonalRowHiddenHolidays',
 	'visualTheme', 'customThemeId',

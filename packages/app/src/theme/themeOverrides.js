@@ -458,7 +458,6 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${browseCss.ayaIndicator}`, `background: ${os(0.3)};`);
 	rule(`.${browseCss.ayaIndicatorActive}`, `background: ${onSurface};`);
 	rule(`.${backdropCss.globalBackdropOverlay}`, `background: ${toCssColor(c.scrim)};`);
-	rule(`.${browseCss.featuredGradient}`, `background: -webkit-linear-gradient(top, ${scrim(0.3)} 0%, ${scrim(0.1)} 40%, ${scrim(0.8)} 100%); background: linear-gradient(to bottom, ${scrim(0.3)} 0%, ${scrim(0.1)} 40%, ${scrim(0.8)} 100%);`);
 	rule(`.${browseCss.detailPlaceholder} p, .${browseCss.empty}`, `color: ${os(0.7)};`);
 	// The card takes the media bar's own overlay color at three quarters of its
 	// opacity, outlined with the theme's card border.

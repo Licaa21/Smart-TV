@@ -118,25 +118,6 @@
 	transition: opacity 0.25s ease;
 }
 
-/* Scrim behind the info card, gone while a trailer plays so the video stands
-   clear. */
-.featuredGradient {
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	z-index: 1;
-	pointer-events: none;
-	background: -webkit-linear-gradient(top, rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.3) 0%, rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.1) 40%, rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.8) 100%);
-	background: linear-gradient(to bottom, rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.3) 0%, rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.1) 40%, rgba(var(--theme-scrim-rgb, 0, 0, 0), 0.8) 100%);
-	transition: opacity 0.25s ease;
-}
-
-.trailerActive .featuredGradient {
-	opacity: 0;
-}
-
 .featuredContent {
 	position: absolute;
 	bottom: 52px;
@@ -1719,4 +1700,80 @@
 .ayaIndicatorActive {
 	width: 16px;
 	background: #fff;
+}
+
+/* Peek Home Rows. Browse sizes the scroller to the peek and the bar takes what is left, so
+   everything placed inside the bar settles above the rows. The backdrop layers still fill
+   the screen behind them. */
+.rowPeek {
+	.featuredBanner,
+	.makdBanner,
+	.galleryBanner,
+	.bookshelfBanner,
+	.ayaBanner {
+		-webkit-flex: 1;
+		flex: 1;
+		overflow: visible;
+	}
+
+	.contentRows {
+		-webkit-flex: none;
+		flex: none;
+		z-index: 11;
+		padding-top: 0;
+		// The bar keeps focus and the pointer until Down moves into the rows.
+		pointer-events: none;
+
+		> :first-child {
+			margin-top: 0;
+		}
+	}
+
+	.featuredBackdrop,
+	.makdBackdrop,
+	.makdGradient,
+	.galleryGlow {
+		bottom: auto;
+		height: 100vh;
+	}
+
+	// Kept clear of the carousel arrows, which come down to the middle of the shorter bar.
+	.featuredContent {
+		left: 106px;
+		right: 106px;
+	}
+
+	.makdTextWithLogo,
+	.makdTextNoLogo {
+		margin-bottom: 40px;
+	}
+
+	// Laid out at full height and scaled down from the top, so the shelf still meets the ledge.
+	.bookshelfRow {
+		bottom: auto;
+		height: calc(~"100vh - 12px");
+		-webkit-transform-origin: 50% 0;
+		transform-origin: 50% 0;
+	}
+
+	.ayaBanner {
+		display: -webkit-flex;
+		display: flex;
+		-webkit-flex-direction: column;
+		flex-direction: column;
+	}
+
+	.ayaScale {
+		-webkit-flex: 1;
+		flex: 1;
+	}
+
+	.ayaFrame {
+		position: absolute;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		height: auto;
+	}
 }

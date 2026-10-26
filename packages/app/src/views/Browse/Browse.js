@@ -33,6 +33,8 @@ import useExternalRows from './useExternalRows';
 import useMediaPreview from './useMediaPreview';
 import {buildBrowseRows, sameRowList} from './buildBrowseRows';
 import {markHomeReady} from '../../utils/homeReady';
+import {rem} from '../../utils/rootScale';
+import {rowImageType, rowPeekHeight} from './rowPeek';
 
 import css from './Browse.module.less';
 
@@ -738,6 +740,15 @@ const Browse = ({
 		window.cancelAnimationFrame(settleRef.current.frame);
 	}, []);
 
+	const rowPeek = browseMode === 'featured' && showFeaturedBar && featuredItems.length > 0
+		? rowPeekHeight(settings, filteredRows[0])
+		: 0;
+
+	// Rows mode leaves the scroller wherever the last row pinned it, and the peek shows its top.
+	useLayoutEffect(() => {
+		if (rowPeek && contentRowsRef.current) contentRowsRef.current.scrollTop = 0;
+	}, [rowPeek]);
+
 	const navOffsetClass = settings.navbarPosition === 'left' ? css.sidebarOffset : css.topbarOffset;
 	const rowsClipClass = showTopInfoArea ? '' : css.rowsClipTop;
 
@@ -757,7 +768,7 @@ const Browse = ({
 
 	return (
 		<div className={css.page}>
-			<div className={`${css.mainContent} ${navOffsetClass}`} ref={mainContentRef}>
+			<div className={`${css.mainContent} ${navOffsetClass} ${rowPeek ? css.rowPeek : ''}`} ref={mainContentRef}>
 				<BackdropLayer
 					targetUrl={targetBackdropUrl}
 					blurAmount={settings.backdropBlurHome}
@@ -781,6 +792,7 @@ const Browse = ({
 					) : settings.featuredBarStyle === 'gallery' ? (
 						<GalleryBanner
 							isVisible={browseMode === 'featured'}
+							rowPeek={rowPeek}
 							browseVisible={isVisible}
 							featuredItems={featuredItems}
 							api={api}
@@ -804,6 +816,7 @@ const Browse = ({
 					) : settings.featuredBarStyle === 'bookshelf' ? (
 						<BookshelfBar
 							isVisible={browseMode === 'featured'}
+							rowPeek={rowPeek}
 							featuredItems={featuredItems}
 							settings={settings}
 							getItemServerUrl={getItemServerUrl}
@@ -859,6 +872,7 @@ const Browse = ({
 				<div
 					ref={contentRowsRef}
 					className={`${css.contentRows} ${browseMode === 'rows' ? css.rowsMode : ''} ${rowsClipClass}`}
+					style={rowPeek ? {height: rem(rowPeek)} : undefined}
 					data-pointer-rows
 				>
 					{filteredRows.map((row, index) => {
@@ -917,14 +931,6 @@ const Browse = ({
 						if (row.isSeerrRow || row.isOnlineRecoRow) selectHandler = rowSelect.seerr;
 						else if (row.isExternalRow) selectHandler = rowSelect.external;
 						else if (row.isGenreRow) selectHandler = rowSelect.genre;
-						// Per library rows share one override under the id that gates them.
-						// Overrides are a classic rows feature, the modern layout keeps its
-						// own arrangement untouched.
-						const imageTypeKey = row.isLatestRow ? 'latest-media'
-							: row.isRecentlyReleasedRow ? 'recently-released' : row.id;
-						const rowImageOverride = settings.homeRowsStyle === 'v1'
-							? (settings.homeRowImageTypes || {})[imageTypeKey]
-							: undefined;
 						const rowMenuOptions = isCwOrNextUp
 							? continueWatchingMenuOptions
 							: undefined;
@@ -936,7 +942,7 @@ const Browse = ({
 								items={row.items}
 								serverUrl={serverUrl}
 								cardType={row.type}
-								rowImageType={rowImageOverride || settings.homeRowsImageType}
+								rowImageType={rowImageType(row, settings)}
 								onSelectItem={selectHandler}
 								onFocus={handleRowFocus}
 								onFocusItem={handleFocusItem}
