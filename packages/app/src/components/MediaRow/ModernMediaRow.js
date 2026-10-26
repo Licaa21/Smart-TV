@@ -56,7 +56,7 @@ const ModernMediaRow = ({
 	const [focusedItemId, setFocusedItemId] = useState(null);
 	const [details, setDetails] = useState(null);
 	const platform = useRef(getPlatform()).current;
-	const {noteFocus, noteBlur, warms} = useWarmRow(rowIndex, settings.rememberRowCard);
+	const {noteFocus, noteBlur, rankOf} = useWarmRow(rowIndex, settings.rememberRowCard);
 
 	const keyPrefix = rowId || title || rowIndex || '';
 	const itemCount = items?.length || 0;
@@ -274,7 +274,7 @@ const ModernMediaRow = ({
 								detailsWidth={details?.spotlightId === spotlightId ? details.width : undefined}
 								isLibraryRow={rowId === 'library-tiles'}
 								rowImageType={rowImageType}
-								warmFocusArt={warms(index, focusedIndex)}
+								warmRank={rankOf(index, focusedIndex)}
 								menuOptions={menuOptions}
 							/>
 						);

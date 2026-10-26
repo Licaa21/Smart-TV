@@ -90,7 +90,8 @@ describe('ModernMediaCard with a Seerr title', () => {
 	});
 
 	it('hands over to the backdrop when the thumb fails to load', () => {
-		render(<ModernMediaCard item={seerrShow()} serverUrl="http://server" isFocused />);
+		// a title of its own, since a thumb that failed is remembered for every card of that title
+		render(<ModernMediaCard item={seerrShow({Id: 'seerr-tv-4141', _seerrRaw: {mediaId: 4141, mediaType: 'tv'}})} serverUrl="http://server" isFocused />);
 		fireEvent.error(document.querySelector('[class~="imageWide"]'));
 		expect(wearing()).toBe(BACKDROP);
 	});
@@ -179,7 +180,7 @@ describe('ModernMediaCard growing on focus', () => {
 	});
 
 	it('fetches the wide art ahead for a card the row asks to, which then shows it at once', () => {
-		const {rerender} = render(<ModernMediaCard item={thumbed('beside')} serverUrl="http://server" warmFocusArt />);
+		const {rerender} = render(<ModernMediaCard item={thumbed('beside')} serverUrl="http://server" warmRank={1} />);
 		expect(shown()).toContain('/Images/Primary');
 		expect(loads.map((art) => art.src)).toEqual([expect.stringContaining('/Images/Thumb')]);
 
@@ -191,25 +192,32 @@ describe('ModernMediaCard growing on focus', () => {
 	});
 
 	it('drops the fetch of a card that is no longer asked to', () => {
-		const {rerender} = render(<ModernMediaCard item={thumbed('passed')} serverUrl="http://server" warmFocusArt />);
+		const {rerender} = render(<ModernMediaCard item={thumbed('passed')} serverUrl="http://server" warmRank={1} />);
 		expect(loads[0].src).toContain('/Images/Thumb');
 		rerender(<ModernMediaCard item={thumbed('passed')} serverUrl="http://server" />);
 		expect(loads[0].src).toBe('');
 	});
 
 	it('fetches the titled thumb ahead for a Seerr or outside list title', () => {
-		render(<ModernMediaCard item={seerrShow()} serverUrl="http://server" warmFocusArt />);
+		render(<ModernMediaCard item={seerrShow()} serverUrl="http://server" warmRank={1} />);
 		expect(loads.map((art) => art.src)).toEqual([THUMB]);
 	});
 
-	it('lets a thumb that was asked of the plugin finish when the card leaves the window', () => {
-		const {rerender} = render(<ModernMediaCard item={seerrShow({Id: 'seerr-tv-10'})} serverUrl="http://server" warmFocusArt />);
-		rerender(<ModernMediaCard item={seerrShow({Id: 'seerr-tv-10'})} serverUrl="http://server" />);
-		expect(loads[0].src).toBe(THUMB);
+	it('moves on to the plain backdrop when the thumb fetched ahead comes back with nothing, for every card of the title', () => {
+		const missing = () => seerrShow({Id: 'seerr-tv-4242', _seerrRaw: {mediaId: 4242, mediaType: 'tv'}});
+		const MISSING_THUMB = 'http://server/Moonfin/Tmdb/Thumb?type=tv&tmdbId=4242&ApiKey=token';
+		render(<ModernMediaCard item={missing()} serverUrl="http://server" warmRank={1} />);
+		expect(loads[0].src).toBe(MISSING_THUMB);
+		act(() => loads[0].onerror());
+		expect(loads[1].src).toBe(BACKDROP);
+
+		// another card of the same title goes straight to the backdrop
+		render(<ModernMediaCard item={missing()} serverUrl="http://server" warmRank={1} />);
+		expect(loads[2].src).toBe(BACKDROP);
 	});
 
 	it('fetches nothing ahead while the row holds its images back', () => {
-		render(<ModernMediaCard item={thumbed('held')} serverUrl="http://server" warmFocusArt deferImage />);
+		render(<ModernMediaCard item={thumbed('held')} serverUrl="http://server" warmRank={1} deferImage />);
 		expect(loads).toHaveLength(0);
 	});
 
@@ -219,8 +227,8 @@ describe('ModernMediaCard growing on focus', () => {
 	});
 
 	it('keeps the fetch going when focus lands on the card it was fetched for', () => {
-		const {rerender} = render(<ModernMediaCard item={thumbed('landed')} serverUrl="http://server" warmFocusArt />);
-		rerender(<ModernMediaCard item={thumbed('landed')} serverUrl="http://server" warmFocusArt isFocused />);
+		const {rerender} = render(<ModernMediaCard item={thumbed('landed')} serverUrl="http://server" warmRank={1} />);
+		rerender(<ModernMediaCard item={thumbed('landed')} serverUrl="http://server" warmRank={0} isFocused />);
 		expect(loads[0].src).toContain('/Images/Thumb');
 	});
 });

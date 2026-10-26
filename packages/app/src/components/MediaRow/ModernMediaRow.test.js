@@ -26,11 +26,11 @@ jest.mock('../../platform', () => ({getPlatform: () => 'webos'}));
 jest.mock('../Skeleton', () => ({SkeletonHomeRow: () => null, SkeletonRowTitle: () => null}));
 jest.mock('../MediaCard/ModernMediaCard', () => {
 	const React = require('react');
-	return ({item, spotlightId, onFocused, warmFocusArt}) => React.createElement('div', {
+	return ({item, spotlightId, onFocused, warmRank}) => React.createElement('div', {
 		className: 'spottable',
 		tabIndex: -1,
 		'data-spotlight-id': spotlightId,
-		'data-warm': warmFocusArt ? 'yes' : 'no',
+		'data-warm': warmRank >= 0 ? 'yes' : 'no',
 		onFocus: () => onFocused?.(item.Id)
 	}, item.Name);
 });
@@ -77,7 +77,7 @@ describe('ModernMediaRow', () => {
 			draw({items: many});
 			expect(warmCards()).toEqual([]);
 			focusCard(3);
-			expect(warmCards()).toEqual([2, 3, 4, 5, 6, 7, 8]);
+			expect(warmCards()).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 			focusCard(2);
 			expect(warmCards()).toEqual([0, 1, 2, 3]);
 		});
