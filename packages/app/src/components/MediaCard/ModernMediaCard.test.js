@@ -197,6 +197,17 @@ describe('ModernMediaCard growing on focus', () => {
 		expect(loads[0].src).toBe('');
 	});
 
+	it('fetches the titled thumb ahead for a Seerr or outside list title', () => {
+		render(<ModernMediaCard item={seerrShow()} serverUrl="http://server" warmFocusArt />);
+		expect(loads.map((art) => art.src)).toEqual([THUMB]);
+	});
+
+	it('lets a thumb that was asked of the plugin finish when the card leaves the window', () => {
+		const {rerender} = render(<ModernMediaCard item={seerrShow({Id: 'seerr-tv-10'})} serverUrl="http://server" warmFocusArt />);
+		rerender(<ModernMediaCard item={seerrShow({Id: 'seerr-tv-10'})} serverUrl="http://server" />);
+		expect(loads[0].src).toBe(THUMB);
+	});
+
 	it('fetches nothing ahead while the row holds its images back', () => {
 		render(<ModernMediaCard item={thumbed('held')} serverUrl="http://server" warmFocusArt deferImage />);
 		expect(loads).toHaveLength(0);
