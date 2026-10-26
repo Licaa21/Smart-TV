@@ -61,8 +61,6 @@ const expandTransition = (speed) => {
 	return ms ? `width ${ms}ms ${EXPAND_CURVE}` : 'none';
 };
 
-const ART_WAIT_MS = 300;
-
 // Wide art that has already come in, so a card focused after its art arrived opens straight away.
 const ART_MEMORY = 200;
 const loadedArt = new Set();
@@ -72,16 +70,16 @@ const rememberArt = (url) => {
 	if (loadedArt.size > ART_MEMORY) loadedArt.delete(loadedArt.values().next().value);
 };
 
-// Older engines have no decode, so loaded is as close as they get to ready to draw.
-const loadArt = (url, onReady, onFail) => {
+// Fetches the art into the cache ahead of the card that will wear it. Returns what drops the request, for
+// art no one is going to want after all.
+const loadArt = (url) => {
 	const art = new window.Image();
-	const ready = () => {
-		rememberArt(url);
-		onReady?.();
-	};
-	art.onload = () => (art.decode ? art.decode().then(ready, ready) : ready());
-	art.onerror = onFail || null;
+	art.onload = () => rememberArt(url);
 	art.src = url;
+	return () => {
+		art.onload = null;
+		art.src = '';
+	};
 };
 
 // The art a card shows, at rest or focused.
@@ -361,45 +359,30 @@ const ModernMediaCard = ({
 		item?._external === true ||
 		item?._seerr === true
 	);
-	// A card that grows keeps its poster until the wide art has loaded, so the poster is never
-	// shown cropped to the wide shape while the art comes in. Slow art gets a short wait, then
-	// the card opens anyway.
+	// A card that grows does so as focus lands on it. Its poster stands in the wide frame until the wide
+	// art is in, and the art then fades in over it. A card whose art was fetched ahead has it at once.
 	const swapsArt = canRenderExpanded && Boolean(restingUrl && focusUrl) && focusUrl !== restingUrl;
-	const [artArrived, setArtArrived] = useState(false);
-	useEffect(() => {
-		if (!isFocused) {
-			setArtArrived(false);
-			return undefined;
-		}
-		if (!swapsArt || loadedArt.has(focusUrl)) return undefined;
-		let waiting = true;
-		const arrive = () => {
-			if (!waiting) return;
-			waiting = false;
-			setArtArrived(true);
-		};
-		loadArt(focusUrl, arrive, arrive);
-		const timer = setTimeout(arrive, ART_WAIT_MS);
-		return () => {
-			waiting = false;
-			clearTimeout(timer);
-		};
-	}, [isFocused, swapsArt, focusUrl]);
+	const [arrivedUrl, setArrivedUrl] = useState(null);
+	const handleWideLoad = useCallback(() => {
+		rememberArt(focusUrl);
+		setArrivedUrl(focusUrl);
+	}, [focusUrl]);
 
-	// The cards beside the focused one fetch their wide art ahead, so moving along a row opens
-	// each card at once.
+	// The cards around the focused one fetch their wide art ahead, so moving about opens each card at once.
+	const warmsArt = warmFocusArt && !deferImage && swapsArt && !isUnownedSeerrTitle(item);
 	useEffect(() => {
-		if (warmFocusArt && swapsArt && !isUnownedSeerrTitle(item) && !loadedArt.has(focusUrl)) {
-			loadArt(focusUrl);
-		}
-	}, [warmFocusArt, swapsArt, focusUrl, item]);
+		if (!warmsArt || loadedArt.has(focusUrl)) return undefined;
+		return loadArt(focusUrl);
+	}, [warmsArt, focusUrl]);
 
-	const expanded = isFocused && canRenderExpanded && (!swapsArt || artArrived || loadedArt.has(focusUrl));
-	const imageUrl = isFocused && (expanded || !canRenderExpanded) ? focusUrl : restingUrl;
+	const expanded = isFocused && canRenderExpanded;
+	const overlaysArt = expanded && swapsArt;
+	const wideArrived = arrivedUrl === focusUrl || loadedArt.has(focusUrl);
+	const imageUrl = isFocused && !overlaysArt ? focusUrl : restingUrl;
 
 	const handleImageError = useCallback(() => {
-		if (seerrThumb && imageUrl === seerrThumb) setFailedThumb(seerrThumb);
-	}, [imageUrl, seerrThumb]);
+		if (seerrThumb && focusUrl === seerrThumb) setFailedThumb(seerrThumb);
+	}, [focusUrl, seerrThumb]);
 
 	const extendedSectionWidth = Math.max(detailsWidth || 0, expandedWidth);
 
@@ -443,8 +426,21 @@ const ModernMediaCard = ({
 							width={cardWidth}
 							height={imageHeight}
 							style={{height: `${imageHeight}px`, ...(rowArtwork && rowImageType === 'logo' ? {objectFit: 'contain'} : null)}}
-							onError={handleImageError}
+							onError={imageUrl === focusUrl ? handleImageError : undefined}
 						/>
+						{overlaysArt && (
+							<img
+								className={wideArrived ? `${css.image} ${css.imageWide} ${css.imageWideIn}` : `${css.image} ${css.imageWide}`}
+								src={deferImage ? undefined : focusUrl}
+								alt=""
+								width={cardWidth}
+								height={imageHeight}
+								// the poster under it already casts the shadow, and a theme's glow rule is only beaten from here
+								style={{height: `${imageHeight}px`, boxShadow: 'none'}}
+								onLoad={handleWideLoad}
+								onError={handleImageError}
+							/>
+						)}
 						{(item?.Type === 'Genre' || item?.Type === 'MusicGenre') && (
 							<>
 								<div className={css.genreOverlay} />

@@ -1,6 +1,7 @@
-import {fireEvent, render} from '@testing-library/react';
+import {act, fireEvent, render} from '@testing-library/react';
 
 import ModernMediaRow from './ModernMediaRow';
+import {announceFocusedRow, isNearFocusedRow as isNear} from './warmWindow';
 
 // The CLI ships a second copy of React, so the components' JSX goes through the copy under test.
 jest.mock('react/jsx-dev-runtime', () => {
@@ -25,7 +26,13 @@ jest.mock('../../platform', () => ({getPlatform: () => 'webos'}));
 jest.mock('../Skeleton', () => ({SkeletonHomeRow: () => null, SkeletonRowTitle: () => null}));
 jest.mock('../MediaCard/ModernMediaCard', () => {
 	const React = require('react');
-	return ({item, spotlightId}) => React.createElement('div', {className: 'spottable', tabIndex: -1, 'data-spotlight-id': spotlightId}, item.Name);
+	return ({item, spotlightId, onFocused, warmFocusArt}) => React.createElement('div', {
+		className: 'spottable',
+		tabIndex: -1,
+		'data-spotlight-id': spotlightId,
+		'data-warm': warmFocusArt ? 'yes' : 'no',
+		onFocus: () => onFocused?.(item.Id)
+	}, item.Name);
 });
 
 const items = Array.from({length: 6}, (_, i) => ({Id: `item${i}`, Name: `Title ${i}`}));
@@ -57,5 +64,50 @@ describe('ModernMediaRow', () => {
 		draw({onFocus});
 		focusCard(0);
 		expect(onFocus).toHaveBeenCalledWith(2);
+	});
+
+	describe('fetching wide art ahead', () => {
+		const many = Array.from({length: 14}, (_, i) => ({Id: `many${i}`, Name: `Many ${i}`}));
+		const warmCards = () => [...document.querySelectorAll('.spottable')].map((el, i) => (el.getAttribute('data-warm') === 'yes' ? i : -1)).filter((i) => i >= 0);
+		const leaveRow = () => fireEvent.blur(document.querySelectorAll('.spottable')[0], {relatedTarget: document.body});
+
+		beforeEach(() => announceFocusedRow(-1));
+
+		it('asks for the cards ahead of the focused one, and flips when focus turns back', () => {
+			draw({items: many});
+			expect(warmCards()).toEqual([]);
+			focusCard(3);
+			expect(warmCards()).toEqual([2, 3, 4, 5, 6, 7, 8]);
+			focusCard(2);
+			expect(warmCards()).toEqual([0, 1, 2, 3]);
+		});
+
+		it('asks for the first cards of a row beside the focused one', () => {
+			draw({items: many});
+			act(() => announceFocusedRow(1));
+			expect(warmCards()).toEqual([0, 1, 2, 3, 4]);
+			act(() => announceFocusedRow(3));
+			expect(warmCards()).toEqual([0, 1, 2, 3, 4]);
+			act(() => announceFocusedRow(6));
+			expect(warmCards()).toEqual([]);
+		});
+
+		it('also asks for the card the row was left on, and the ones after it', () => {
+			draw({items: many});
+			focusCard(9);
+			leaveRow();
+			act(() => announceFocusedRow(1));
+			expect(warmCards()).toEqual([0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13]);
+		});
+
+		it('tells the other rows which row took focus', () => {
+			draw({items: many});
+			focusCard(0);
+			expect(isNear(1)).toBe(true);
+			expect(isNear(3)).toBe(true);
+			expect(isNear(2)).toBe(true);
+			expect(isNear(0)).toBe(false);
+			expect(isNear(4)).toBe(false);
+		});
 	});
 });

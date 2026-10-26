@@ -10,6 +10,7 @@ import {useAuth} from '../../context/AuthContext';
 import {useSettings} from '../../context/SettingsContext';
 import {useSeerr} from '../../context/SeerrContext';
 import {ClassicMediaRow, ModernMediaRow} from '../../components/MediaRow';
+import {announceFocusedRow} from '../../components/MediaRow/warmWindow';
 import MediaPreviewContext from '../../components/MediaCard/MediaPreviewContext';
 import {modernRowSpacing} from '../../components/MediaCard/modernCardLayout';
 import SeerrTileRow from '../../components/SeerrTileRow';
@@ -813,6 +814,8 @@ const Browse = ({
 		lastFocusedRowRef.current = null;
 		setContentFocusHint(null);
 		detailSectionRef.current?.clearFocusedItem();
+		// The bar is the place above the first row, which fetches its first cards ahead
+		announceFocusedRow(-1);
 	}, [setBrowseMode]);
 
 	const handleRowFocus = useCallback((rowIndex) => {

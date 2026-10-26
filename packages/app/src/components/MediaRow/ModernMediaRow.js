@@ -9,6 +9,7 @@ import {useSettings} from '../../context/SettingsContext';
 import {getPlatform} from '../../platform';
 import {modernCardMetrics} from '../MediaCard/modernCardLayout';
 import PlaceholderRow from './PlaceholderRow';
+import {warmsWideArt, announceFocusedRow, isNearFocusedRow, watchFocusedRow} from './warmWindow';
 
 import css from './ModernMediaRow.module.less';
 
@@ -55,6 +56,16 @@ const ModernMediaRow = ({
 	const [focusedItemId, setFocusedItemId] = useState(null);
 	const [details, setDetails] = useState(null);
 	const platform = useRef(getPlatform()).current;
+	// The card focus was last on and the way it was moving, for the cards that fetch their wide art ahead
+	const lastIndexRef = useRef(-1);
+	const directionRef = useRef(1);
+	const inRowRef = useRef(false);
+	const [near, setNear] = useState(() => isNearFocusedRow(rowIndex));
+	useEffect(() => {
+		const sync = () => setNear(isNearFocusedRow(rowIndex));
+		sync();
+		return watchFocusedRow(sync);
+	}, [rowIndex]);
 
 	const keyPrefix = rowId || title || rowIndex || '';
 	const itemCount = items?.length || 0;
@@ -96,10 +107,15 @@ const ModernMediaRow = ({
 
 	const handleFocus = useCallback((e) => {
 		onFocus?.(rowIndex);
+		announceFocusedRow(rowIndex);
 		// The next cards are drawn as focus nears the end of those that are.
 		const grownCard = e.target.closest('.spottable');
 		if (grownCard && grownCard.parentNode && items && items.length > 0) {
 			const grownIndex = Array.prototype.indexOf.call(grownCard.parentNode.children, grownCard);
+			// Entering the row says nothing about the way focus is moving in it
+			if (inRowRef.current && grownIndex !== lastIndexRef.current) directionRef.current = grownIndex > lastIndexRef.current ? 1 : -1;
+			inRowRef.current = true;
+			lastIndexRef.current = grownIndex;
 			setShownCount((current) => {
 				const count = Math.min(items.length, current === null ? initialRowCount(items.length) : current);
 				const grown = grownRowCount(count, grownIndex, items.length);
@@ -163,6 +179,8 @@ const ModernMediaRow = ({
 		const nextTarget = e.relatedTarget;
 		const rowNode = document.querySelector(`[data-row-index="${rowIndex}"]`) || rowElementRef.current;
 		if (rowNode && nextTarget && typeof rowNode.contains === 'function' && rowNode.contains(nextTarget)) return;
+		inRowRef.current = false;
+		directionRef.current = 1;
 		setFocusedItemId(null);
 	}, [rowIndex]);
 
@@ -236,6 +254,12 @@ const ModernMediaRow = ({
 	if (!items || items.length === 0) return null;
 
 	const focusedIndex = focusedItemId ? items.findIndex((item) => item.Id === focusedItemId) : -1;
+	const warm = {
+		focusedIndex,
+		direction: directionRef.current,
+		neighbour: near,
+		restIndex: settings.rememberRowCard === false ? -1 : lastIndexRef.current
+	};
 
 	return (
 		<RowContainer
@@ -253,7 +277,6 @@ const ModernMediaRow = ({
 				<div className={css.items}>
 					{items.slice(0, limit).map((item, index) => {
 						const spotlightId = `media-${keyPrefix}-${item.Id}`;
-						const besideFocus = focusedIndex >= 0 && Math.abs(index - focusedIndex) === 1;
 						const isFirst = index === 0;
 						const isLast = index === limit - 1;
 						return (
@@ -274,7 +297,7 @@ const ModernMediaRow = ({
 								detailsWidth={details?.spotlightId === spotlightId ? details.width : undefined}
 								isLibraryRow={rowId === 'library-tiles'}
 								rowImageType={rowImageType}
-								warmFocusArt={besideFocus}
+								warmFocusArt={warmsWideArt(index, warm)}
 								menuOptions={menuOptions}
 							/>
 						);
