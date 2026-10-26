@@ -36,6 +36,24 @@
 	box-sizing: border-box;
 }
 
+// The wide art of a card that grew before it had come in lies over the poster and fades in once it has
+.imageWide {
+	position: absolute;
+	top: 0;
+	left: 0;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+
+	:global(.perf-low) &,
+	:global(.perf-lean) & {
+		transition: none;
+	}
+}
+
+.imageWideIn {
+	opacity: 1;
+}
+
 // OLED mode darkens the chrome, so artwork is lifted to match. The values are
 // written out rather than read from a variable, because the build inlines
 // custom property fallbacks for the older sets.
