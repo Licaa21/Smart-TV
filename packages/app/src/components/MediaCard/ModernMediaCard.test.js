@@ -163,84 +163,46 @@ describe('ModernMediaCard growing on focus', () => {
 		expect(shown()).toContain('/Images/Primary');
 	});
 
-	it('shows art that has arrived before without waiting for it again', () => {
+	it('shows art that has arrived before as soon as it has loaded, without a wait for the network', () => {
 		const {unmount} = render(<ModernMediaCard item={thumbed('again')} serverUrl="http://server" isFocused />);
 		fireEvent.load(wide());
 		unmount();
 		render(<ModernMediaCard item={thumbed('again')} serverUrl="http://server" isFocused />);
-		// the art is there, and shows as soon as it has decoded
+		// the art is there, and shows as soon as the picture has loaded
 		expect(faded()).toBe(false);
 		fireEvent.load(wide());
 		expect(faded()).toBe(true);
 	});
 
-	it('shows the art once the TV has decoded it, and not as it comes in', async () => {
-		let finish;
-		const decode = jest.fn(() => new Promise((resolve) => {
-			finish = resolve;
-		}));
-		const real = Object.getOwnPropertyDescriptor(window.HTMLImageElement.prototype, 'decode');
-		Object.defineProperty(window.HTMLImageElement.prototype, 'decode', {configurable: true, value: decode});
+	it('draws a bitmap made ahead at the size of the card, on a canvas', async () => {
+		const realFetch = window.fetch;
+		const realCreate = URL.createObjectURL;
+		const realBitmap = window.createImageBitmap;
+		const realContext = window.HTMLCanvasElement.prototype.getContext;
+		const draws = [];
+		const made = {width: 600, height: 360, close: jest.fn()};
+		window.fetch = jest.fn(() => Promise.resolve({ok: true, status: 200, blob: () => Promise.resolve({size: 1000})}));
+		URL.createObjectURL = jest.fn(() => 'blob:card/1');
+		window.createImageBitmap = jest.fn((source, ...rest) => Promise.resolve(rest.length ? made : {width: 1280, height: 720, close: jest.fn()}));
+		window.HTMLCanvasElement.prototype.getContext = () => ({drawImage: (...args) => draws.push(args)});
 		try {
-			render(<ModernMediaCard item={thumbed('decoding')} serverUrl="http://server" isFocused />);
-			fireEvent.load(wide());
-			expect(decode).toHaveBeenCalled();
-			expect(faded()).toBe(false);
+			const {rerender} = render(<ModernMediaCard item={thumbed('bitmapped')} serverUrl="http://server" warmRank={1} />);
 			await act(async () => {
-				finish();
+				for (let i = 0; i < 12; i++) await Promise.resolve();
 			});
-			expect(faded()).toBe(true);
+			expect(window.createImageBitmap).toHaveBeenCalledTimes(2);
+			rerender(<ModernMediaCard item={thumbed('bitmapped')} serverUrl="http://server" isFocused />);
+			const canvas = document.querySelector('canvas[class~="imageWide"]');
+			expect(canvas).not.toBeNull();
+			expect(canvas.className).toContain('imageWideIn');
+			expect(draws[0][0]).toBe(made);
+			expect(document.querySelector('img[class~="imageWide"]')).toBeNull();
 		} finally {
-			if (real) Object.defineProperty(window.HTMLImageElement.prototype, 'decode', real);
-			else delete window.HTMLImageElement.prototype.decode;
+			window.fetch = realFetch;
+			URL.createObjectURL = realCreate;
+			window.createImageBitmap = realBitmap;
+			window.HTMLCanvasElement.prototype.getContext = realContext;
 		}
-	});
-
-	it('shows the art anyway when the TV never answers the decode', () => {
-		const real = Object.getOwnPropertyDescriptor(window.HTMLImageElement.prototype, 'decode');
-		Object.defineProperty(window.HTMLImageElement.prototype, 'decode', {configurable: true, value: () => new Promise(() => {})});
-		try {
-			render(<ModernMediaCard item={thumbed('never')} serverUrl="http://server" isFocused />);
-			fireEvent.load(wide());
-			expect(faded()).toBe(false);
-			act(() => {
-				jest.advanceTimersByTime(400);
-			});
-			expect(faded()).toBe(true);
-		} finally {
-			if (real) Object.defineProperty(window.HTMLImageElement.prototype, 'decode', real);
-			else delete window.HTMLImageElement.prototype.decode;
-		}
-	});
-
-	it('lets a decode that ends after focus left show nothing', async () => {
-		let finish;
-		const real = Object.getOwnPropertyDescriptor(window.HTMLImageElement.prototype, 'decode');
-		Object.defineProperty(window.HTMLImageElement.prototype, 'decode', {configurable: true, value: () => new Promise((resolve) => {
-			finish = resolve;
-		})});
-		try {
-			const {rerender} = render(<ModernMediaCard item={thumbed('late-decode')} serverUrl="http://server" isFocused />);
-			fireEvent.load(wide());
-			rerender(<ModernMediaCard item={thumbed('late-decode')} serverUrl="http://server" />);
-			await act(async () => {
-				finish();
-			});
-			rerender(<ModernMediaCard item={thumbed('late-decode')} serverUrl="http://server" isFocused />);
-			expect(faded()).toBe(false);
-		} finally {
-			if (real) Object.defineProperty(window.HTMLImageElement.prototype, 'decode', real);
-			else delete window.HTMLImageElement.prototype.decode;
-		}
-	});
-
-	it('waits for the decode again when the card is focused again', () => {
-		const {rerender} = render(<ModernMediaCard item={thumbed('refocus')} serverUrl="http://server" isFocused />);
-		fireEvent.load(wide());
-		expect(faded()).toBe(true);
-		rerender(<ModernMediaCard item={thumbed('refocus')} serverUrl="http://server" />);
-		rerender(<ModernMediaCard item={thumbed('refocus')} serverUrl="http://server" isFocused />);
-		expect(faded()).toBe(false);
 	});
 
 	it('keeps the poster when the wide art never comes', () => {
