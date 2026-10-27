@@ -5,9 +5,13 @@
 - Nothing is waiting on a plugin: Moonbase 2.4.0.7 is Active on the server (checked 2026-10-27, `Moonfin/Tmdb/Thumb?...&size=w780` redirects to the 780 px picture), so the 1.7.x thumbs were already the smaller ones.
 - Try 1.7.2 on the TV (see below) and send the diagnostic report taken right after scrolling a TMDB or IMDb row. Look at the 'Wide art summary' lines: `ready`/`late` (was the art held), `plain`, and `decodeAvgMs`/`decodeMaxMs` (how long the TV took to decode).
 
+## 1.8.3: the first card of each row, and the title lookups kept
+
+The user confirmed 1.8.2 on the TV: every card but the first of each row is instant. A neighbouring row's cards were ranked 9 and up, so the card a row is entered on (and the first row from the media bar) was on the old slow path. 1.8.3 gives rank 9 (the card a row is entered on) the hidden picture and the decode ahead (`decodesAhead`). The IMDb and custom row title lookups are kept on the device for a week (`localizeExternalItems.js`). Not tried on the TV: read `shownAhead` against `shown` in the report, and the number of `Seerr/Api` requests in the first seconds. If the first row from the media bar is still slow, the cause is the row not having its pictures fetched yet at that moment, not the display.
+
 ## 1.8.2: the art still not instant in the 1.8.1 report
 
-The 1.8.1 report showed the art held (22 of 25 thumbs ready, 3 late, library 15 of 15) and decoded ahead (164 to 206 ms), and the user still saw it not instant: the wide `<img>` was made at focus and waited for its own load, a render and a 150 ms fade. 1.8.2 keeps it in the near cards, hidden, and only flips it on at focus. Not tried on the TV: read `shownAvgMs`/`shownMaxMs`/`shownAhead` in the 'Wide art summary'. If they are high with `shownAhead` near `shown`, the cost is the TV's paint of the hidden layer: next try `will-change: opacity` on `.imageWide`, or fewer cards held (`DECODE_AHEAD_RANK`). The 1.8.1 report also still shows 96 Seerr lookups in the first 9 s (IMDb and custom rows); a cache kept across starts would remove them, ask first.
+The 1.8.1 report showed the art held (22 of 25 thumbs ready, 3 late, library 15 of 15) and decoded ahead (164 to 206 ms), and the user still saw it not instant: the wide `<img>` was made at focus and waited for its own load, a render and a 150 ms fade. 1.8.2 keeps it in the near cards, hidden, and only flips it on at focus. Not tried on the TV: read `shownAvgMs`/`shownMaxMs`/`shownAhead` in the 'Wide art summary'. If they are high with `shownAhead` near `shown`, the cost is the TV's paint of the hidden layer: next try `will-change: opacity` on `.imageWide`, or fewer cards held (`DECODE_NEAR_RANK` in `components/MediaRow/warmWindow.js`). The 1.8.1 report also still shows 96 Seerr lookups in the first 9 s (IMDb and custom rows); a cache kept across starts would remove them, ask first.
 
 ## 1.8.1: the lag in the 1.8.0 report
 
