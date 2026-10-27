@@ -3,9 +3,13 @@
 ## Waiting on the user
 
 - **Restart Jellyfin.** Moonbase 2.4.0.7 (the thumb takes `size=w300|w780|w1280`) is installed on the server and waits for a restart: the install was accepted (204) on 2026-10-26, but the restart was blocked by the permission classifier, so it was not done. Until it is restarted, 2.4.0.6 stays active and the TV's `&size=w780` is ignored (nothing breaks, the thumbs are just the 1280 px ones). After the restart: check `/Plugins` shows 2.4.0.7 and that `Moonfin/Tmdb/Thumb?...&size=w780` redirects to `.../t/p/w780/...`.
-- Try 1.7.0 on the TV (see below) and send the diagnostic report taken right after scrolling a TMDB or IMDb row.
+- Try 1.7.1 on the TV (see below) and send the diagnostic report taken right after scrolling a TMDB or IMDb row. Look at the 'Wide art summary' lines: `ready`/`late` (was the art held), `plain`, and `decodeAvgMs`/`decodeMaxMs` (how long the TV took to decode).
 
-## Modern cards: the wide picture on external rows (1.7.0, to be confirmed on the TV)
+## 1.7.1: the picture drew in from the top on every row, even held
+
+The report from 1.7.0 (2026-10-27) showed the wide art held at all 75 card focuses (library 14, thumb 61, none late), and the user still saw the picture draw in from the top, on all rows. So it is the TV decoding and painting it, not a download. 1.7.1 decodes the nearest cards' art ahead (`decodeArt`) and shows a card's art only once `img.decode()` has finished (400 ms at most). Checked in a browser with the CPU slowed 6x (the art shows 40 to 100 ms after the key); not known on the TV. If it still draws in, the summary's `decodeMaxMs` says whether decoding is the slow part; the next suspects are the size of the picture (Moonbase 2.4.0.7's `size=w780` is not active until Jellyfin restarts), the raster of the focused card's own layer (`will-change: transform` in `ModernMediaCard.module.less`) and the width transition on the card.
+
+## Modern cards: the wide picture on external rows (1.7.0, confirmed on the TV only in part)
 
 **Seen on the TV with 1.6.4:** the card grew at once, but about half the cards of the external rows (IMDb, TMDB, Seerr, upcoming) drew their landscape picture in from the top, i.e. the picture was downloading as the card was focused.
 
