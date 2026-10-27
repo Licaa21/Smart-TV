@@ -15,7 +15,7 @@ const SEEK_BACK_TICKS = 10000000;
 const nextUpStartOf = (creditsStart, runTime, nearEndTicks = NEAR_END_TICKS) => Math.min(creditsStart ?? Infinity, runTime > 0 ? runTime - nearEndTicks : Infinity);
 
 // With autoplay the ended handler moves on at the end of the file, so the card only shows for the timeout.
-const nearEndTicksOf = (settings) => (settings.autoPlay ? (settings.nextUpTimeout ?? 7) * 10000000 : NEAR_END_TICKS);
+const nearEndTicksOf = (autoPlay, nextUpTimeout) => (autoPlay ? (nextUpTimeout ?? 7) * 10000000 : NEAR_END_TICKS);
 
 // The prompt's own button, which the key handler tells apart from the controls underneath.
 // How long after a skip a reading short of the segment's end is still the skip landing.
@@ -179,7 +179,7 @@ const useSegmentPopups = ({
 		const creditsStart = mediaSegments?.creditsStart ?? null;
 
 		// From here on the next episode is offered, or the credits card in place of the skip prompt
-		const nearEndTicks = nearEndTicksOf(settings);
+		const nearEndTicks = nearEndTicksOf(settings.autoPlay, settings.nextUpTimeout);
 		const nextUpFrom = nextUpStartOf(creditsStart, runTimeRef.current, nearEndTicks);
 
 		// A seek into a segment offers it again, however the prompt for it ended before: dismissed, or hidden after its
@@ -315,7 +315,7 @@ const useSegmentPopups = ({
 			dismissedSegmentsRef.current.delete(seg.start);
 			if (promptShownAtRef.current?.start === seg.start) promptShownAtRef.current = null;
 		});
-		if (nextUpWouldShow && hasTriggeredNextEpisodeRef.current && ticks >= nextUpStartOf(mediaSegments?.creditsStart ?? null, runTimeRef.current, nearEndTicksOf(settings))) {
+		if (nextUpWouldShow && hasTriggeredNextEpisodeRef.current && ticks >= nextUpStartOf(mediaSegments?.creditsStart ?? null, runTimeRef.current, nearEndTicksOf(settings.autoPlay, settings.nextUpTimeout))) {
 			found = true;
 			hasTriggeredNextEpisodeRef.current = false;
 		}

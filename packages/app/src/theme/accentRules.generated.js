@@ -218,6 +218,8 @@ export const ACCENT_RULES = {
 		["views/Details/Details.module.less","",".{personPhoto}","border","3px solid {accent}"],
 		["views/Details/Details.module.less","",".{personPhotoPlaceholder}","border","3px solid {accent}"],
 		["views/Details/Details.module.less","",".{overviewToggleHint}","color","{accent}"],
+		["views/Details/Details.module.less","",".{personActionBtn}:focus","background","rgba({rgb}, 0.3)"],
+		["views/Details/Details.module.less","",".{personActionBtn}:focus","border-color","{accent}"],
 		["views/Details/Details.module.less","",".{personTabActive}","background","{accent}"],
 		["views/Details/Details.module.less","","html[data-theme-id='neon_pulse'] .{title}, html[data-theme-id='neon_pulse'] .{seasonDetailTitle}, html[data-theme-id='neon_pulse'] .{seasonEpTitle}, html[data-theme-id='neon_pulse'] .{castName}","color","{accent}"],
 		["views/Details/Details.module.less","","html[data-theme-id='neon_pulse'] .{episodeNumber}, html[data-theme-id='neon_pulse'] .{infoBadge}","border","1px solid rgba({rgb}, 0.5)"],

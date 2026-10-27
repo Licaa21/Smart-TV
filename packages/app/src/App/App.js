@@ -1552,7 +1552,7 @@ const AppContent = (props) => {
 		const item = person.Type ? person : {...person, Type: 'Person'};
 		setSelectedItem(item);
 		navigateTo(PANELS.DETAILS, false);
-	}, [navigateTo]);
+	}, [navigateTo, playingItem, playbackOptions, isResume, panelHistory.length]);
 
 	const handleOpenRecordings = useCallback(() => {
 		navigateTo(PANELS.RECORDINGS);
