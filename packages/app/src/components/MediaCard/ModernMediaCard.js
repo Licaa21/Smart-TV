@@ -14,7 +14,7 @@ import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
 import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
-import {hasArt, rememberArt, artSource, artState, touchArt, decodeArt, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded} from './artPrefetch';
+import {hasArt, rememberArt, artSource, artState, touchArt, bitmapFor, decodeArt, prefetchArt, noteArtFocus, noteArtArrived} from './artPrefetch';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
 
@@ -58,9 +58,7 @@ const EXPAND_MS = {extraSlow: 450, slow: 300, medium: 180, fast: 90, off: 0};
 const EXPAND_CURVE = 'cubic-bezier(0.65, 0, 0.35, 1)';
 
 // The cards this near to focus have their art decoded ahead as well as held
-const DECODE_AHEAD_RANK = 2;
-// A decode the TV does not answer within this long shows the art anyway
-const DECODE_WAIT_MS = 400;
+const DECODE_AHEAD_RANK = 4;
 
 const expandTransition = (speed) => {
 	const ms = EXPAND_MS[speed] || 0;
@@ -370,49 +368,15 @@ const ModernMediaCard = ({
 	// art is in, and the art then fades in over it. A card whose art was fetched ahead has it at once.
 	const swapsArt = canRenderExpanded && Boolean(restingUrl && focusUrl) && focusUrl !== restingUrl;
 	const [arrivedUrl, setArrivedUrl] = useState(null);
-	// Moves on whenever focus leaves the card, so what a decode finds out after that is let go
-	const focusTokenRef = useRef(0);
-	const aliveRef = useRef(true);
-	useEffect(() => {
-		aliveRef.current = true;
-		return () => {
-			aliveRef.current = false;
-		};
-	}, []);
 	// Set when the card was focused before its art was there, to tell the report how long it took
 	const lateSinceRef = useRef(0);
-	const handleWideLoad = useCallback((event) => {
+	const handleWideLoad = useCallback(() => {
 		// A held copy is remembered by being held; only art loaded the plain way is noted here
 		if (artSource(focusUrl) === focusUrl) rememberArt(focusUrl);
-		const img = event?.currentTarget;
-		// The art is shown once the TV has decoded it. Shown as it came in, a large picture was painted as it decoded,
-		// from the top down, and a card with its art held drew that way too.
-		// Only while this focus lasts: a decode that ends after focus left shows nothing
-		const token = focusTokenRef.current;
-		let revealed = false;
-		let timer = null;
-		const reveal = () => {
-			clearTimeout(timer);
-			if (revealed || !aliveRef.current || token !== focusTokenRef.current) return;
-			revealed = true;
-			setArrivedUrl(focusUrl);
-			if (lateSinceRef.current) {
-				noteArtArrived(focusUrl, Date.now() - lateSinceRef.current);
-				lateSinceRef.current = 0;
-			}
-		};
-		if (img && typeof img.decode === 'function') {
-			const since = Date.now();
-			timer = setTimeout(reveal, DECODE_WAIT_MS);
-			img.decode().then(() => {
-				noteArtDecoded(focusUrl, Date.now() - since);
-				reveal();
-			}, () => {
-				// A picture that could not be decoded is not shown
-				if (img.naturalWidth > 0) reveal();
-			});
-		} else {
-			reveal();
+		setArrivedUrl(focusUrl);
+		if (lateSinceRef.current) {
+			noteArtArrived(focusUrl, Date.now() - lateSinceRef.current);
+			lateSinceRef.current = 0;
 		}
 	}, [focusUrl]);
 	// A request for the art ended, and the card has something to draw, or to ask the network for
@@ -445,12 +409,25 @@ const ModernMediaCard = ({
 	}, [rank]);
 	// The art of the nearest cards is decoded ahead, so the card draws it at once and not as it decodes
 	useEffect(() => {
-		if (rank >= 0 && rank <= DECODE_AHEAD_RANK && !deferImage && swapsArt) decodeArt(focusUrl);
-	}, [rank, deferImage, swapsArt, focusUrl, artTick]);
+		if (rank >= 0 && rank <= DECODE_AHEAD_RANK && !deferImage && swapsArt) decodeArt(focusUrl, expandedWidth, imageHeight, onArtDone);
+	}, [rank, deferImage, swapsArt, focusUrl, artTick, expandedWidth, imageHeight, onArtDone]);
 
 	const expanded = isFocused && canRenderExpanded;
 	const overlaysArt = expanded && swapsArt;
+	// The picture shows once it has loaded: a copy still coming in painted from the top
 	const wideArrived = arrivedUrl === focusUrl;
+	// The card draws a bitmap made ahead at its size when there is one, and the picture otherwise
+	const bitmap = overlaysArt && !deferImage ? bitmapFor(focusUrl, expandedWidth, imageHeight) : null;
+	// Drawn as the canvas attaches, or when the bitmap changes
+	const drawBitmap = useCallback((canvas) => {
+		const context = canvas && bitmap ? canvas.getContext('2d') : null;
+		if (!context) return;
+		try {
+			context.drawImage(bitmap, 0, 0);
+		} catch {
+			// a bitmap that cannot be drawn leaves the canvas empty, and the poster shows
+		}
+	}, [bitmap]);
 	const imageUrl = isFocused && !overlaysArt ? focusUrl : restingUrl;
 
 	// The report is told whether the art was there when the card was focused, and how long it took when it was not
@@ -459,21 +436,18 @@ const ModernMediaCard = ({
 		if (!isFocused || !overlaysArt || !focusUrl) {
 			lateSinceRef.current = 0;
 			countedFocusRef.current = false;
-			// The next time the art is drawn it is shown once decoded again
-			focusTokenRef.current += 1;
-			setArrivedUrl((url) => (url === null ? url : null));
 			return undefined;
 		}
 		if (!countedFocusRef.current) {
 			countedFocusRef.current = true;
-			lateSinceRef.current = noteArtFocus(focusUrl) ? 0 : Date.now();
+			lateSinceRef.current = noteArtFocus(focusUrl, Boolean(bitmapFor(focusUrl, expandedWidth, imageHeight))) ? 0 : Date.now();
 		}
 		touchArt(focusUrl);
 		// A held copy that was let go since it was fetched is fetched again, when nothing is already asking for it.
 		if (deferImage || hasArt(focusUrl) || artState(focusUrl) !== 'none') return undefined;
 		const request = prefetchArt(focusUrl, 0, onArtFail, onArtDone);
 		return () => request.cancel();
-	}, [isFocused, overlaysArt, focusUrl, deferImage, onArtFail, onArtDone]);
+	}, [isFocused, overlaysArt, focusUrl, deferImage, expandedWidth, imageHeight, onArtFail, onArtDone]);
 
 	const handleImageError = useCallback(() => {
 		if (seerrThumb && focusUrl === seerrThumb) failThumb(seerrThumb);
@@ -523,7 +497,17 @@ const ModernMediaCard = ({
 							style={{height: `${imageHeight}px`, ...(rowArtwork && rowImageType === 'logo' ? {objectFit: 'contain'} : null)}}
 							onError={imageUrl === focusUrl ? handleImageError : undefined}
 						/>
-						{overlaysArt && (
+						{overlaysArt && bitmap && (
+							<canvas
+								ref={drawBitmap}
+								className={`${css.image} ${css.imageWide} ${css.imageWideIn}`}
+								width={bitmap.width}
+								height={bitmap.height}
+								// the poster under it already casts the shadow, and a theme's glow rule is only beaten from here
+								style={{height: `${imageHeight}px`, boxShadow: 'none'}}
+							/>
+						)}
+						{overlaysArt && !bitmap && (
 							<img
 								className={wideArrived ? `${css.image} ${css.imageWide} ${css.imageWideIn}` : `${css.image} ${css.imageWide}`}
 								src={deferImage ? undefined : (artSource(focusUrl) || undefined)}

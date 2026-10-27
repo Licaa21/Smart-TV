@@ -1,4 +1,4 @@
-import {hasArt, artSource, artState, touchArt, decodeArt, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded, setArtLogSink} from './artPrefetch';
+import {hasArt, artSource, artState, touchArt, bitmapFor, decodeArt, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded, setArtLogSink} from './artPrefetch';
 
 describe('prefetchArt', () => {
 	const RealImage = window.Image;
@@ -254,6 +254,89 @@ describe('prefetchArt reading the art as a blob', () => {
 		await flush();
 		expect(artSource(urls[0])).toMatch(/^blob:art\//);
 		expect(artSource(urls[1])).toBeNull();
+	});
+
+	it('makes a bitmap of a held picture at the size asked, cropped to cover, and says when it is there', async () => {
+		const realBitmap = window.createImageBitmap;
+		const calls = [];
+		const natural = {width: 1280, height: 720, close: jest.fn()};
+		const made = {width: 520, height: 360, close: jest.fn()};
+		window.createImageBitmap = jest.fn((...args) => {
+			calls.push(args);
+			return Promise.resolve(args.length === 1 ? natural : made);
+		});
+		try {
+			const url = 'http://server/bitmap-me.jpg';
+			const ready = jest.fn();
+			ask(url, 0);
+			answer(0, ok());
+			await flush();
+			decodeArt(url, 520, 360, ready);
+			await flush();
+			await flush();
+			expect(bitmapFor(url, 520, 360)).toBe(made);
+			expect(bitmapFor(url, 300, 200)).toBeNull();
+			expect(ready).toHaveBeenCalledTimes(1);
+			// 520x360 covered from 1280x720: the width is cropped to the card's shape, centred
+			const [, left, top, cropWidth, cropHeight, options] = calls[1];
+			expect(cropHeight).toBe(720);
+			expect(cropWidth).toBe(Math.round(520 / (360 / 720)));
+			expect(left).toBe(Math.round((1280 - cropWidth) / 2));
+			expect(top).toBe(0);
+			expect(options).toEqual(expect.objectContaining({resizeWidth: 520, resizeHeight: 360}));
+			expect(natural.close).toHaveBeenCalled();
+			expect(hasArt(url)).toBe(true);
+			decodeArt(url, 520, 360, ready);
+			expect(window.createImageBitmap).toHaveBeenCalledTimes(2);
+		} finally {
+			window.createImageBitmap = realBitmap;
+		}
+	});
+
+	it('tells every card sharing a picture and a size when its bitmap is there', async () => {
+		const realBitmap = window.createImageBitmap;
+		window.createImageBitmap = jest.fn((...args) => Promise.resolve(args.length === 1 ? {width: 1280, height: 720, close: jest.fn()} : {width: 520, height: 360, close: jest.fn()}));
+		try {
+			const url = 'http://server/shared-bitmap.jpg';
+			ask(url, 0);
+			answer(0, ok());
+			await flush();
+			const first = jest.fn();
+			const second = jest.fn();
+			decodeArt(url, 520, 360, first);
+			decodeArt(url, 520, 360, second);
+			await flush();
+			await flush();
+			expect(first).toHaveBeenCalledTimes(1);
+			expect(second).toHaveBeenCalledTimes(1);
+			expect(window.createImageBitmap).toHaveBeenCalledTimes(2);
+		} finally {
+			window.createImageBitmap = realBitmap;
+		}
+	});
+
+	it('lets a bitmap that cannot be made fall back to decoding the picture', async () => {
+		const realBitmap = window.createImageBitmap;
+		window.createImageBitmap = jest.fn(() => Promise.reject(new Error('no')));
+		const decodes = [];
+		window.Image = function FakeImage () {
+			const art = {decode: jest.fn(() => Promise.resolve())};
+			decodes.push(art);
+			return art;
+		};
+		try {
+			const url = 'http://server/no-bitmap.jpg';
+			ask(url, 0);
+			answer(0, ok());
+			await flush();
+			decodeArt(url, 520, 360);
+			await flush();
+			await flush();
+			expect(bitmapFor(url, 520, 360)).toBeNull();
+			expect(decodes).toHaveLength(1);
+		} finally {
+			window.createImageBitmap = realBitmap;
+		}
 	});
 
 	it('decodes the held pictures it is told to ahead, with the held address', async () => {
