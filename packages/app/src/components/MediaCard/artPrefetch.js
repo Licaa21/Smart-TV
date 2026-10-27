@@ -149,23 +149,28 @@ const pumpDecode = () => {
 	}
 	decoding = true;
 	const since = Date.now();
-	const img = new window.Image();
-	img.src = entry.blobUrl;
-	decoded.set(url, {img, blobUrl: entry.blobUrl});
-	if (decoded.size > DECODED_MAX) decoded.delete(decoded.keys().next().value);
 	let timer = null;
 	let finished = false;
-	const finish = () => {
+	// Only a decode that ended well is counted, so the report's times are the TV's and not the limit or a broken picture
+	const finish = (ok) => {
 		if (finished) return;
 		finished = true;
 		clearTimeout(timer);
-		noteArtDecoded(url, Date.now() - since); // eslint-disable-line no-use-before-define
+		if (ok) noteArtDecoded(url, Date.now() - since); // eslint-disable-line no-use-before-define
 		decoding = false;
 		pumpDecode();
 	};
-	timer = setTimeout(finish, DECODE_TIMEOUT_MS);
-	if (typeof img.decode === 'function') img.decode().then(finish, finish);
-	else finish();
+	timer = setTimeout(() => finish(false), DECODE_TIMEOUT_MS);
+	try {
+		const img = new window.Image();
+		img.src = entry.blobUrl;
+		decoded.set(url, {img, blobUrl: entry.blobUrl});
+		if (decoded.size > DECODED_MAX) decoded.delete(decoded.keys().next().value);
+		if (typeof img.decode === 'function') img.decode().then(() => finish(true), () => finish(false));
+		else finish(true);
+	} catch (err) {
+		finish(false);
+	}
 };
 
 const waiting = [];
@@ -400,6 +405,11 @@ export const noteArtArrived = (url, ms) => {
 	if (arrivedLines >= LATE_LINES_PER_SUMMARY) return;
 	arrivedLines += 1;
 	logArt('Wide art arrived late', {kind: kindOf(url), ms});
+};
+
+// A card that focus has left no longer wants its picture decoded ahead.
+export const dropDecode = (url) => {
+	decodeQueue.delete(url);
 };
 
 // Asks for the held picture to be decoded ahead, nearest card first, one at a time. Nothing happens for a picture that

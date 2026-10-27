@@ -1,4 +1,4 @@
-import {hasArt, artSource, artState, touchArt, decodeArt, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded, setArtLogSink} from './artPrefetch';
+import {hasArt, artSource, artState, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded, setArtLogSink} from './artPrefetch';
 
 describe('prefetchArt', () => {
 	const RealImage = window.Image;
@@ -285,6 +285,35 @@ describe('prefetchArt reading the art as a blob', () => {
 		// leaves nothing under way for the tests after it
 		decodes[2].finish();
 		await flush();
+	});
+
+	it('does not decode a picture whose card has let it go, and counts only the decodes that ended well', async () => {
+		const lines = [];
+		setArtLogSink((message, context) => lines.push([message, context]));
+		const decodes = [];
+		window.Image = function FakeImage () {
+			const art = {decode: jest.fn(() => new Promise((resolve) => { art.finish = resolve; }))};
+			decodes.push(art);
+			return art;
+		};
+		const urls = ['http://server/drop-a.jpg', 'http://server/drop-b.jpg', 'http://server/drop-c.jpg'];
+		urls.forEach((url, i) => ask(url, i));
+		urls.forEach((url, i) => answer(i, ok()));
+		await flush();
+		await flush();
+		decodeArt(urls[0], 0);
+		decodeArt(urls[1], 1);
+		decodeArt(urls[2], 2);
+		dropDecode(urls[1]);
+		decodes[0].finish();
+		await flush();
+		// the card that was let go is skipped
+		expect(decodes).toHaveLength(2);
+		expect(decodes[1].src).toBe(artSource(urls[2]));
+		decodes[1].finish();
+		await flush();
+		expect(decodes).toHaveLength(2);
+		setArtLogSink(null);
 	});
 
 	it('does not wait for a decode that never ends', async () => {

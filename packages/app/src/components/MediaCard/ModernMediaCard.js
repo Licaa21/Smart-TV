@@ -14,7 +14,7 @@ import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
 import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
-import {hasArt, rememberArt, artSource, artState, touchArt, decodeArt, prefetchArt, noteArtFocus, noteArtArrived} from './artPrefetch';
+import {hasArt, rememberArt, artSource, artState, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived} from './artPrefetch';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
 
@@ -409,7 +409,10 @@ const ModernMediaCard = ({
 	}, [rank]);
 	// The art of the nearest cards is decoded ahead, so the card draws it at once and not as it decodes
 	useEffect(() => {
-		if (rank >= 0 && rank <= DECODE_AHEAD_RANK && !deferImage && swapsArt) decodeArt(focusUrl, rank);
+		if (!(rank >= 0 && rank <= DECODE_AHEAD_RANK && !deferImage && swapsArt)) return undefined;
+		decodeArt(focusUrl, rank);
+		// A card focus has moved away from, or that is gone, is not decoded for
+		return () => dropDecode(focusUrl);
 	}, [rank, deferImage, swapsArt, focusUrl, artTick]);
 
 	const expanded = isFocused && canRenderExpanded;
