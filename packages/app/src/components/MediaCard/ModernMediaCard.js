@@ -14,7 +14,7 @@ import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
 import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
-import {hasArt, rememberArt, artSource, artState, touchArt, prefetchArt, noteArtFocus, noteArtArrived} from './artPrefetch';
+import {hasArt, rememberArt, artSource, artState, touchArt, decodeArt, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded} from './artPrefetch';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
 
@@ -56,6 +56,11 @@ const getMetadataLine = (item) => {
 // The same speeds and curve Moonfin Core opens its modern cards with
 const EXPAND_MS = {extraSlow: 450, slow: 300, medium: 180, fast: 90, off: 0};
 const EXPAND_CURVE = 'cubic-bezier(0.65, 0, 0.35, 1)';
+
+// The cards this near to focus have their art decoded ahead as well as held
+const DECODE_AHEAD_RANK = 2;
+// A decode the TV does not answer within this long shows the art anyway
+const DECODE_WAIT_MS = 400;
 
 const expandTransition = (speed) => {
 	const ms = EXPAND_MS[speed] || 0;
@@ -365,19 +370,53 @@ const ModernMediaCard = ({
 	// art is in, and the art then fades in over it. A card whose art was fetched ahead has it at once.
 	const swapsArt = canRenderExpanded && Boolean(restingUrl && focusUrl) && focusUrl !== restingUrl;
 	const [arrivedUrl, setArrivedUrl] = useState(null);
+	// Moves on whenever focus leaves the card, so what a decode finds out after that is let go
+	const focusTokenRef = useRef(0);
+	const aliveRef = useRef(true);
+	useEffect(() => {
+		aliveRef.current = true;
+		return () => {
+			aliveRef.current = false;
+		};
+	}, []);
 	// Set when the card was focused before its art was there, to tell the report how long it took
 	const lateSinceRef = useRef(0);
-	const handleWideLoad = useCallback(() => {
+	const handleWideLoad = useCallback((event) => {
 		// A held copy is remembered by being held; only art loaded the plain way is noted here
 		if (artSource(focusUrl) === focusUrl) rememberArt(focusUrl);
-		setArrivedUrl(focusUrl);
-		if (lateSinceRef.current) {
-			noteArtArrived(focusUrl, Date.now() - lateSinceRef.current);
-			lateSinceRef.current = 0;
+		const img = event?.currentTarget;
+		// The art is shown once the TV has decoded it. Shown as it came in, a large picture was painted as it decoded,
+		// from the top down, and a card with its art held drew that way too.
+		// Only while this focus lasts: a decode that ends after focus left shows nothing
+		const token = focusTokenRef.current;
+		let revealed = false;
+		let timer = null;
+		const reveal = () => {
+			clearTimeout(timer);
+			if (revealed || !aliveRef.current || token !== focusTokenRef.current) return;
+			revealed = true;
+			setArrivedUrl(focusUrl);
+			if (lateSinceRef.current) {
+				noteArtArrived(focusUrl, Date.now() - lateSinceRef.current);
+				lateSinceRef.current = 0;
+			}
+		};
+		if (img && typeof img.decode === 'function') {
+			const since = Date.now();
+			timer = setTimeout(reveal, DECODE_WAIT_MS);
+			img.decode().then(() => {
+				noteArtDecoded(focusUrl, Date.now() - since);
+				reveal();
+			}, () => {
+				// A picture that could not be decoded is not shown
+				if (img.naturalWidth > 0) reveal();
+			});
+		} else {
+			reveal();
 		}
 	}, [focusUrl]);
 	// A request for the art ended, and the card has something to draw, or to ask the network for
-	const [, setArtTick] = useState(0);
+	const [artTick, setArtTick] = useState(0);
 	const onArtDone = useCallback(() => setArtTick((n) => n + 1), []);
 	// A thumb the plugin has none of (a 404), or one that would not load, hands over to the backdrop before the card
 	// is ever focused. Any other answer may pass.
@@ -404,10 +443,14 @@ const ModernMediaCard = ({
 	useEffect(() => {
 		prefetchRef.current?.setRank(rank);
 	}, [rank]);
+	// The art of the nearest cards is decoded ahead, so the card draws it at once and not as it decodes
+	useEffect(() => {
+		if (rank >= 0 && rank <= DECODE_AHEAD_RANK && !deferImage && swapsArt) decodeArt(focusUrl);
+	}, [rank, deferImage, swapsArt, focusUrl, artTick]);
 
 	const expanded = isFocused && canRenderExpanded;
 	const overlaysArt = expanded && swapsArt;
-	const wideArrived = arrivedUrl === focusUrl || hasArt(focusUrl);
+	const wideArrived = arrivedUrl === focusUrl;
 	const imageUrl = isFocused && !overlaysArt ? focusUrl : restingUrl;
 
 	// The report is told whether the art was there when the card was focused, and how long it took when it was not
@@ -416,6 +459,9 @@ const ModernMediaCard = ({
 		if (!isFocused || !overlaysArt || !focusUrl) {
 			lateSinceRef.current = 0;
 			countedFocusRef.current = false;
+			// The next time the art is drawn it is shown once decoded again
+			focusTokenRef.current += 1;
+			setArrivedUrl((url) => (url === null ? url : null));
 			return undefined;
 		}
 		if (!countedFocusRef.current) {

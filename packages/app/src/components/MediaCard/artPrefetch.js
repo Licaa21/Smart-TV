@@ -20,6 +20,12 @@ const MAX_HELD = 150;
 // A held address is given up this long after it left, so a card still loading from it is not cut off.
 const REVOKE_DELAY_MS = 10000;
 const held = new Map();
+// The nearest pictures are decoded ahead. A held copy is only bytes: drawn the first time, a large picture was
+// decoded as it was painted, and a TV's slow decoder showed that as the picture drawing in from the top. The images
+// are kept here so what was decoded is not let go before the card draws it.
+const DECODED_MAX = 6;
+const decoded = new Map();
+
 let heldBytes = 0;
 // The picture the focused card draws, which is never the one let go.
 let drawnUrl = null;
@@ -88,6 +94,7 @@ const hold = (url, blob) => {
 		if (oldest === undefined) break;
 		const entry = held.get(oldest);
 		held.delete(oldest);
+		decoded.delete(oldest);
 		heldBytes -= entry.size;
 		release(entry.blobUrl);
 	}
@@ -116,6 +123,22 @@ export const touchArt = (url) => {
 		held.delete(url);
 		held.set(url, entry);
 	}
+};
+
+export const decodeArt = (url) => {
+	const entry = held.get(url);
+	if (!entry || typeof window === 'undefined' || typeof window.Image !== 'function') return;
+	const known = decoded.get(url);
+	decoded.delete(url);
+	if (known && known.blobUrl === entry.blobUrl) {
+		decoded.set(url, known);
+		return;
+	}
+	const img = new window.Image();
+	img.src = entry.blobUrl;
+	decoded.set(url, {img, blobUrl: entry.blobUrl});
+	if (decoded.size > DECODED_MAX) decoded.delete(decoded.keys().next().value);
+	if (typeof img.decode === 'function') img.decode().catch(() => {});
 };
 
 const waiting = [];
@@ -298,11 +321,25 @@ let lateLines = 0;
 let arrivedLines = 0;
 let tally = {};
 
+const rowFor = (kind) => tally[kind] || (tally[kind] = {ready: 0, late: 0, plain: 0, decodes: 0, decodeMs: 0, decodeMax: 0});
+
+// What the summary says: per kind, the cards that had their art and those that had not, the pictures that were loaded
+// the plain way, and how long the TV took to decode a picture it drew.
+const summary = () => {
+	const out = {};
+	Object.keys(tally).forEach((kind) => {
+		const row = tally[kind];
+		out[kind] = {ready: row.ready, late: row.late, plain: row.plain, decoded: row.decodes, decodeAvgMs: row.decodes ? Math.round(row.decodeMs / row.decodes) : 0, decodeMaxMs: row.decodeMax};
+	});
+	return out;
+};
+
 // A card that grows into wide art has just been focused: whether the art was there, or what became of it.
 export const noteArtFocus = (url) => {
 	const kind = kindOf(url);
 	const ready = hasArt(url);
-	const row = tally[kind] || (tally[kind] = {ready: 0, late: 0});
+	const row = rowFor(kind);
+	if (!readsAsBlob(url)) row.plain += 1;
 	if (ready) {
 		row.ready += 1;
 	} else {
@@ -314,13 +351,21 @@ export const noteArtFocus = (url) => {
 	}
 	focuses += 1;
 	if (focuses >= FOCUSES_PER_SUMMARY) {
-		logArt('Wide art summary', tally);
+		logArt('Wide art summary', summary());
 		focuses = 0;
 		lateLines = 0;
 		arrivedLines = 0;
 		tally = {};
 	}
 	return ready;
+};
+
+// The TV finished decoding the picture a card drew, ms after it was drawn.
+export const noteArtDecoded = (url, ms) => {
+	const row = rowFor(kindOf(url));
+	row.decodes += 1;
+	row.decodeMs += ms;
+	if (ms > row.decodeMax) row.decodeMax = ms;
 };
 
 // It came in after the card was focused, ms later.

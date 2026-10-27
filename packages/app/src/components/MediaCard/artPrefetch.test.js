@@ -1,4 +1,4 @@
-import {hasArt, artSource, artState, touchArt, prefetchArt, noteArtFocus, noteArtArrived, setArtLogSink} from './artPrefetch';
+import {hasArt, artSource, artState, touchArt, decodeArt, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded, setArtLogSink} from './artPrefetch';
 
 describe('prefetchArt', () => {
 	const RealImage = window.Image;
@@ -254,6 +254,43 @@ describe('prefetchArt reading the art as a blob', () => {
 		await flush();
 		expect(artSource(urls[0])).toMatch(/^blob:art\//);
 		expect(artSource(urls[1])).toBeNull();
+	});
+
+	it('decodes the held pictures it is told to ahead, with the held address', async () => {
+		const decodes = [];
+		window.Image = function FakeImage () {
+			const art = {decode: jest.fn(() => Promise.resolve())};
+			decodes.push(art);
+			return art;
+		};
+		const url = 'http://server/decode-me.jpg';
+		decodeArt(url);
+		expect(decodes).toHaveLength(0);
+		ask(url, 0);
+		answer(0, ok());
+		await flush();
+		decodeArt(url);
+		expect(decodes).toHaveLength(1);
+		expect(decodes[0].src).toBe(artSource(url));
+		expect(decodes[0].decode).toHaveBeenCalled();
+		decodeArt(url);
+		expect(decodes).toHaveLength(1);
+	});
+
+	it('tells the report how long the TV took to decode, per kind', () => {
+		const lines = [];
+		setArtLogSink((message, context) => lines.push([message, context]));
+		// enough focuses for a summary whatever the counters stood at
+		for (let i = 0; i < 50; i++) {
+			const url = `http://server/Items/x${i}/Images/Backdrop`;
+			noteArtFocus(url);
+			noteArtDecoded(url, 100 + i);
+		}
+		const summaryLine = lines.filter(([message]) => message === 'Wide art summary').pop();
+		expect(summaryLine[1].library).toEqual(expect.objectContaining({late: expect.any(Number), plain: expect.any(Number)}));
+		expect(summaryLine[1].library.decoded).toBeGreaterThan(0);
+		expect(summaryLine[1].library.decodeMaxMs).toBeGreaterThanOrEqual(100);
+		expect(summaryLine[1].library.decodeAvgMs).toBeGreaterThanOrEqual(100);
 	});
 
 	it('gives the oldest picture up, and takes its address back a while later, once too much is held', async () => {
