@@ -1,6 +1,6 @@
 # Moonfin Smart TV fork (Lica)
 
-This folder is the **implement** branch.
+This folder is the **daily** branch.
 
 ## Read this first
 
