@@ -53,7 +53,7 @@ git rev-parse -q --verify "$prev^{commit}" >/dev/null 2>&1 || prev="$from~30"
 notes="$(mktemp)"
 log="$(mktemp)"
 # a commit that only changes CLAUDE.md or the README is not part of what the build changed
-git log --no-merges --format='%an%x09%h%x09%s' "$prev..$from" | awk -F'	' '$3 !~ /^(CLAUDE.md|README):/' > "$log"
+git log --no-merges --format='%an%x09%h%x09%s' "$prev..$from" | awk -F'	' '$3 !~ /^(CLAUDE.md|README|config.xml):/' > "$log"
 {
   echo "Lica's Fork $n for Moonfin $version, built from commit \`$from\` on $(date '+%Y-%m-%d %H:%M')."
   echo
@@ -79,5 +79,13 @@ done
 
 gh release create "fork-v$n" "$versioned" --repo "$REPO" --target "$from" \
   --title "Lica's Fork $n (Moonfin $version)" --notes-file "$notes" --latest
+# The TV-Store reads config.xml from the main branch of the repository, so the fork's version goes there too: this one
+# line is the only thing committed to main besides the README and the ignore rules.
+MAIN_DIR="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+config=packages/build-tizen/tizen/config.xml
+if [ -f "$MAIN_DIR/$config" ] && ! grep -q "<widget [^>]* version=\"$n\"" "$MAIN_DIR/$config"; then
+  sed -i -E "s/(<widget [^>]* version=\")[0-9.]+(\")/\1$n\2/" "$MAIN_DIR/$config"
+  git -C "$MAIN_DIR" -c user.name=Licaa21 -c user.email=184849302+Licaa21@users.noreply.github.com commit -q -m "config.xml: the fork's version $n" -- "$config"     && git -C "$MAIN_DIR" push -q origin main     || echo "The version $n was not committed to main. Do it by hand: config.xml in main, then push."
+fi
 echo "Published $versioned: https://github.com/$REPO/releases/tag/fork-v$n"
 echo "The newest one is always at https://github.com/$REPO/releases/latest"
