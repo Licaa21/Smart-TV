@@ -14,7 +14,7 @@ import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
 import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
-import {hasArt, rememberArt, artSource, artState, touchArt, bitmapFor, decodeArt, prefetchArt, noteArtFocus, noteArtArrived} from './artPrefetch';
+import {hasArt, rememberArt, artSource, artState, touchArt, decodeArt, prefetchArt, noteArtFocus, noteArtArrived} from './artPrefetch';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
 
@@ -409,25 +409,13 @@ const ModernMediaCard = ({
 	}, [rank]);
 	// The art of the nearest cards is decoded ahead, so the card draws it at once and not as it decodes
 	useEffect(() => {
-		if (rank >= 0 && rank <= DECODE_AHEAD_RANK && !deferImage && swapsArt) decodeArt(focusUrl, expandedWidth, imageHeight, onArtDone);
-	}, [rank, deferImage, swapsArt, focusUrl, artTick, expandedWidth, imageHeight, onArtDone]);
+		if (rank >= 0 && rank <= DECODE_AHEAD_RANK && !deferImage && swapsArt) decodeArt(focusUrl, rank);
+	}, [rank, deferImage, swapsArt, focusUrl, artTick]);
 
 	const expanded = isFocused && canRenderExpanded;
 	const overlaysArt = expanded && swapsArt;
 	// The picture shows once it has loaded: a copy still coming in painted from the top
 	const wideArrived = arrivedUrl === focusUrl;
-	// The card draws a bitmap made ahead at its size when there is one, and the picture otherwise
-	const bitmap = overlaysArt && !deferImage ? bitmapFor(focusUrl, expandedWidth, imageHeight) : null;
-	// Drawn as the canvas attaches, or when the bitmap changes
-	const drawBitmap = useCallback((canvas) => {
-		const context = canvas && bitmap ? canvas.getContext('2d') : null;
-		if (!context) return;
-		try {
-			context.drawImage(bitmap, 0, 0);
-		} catch {
-			// a bitmap that cannot be drawn leaves the canvas empty, and the poster shows
-		}
-	}, [bitmap]);
 	const imageUrl = isFocused && !overlaysArt ? focusUrl : restingUrl;
 
 	// The report is told whether the art was there when the card was focused, and how long it took when it was not
@@ -440,14 +428,14 @@ const ModernMediaCard = ({
 		}
 		if (!countedFocusRef.current) {
 			countedFocusRef.current = true;
-			lateSinceRef.current = noteArtFocus(focusUrl, Boolean(bitmapFor(focusUrl, expandedWidth, imageHeight))) ? 0 : Date.now();
+			lateSinceRef.current = noteArtFocus(focusUrl) ? 0 : Date.now();
 		}
 		touchArt(focusUrl);
 		// A held copy that was let go since it was fetched is fetched again, when nothing is already asking for it.
 		if (deferImage || hasArt(focusUrl) || artState(focusUrl) !== 'none') return undefined;
 		const request = prefetchArt(focusUrl, 0, onArtFail, onArtDone);
 		return () => request.cancel();
-	}, [isFocused, overlaysArt, focusUrl, deferImage, expandedWidth, imageHeight, onArtFail, onArtDone]);
+	}, [isFocused, overlaysArt, focusUrl, deferImage, onArtFail, onArtDone]);
 
 	const handleImageError = useCallback(() => {
 		if (seerrThumb && focusUrl === seerrThumb) failThumb(seerrThumb);
@@ -497,17 +485,7 @@ const ModernMediaCard = ({
 							style={{height: `${imageHeight}px`, ...(rowArtwork && rowImageType === 'logo' ? {objectFit: 'contain'} : null)}}
 							onError={imageUrl === focusUrl ? handleImageError : undefined}
 						/>
-						{overlaysArt && bitmap && (
-							<canvas
-								ref={drawBitmap}
-								className={`${css.image} ${css.imageWide} ${css.imageWideIn}`}
-								width={bitmap.width}
-								height={bitmap.height}
-								// the poster under it already casts the shadow, and a theme's glow rule is only beaten from here
-								style={{height: `${imageHeight}px`, boxShadow: 'none'}}
-							/>
-						)}
-						{overlaysArt && !bitmap && (
+						{overlaysArt && (
 							<img
 								className={wideArrived ? `${css.image} ${css.imageWide} ${css.imageWideIn}` : `${css.image} ${css.imageWide}`}
 								src={deferImage ? undefined : (artSource(focusUrl) || undefined)}

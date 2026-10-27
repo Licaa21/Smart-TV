@@ -174,37 +174,6 @@ describe('ModernMediaCard growing on focus', () => {
 		expect(faded()).toBe(true);
 	});
 
-	it('draws a bitmap made ahead at the size of the card, on a canvas', async () => {
-		const realFetch = window.fetch;
-		const realCreate = URL.createObjectURL;
-		const realBitmap = window.createImageBitmap;
-		const realContext = window.HTMLCanvasElement.prototype.getContext;
-		const draws = [];
-		const made = {width: 600, height: 360, close: jest.fn()};
-		window.fetch = jest.fn(() => Promise.resolve({ok: true, status: 200, blob: () => Promise.resolve({size: 1000})}));
-		URL.createObjectURL = jest.fn(() => 'blob:card/1');
-		window.createImageBitmap = jest.fn((source, ...rest) => Promise.resolve(rest.length ? made : {width: 1280, height: 720, close: jest.fn()}));
-		window.HTMLCanvasElement.prototype.getContext = () => ({drawImage: (...args) => draws.push(args)});
-		try {
-			const {rerender} = render(<ModernMediaCard item={thumbed('bitmapped')} serverUrl="http://server" warmRank={1} />);
-			await act(async () => {
-				for (let i = 0; i < 12; i++) await Promise.resolve();
-			});
-			expect(window.createImageBitmap).toHaveBeenCalledTimes(2);
-			rerender(<ModernMediaCard item={thumbed('bitmapped')} serverUrl="http://server" isFocused />);
-			const canvas = document.querySelector('canvas[class~="imageWide"]');
-			expect(canvas).not.toBeNull();
-			expect(canvas.className).toContain('imageWideIn');
-			expect(draws[0][0]).toBe(made);
-			expect(document.querySelector('img[class~="imageWide"]')).toBeNull();
-		} finally {
-			window.fetch = realFetch;
-			URL.createObjectURL = realCreate;
-			window.createImageBitmap = realBitmap;
-			window.HTMLCanvasElement.prototype.getContext = realContext;
-		}
-	});
-
 	it('keeps the poster when the wide art never comes', () => {
 		render(<ModernMediaCard item={thumbed('slow')} serverUrl="http://server" isFocused />);
 		act(() => {

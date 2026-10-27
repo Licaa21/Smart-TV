@@ -85,3 +85,9 @@ export const localizeSeerrCards = (cards, language) => localize(
 	// Only what came from outside the library. A card the library turned out to hold still carries the marks of the list it came from, and is never asked about
 	(card) => card._seerr === true && card._external === true && !card._resolvedFromExternal
 );
+
+// Rows the plugin already answers in the language it is asked for: the TMDB charts (checked on the server with
+// Moonbase 2.4.0.7, 2026-10-27). The IMDb lists and the viewer's own lists come back as the source names them, in
+// English, so those still go through the pass above. Asking Seerr for a title of each of a dozen rows at every start
+// was 190 requests in the first half minute, and the TV answered some of them seconds late.
+export const pluginTranslatesRow = (rowId) => /^tmdb_/.test(String(rowId || ''));

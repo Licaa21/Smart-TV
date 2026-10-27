@@ -25,11 +25,6 @@ const held = new Map();
 // are kept here so what was decoded is not let go before the card draws it.
 const DECODED_MAX = 6;
 const decoded = new Map();
-const BITMAPS_MAX = 8;
-const bitmaps = new Map();
-const bitmapWork = new Map();
-// Pictures a bitmap could not be made of, so each tick of a card does not try again
-const bitmapFailed = new Set();
 
 let heldBytes = 0;
 // The picture the focused card draws, which is never the one let go.
@@ -130,42 +125,48 @@ export const touchArt = (url) => {
 	}
 };
 
-// Where a bitmap cannot be made, the picture is at least decoded ahead the plain way, so the first draw is not the decode.
-const decodeWithImage = (url, entry) => {
-	if (typeof window === 'undefined' || typeof window.Image !== 'function') return;
-	const known = decoded.get(url);
-	decoded.delete(url);
-	if (known && known.blobUrl === entry.blobUrl) {
-		decoded.set(url, known);
+// The nearest pictures are decoded ahead the plain way, one at a time and nearest first. A TV decodes slowly and on one
+// thread: several at once held it up for seconds, and so did making bitmaps of them (1.7.2 and 1.8.0 logged 0.6 to 3
+// seconds a picture), which stalled the rest of the app with it.
+const DECODE_QUEUE_MAX = 6;
+const DECODE_TIMEOUT_MS = 3000;
+const decodeQueue = new Map();
+let decoding = false;
+
+const pumpDecode = () => {
+	if (decoding || typeof window === 'undefined' || typeof window.Image !== 'function') return;
+	let nearest = null;
+	decodeQueue.forEach((job, queued) => {
+		if (!nearest || job.rank < nearest.job.rank) nearest = {url: queued, job};
+	});
+	if (!nearest) return;
+	const {url} = nearest;
+	decodeQueue.delete(url);
+	const entry = held.get(url);
+	if (!entry) {
+		pumpDecode();
 		return;
 	}
+	decoding = true;
+	const since = Date.now();
 	const img = new window.Image();
 	img.src = entry.blobUrl;
 	decoded.set(url, {img, blobUrl: entry.blobUrl});
 	if (decoded.size > DECODED_MAX) decoded.delete(decoded.keys().next().value);
-	if (typeof img.decode === 'function') img.decode().catch(() => {});
+	let timer = null;
+	let finished = false;
+	const finish = () => {
+		if (finished) return;
+		finished = true;
+		clearTimeout(timer);
+		noteArtDecoded(url, Date.now() - since); // eslint-disable-line no-use-before-define
+		decoding = false;
+		pumpDecode();
+	};
+	timer = setTimeout(finish, DECODE_TIMEOUT_MS);
+	if (typeof img.decode === 'function') img.decode().then(finish, finish);
+	else finish();
 };
-
-// The pictures of the nearest cards made into bitmaps of exactly the size the card draws them at, ahead and off the
-// main thread. The TV decoded and scaled a picture as the card first drew it, and that showed as the picture painting
-// in from the top; a bitmap is only blitted. Each is made from the held copy: decoded, cropped to the card's shape the
-// way the card crops it (cover), and scaled to its size.
-
-export const bitmapFor = (url, width, height) => {
-	const entry = bitmaps.get(`${url}|${width}x${height}`);
-	return entry ? entry.bitmap : null;
-};
-
-// A bitmap is closed when it is let go, which frees its pixels. A card that still holds one finds drawing it fails, and
-// leaves the poster to show.
-const closeBitmap = (entry) => {
-	try {
-		entry.bitmap.close?.();
-	} catch {
-		// a bitmap that is already closed is the same as one that is let go
-	}
-};
-const BITMAP_FAILED_MAX = 200;
 
 const waiting = [];
 const active = new Set();
@@ -347,7 +348,7 @@ let lateLines = 0;
 let arrivedLines = 0;
 let tally = {};
 
-const rowFor = (kind) => tally[kind] || (tally[kind] = {ready: 0, late: 0, plain: 0, bitmap: 0, decodes: 0, decodeMs: 0, decodeMax: 0});
+const rowFor = (kind) => tally[kind] || (tally[kind] = {ready: 0, late: 0, plain: 0, decodes: 0, decodeMs: 0, decodeMax: 0});
 
 // What the summary says: per kind, the cards that had their art and those that had not, the pictures that were loaded
 // the plain way, and how long the TV took to decode a picture it drew.
@@ -355,18 +356,17 @@ const summary = () => {
 	const out = {};
 	Object.keys(tally).forEach((kind) => {
 		const row = tally[kind];
-		out[kind] = {ready: row.ready, late: row.late, plain: row.plain, bitmap: row.bitmap, decoded: row.decodes, decodeAvgMs: row.decodes ? Math.round(row.decodeMs / row.decodes) : 0, decodeMaxMs: row.decodeMax};
+		out[kind] = {ready: row.ready, late: row.late, plain: row.plain, decoded: row.decodes, decodeAvgMs: row.decodes ? Math.round(row.decodeMs / row.decodes) : 0, decodeMaxMs: row.decodeMax};
 	});
 	return out;
 };
 
 // A card that grows into wide art has just been focused: whether the art was there, or what became of it.
-export const noteArtFocus = (url, drewBitmap = false) => {
+export const noteArtFocus = (url) => {
 	const kind = kindOf(url);
 	const ready = hasArt(url);
 	const row = rowFor(kind);
 	if (!readsAsBlob(url)) row.plain += 1;
-	if (drewBitmap) row.bitmap += 1;
 	if (ready) {
 		row.ready += 1;
 	} else {
@@ -402,70 +402,24 @@ export const noteArtArrived = (url, ms) => {
 	logArt('Wide art arrived late', {kind: kindOf(url), ms});
 };
 
-// Makes the bitmap of a held picture at width x height for the card that will draw it, and says when it is there.
-// Without createImageBitmap, or when it fails, the picture is decoded ahead the plain way.
-export const decodeArt = (url, width, height, onReady) => {
+// Asks for the held picture to be decoded ahead, nearest card first, one at a time. Nothing happens for a picture that
+// is not held yet: the card asks again when it arrives.
+export const decodeArt = (url, rank = 0) => {
 	const entry = held.get(url);
 	if (!entry || typeof window === 'undefined') return;
-	if (typeof window.createImageBitmap !== 'function' || !width || !height) {
-		decodeWithImage(url, entry);
+	const known = decoded.get(url);
+	if (known && known.blobUrl === entry.blobUrl) {
+		decoded.delete(url);
+		decoded.set(url, known);
 		return;
 	}
-	const key = `${width}x${height}`;
-	const work = `${url}|${key}`;
-	const known = bitmaps.get(work);
-	if (known) {
-		bitmaps.delete(work);
-		bitmaps.set(work, known);
-		return;
-	}
-	if (bitmapFailed.has(work)) {
-		decodeWithImage(url, entry);
-		return;
-	}
-	if (bitmapWork.has(work)) {
-		if (onReady) bitmapWork.get(work).add(onReady);
-		return;
-	}
-	const waitingFor = new Set(onReady ? [onReady] : []);
-	bitmapWork.set(work, waitingFor);
-	const since = Date.now();
-	window.createImageBitmap(entry.blob)
-		.then((natural) => {
-			const scale = Math.max(width / natural.width, height / natural.height);
-			const cropWidth = Math.min(natural.width, Math.round(width / scale));
-			const cropHeight = Math.min(natural.height, Math.round(height / scale));
-			const left = Math.max(0, Math.round((natural.width - cropWidth) / 2));
-			const top = Math.max(0, Math.round((natural.height - cropHeight) / 2));
-			const closeNatural = () => natural.close?.();
-			return window.createImageBitmap(natural, left, top, cropWidth, cropHeight, {resizeWidth: width, resizeHeight: height, resizeQuality: 'high'})
-				.then((made) => {
-					closeNatural();
-					return made;
-				}, (error) => {
-					closeNatural();
-					throw error;
-				});
-		})
-		.then((bitmap) => {
-			bitmapWork.delete(work);
-			bitmaps.delete(work);
-			bitmaps.set(work, {bitmap, url});
-			while (bitmaps.size > BITMAPS_MAX) {
-				const oldest = [...bitmaps.keys()].find((other) => other !== work && bitmaps.get(other).url !== drawnUrl);
-				if (oldest === undefined) break;
-				closeBitmap(bitmaps.get(oldest));
-				bitmaps.delete(oldest);
-			}
-			noteArtDecoded(url, Date.now() - since);
-			waitingFor.forEach((ready) => ready());
-		})
-		.catch(() => {
-			bitmapWork.delete(work);
-			if (bitmapFailed.size >= BITMAP_FAILED_MAX) bitmapFailed.clear();
-			bitmapFailed.add(work);
-			decodeWithImage(url, entry);
-			// the cards waiting for it take the picture the way they did
-			waitingFor.forEach((ready) => ready());
+	decodeQueue.set(url, {rank});
+	while (decodeQueue.size > DECODE_QUEUE_MAX) {
+		let farthest = null;
+		decodeQueue.forEach((job, other) => {
+			if (!farthest || job.rank > farthest.rank) farthest = {url: other, rank: job.rank};
 		});
+		decodeQueue.delete(farthest.url);
+	}
+	pumpDecode();
 };

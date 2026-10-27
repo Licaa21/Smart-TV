@@ -8,7 +8,7 @@ import {resolveItemsByProviderIds} from '../../services/jellyfinApi';
 import {seasonalCountryParam} from '../../utils/seasonalRow';
 import {resolveDeviceCountry} from '../../utils/deviceCountry';
 import {currentMetadataLanguage} from '../../utils/metadataLanguage';
-import {localizeExternalItems, localizeSeerrCards} from '../../utils/localizeExternalItems';
+import {localizeExternalItems, localizeSeerrCards, pluginTranslatesRow} from '../../utils/localizeExternalItems';
 
 // Home rows built from TMDB and IMDb charts, lists the viewer pasted a URL for, and the
 // Radarr and Sonarr calendars. Items arrive as provider ids, so every row is resolved against
@@ -172,12 +172,12 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 					}
 				}
 
-				// What the library does not hold in the rows is put into the language before they are shown, whatever the plugin
-				// did with the language it was asked for, since one that keeps a copy from before, or does not know the language,
-				// answers in English. The rows then come up once, already in it, and are not swapped a few seconds later. The
+				// What the library does not hold in the rows is put into the language before they are shown, since the IMDb
+				// lists and the viewer's own lists come back in English, and a plugin that keeps a copy from before, or does not
+				// know the language, answers in English too. The TMDB charts are left to the plugin, which translates them. The rows then come up once, already in it, and are not swapped a few seconds later. The
 				// seasonal row has been through this already.
 				const built = await Promise.all([...presetRows, ...builtCustomRows, seasonalRow, ...resolvedCalendarRows].filter(Boolean).map(async (row) => (
-					language && row.isExternalRow && !row.isSeasonalRow
+					language && row.isExternalRow && !row.isSeasonalRow && !pluginTranslatesRow(row.id)
 						? {...row, items: await localizeSeerrCards(row.items, language).catch(() => row.items)}
 						: row
 				)));

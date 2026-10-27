@@ -1,5 +1,5 @@
 import seerrApi from '../services/seerrApi';
-import {localizeExternalItems, localizeSeerrCards} from './localizeExternalItems';
+import {localizeExternalItems, localizeSeerrCards, pluginTranslatesRow} from './localizeExternalItems';
 
 jest.mock('../services/seerrApi', () => ({
 	__esModule: true,
@@ -74,5 +74,15 @@ describe('localizeSeerrCards', () => {
 		const [show] = await localizeSeerrCards([card(2000, {Type: 'Series'})], 'ro');
 		expect(seerrApi.getTv).toHaveBeenCalledWith('2000', 'ro');
 		expect(show.Name).toBe('Serial');
+	});
+});
+
+describe('pluginTranslatesRow', () => {
+	it('leaves the TMDB charts to the plugin and keeps the IMDb lists and the viewer own lists for the pass', () => {
+		expect(pluginTranslatesRow('tmdb_popular_movies')).toBe(true);
+		expect(pluginTranslatesRow('tmdb_top_rated_tv')).toBe(true);
+		expect(pluginTranslatesRow('imdb-top250-movies')).toBe(false);
+		expect(pluginTranslatesRow('external-abc')).toBe(false);
+		expect(pluginTranslatesRow(undefined)).toBe(false);
 	});
 });
