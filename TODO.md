@@ -2,7 +2,7 @@
 
 ## Waiting on the user
 
-- **Restart Jellyfin.** Moonbase 2.4.0.7 (the thumb takes `size=w300|w780|w1280`) is installed on the server and waits for a restart: the install was accepted (204) on 2026-10-26, but the restart was blocked by the permission classifier, so it was not done. Until it is restarted, 2.4.0.6 stays active and the TV's `&size=w780` is ignored (nothing breaks, the thumbs are just the 1280 px ones). After the restart: check `/Plugins` shows 2.4.0.7 and that `Moonfin/Tmdb/Thumb?...&size=w780` redirects to `.../t/p/w780/...`.
+- Nothing is waiting on a plugin: Moonbase 2.4.0.7 is Active on the server (checked 2026-10-27, `Moonfin/Tmdb/Thumb?...&size=w780` redirects to the 780 px picture), so the 1.7.x thumbs were already the smaller ones.
 - Try 1.7.2 on the TV (see below) and send the diagnostic report taken right after scrolling a TMDB or IMDb row. Look at the 'Wide art summary' lines: `ready`/`late` (was the art held), `plain`, and `decodeAvgMs`/`decodeMaxMs` (how long the TV took to decode).
 
 ## 1.7.2: the picture on every row drew in from the top, held or not
