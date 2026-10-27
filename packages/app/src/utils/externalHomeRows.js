@@ -89,6 +89,7 @@ const normalizeExternalItem = (item, rowId, source) => {
 		OfficialRating: item.officialRating ?? null,
 		Overview: item.overview || null,
 		CommunityRating: item.rating ?? null,
+		Popularity: item.popularity ?? null,
 		Genres: Array.isArray(item.genres) ? item.genres : [],
 		RunTimeTicks: item.runTimeTicks ?? null,
 		_externalPosterUrl: item.posterUrl ? seerrApi.getImageUrl(item.posterUrl, 'w342') : null,
@@ -125,17 +126,20 @@ export const buildSeasonalRow = (payload, hiddenHolidays = []) => {
 	};
 };
 
+const shuffled = (items) => {
+	const out = [...items];
+	for (let i = out.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[out[i], out[j]] = [out[j], out[i]];
+	}
+	return out;
+};
+
 // Client side sorting for custom rows.
 const applySorting = (items, sortBy, sortOrder) => {
 	if (!sortBy || sortBy === 'none') return items;
+	if (sortBy === 'shuffle') return shuffled(items);
 	const sorted = [...items];
-	if (sortBy === 'shuffle') {
-		for (let i = sorted.length - 1; i > 0; i--) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[sorted[i], sorted[j]] = [sorted[j], sorted[i]];
-		}
-		return sorted;
-	}
 	const dir = sortOrder === 'desc' ? -1 : 1;
 	sorted.sort((a, b) => {
 		let av;
@@ -154,6 +158,30 @@ const applySorting = (items, sortBy, sortOrder) => {
 	return sorted;
 };
 
+const EXTERNAL_SORT_KEYS = {
+	releaseDate: (item) => item.ProductionYear || 0,
+	rating: (item) => item.CommunityRating || 0,
+	popularity: (item) => item.Popularity || 0
+};
+
+// The order the IMDb, TMDB and Seerr rows' sort settings ask for. Ties go to the name, since a
+// release date is often only a year.
+export const sortExternalItems = (items, sortBy, sortOrder) => {
+	if (!sortBy || sortBy === 'none' || !items.length) return items;
+	if (sortBy === 'shuffle') return shuffled(items);
+	const byName = (a, b) => {
+		const x = (a.Name || '').toLowerCase();
+		const y = (b.Name || '').toLowerCase();
+		return x < y ? -1 : x > y ? 1 : 0;
+	};
+	const key = EXTERNAL_SORT_KEYS[sortBy];
+	const dir = sortOrder === 'descending' ? -1 : 1;
+	return [...items].sort((a, b) => {
+		const cmp = key ? key(a) - key(b) : byName(a, b);
+		return cmp === 0 ? byName(a, b) : cmp * dir;
+	});
+};
+
 // TMDB's movie and TV charts don't say what each result is, so the chart's path decides.
 // Trending says per result, which matters for the list that mixes both.
 const chartItemType = (path) => {
@@ -162,13 +190,16 @@ const chartItemType = (path) => {
 	return null;
 };
 
-// Fetches a preset TMDB or IMDb chart row.
+// Fetches a preset TMDB or IMDb chart row. The whole chart is sorted before the row is cut to size.
 export const fetchExternalPresetRow = async (rowId, options = {}) => {
 	const cfg = findPreset(rowId);
 	if (!cfg) return [];
 	const items = await fetchCustomRow({source: cfg.source, type: cfg.type, params: {}}, options);
 	const type = chartItemType(cfg.type);
-	return items.slice(0, options.limit || HOME_ROW_LIMIT).map((it) => normalizeExternalItem(type ? {...it, type} : it, rowId, cfg.source));
+	const limit = options.limit || HOME_ROW_LIMIT;
+	const pool = options.sortBy && options.sortBy !== 'none' ? items : items.slice(0, limit);
+	const normalized = pool.map((it) => normalizeExternalItem(type ? {...it, type} : it, rowId, cfg.source));
+	return sortExternalItems(normalized, options.sortBy, options.sortOrder).slice(0, limit);
 };
 
 // Fetches a user configured custom row. `row` is the stored config

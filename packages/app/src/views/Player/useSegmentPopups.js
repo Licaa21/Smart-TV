@@ -12,7 +12,10 @@ const SEEK_FORWARD_TICKS = 30000000;
 const SEEK_BACK_TICKS = 10000000;
 
 // Where the next episode is offered from: the credits, or the last stretch of the runtime, whichever comes first.
-const nextUpStartOf = (creditsStart, runTime) => Math.min(creditsStart ?? Infinity, runTime > 0 ? runTime - NEAR_END_TICKS : Infinity);
+const nextUpStartOf = (creditsStart, runTime, nearEndTicks = NEAR_END_TICKS) => Math.min(creditsStart ?? Infinity, runTime > 0 ? runTime - nearEndTicks : Infinity);
+
+// With autoplay the ended handler moves on at the end of the file, so the card only shows for the timeout.
+const nearEndTicksOf = (settings) => (settings.autoPlay ? (settings.nextUpTimeout ?? 7) * 10000000 : NEAR_END_TICKS);
 
 // The prompt's own button, which the key handler tells apart from the controls underneath.
 // How long after a skip a reading short of the segment's end is still the skip landing.
@@ -79,40 +82,40 @@ const useSegmentPopups = ({
 		skipSegmentRef.current = skipSegment;
 	}, [skipSegment]);
 	const hasTriggeredNextEpisodeRef = useRef(false);
-	const nextEpisodeTimerRef = useRef(null);
-	const nextEpisodeTimeoutRef = useRef(null);
 
 	// --- Countdown ---
 
 	const cancelNextEpisodeCountdown = useCallback(() => {
-		if (nextEpisodeTimerRef.current) {
-			clearInterval(nextEpisodeTimerRef.current);
-			nextEpisodeTimerRef.current = null;
-		}
-		if (nextEpisodeTimeoutRef.current) {
-			clearTimeout(nextEpisodeTimeoutRef.current);
-			nextEpisodeTimeoutRef.current = null;
-		}
 		hasTriggeredNextEpisodeRef.current = true;
 		setNextEpisodeCountdown(null);
 		setShowNextEpisode(false);
 		setShowSkipCredits(false);
 	}, []);
 
+	// Counts an episode that starts by itself, or raises the prompt in its place and returns true. The ended handler
+	// calls it, and so does the outro's automatic skip.
+	const shouldHoldForStillWatching = useCallback(() => {
+		cancelNextEpisodeCountdown();
+		if (currentIsPreroll) return false;
+		if (shouldAskStillWatching(consecutiveRef.current, settings.stillWatchingBehavior)) {
+			setAskStillWatching(true);
+			return true;
+		}
+		consecutiveRef.current += 1;
+		return false;
+	}, [currentIsPreroll, cancelNextEpisodeCountdown, settings.stillWatchingBehavior]);
+
 	// The automatic path. A long enough run of these is what raises the prompt.
 	const handlePlayNextEpisode = useCallback(async () => {
 		if (!nextEpisode || !onPlayNext) return;
-		cancelNextEpisodeCountdown();
-		if (shouldAskStillWatching(consecutiveRef.current, settings.stillWatchingBehavior)) {
+		if (shouldHoldForStillWatching()) {
 			// The current episode is still running underneath, and the prompt says
 			// playback has been paused, so it has to actually be paused.
 			onPausePlayback?.();
-			setAskStillWatching(true);
 			return;
 		}
-		consecutiveRef.current += 1;
 		await onPlayNext(nextEpisode);
-	}, [nextEpisode, onPlayNext, onPausePlayback, cancelNextEpisodeCountdown, settings.stillWatchingBehavior]);
+	}, [nextEpisode, onPlayNext, onPausePlayback, shouldHoldForStillWatching]);
 
 	// Pressing Play Next answers the question, so the run starts over.
 	const handlePlayNextNow = useCallback(async () => {
@@ -133,34 +136,6 @@ const useSegmentPopups = ({
 		consecutiveRef.current = 0;
 		onStopPlayback?.();
 	}, [onStopPlayback]);
-
-	const startNextEpisodeCountdown = useCallback(() => {
-		if (nextEpisodeTimeoutRef.current) return;
-
-		const timeout = settings.nextUpTimeout ?? 7;
-		if (timeout === 0) {
-			handlePlayNextEpisode();
-			return;
-		}
-		setNextEpisodeCountdown(timeout);
-
-		nextEpisodeTimeoutRef.current = setTimeout(() => {
-			nextEpisodeTimeoutRef.current = null;
-			handlePlayNextEpisode();
-		}, timeout * 1000);
-
-		// Both the timer text and the ring read this, so it ticks whichever the
-		// viewer has chosen to see.
-		let countdown = timeout;
-		nextEpisodeTimerRef.current = setInterval(() => {
-			countdown--;
-			setNextEpisodeCountdown(countdown);
-			if (countdown <= 0) {
-				clearInterval(nextEpisodeTimerRef.current);
-				nextEpisodeTimerRef.current = null;
-			}
-		}, 1000);
-	}, [handlePlayNextEpisode, settings.nextUpTimeout]);
 
 	// --- Skip segment ---
 
@@ -194,14 +169,6 @@ const useSegmentPopups = ({
 		// run out and was hidden the moment it appeared.
 		promptShownAtRef.current = null;
 		hasTriggeredNextEpisodeRef.current = false;
-		if (nextEpisodeTimerRef.current) {
-			clearInterval(nextEpisodeTimerRef.current);
-			nextEpisodeTimerRef.current = null;
-		}
-		if (nextEpisodeTimeoutRef.current) {
-			clearTimeout(nextEpisodeTimeoutRef.current);
-			nextEpisodeTimeoutRef.current = null;
-		}
 	}, []);
 
 	// --- Segment checking (call from timeupdate) ---
@@ -212,7 +179,8 @@ const useSegmentPopups = ({
 		const creditsStart = mediaSegments?.creditsStart ?? null;
 
 		// From here on the next episode is offered, or the credits card in place of the skip prompt
-		const nextUpFrom = nextUpStartOf(creditsStart, runTimeRef.current);
+		const nearEndTicks = nearEndTicksOf(settings);
+		const nextUpFrom = nextUpStartOf(creditsStart, runTimeRef.current, nearEndTicks);
 
 		// A seek into a segment offers it again, however the prompt for it ended before: dismissed, or hidden after its
 		// few seconds. A segment that skips by itself is left as it is, so winding back into an intro to watch it does
@@ -314,12 +282,17 @@ const useSegmentPopups = ({
 		// to the very end still moves on, because the ended handler plays the next one.
 		if (nextEpisode && !currentIsPreroll && !skipPromptVisible && runTimeRef.current > 0 && settings.nextUpBehavior !== 'disabled') {
 			const remaining = runTimeRef.current - ticks;
-			const nearEnd = remaining < NEAR_END_TICKS;
+			const nearEnd = remaining < nearEndTicks;
 			if (nearEnd && !hasTriggeredNextEpisodeRef.current) {
 				setShowNextEpisode(true);
 			}
+			// Counts down what's left, and a seek back out of the window takes the card down.
+			if (settings.autoPlay && !hasTriggeredNextEpisodeRef.current) {
+				setNextEpisodeCountdown(nearEnd ? Math.ceil(remaining / 10000000) : null);
+				if (!nearEnd) setShowNextEpisode(false);
+			}
 		}
-	}, [mediaSegments, settings.introAction, settings.nextUpBehavior, settings.outroAction, settings.replaceSkipOutroWithNextUp, settings.mediaSegmentAutoHide, nextEpisode, currentIsPreroll, runTimeRef, handlePlayNextEpisode, handleSkipSegment]);
+	}, [mediaSegments, settings.introAction, settings.nextUpBehavior, settings.outroAction, settings.replaceSkipOutroWithNextUp, settings.mediaSegmentAutoHide, settings.nextUpTimeout, settings.autoPlay, nextEpisode, currentIsPreroll, runTimeRef, handlePlayNextEpisode, handleSkipSegment]);
 
 	// --- Bringing the prompt back by hand ---
 
@@ -342,13 +315,13 @@ const useSegmentPopups = ({
 			dismissedSegmentsRef.current.delete(seg.start);
 			if (promptShownAtRef.current?.start === seg.start) promptShownAtRef.current = null;
 		});
-		if (nextUpWouldShow && hasTriggeredNextEpisodeRef.current && ticks >= nextUpStartOf(mediaSegments?.creditsStart ?? null, runTimeRef.current)) {
+		if (nextUpWouldShow && hasTriggeredNextEpisodeRef.current && ticks >= nextUpStartOf(mediaSegments?.creditsStart ?? null, runTimeRef.current, nearEndTicksOf(settings))) {
 			found = true;
 			hasTriggeredNextEpisodeRef.current = false;
 		}
 		if (found) checkSegments(ticks);
 		return found;
-	}, [mediaSegments, nextEpisode, runTimeRef, checkSegments, settings.introAction, settings.outroAction, settings.nextUpBehavior, settings.replaceSkipOutroWithNextUp, currentIsPreroll]);
+	}, [mediaSegments, nextEpisode, runTimeRef, checkSegments, settings.introAction, settings.outroAction, settings.nextUpBehavior, settings.replaceSkipOutroWithNextUp, settings.nextUpTimeout, settings.autoPlay, currentIsPreroll]);
 
 	// --- Clearing the way for a popup ---
 
@@ -359,8 +332,7 @@ const useSegmentPopups = ({
 	useEffect(() => {
 		if (!(showSkipCredits || showNextEpisode) || !nextEpisode || activeModal) return;
 		hideControls();
-		if (settings.autoPlay) startNextEpisodeCountdown();
-	}, [showSkipCredits, showNextEpisode, nextEpisode, activeModal, settings.autoPlay, startNextEpisodeCountdown, hideControls]);
+	}, [showSkipCredits, showNextEpisode, nextEpisode, activeModal, hideControls]);
 
 	// --- Keydown handler (returns true if event was consumed) ---
 
@@ -467,6 +439,7 @@ const useSegmentPopups = ({
 		nextEpisodeCountdown,
 		handleSkipSegment,
 		handlePlayNextNow,
+		shouldHoldForStillWatching,
 		cancelNextEpisodeCountdown,
 		checkSegments,
 		handlePopupKeyDown,

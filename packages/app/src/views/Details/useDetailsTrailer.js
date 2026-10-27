@@ -7,9 +7,10 @@ import {extractYouTubeIdFromUrl} from '../../services/youtubeTrailer';
 import seerrApi from '../../services/seerrApi';
 import {
 	attachTrailerStream, fetchVideoStream, fetchSponsorSegments, isManifestUrl, nativeManifestSkipped,
-	needsHlsJs, noteNativeManifest, playsManifestNatively, watchManifestPlayback
+	needsHlsJs, noteNativeManifest, playsManifestNatively, searchedTrailers, searchesForTrailer, watchManifestPlayback
 } from '../../services/youtubeTrailer';
 import serverLogger from '../../services/serverLogger';
+import {getServerType} from '../../services/jellyfinApi';
 import {volumeLevel} from '../../utils/volumeLevel';
 import {trailerChoicesFor} from './trailerChoices';
 
@@ -131,7 +132,8 @@ const useDetailsTrailer = ({item, effectiveApi, onPlay, trailerVolume, showCapti
 				}
 			} catch (err) { void err; }
 
-			const choices = trailerChoicesFor(localItems, item.RemoteTrailers);
+			let choices = trailerChoicesFor(localItems, item.RemoteTrailers);
+			if (!choices.length && searchesForTrailer(item, getServerType())) choices = trailerChoicesFor([], await searchedTrailers(item));
 			if (choices.length > 1) {
 				choicesOpenerRef.current = opener;
 				setTrailerChoices(choices);

@@ -143,8 +143,115 @@ describe('buildSeasonalParticles', () => {
 	});
 
 	test('only spring and halloween have flyers', () => {
-		for (const effect of ['snow', 'christmas', 'fireflies', 'leaves', 'confetti', 'fireworks']) {
+		for (const effect of ['snow', 'christmas', 'fireflies', 'leaves', 'confetti', 'fireworks', 'valentines', 'easter', 'pride', 'lunar', 'diwali']) {
 			expect(buildSeasonalParticles(effect, 'heavy', 1).flyers).toHaveLength(0);
+		}
+	});
+
+	test('the holiday effects fill the screen at their share of the count', () => {
+		for (const tier of ['low', 'high']) {
+			for (const effect of ['valentines', 'easter', 'pride', 'lunar', 'diwali']) {
+				const {falling, flyers, bursts} = buildSeasonalParticles(effect, 'normal', 3, tier);
+				expect(falling).toHaveLength(Math.round(FALL_COUNTS[tier].normal * (COUNT_SHARE[effect] || 1)));
+				expect(flyers).toHaveLength(0);
+				expect(bursts).toHaveLength(0);
+			}
+		}
+		expect(COUNT_SHARE.lunar).toBe(0.5);
+		expect(COUNT_SHARE.diwali).toBeUndefined();
+	});
+
+	test('valentines drops hearts in its own reds and pinks, turning over like petals', () => {
+		for (const p of buildSeasonalParticles('valentines', 'heavy', 7).falling) {
+			expect(p.shape).toBe('heart');
+			expect(p.path).toMatch(/^petals[0-3]$/);
+			expect(p.style.backgroundImage).toMatch(/^url\("data:image\/svg\+xml;charset=utf8,/);
+			const fill = decodeURIComponent(p.style.backgroundImage).match(/stop-color="(#[0-9a-f]{6})"/)[1];
+			expect(['#e53950', '#d81b60', '#ff4d6d', '#ff8fab', '#c2185b', '#ffb3c6']).toContain(fill);
+		}
+	});
+
+	test('easter mixes painted eggs that only sway into pastel petals', () => {
+		const {falling} = buildSeasonalParticles('easter', 'heavy', 5);
+		const eggs = falling.filter(p => p.shape === 'egg');
+		const petals = falling.filter(p => p.shape === 'petal');
+		expect(eggs.length + petals.length).toBe(falling.length);
+		expect(eggs.length).toBeGreaterThan(0);
+		for (const egg of eggs) {
+			expect(egg.path).toMatch(/^leaves[0-3]$/);
+			expect(decodeURIComponent(egg.style.backgroundImage)).toContain('<polyline');
+		}
+		for (const petal of petals) {
+			expect(petal.path).toMatch(/^petals[0-3]$/);
+			expect(['#b3e5fc', '#f8bbd0', '#fff59d', '#c5e1a5', '#d1c4e9', '#ffccbc']).toContain(petal.style.backgroundColor);
+		}
+	});
+
+	test('about a third of easter is eggs, a fifth of diwali stars and nearly half of lunar lanterns', () => {
+		const share = (effect, shapes) => {
+			let count = 0;
+			let total = 0;
+			for (let seed = 1; seed <= 40; seed++) {
+				const {falling} = buildSeasonalParticles(effect, 'heavy', seed);
+				count += falling.filter(p => shapes.includes(p.shape)).length;
+				total += falling.length;
+			}
+			return count / total;
+		};
+		expect(share('easter', ['egg'])).toBeCloseTo(0.35, 1);
+		expect(share('diwali', ['star', 'paleStar'])).toBeCloseTo(0.2, 1);
+		expect(share('lunar', ['lantern'])).toBeCloseTo(0.45, 1);
+	});
+
+	test('pride is confetti in the flag colors', () => {
+		const pride = ['#e40303', '#ff8c00', '#ffed00', '#008026', '#004dff', '#750787', '#5bcefa', '#f5a9b8', '#ffffff'];
+		for (const p of buildSeasonalParticles('pride', 'heavy', 2).falling) {
+			expect(p.path).toMatch(/^confetti[0-3]$/);
+			expect(['strip', 'disc']).toContain(p.shape);
+			expect(pride).toContain(p.style.backgroundColor);
+		}
+	});
+
+	test('lunar new year sends lanterns and flickering embers up from below', () => {
+		const {falling} = buildSeasonalParticles('lunar', 'heavy', 4);
+		expect(new Set(falling.map(p => p.shape))).toEqual(new Set(['lantern', 'ember']));
+		for (const p of falling.filter(f => f.shape === 'lantern')) {
+			expect(p.path).toMatch(/^rise[0-3]$/);
+			expect(p.style.opacity).toBeGreaterThan(0);
+		}
+		for (const p of falling.filter(f => f.shape === 'ember')) {
+			expect(p.path).toMatch(/^riseFlicker[0-3]$/);
+			expect(p.style.opacity).toBeUndefined();
+			expect(p.style.backgroundImage).toMatch(/^radial-gradient/);
+		}
+		for (const p of falling) {
+			// Between 0.03 and 0.06 screen heights a second over the 124vh climb.
+			const rise = seconds(p.style.animationDuration);
+			expect(rise).toBeGreaterThanOrEqual(20.5);
+			expect(rise).toBeLessThanOrEqual(41);
+		}
+	});
+
+	test('diwali sends twinkling stars and flickering embers up from below', () => {
+		const {falling} = buildSeasonalParticles('diwali', 'heavy', 6);
+		const stars = falling.filter(p => p.shape === 'star' || p.shape === 'paleStar');
+		expect(stars.length).toBeGreaterThan(0);
+		expect(stars.length).toBeLessThan(falling.length / 2);
+		for (const p of stars) expect(p.path).toMatch(/^riseTwinkle[0-3]$/);
+		for (const p of falling.filter(f => f.shape === 'ember')) expect(p.path).toMatch(/^riseFlicker[0-3]$/);
+	});
+
+	test('a flicker is a second animation on the same element, timed after the rise', () => {
+		for (const p of buildSeasonalParticles('diwali', 'heavy', 6).falling) {
+			const durations = p.style.animationDuration.split(', ');
+			const delays = p.style.animationDelay.split(', ');
+			expect(durations).toHaveLength(2);
+			expect(delays).toHaveLength(2);
+			expect(p.style.WebkitAnimationDuration).toBe(p.style.animationDuration);
+			expect(p.style.WebkitAnimationDelay).toBe(p.style.animationDelay);
+			expect(seconds(delays[0])).toBeGreaterThan(-seconds(durations[0]));
+			// It runs back and forth, so a whole cycle is two of its durations.
+			expect(seconds(delays[1])).toBeGreaterThanOrEqual(-2 * seconds(durations[1]));
 		}
 	});
 

@@ -15,6 +15,7 @@ import {
 	firstPosterImageUrl,
 	firstChapterImageUrl
 } from './spotlightImages';
+import {collectionPlaylistItems} from '../collectionPlaylist';
 
 // The summary cards reuse the detail screen's own icon set rather than carrying a second one.
 export const CARD_ICONS = {
@@ -28,7 +29,9 @@ export const CARD_ICONS = {
 	albums: MATERIAL_ICON_PATHS.album,
 	playlist: MATERIAL_ICON_PATHS.playlist_play,
 	playlistOrder: MATERIAL_ICON_PATHS.format_list_numbered,
-	filmography: MATERIAL_ICON_PATHS.movie,
+	filmography: DETAIL_ICON_PATHS.movieOutlined,
+	appearances: DETAIL_ICON_PATHS.starOutline,
+	crew: DETAIL_ICON_PATHS.movieCreationOutlined,
 	seerrDetails: MATERIAL_ICON_PATHS.info,
 	fileDetails: MATERIAL_ICON_PATHS.info
 };
@@ -144,7 +147,11 @@ class CardBuilder {
 			case 'Book': return {tracks: () => this.tracksCard(), similar: () => this.similarCard()};
 			case 'Playlist': return {playlist: () => this.playlistCard()};
 			case 'MusicArtist': return {albums: () => this.albumsCard(), similar: () => this.similarCard()};
-			case 'Person': return {filmography: () => this.filmographyCard()};
+			case 'Person': return {
+				filmography: () => this.filmographyCard(),
+				appearances: () => this.personAppearancesCard(),
+				crew: () => this.personCrewCard()
+			};
 			case 'BoxSet': return {
 				boxset_items: () => this.boxSetItemsCard(),
 				people: () => this.boxSetPeopleCard(),
@@ -538,41 +545,82 @@ class CardBuilder {
 		};
 	}
 
+	shownAppearances() {
+		return this.shows('seerrPersonAppearances') ? this.s.seerrAppearances || [] : [];
+	}
+
+	shownCrewCredits() {
+		return this.shows('seerrPersonCrew') ? this.s.seerrCrewCredits || [] : [];
+	}
+
+	// Each of a person's cards takes a backdrop the others haven't, from its own credits where it can.
+	// Only the cards that show take one, so a missing card can't leave two others sharing.
+	personBackdrops() {
+		if (this.personBackdropsCache) return this.personBackdropsCache;
+		const {personMovies = [], personSeries = [], filmography = [], serverUrl} = this.s;
+		const landscapes = (items) => items.map((entry) => spotlightLandscapeImageUrl(serverUrl, entry)).filter(Boolean);
+		const cards = [
+			['filmography', [...personMovies, ...personSeries, ...filmography]],
+			['appearances', this.shownAppearances()],
+			['crew', this.shownCrewCredits()]
+		].filter(([, items]) => items.length).map(([id, items]) => [id, landscapes(items)]);
+		const all = cards.flatMap(([, pool]) => pool);
+		const used = new Set();
+		const pick = (pool) => {
+			const url = pool.find((candidate) => !used.has(candidate)) || all.find((candidate) => !used.has(candidate)) || pool[0] || all[0] || null;
+			if (url) used.add(url);
+			return url;
+		};
+		this.personBackdropsCache = Object.fromEntries(cards.map(([id, pool]) => [id, pick(pool)]));
+		return this.personBackdropsCache;
+	}
+
 	filmographyCard() {
-		const {personMovies = [], personSeries = [], filmography = [], serverUrl, fallbackImageUrl} = this.s;
-		const seerrAppearances = this.shows('seerrPersonAppearances') ? this.s.seerrAppearances || [] : [];
-		const seerrCrewCredits = this.shows('seerrPersonCrew') ? this.s.seerrCrewCredits || [] : [];
+		const {personMovies = [], personSeries = [], filmography = [], fallbackImageUrl} = this.s;
 		const hasLibrary = personMovies.length > 0 || personSeries.length > 0;
-		if (!hasLibrary && !filmography.length && !seerrAppearances.length && !seerrCrewCredits.length) return null;
-
-		const subtitle = joinSubtitle([
-			personMovies.length ? countLabel(personMovies.length, $L('1 movie'), $L('{count} movies')) : null,
-			personSeries.length ? countLabel(personSeries.length, $L('1 show'), $L('{count} shows')) : null,
-			!hasLibrary && filmography.length ? countLabel(filmography.length, $L('1 item'), $L('{count} items')) : null,
-			!hasLibrary && !filmography.length && seerrAppearances.length
-				? countLabel(seerrAppearances.length, $L('1 item'), $L('{count} items')) : null
-		]);
-
-		const lead = personMovies[0] || personSeries[0] || filmography[0] || null;
+		if (!hasLibrary && !filmography.length) return null;
 		return {
 			id: 'filmography',
 			title: $L('Filmography'),
-			subtitle,
-			imageUrl: (lead ? spotlightItemImageUrl(serverUrl, lead) : firstPosterImageUrl(serverUrl, seerrAppearances)) || fallbackImageUrl,
+			subtitle: joinSubtitle([
+				personMovies.length ? countLabel(personMovies.length, $L('1 movie'), $L('{count} movies')) : null,
+				personSeries.length ? countLabel(personSeries.length, $L('1 show'), $L('{count} shows')) : null,
+				!hasLibrary ? countLabel(filmography.length, $L('1 item'), $L('{count} items')) : null
+			]),
+			imageUrl: this.personBackdrops().filmography || fallbackImageUrl,
 			icon: CARD_ICONS.filmography,
 			sections: [
 				...(personMovies.length ? [mediaSection($L('Movies'), personMovies)] : []),
 				...(personSeries.length ? [mediaSection($L('TV Shows'), personSeries)] : []),
-				...(seerrAppearances.length ? [seerrSection($L('Appearances (Seerr)'), seerrAppearances, true)] : []),
-				...(seerrCrewCredits.length ? [seerrSection($L('Crew Contributions (Seerr)'), seerrCrewCredits, true)] : []),
-				...(!hasLibrary && !seerrAppearances.length && !seerrCrewCredits.length && filmography.length
-					? [mediaSection($L('Appearances'), filmography)] : [])
+				...(!hasLibrary ? [mediaSection($L('Filmography'), filmography)] : [])
 			]
 		};
 	}
 
+	seerrCreditsCard(id, title, credits, icon) {
+		const {serverUrl, fallbackImageUrl} = this.s;
+		return {
+			id,
+			title,
+			subtitle: countLabel(credits.length, $L('1 item'), $L('{count} items')),
+			imageUrl: this.personBackdrops()[id] || firstPosterImageUrl(serverUrl, credits) || fallbackImageUrl,
+			icon,
+			sections: [seerrSection(title, credits, true)]
+		};
+	}
+
+	personAppearancesCard() {
+		const credits = this.shownAppearances();
+		return credits.length ? this.seerrCreditsCard('appearances', $L('Appearances (Seerr)'), credits, CARD_ICONS.appearances) : null;
+	}
+
+	personCrewCard() {
+		const credits = this.shownCrewCredits();
+		return credits.length ? this.seerrCreditsCard('crew', $L('Crew Contributions (Seerr)'), credits, CARD_ICONS.crew) : null;
+	}
+
 	boxSetItemsCard() {
-		const {collectionItems = [], missingCollectionItems = [], settings = {}, serverUrl, fallbackImageUrl} = this.s;
+		const {collectionItems = [], missingCollectionItems = [], settings = {}, serverUrl, item, fallbackImageUrl} = this.s;
 		const showMissing = settings.seerrShowMissingCollectionItems !== false;
 		// Slotted in by release date, the same way the parent collection card orders its own
 		// missing titles.
@@ -593,7 +641,7 @@ class CardBuilder {
 				series.length ? countLabel(series.length, $L('1 show'), $L('{count} shows')) : null,
 				!movies.length && !series.length ? countLabel(items.length, $L('1 item'), $L('{count} items')) : null
 			]),
-			imageUrl: firstLandscapeImageUrl(serverUrl, items) || fallbackImageUrl,
+			imageUrl: spotlightLandscapeImageUrl(serverUrl, item, {fallbackUrl: fallbackImageUrl}) || firstLandscapeImageUrl(serverUrl, items),
 			icon: CARD_ICONS.collections,
 			sections: [
 				...(movies.length ? [memberSection($L('Movies'), movies)] : []),
@@ -638,22 +686,30 @@ class CardBuilder {
 	}
 
 	playlistOrderCard() {
-		const {playlistItems = [], serverUrl, fallbackImageUrl} = this.s;
-		if (!playlistItems.length) return null;
+		const {playlistItems = [], collectionItems = [], playlistSort, serverUrl, item, fallbackImageUrl} = this.s;
+		const tracks = collectionPlaylistItems(playlistItems, collectionItems);
+		if (!tracks.length) return null;
+		// Art that differs from the Movies & Shows card beside it, where there is any.
+		const collectionImageUrl = spotlightLandscapeImageUrl(serverUrl, item, {fallbackUrl: fallbackImageUrl});
+		const trackImageUrls = tracks.map((track) => spotlightLandscapeImageUrl(serverUrl, track)).filter(Boolean);
 		return {
 			id: 'playlist_order',
 			title: $L('Playlist Order'),
-			subtitle: countLabel(playlistItems.length, $L('1 item'), $L('{count} items')),
-			imageUrl: spotlightLandscapeImageUrl(serverUrl, playlistItems[0], {fallbackUrl: fallbackImageUrl}),
+			subtitle: countLabel(tracks.length, $L('1 item'), $L('{count} items')),
+			imageUrl: trackImageUrls.find((url) => url !== collectionImageUrl) || trackImageUrls[0] || fallbackImageUrl,
 			icon: CARD_ICONS.playlistOrder,
 			// A collection's order can be sorted from the modal it opens.
-			headerAction: this.s.playlistSort ? {label: this.s.playlistSort.label, onClick: this.s.playlistSort.open} : null,
+			headerAction: playlistSort ? {label: playlistSort.label, onClick: playlistSort.open} : null,
 			sections: [{
 				kind: 'tracks',
 				title: $L('Playlist Order'),
-				count: playlistItems.length,
-				tracks: playlistItems,
-				showAlbum: true
+				count: tracks.length,
+				tracks,
+				showAlbum: true,
+				isPlaylist: true,
+				loading: Boolean(playlistSort?.loading && !playlistItems.length),
+				// Until the playlist is in, a row opens its title, since there's no run yet to play from it.
+				opensItems: !playlistItems.length
 			}]
 		};
 	}

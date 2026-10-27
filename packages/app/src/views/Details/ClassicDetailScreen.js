@@ -460,7 +460,7 @@ const ClassicDetailScreen = ({
 								? seriesThumbUrl(serverUrl, item, CHAPTER_THUMB)
 								: null;
 							const chapterImageUrl = seriesThumb ||
-								(chapter.ImageTag ? `${serverUrl}/Items/${item.Id}/Images/Chapter/${index}?maxWidth=400&tag=${chapter.ImageTag}` : null);
+								(chapter.ImageTag ? getImageUrl(serverUrl, item.Id, `Chapter/${index}`, {maxWidth: 400, tag: chapter.ImageTag}) : null);
 
 							return (
 								<SpottableDiv

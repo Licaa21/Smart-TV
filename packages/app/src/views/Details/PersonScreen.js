@@ -10,6 +10,8 @@ import {rankLibraryItems} from '../../utils/personCredits';
 import {getImageUrl} from '../../utils/helpers';
 import {isMdblistEnabled} from '../../services/mdblistApi';
 import {KEYS} from '../../utils/keys';
+import {DETAIL_ICON_PATHS} from './detailIcons';
+import {HorizontalContainer} from './detailsSpottables';
 
 import css from './Details.module.less';
 
@@ -17,7 +19,10 @@ const SpottableDiv = Spottable('div');
 
 const TabsContainer = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'div');
 
-const PersonScreen = ({item, serverUrl, settings, showsSection, filmography, personDates, birthPlace, onSelectItem, onSelectSeerrItem}) => {
+const PersonScreen = ({
+	item, serverUrl, settings, showsSection, filmography, personDates, birthPlace,
+	onSelectItem, onSelectSeerrItem, onOpenPersonDisplayModal, canFavorite, isFavorite, onToggleFavorite
+}) => {
 	const {appearances, crewCredits, ranking} = usePersonSeerrCredits(item.ProviderIds?.Tmdb);
 	// With Popularity chosen, the most popular first, by what Seerr says of the same titles, and the one the backdrop
 	// comes from ahead of them. Any other sort stands as the filmography came.
@@ -132,6 +137,22 @@ const PersonScreen = ({item, serverUrl, settings, showsSection, filmography, per
 							<span className={css.overviewToggleHint}>{expanded ? $L('Less') : $L('More')}</span>
 						</SpottableDiv>
 					)}
+					<HorizontalContainer className={css.personActionRow} spotlightId="details-action-buttons">
+						{canFavorite && (
+							<SpottableDiv className={css.personActionBtn} onClick={onToggleFavorite}>
+								<svg viewBox="0 -960 960 960" fill="currentColor">
+									<path d={DETAIL_ICON_PATHS.favorite} />
+								</svg>
+								<span>{isFavorite ? $L('Favorited') : $L('Favorite')}</span>
+							</SpottableDiv>
+						)}
+						<SpottableDiv className={css.personActionBtn} onClick={onOpenPersonDisplayModal}>
+							<svg viewBox="0 -960 960 960" fill="currentColor">
+								<path d={DETAIL_ICON_PATHS.tune} />
+							</svg>
+							<span>{$L('Display')}</span>
+						</SpottableDiv>
+					</HorizontalContainer>
 				</div>
 			</div>
 

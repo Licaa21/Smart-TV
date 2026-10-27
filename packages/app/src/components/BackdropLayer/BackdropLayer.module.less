@@ -8,6 +8,35 @@
 	overflow: hidden;
 }
 
+.fill {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+}
+
+// The top right 70% by 75%, faded out toward the left and the bottom the way the Google TV
+// home screen does. Each direction gets its own mask so the two multiply where they cross.
+@cornerFade: transparent 0%, rgba(0, 0, 0, 0.15) 12%, rgba(0, 0, 0, 0.5) 30%, rgba(0, 0, 0, 0.85) 48%, #000 60%;
+
+.cornerFadeLeft {
+	position: absolute;
+	top: 0;
+	left: 30%;
+	width: 70%;
+	height: 75%;
+	overflow: hidden;
+	-webkit-mask-image: linear-gradient(to right, @cornerFade);
+	mask-image: linear-gradient(to right, @cornerFade);
+}
+
+.cornerFadeDown {
+	.fill();
+	-webkit-mask-image: linear-gradient(to top, @cornerFade);
+	mask-image: linear-gradient(to top, @cornerFade);
+}
+
 .globalBackdropImage {
 	position: absolute;
 	top: -3%;

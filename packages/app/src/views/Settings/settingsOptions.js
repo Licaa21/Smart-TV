@@ -253,6 +253,12 @@ export const getHomeRowsStyleOptions = () => [
 	{ value: 'v1', label: $L('Classic') }
 ];
 
+export const getHomeBackdropStyleOptions = () => [
+	{ value: 'off', label: $L('Off') },
+	{ value: 'fullScreen', label: $L('Full Screen') },
+	{ value: 'corner', label: $L('Corner') }
+];
+
 export const getMediaPreviewModeOptions = () => [
 	{ value: 'off', label: $L('Off') },
 	{ value: 'media', label: $L('Media Preview') },
@@ -469,6 +475,20 @@ export const getSortOrderOptions = () => [
 	{ value: 'auto', label: $L('Auto') },
 	{ value: 'Ascending', label: $L('Ascending') },
 	{ value: 'Descending', label: $L('Descending') }
+];
+
+export const getExternalRowSortByOptions = () => [
+	{ value: 'none', label: $L('Default (List Order)') },
+	{ value: 'name', label: $L('Name') },
+	{ value: 'releaseDate', label: $L('Release Date') },
+	{ value: 'rating', label: $L('Rating') },
+	{ value: 'popularity', label: $L('Popularity') },
+	{ value: 'shuffle', label: $L('Shuffle') }
+];
+
+export const getExternalRowSortOrderOptions = () => [
+	{ value: 'ascending', label: $L('Ascending') },
+	{ value: 'descending', label: $L('Descending') }
 ];
 
 export const getOledModeOptions = () => [
@@ -710,7 +730,12 @@ export const getSeasonalThemeOptions = () => [
 	{ value: 'petals', label: $L('Spring Petals') },
 	{ value: 'fireflies', label: $L('Fireflies') },
 	{ value: 'leaves', label: $L('Falling Leaves') },
-	{ value: 'halloween', label: $L('Halloween') }
+	{ value: 'halloween', label: $L('Halloween') },
+	{ value: 'valentines', label: $L("Valentine's Day") },
+	{ value: 'easter', label: $L('Easter') },
+	{ value: 'pride', label: $L('Pride') },
+	{ value: 'lunar', label: $L('Lunar New Year') },
+	{ value: 'diwali', label: $L('Diwali') }
 ];
 
 // How the skip prompt is built, not just where it sits.

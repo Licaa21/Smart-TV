@@ -3,6 +3,7 @@ import {isSignInPinEnabled} from '../../utils/signInPin';
 import {isTrickplayOn} from '../../utils/trickplayLayout';
 import {getDisplayVersion} from '../../services/versionChecker';
 import {mediaPreviewMode, mediaPreviewSettings} from '../../utils/mediaPreviewMode';
+import {homeBackdropStyle, homeBackdropSettings} from '../../utils/homeBackdropStyle';
 
 import {
 	getAccentColorOptions,
@@ -22,6 +23,7 @@ import {
 	getFolderViewModeOptions,
 	getGenresRowItemFilterOptions,
 	getHomeRowSortOptions, getPlaylistCollectionSortOptions,
+	getHomeBackdropStyleOptions,
 	getHomeRowsStyleOptions,
 	getBookLibraryStyleOptions,
 	getKeyboardStyleOptions,
@@ -497,14 +499,23 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.TOGGLE, key: 'previewAudioEnabled', label: () => $L('Preview Audio'), desc: () => $L('Play the preview with sound.'), icon: 'volume_up', when: whenMediaPreview},
 					{kind: KIND.SLIDER, key: 'previewVolume', label: () => $L('Preview Volume'), desc: () => $L('How loud media previews on cards play'), min: 0, max: 100, step: 5, format: percent, icon: 'volume_down', when: whenMediaPreview},
 					{kind: KIND.TOGGLE, key: 'homeRowOverlay', label: () => $L('Home Row Info Overlay'), desc: () => $L('Show title and metadata when browsing home rows'), icon: 'info_outline', when: (ctx) => ctx.settings.homeRowsStyle === 'v1'},
-					{kind: KIND.TOGGLE, key: 'showHomeBackdrop', label: () => $L('Home Screen Backdrop'), icon: 'photo'},
+					{
+						kind: KIND.OPTION,
+						key: 'homeBackdropStyle',
+						label: () => $L('Home Screen Backdrop'),
+						options: getHomeBackdropStyleOptions,
+						fallback: () => $L('Full Screen'),
+						icon: 'photo',
+						value: (ctx) => homeBackdropStyle(ctx.settings),
+						onSelect: (ctx, style) => ctx.actions.setSettings(homeBackdropSettings(style))
+					},
 					{kind: KIND.TOGGLE, key: 'hideHomeMediaDescription', label: () => $L('Hide Media Description'), desc: () => $L('Hide the movie or episode descriptive text.'), icon: 'description_outlined'},
 					{kind: KIND.SECTION, id: 'externalSources', label: () => $L('External Sources'), when: whenPlugin},
-					{kind: KIND.NAV, id: 'imdbLists', label: () => $L('IMDb Lists'), desc: () => $L('Configure IMDb Top 250, Popular, and other charts.'), icon: 'movie_outlined', action: (ctx) => ctx.actions.openImdbLists(), when: whenPlugin},
-					{kind: KIND.NAV, id: 'externalTmdbLists', label: () => $L('TMDB Lists'), desc: () => $L('Configure Popular, Top Rated, and Trending TMDB lists.'), icon: 'trending_up', action: (ctx) => ctx.actions.openExternalTmdbLists(), when: whenPlugin},
+					{kind: KIND.NAV, id: 'imdbLists', label: () => $L('IMDb Lists'), desc: () => $L('Configure IMDb Top 250, Popular, and other charts.'), icon: 'movie_outlined', keywords: () => [$L('IMDb Row Sorting'), $L('Sort Order')], action: (ctx) => ctx.actions.openImdbLists(), when: whenPlugin},
+					{kind: KIND.NAV, id: 'externalTmdbLists', label: () => $L('TMDB Lists'), desc: () => $L('Configure Popular, Top Rated, and Trending TMDB lists.'), icon: 'trending_up', keywords: () => [$L('TMDB Row Sorting'), $L('Sort Order')], action: (ctx) => ctx.actions.openExternalTmdbLists(), when: whenPlugin},
 					{kind: KIND.NAV, id: 'seasonalRow', label: () => $L('Seasonal Row'), desc: () => $L('Show a row of holiday movies from your library, with Seerr suggestions when available.'), icon: 'celebration_outlined', keywords: () => ['holiday', 'christmas', 'halloween', 'seasonal'], action: (ctx) => ctx.actions.openSeasonalRow(), when: whenPlugin},
 					{kind: KIND.NAV, id: 'externalCalendars', label: () => $L('Upcoming Calendars'), desc: () => $L('Toggle Upcoming Calendars from Radarr/Sonarr.'), icon: 'calendar_month', action: (ctx) => ctx.actions.openExternalCalendars(), when: (ctx) => whenPlugin(ctx) && whenSeerr(ctx)},
-					{kind: KIND.NAV, id: 'seerrHomeRows', label: (ctx) => `${ctx.seerrLabel} ${$L('Rows')}`, desc: () => $L('Configure Seerr Discovery Rows.'), icon: 'list', action: (ctx) => ctx.actions.openSeerrHomeRows(), when: (ctx) => whenPlugin(ctx) && whenSeerr(ctx)},
+					{kind: KIND.NAV, id: 'seerrHomeRows', label: (ctx) => `${ctx.seerrLabel} ${$L('Rows')}`, desc: () => $L('Configure Seerr Discovery Rows.'), icon: 'list', keywords: () => [$L('Seerr Row Sorting'), $L('Sort Order')], action: (ctx) => ctx.actions.openSeerrHomeRows(), when: (ctx) => whenPlugin(ctx) && whenSeerr(ctx)},
 					{
 						kind: KIND.NAV,
 						id: 'externalCustomRows',

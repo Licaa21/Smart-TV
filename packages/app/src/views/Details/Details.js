@@ -9,6 +9,7 @@ import {useSettings} from '../../context/SettingsContext';
 import {useSeerr} from '../../context/SeerrContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import * as jellyfinApi from '../../services/jellyfinApi';
+import {searchesForTrailer} from '../../services/youtubeTrailer';
 import {saveAudioPref, saveSubtitlePref} from '../../services/subtitlePrefs';
 import {fromServerStream} from '../../utils/seriesTrackPrefs';
 import ModernDetailContent from './ModernDetailContent';
@@ -38,6 +39,7 @@ import {collectionQueue, collectionPlayTarget} from '../../utils/collectionPlayb
 import {isSeerrOnlyItem, libraryIdOf, personRouteFor} from '../../utils/seerrTarget';
 import {buildSeerrDetailItem} from '../../utils/seerrDetailItem';
 import {COLLECTION_ITEM_TYPES, IDENTIFIABLE_TYPES, getMediaBadges, seriesThumbUrl, shuffleArray, splitCastAndCrew} from './detailsMedia';
+import {orderItemsByIds} from './collectionPlaylist';
 import useDetailsItem from './useDetailsItem';
 import useSeerrEpisodes from './useSeerrEpisodes';
 import {isSeerrPseudo} from '../../utils/seerrSeasons';
@@ -63,6 +65,8 @@ import SpotlightDetailContent from './spotlight/SpotlightDetailContent';
 import NouveauDetailContent from './nouveau/NouveauDetailContent';
 import MinimalistDetailContent from './minimalist/MinimalistDetailContent';
 import PersonScreen from './PersonScreen';
+import PersonDisplayDialog from './PersonDisplayDialog';
+import {offersFavorite} from './personFavorite';
 import SeasonScreen from './SeasonScreen';
 import PlaylistScreen from './PlaylistScreen';
 import AlbumScreen from './AlbumScreen';
@@ -169,7 +173,8 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	const {
 		setItem, isLoading: libraryLoading, isBlocked: blockedByRating, isSeed, seasons: librarySeasons, episodes, seriesEpisodes: librarySeriesEpisodes, similar, extras, cast, nextUp, nextEpisode,
 		collectionItems, missingCollectionItems, parentCollections, similarSource, similarLoaded, playListsLoaded, loadMoreCollectionItems, removeFromCollection, albumTracks, artistAlbums,
-		playlistItems, setPlaylistItems, episodeRatings, refreshItem,
+		playlistItems, setPlaylistItems, collectionIndexRef, collectionSort, collectionPlaylistLoading, chooseCollectionSort, moveCollectionItem,
+		episodeRatings, refreshItem,
 		selectedVersionIndex, setSelectedVersionIndex,
 		selectedAudioIndex, setSelectedAudioIndex,
 		selectedSubtitleIndex, setSelectedSubtitleIndex
@@ -300,29 +305,50 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 			user?.Policy?.IsAdministrator;
 	}, [item, user]);
 
+	const isBoxSet = item?.Type === 'BoxSet';
+
+	// A moved row can be drawn afresh, so focus is put back on it in its new place.
+	const handleCollectionMove = useCallback((itemIndex, direction) => {
+		const newIndex = itemIndex + direction;
+		if (newIndex < 0 || newIndex >= playlistItems.length) return;
+		const list = Spotlight.getCurrent()?.closest('[data-index]')?.parentElement;
+		moveCollectionItem(itemIndex, newIndex);
+		window.requestAnimationFrame(() => {
+			const row = list?.querySelector(`[data-index="${newIndex}"]`);
+			if (row) Spotlight.focus(row);
+		});
+	}, [playlistItems.length, moveCollectionItem]);
+
+	const collectionOrder = useMemo(() => (isBoxSet ? {
+		sortOption: collectionSort,
+		loading: collectionPlaylistLoading,
+		choose: chooseCollectionSort
+	} : null), [isBoxSet, collectionSort, collectionPlaylistLoading, chooseCollectionSort]);
+
 	// Keyed on the id rather than the item, because marking watched or favourite
 	// builds a new item object, which would otherwise yank focus back to Play.
+	const isPersonItem = item?.Type === 'Person';
 	const loadedItemId = item?.Id;
 	const autoFocusedRef = useRef(null);
 	useEffect(() => {
 		if (isLoading || !loadedItemId) return undefined;
 		const timer = setTimeout(() => {
-			Spotlight.focus(seerrOnly ? 'details-action-buttons' : 'details-primary-btn');
+			Spotlight.focus(seerrOnly || isPersonItem ? 'details-action-buttons' : 'details-primary-btn');
 			autoFocusedRef.current = Spotlight.getCurrent();
 		}, 150);
 		return () => clearTimeout(timer);
-	}, [isLoading, loadedItemId, seerrOnly]);
+	}, [isLoading, loadedItemId, seerrOnly, isPersonItem]);
 
 	// The row a title is opened from doesn't carry everything the buttons are built from, so
 	// a Resume can appear once the full record lands and take the primary spot from under
 	// the focus, leaving it on Restart. Put it back, but only while it is still sitting where
 	// it was put, so a viewer who has already moved along the row is left where they are.
 	useEffect(() => {
-		if (isSeed || seerrOnly || !autoFocusedRef.current) return;
+		if (isSeed || seerrOnly || isPersonItem || !autoFocusedRef.current) return;
 		if (Spotlight.getCurrent() !== autoFocusedRef.current) return;
 		Spotlight.focus('details-primary-btn');
 		autoFocusedRef.current = Spotlight.getCurrent();
-	}, [isSeed, seerrOnly]);
+	}, [isSeed, seerrOnly, isPersonItem]);
 
 	// A hidden logo falls back to the title text, as a missing one does.
 	const logoUrl = useMemo(
@@ -415,9 +441,9 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				onPlay?.(target, shouldResumeTarget(target), {});
 			}
 		} else if (item.Type === 'BoxSet') {
-			// The rest of the collection rides along, so finishing one film starts the next
-			// rather than sending the viewer back to pick it.
-			const queue = collectionQueue(collectionItems);
+			// The rest of the collection rides along in playlist order, so finishing one film starts
+			// the next rather than sending the viewer back to pick it.
+			const queue = orderItemsByIds(collectionQueue(collectionItems), collectionIndexRef.current);
 			const target = collectionPlayTarget(queue);
 			if (target) {
 				onPlay?.(target, shouldResumeTarget(target), {videoQueue: queue});
@@ -449,7 +475,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				onPlay?.(item, false, parts.length ? {...playbackOptions, videoQueue: [item, ...parts]} : playbackOptions);
 			}
 		}
-	}, [item, seerrOnly, episodes, nextUp, seasons, collectionItems, albumTracks, playlistItems, onPlay, onSelectItem, buildPlaybackOptions, effectiveApi, settings, tagWithServerInfo, isSyncPlayInGroup, playListFrom, fetchAdditionalParts]);
+	}, [item, seerrOnly, episodes, nextUp, seasons, collectionItems, albumTracks, playlistItems, onPlay, onSelectItem, buildPlaybackOptions, effectiveApi, settings, tagWithServerInfo, isSyncPlayInGroup, playListFrom, fetchAdditionalParts, collectionIndexRef]);
 
 	const handleResume = useCallback(async () => {
 		if (!item) return;
@@ -649,7 +675,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 			const currentAudio = audios[selectedAudioIndex];
 			const languages = subtitleDownloadLanguages(
 				settings.subtitleDownloadLanguages,
-				toSubtitleLanguage(currentSub?.Language, currentAudio?.Language, subs[0]?.Language)
+				toSubtitleLanguage(settings.subtitleLanguage, currentSub?.Language, currentAudio?.Language, subs[0]?.Language)
 			);
 			const results = await searchRemoteSubtitlesIn(effectiveApi, item.Id, languages);
 			setRemoteSubtitleResults(mapRemoteSubtitleOptions(results));
@@ -659,7 +685,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		} finally {
 			setIsSearchingRemoteSubtitles(false);
 		}
-	}, [item, selectedVersionIndex, selectedSubtitleIndex, selectedAudioIndex, effectiveApi, openModal, settings.subtitleDownloadLanguages]);
+	}, [item, selectedVersionIndex, selectedSubtitleIndex, selectedAudioIndex, effectiveApi, openModal, settings.subtitleDownloadLanguages, settings.subtitleLanguage]);
 
 	const handleSelectRemoteSubtitle = useCallback(async (e) => {
 		const index = parseInt(e.currentTarget.dataset.index, 10);
@@ -945,6 +971,21 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	// What the long press menu on a playlist row can do. The same title can sit in a playlist
 	// twice, so a row is found by its entry id when it has one.
 	const playlistMenu = useMemo(() => {
+		// A collection's rows can move in its play order, which switches it to the custom order,
+		// but they can't leave the collection from here.
+		if (item?.Type === 'BoxSet') {
+			if (!playlistItems.length) return null;
+			const at = (entry) => playlistItems.findIndex((candidate) => candidate.Id === entry.Id);
+			return {
+				playlist: {
+					canManage: true,
+					canRemove: false,
+					positionOf: (entry) => ({first: at(entry) <= 0, last: at(entry) >= playlistItems.length - 1}),
+					play: playTrack,
+					move: (entry, direction) => handleCollectionMove(at(entry), direction)
+				}
+			};
+		}
 		if (item?.Type !== 'Playlist') return null;
 		const indexOf = (entry) => playlistItems.findIndex((candidate) => (entry.PlaylistItemId
 			? candidate.PlaylistItemId === entry.PlaylistItemId
@@ -961,7 +1002,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				move: (entry, direction) => handlePlaylistItemReorder(indexOf(entry), direction)
 			}
 		};
-	}, [item?.Type, playlistItems, canManagePlaylist, playTrack, handleRemoveFromPlaylist, handlePlaylistItemReorder]);
+	}, [item?.Type, playlistItems, canManagePlaylist, playTrack, handleRemoveFromPlaylist, handlePlaylistItemReorder, handleCollectionMove]);
 
 	// No artwork, name or retry on purpose, since a retry would read as an invitation.
 	if (!seerrOnly && blockedByRating) {
@@ -994,22 +1035,24 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 	const isSeries = item.Type === 'Series';
 	const isSeason = item.Type === 'Season';
 	const isPerson = item.Type === 'Person';
-	const isBoxSet = item.Type === 'BoxSet';
 	const isAlbum = item.Type === 'MusicAlbum';
 	const isMusicArtist = item.Type === 'MusicArtist';
 	const isPlaylist = item.Type === 'Playlist';
 	const isAudioTrack = item.Type === 'Audio';
 	const isBook = item.Type === 'Book';
 	const isReadableBook = isBook && !!bookReader(item);
-	const isRatable = isRatableItemType(item.Type);
+	// Plex has no personal ratings, since its one rating stands in for favorites.
+	const isRatable = isRatableItemType(item.Type) && (item._serverType || jellyfinApi.getServerType()) !== 'plex';
 	const ratingStyle = normalizeRatingStyle(settings.personalRatingStyle);
 
 	// A series keeps the button with nothing counted against it, since a trailer sitting in a
 	// season folder belongs to that season rather than the series it came from. A movie or series the library has
-	// no trailer for has one when Seerr knows of one, which a title that was requested there and then added is.
+	// no trailer for has one when Seerr knows of one, which a title that was requested there and then added is. A movie
+	// or show on a server that keeps no trailer links has YouTube searched for one.
+	const searchesTrailer = (item.Type === 'Movie' || isSeries) && searchesForTrailer(item, jellyfinApi.getServerType());
 	const hasTrailer = seerrOnly
 		? item.RemoteTrailers?.length > 0
-		: (item.LocalTrailerCount > 0 || item.RemoteTrailers?.length > 0 || isSeries || trailer.hasLookedUpTrailer);
+		: (item.LocalTrailerCount > 0 || item.RemoteTrailers?.length > 0 || isSeries || trailer.hasLookedUpTrailer || searchesTrailer);
 
 	// Collections only hold video content, so the action is hidden on people,
 	// music and playlists rather than offering a call the server would reject.
@@ -1171,6 +1214,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				onClearRating={handleClearRating}
 				onClose={modals.handleCloseRatingDialog}
 			/>
+			{modals.showPersonDisplayModal && <PersonDisplayDialog onClose={modals.handleClosePersonDisplayModal} />}
 			<SeerrDialogs seerr={seerr} title={item.Name} />
 			<ReviewDialog review={reviews.openReview} onClose={reviews.handleCloseReview} />
 		</>
@@ -1194,6 +1238,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 					onSelectSeerrCard={handleSelectSeerrCard}
 					canChangeArtwork={canChangeArtwork}
 					handleOpenArtworkModal={modals.handleOpenArtworkModal}
+					handleOpenPersonDisplayModal={modals.handleOpenPersonDisplayModal}
 					effectiveApi={effectiveApi}
 					serverToken={initialItem?._serverAccessToken || jellyfinApi.getApiKey()}
 					effectiveServerUrl={effectiveServerUrl}
@@ -1236,6 +1281,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 					albumTracks={albumTracks}
 					artistAlbums={artistAlbums}
 					playlistItems={shownPlaylistItems}
+					collectionOrder={collectionOrder}
 					personMovies={personMovies}
 					personSeries={personSeries}
 					birthDate={birthDate}
@@ -1295,7 +1341,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 
 	if (isPerson) {
 		return (
-			<DetailScrollPage backdrop={backdrop} scrollerRef={pageScrollerRef} onScrollTo={handlePageScrollTo} sidebarDocked={sidebarDocked}>
+			<DetailScrollPage backdrop={backdrop} scrollerRef={pageScrollerRef} onScrollTo={handlePageScrollTo} sidebarDocked={sidebarDocked} footer={overlays}>
 				<PersonScreen
 					item={item}
 					serverUrl={effectiveServerUrl}
@@ -1306,6 +1352,10 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 					birthPlace={birthPlace}
 					onSelectItem={onSelectItem}
 					onSelectSeerrItem={seerrNav?.onSelectItem}
+					onOpenPersonDisplayModal={modals.handleOpenPersonDisplayModal}
+					canFavorite={offersFavorite(true, effectiveServerUrl)}
+					isFavorite={Boolean(item.UserData?.IsFavorite)}
+					onToggleFavorite={handleToggleFavorite}
 				/>
 			</DetailScrollPage>
 		);
@@ -1405,7 +1455,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 			settings={settings}
 			seerr={seerr}
 			seerrOnly={seerrOnly}
-			hasTrailer={item.LocalTrailerCount > 0 || item.RemoteTrailers?.length > 0 || trailer.hasLookedUpTrailer}
+			hasTrailer={item.LocalTrailerCount > 0 || item.RemoteTrailers?.length > 0 || trailer.hasLookedUpTrailer || searchesTrailer}
 			isSeries={isSeries}
 			isSeason={isSeason}
 			isBoxSet={isBoxSet}

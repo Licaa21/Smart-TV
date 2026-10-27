@@ -126,7 +126,7 @@ const QUALITY_FILTERS = [
 	{key: 'sd', label: $L('SD')},
 	{key: 'hd', label: $L('HD')},
 	{key: 'uhd', label: $L('4K'), jellyfinOnly: true},
-	{key: 'threeD', label: $L('3D')}
+	{key: 'threeD', label: $L('3D'), plexless: true}
 ];
 
 // A tag list can run to thousands of entries, and each one costs a focusable
@@ -225,6 +225,7 @@ const GridList = memo(VirtualGridList);
 const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto, onHome, onPlay, onSearch, backHandlerRef}) => {
 	const {api, serverUrl, serverType} = useAuth();
 	const {settings, updateSetting} = useSettings();
+	const libraryServerType = library?._serverType || serverType;
 
 	const effectiveApi = useMemo(() => {
 		if (library?._serverUrl && library?._serverAccessToken) {
@@ -264,6 +265,16 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const [yearFilters, setYearFilters] = useState([]);
 	const [audioLanguageFilters, setAudioLanguageFilters] = useState([]);
 	const [subtitleLanguageFilters, setSubtitleLanguageFilters] = useState([]);
+	// Plex can't filter on these, so a choice carried over from another server's library is dropped.
+	useEffect(() => {
+		if (libraryServerType !== 'plex') return;
+		const none = (current) => (current.length ? [] : current);
+		setLikedFilter('all');
+		setSeriesFilter('all');
+		setFeatureFilters(none);
+		setVideoSourceFilters(none);
+		setQualityFilters((current) => (current.includes('threeD') ? current.filter((key) => key !== 'threeD') : current));
+	}, [libraryServerType]);
 	const [facetValues, setFacetValues] = useState(null);
 	const [facetLimit, setFacetLimit] = useState(FACET_PAGE);
 	const [facetQuery, setFacetQuery] = useState('');
@@ -1394,7 +1405,9 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const showVideoFilters = !isMusicLibrary && !isPlaylistLibrary && !isFilterMode;
 	// Emby's items query has no 4K flag and its series status holds only
 	// continuing and ended, so those options stay out of the panel there.
-	const supported = (options) => options.filter(o => !o.jellyfinOnly || serverType !== 'emby');
+	// Plex can't filter on series status, likes, subtitles, trailers, extras, theme media, 3D or disc source.
+	const onPlex = libraryServerType === 'plex';
+	const supported = (options) => options.filter(o => (!o.jellyfinOnly || libraryServerType !== 'emby') && !(onPlex && o.plexless));
 	const folderName = folderStack.length > 0 ? folderStack[folderStack.length - 1].name : library?.Name;
 	const displayName = genreFilter || studioFilter || library?.Name || '';
 	const titleProps = {isFolderView, folderStack, rootName: library?.Name, displayName, shownCount, onBreadcrumb: handleFolderBreadcrumb};
@@ -1701,15 +1714,15 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 						renderSection('played', $L('Played Status'), chosenLabel(PLAYED_FILTERS, playedFilter), () => (
 							PLAYED_FILTERS.map((option) => renderRadioRow(option.key, $L(option.label), playedFilter === option.key, handlePlayedFilterSelect, 'data-played-key'))
 						)),
-						renderSection('liked', $L('My Rating'), chosenLabel(LIKED_FILTERS, likedFilter), () => (
+						!onPlex && renderSection('liked', $L('My Rating'), chosenLabel(LIKED_FILTERS, likedFilter), () => (
 							LIKED_FILTERS.map((option) => renderRadioRow(option.key, $L(option.label), likedFilter === option.key, handleLikedFilterSelect, 'data-liked-key'))
 						)),
-						isSeriesLibrary && renderSection('series', $L('Series Status'), chosenLabel(SERIES_FILTERS, seriesFilter), () => (
+						isSeriesLibrary && !onPlex && renderSection('series', $L('Series Status'), chosenLabel(SERIES_FILTERS, seriesFilter), () => (
 							supported(SERIES_FILTERS).map((option) => renderRadioRow(option.key, $L(option.label), seriesFilter === option.key, handleSeriesFilterSelect, 'data-series-key'))
 						)),
-						showVideoFilters && renderOptionSection('features', $L('Features'), supported(FEATURE_FILTERS), featureFilters, handleFeatureToggle),
+						showVideoFilters && !onPlex && renderOptionSection('features', $L('Features'), supported(FEATURE_FILTERS), featureFilters, handleFeatureToggle),
 						showVideoFilters && renderOptionSection('quality', $L('Quality'), supported(QUALITY_FILTERS), qualityFilters, handleQualityToggle),
-						showVideoFilters && renderOptionSection('source', $L('Source'), VIDEO_SOURCE_FILTERS, videoSourceFilters, handleVideoSourceToggle),
+						showVideoFilters && !onPlex && renderOptionSection('source', $L('Source'), VIDEO_SOURCE_FILTERS, videoSourceFilters, handleVideoSourceToggle),
 						!genreFilter && renderFacetSection('genres', $L('Genres'), facetValues?.genres, genreFilters, handleGenreToggle),
 						renderFacetSection('ratings', $L('Parental Rating'), facetValues?.officialRatings, ratingFilters, handleRatingToggle),
 						renderFacetSection('tags', $L('Tags'), facetValues?.tags, tagFilters, handleTagToggle),

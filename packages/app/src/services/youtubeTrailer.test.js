@@ -11,6 +11,7 @@ import {
 	buildInnertubePayload,
 	extractInnertubeStream,
 	fetchVideoStream,
+	firstSearchVideoId,
 	freshVisitorData,
 	isManifestUrl,
 	isStaleVisitor,
@@ -622,5 +623,17 @@ describe('native manifest memory', () => {
 		noteNativeManifest(true, now);
 		noteNativeManifest(false, now);
 		expect(nativeManifestSkipped(now)).toBe(false);
+	});
+});
+
+describe('the trailer search', () => {
+	test('takes the first video in the order YouTube ranked them, past channels and shelves', () => {
+		const answer = {contents: {sectionListRenderer: {contents: [{itemSectionRenderer: {contents: [
+			{channelRenderer: {channelId: 'c'}},
+			{videoRenderer: {videoId: 'first'}},
+			{videoRenderer: {videoId: 'second'}}
+		]}}]}}};
+		expect(firstSearchVideoId(answer)).toBe('first');
+		expect(firstSearchVideoId({contents: []})).toBeNull();
 	});
 });

@@ -7,6 +7,7 @@ import {createLiveTvGuideStore} from '../../services/liveTvGuideStore';
 import {formatClockTime} from '../../utils/clock';
 import {KEYS, isBackKey} from '../../utils/keys';
 import {fittingItems} from '../../utils/measureText';
+import {getImageUrl} from '../../utils/helpers';
 import {rem, rootScale} from '../../utils/rootScale';
 import useSurfaceAccent from '../../hooks/useSurfaceAccent';
 import {
@@ -82,7 +83,7 @@ const buildEntry = (channel, store, now, serverUrl, clockDisplay) => {
 		channelNumber: channel.ChannelNumber || null,
 		channelName: channel.Name || '',
 		logoUrl: channel.ImageTags?.Primary
-			? `${serverUrl}/Items/${channel.Id}/Images/Primary?maxHeight=80&tag=${channel.ImageTags.Primary}`
+			? getImageUrl(serverUrl, channel.Id, 'Primary', {maxHeight: 80, tag: channel.ImageTags.Primary})
 			: null,
 		isFavorite: channel.UserData?.IsFavorite === true,
 		programTitle: program?.Name || null,

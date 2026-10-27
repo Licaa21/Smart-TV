@@ -18,7 +18,7 @@ const SHARP_LOOK = {WebkitFilter: 'none', filter: 'none', top: 0, left: 0, width
 // The oversize of a layer that is blurred by a filter or by the server, which hides the edges it darkens
 const OVERSIZE_LOOK = {top: '', left: '', width: '', height: ''};
 
-const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, scrimWhenEmpty = true}) => {
+const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, inCorner, scrimWhenEmpty = true}) => {
 	const blurredUrl = serverBlurredUrl(requestedUrl, blurAmount);
 	const targetUrl = blurredUrl || requestedUrl;
 	// A picture the server cannot blur is made soft by the screen, at any performance level
@@ -119,16 +119,21 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 
 	return (
 		<div className={css.globalBackdrop}>
-			<div
-				ref={layerARef}
-				className={css.globalBackdropImage}
-				style={layerStyle}
-			/>
-			<div
-				ref={layerBRef}
-				className={css.globalBackdropImage}
-				style={layerStyle}
-			/>
+			{/* The frames stay mounted either way, so the layers keep the picture they hold */}
+			<div className={inCorner ? css.cornerFadeLeft : css.fill}>
+				<div className={inCorner ? css.cornerFadeDown : css.fill}>
+					<div
+						ref={layerARef}
+						className={css.globalBackdropImage}
+						style={layerStyle}
+					/>
+					<div
+						ref={layerBRef}
+						className={css.globalBackdropImage}
+						style={layerStyle}
+					/>
+				</div>
+			</div>
 			{(scrimWhenEmpty || targetUrl) && <div className={css.globalBackdropOverlay} style={overlayStyle} />}
 		</div>
 	);

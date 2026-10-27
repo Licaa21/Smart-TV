@@ -58,7 +58,7 @@ const SpotlightDetailContent = (props) => {
 		effectiveApi, serverToken, seasons = [], similar = [], similarSource, reviews = [], onSelectReview, extras = [], cast = [], crew = [],
 		nextUp = [], collectionItems = [], missingCollectionItems = [], parentCollections = [],
 		albumTracks = [], artistAlbums = [], playlistItems = [], personMovies = [], personSeries = [],
-		filmography, loadMoreCollectionItems, collectionMenu,
+		filmography, loadMoreCollectionItems, collectionMenu, collectionOrder,
 		mediaSource, hasMultipleVersions, selectedAudioIndex, selectedSubtitleIndex,
 		onSelectItem, onSelectPerson, onSelectStudio, onSelectSeerrCard,
 		handleChapterSelect, handleExtraSelect, playTrack, playlistMenu,
@@ -140,13 +140,14 @@ const SpotlightDetailContent = (props) => {
 	}), [seerrCredits, settings]);
 	// A collection's play order sorts the same way it does in Modern and Nouveau.
 	const isBoxSet = item.Type === 'BoxSet';
-	const collectionSort = useCollectionSort(isBoxSet ? effectiveApi : null, item.Id, isBoxSet ? playlistItems : EMPTY_LIST);
-	const shownPlaylistItems = isBoxSet ? collectionSort.sorted : playlistItems;
+	const collectionSort = useCollectionSort(collectionOrder);
 	const {openSort: openCollectionSort, sortOption: collectionSortOption} = collectionSort;
-	const playlistSort = useMemo(
-		() => (isBoxSet ? {label: sortLabel(collectionSortOption), open: openCollectionSort} : null),
-		[isBoxSet, collectionSortOption, openCollectionSort]
-	);
+	const collectionLoading = Boolean(collectionOrder?.loading);
+	const playlistSort = useMemo(() => (isBoxSet ? {
+		label: sortLabel(collectionSortOption),
+		open: openCollectionSort,
+		loading: collectionLoading
+	} : null), [isBoxSet, collectionSortOption, openCollectionSort, collectionLoading]);
 
 	const cardFallbackImageUrl = useMemo(
 		() => spotlightCardFallbackUrl(effectiveServerUrl, item, backdropUrl),
@@ -157,7 +158,7 @@ const SpotlightDetailContent = (props) => {
 		item, serverUrl: effectiveServerUrl, settings, showsSection, seerrOnly, mediaSource,
 		seasons, episodes, seriesEpisodes, similar, similarSource, reviews, extras, cast, crew, nextUp,
 		collectionItems, missingCollectionItems, parentCollections,
-		albumTracks, artistAlbums, playlistItems: shownPlaylistItems, playlistSort,
+		albumTracks, artistAlbums, playlistItems, playlistSort,
 		personMovies, personSeries, filmography: otherCredits,
 		seerrAppearances, seerrCrewCredits,
 		studioCards, canManagePlaylist,
@@ -175,7 +176,7 @@ const SpotlightDetailContent = (props) => {
 	}), [
 		item, effectiveServerUrl, settings, showsSection, seerrOnly, mediaSource, seasons, episodes, seriesEpisodes, similar, similarSource, reviews,
 		extras, cast, crew, nextUp, collectionItems, missingCollectionItems, parentCollections,
-		albumTracks, artistAlbums, shownPlaylistItems, playlistSort, personMovies, personSeries, otherCredits,
+		albumTracks, artistAlbums, playlistItems, playlistSort, personMovies, personSeries, otherCredits,
 		seerrAppearances, seerrCrewCredits, studioCards, canManagePlaylist, cardFallbackImageUrl,
 		seerr.recommendationCards, seerr.similarCards, seerr.details, seerr.mediaType, seerr.collection, seerr.seasonMarkers,
 		seerr.pieces.chips, seerr.pieces.facts, seerr.pieces.streaming, seerr.streamingProviders
@@ -299,7 +300,7 @@ const SpotlightDetailContent = (props) => {
 
 	const handleBandKeyDown = useCallback((ev) => {
 		if (ev.keyCode !== KEYS.UP) return;
-		if (Spotlight.focus('details-primary-btn')) {
+		if (Spotlight.focus('details-primary-btn') || Spotlight.focus('details-action-buttons')) {
 			ev.preventDefault();
 			ev.stopPropagation();
 		}
@@ -373,12 +374,22 @@ const SpotlightDetailContent = (props) => {
 				{backdropUrl && <img className={css.backdropImage} src={backdropUrl} alt="" />}
 				<div className={css.scrim} style={scrimStyle(SCRIM, backdropStyle['--gradient-scale'])} />
 			</div>
-			<div className={`${css.page} ${settings.navbarPosition === 'left' ? css.sidebarOffset : css.topbarOffset}`}>
+			<div className={`${css.page} ${settings.navbarPosition === 'left' ? css.sidebarOffset : css.topbarOffset}`} onFocus={keepFocusInView}>
 				<div className={css.hero} style={{width: `${heroColumnWidth}px`}}>
-					{isPerson && posterUrl && <img className={css.personAvatar} src={posterUrl} alt="" />}
-					{tagline && !isPerson && <div className={css.tagline}>{tagline}</div>}
-					{heroTitle()}
-					{isPerson && personBorn()}
+					{isPerson ? (
+						<div className={css.personHeader}>
+							{posterUrl && <img className={css.personAvatar} src={posterUrl} alt="" />}
+							<div className={css.personInfo}>
+								<h1 className={css.title}>{item.Name}</h1>
+								{personBorn()}
+							</div>
+						</div>
+					) : (
+						<>
+							{tagline && <div className={css.tagline}>{tagline}</div>}
+							{heroTitle()}
+						</>
+					)}
 					{metaPieces.length > 0 && (
 						<div className={css.metaRow}>
 							{metaPieces.map((piece, i) => {
@@ -420,16 +431,14 @@ const SpotlightDetailContent = (props) => {
 					{!hideMediaDescription && item.Overview && (
 						<ExpandableOverview text={item.Overview} itemId={item.Id} className={css.descriptionSlot} backRef={overviewBackRef} />
 					)}
-					{!isPerson && (
-						<ModernActionButtons
-							{...props}
-							hasTech={hasTech}
-							maxVisibleButtons={5}
-							overflowAsMenu
-							downTarget={cards.length ? cardSpotlightId(cards[0].id) : null}
-							menuBackRef={menuBackRef}
-						/>
-					)}
+					<ModernActionButtons
+						{...props}
+						hasTech={hasTech}
+						maxVisibleButtons={5}
+						overflowAsMenu
+						downTarget={cards.length ? cardSpotlightId(cards[0].id) : null}
+						menuBackRef={menuBackRef}
+					/>
 					<SeerrDownloadBars seerr={seerr} />
 				</div>
 				{cards.length > 0 && (

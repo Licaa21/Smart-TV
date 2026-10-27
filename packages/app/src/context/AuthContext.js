@@ -15,6 +15,7 @@ import serverLogger from '../services/serverLogger';
 import {clearProxiedImageCache} from '../hooks/useProxiedImage';
 import {parseUrl} from '../utils/urlCompat';
 import {noteProvedSignIn} from '../utils/signInPin';
+import {bestPlexAddress} from '../services/plexTv';
 
 const REVALIDATE_INTERVAL = 5 * 60 * 1000;
 const BACKOFF_DELAYS = [5000, 10000, 20000];
@@ -88,6 +89,12 @@ export const AuthProvider = ({children}) => {
 		}
 	}, []);
 
+	// A Plex server can move between its addresses, so a saved one is checked for the best before it's used, and the
+	// saved servers are read again once a better one is stored.
+	const addressFor = useCallback((entry) => (entry?.serverType === 'plex'
+		? bestPlexAddress(entry, (best) => multiServerManager.updateServer(entry.serverId, {url: best}).then(loadServers))
+		: Promise.resolve(entry?.url)), [loadServers]);
+
 	useEffect(() => {
 		const init = async () => {
 			try {
@@ -120,6 +127,7 @@ export const AuthProvider = ({children}) => {
 						if (restoreTarget !== active) {
 							await multiServerManager.setActiveServer(restoreTarget.serverId, restoreTarget.userId);
 						}
+						restoreTarget = {...restoreTarget, url: await addressFor(restoreTarget)};
 						jellyfinApi.setServer(restoreTarget.url);
 						jellyfinApi.setServerType(restoreTarget.serverType || 'jellyfin');
 						jellyfinApi.setAuth(restoreTarget.userId, restoreTarget.accessToken);
@@ -173,7 +181,7 @@ export const AuthProvider = ({children}) => {
 			}
 		};
 		init();
-	}, [loadServers]);
+	}, [loadServers, addressFor]);
 
 	const login = useCallback(async (server, username, password, options = {}) => {
 		const {serverName: sName, serverType: sType = 'jellyfin', serverVersion: sVersion = null, isAddingNewServer = false, switchToNewUser = true} = options;
@@ -240,7 +248,10 @@ export const AuthProvider = ({children}) => {
 	}, [loadServers]);
 
 	const loginWithToken = useCallback(async (server, authResult, options = {}) => {
-		const {serverName: sName, serverType: sType = 'jellyfin', serverVersion: sVersion = null, isAddingNewServer = false, switchToNewUser = true} = options;
+		const {
+			serverName: sName, serverType: sType = 'jellyfin', serverVersion: sVersion = null, isAddingNewServer = false, switchToNewUser = true,
+			serverFields = null, userFields = null
+		} = options;
 
 		jellyfinApi.setServer(server);
 		jellyfinApi.setServerType(sType);
@@ -267,6 +278,7 @@ export const AuthProvider = ({children}) => {
 			sType,
 			sVersion
 		);
+		if (serverFields || userFields) await multiServerManager.updateServer(serverResult.serverId, serverFields, authResult.User.Id, userFields);
 
 		// Always switch to the newly logged in user
 		const shouldSwitch = switchToNewUser || !isAddingNewServer;
@@ -309,8 +321,9 @@ export const AuthProvider = ({children}) => {
 			const success = await multiServerManager.setActiveServer(serverId, userId);
 			if (!success) return false;
 
-			const active = await multiServerManager.getActiveServer();
-			if (!active) return false;
+			const saved = await multiServerManager.getActiveServer();
+			if (!saved) return false;
+			const active = {...saved, url: await addressFor(saved)};
 
 			// Update API
 			jellyfinApi.setServer(active.url);
@@ -355,7 +368,7 @@ export const AuthProvider = ({children}) => {
 			console.error('[AUTH] Error switching user:', error);
 			return false;
 		}
-	}, [loadServers]);
+	}, [loadServers, addressFor]);
 
 	/**
 	 * Remove a server/user

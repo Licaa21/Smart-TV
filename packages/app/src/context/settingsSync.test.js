@@ -94,7 +94,7 @@ describe('profileToLocal', () => {
 	});
 
 	test('takes the newer seasonal effects as they are', () => {
-		for (const effect of ['christmas', 'petals', 'fireflies', 'halloween']) {
+		for (const effect of ['christmas', 'petals', 'fireflies', 'halloween', 'valentines', 'easter', 'pride', 'lunar', 'diwali']) {
 			expect(profileToLocal({seasonalSurprise: effect}).seasonalTheme).toBe(effect);
 		}
 	});
@@ -323,6 +323,15 @@ describe('the backdrop toggles', () => {
 			.toEqual({showHomeBackdrop: false, detailsBackdropEnabled: false});
 		expect(localToProfile({...defaultSettings, showHomeBackdrop: false}, ['showHomeBackdrop']))
 			.toEqual({homeBackdropEnabled: false});
+	});
+
+	test('the home backdrop style travels under its own key beside the switch', () => {
+		expect(SYNCABLE_KEYS).toContain('homeBackdropStyle');
+		expect(defaultSettings.homeBackdropStyle).toBe('fullScreen');
+		expect(localToProfile({...defaultSettings, homeBackdropStyle: 'corner'}, ['showHomeBackdrop', 'homeBackdropStyle']))
+			.toEqual({homeBackdropEnabled: true, homeBackdropStyle: 'corner'});
+		expect(profileToLocal({homeBackdropEnabled: true, homeBackdropStyle: 'corner'}))
+			.toEqual({showHomeBackdrop: true, homeBackdropStyle: 'corner'});
 	});
 });
 

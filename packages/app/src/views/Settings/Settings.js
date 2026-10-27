@@ -374,7 +374,10 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	}, [popView]);
 
 	useEffect(() => {
-		if (serverUrl && accessToken) {
+		// Plex has no /System/Info, so its version comes from the identity call.
+		if (serverUrl && serverType === 'plex') {
+			api.getPublicInfo().then((info) => info?.Version && setServerVersion(info.Version)).catch(() => {});
+		} else if (serverUrl && accessToken) {
 			fetch(`${serverUrl}/System/Info`, {
 				headers: { Authorization: `MediaBrowser Token="${accessToken}"` }
 			})
@@ -384,7 +387,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 				})
 				.catch(() => {});
 		}
-	}, [serverUrl, accessToken]);
+	}, [serverUrl, accessToken, serverType, api]);
 
 	const toggleSetting = useCallback(
 		(key) => {
@@ -775,6 +778,8 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	const openExternalCustomRows = useCallback(() => {
 		pushView({view: 'externalCustomRows', returnFocusTo: 'setting-externalCustomRows'});
 	}, [pushView]);
+
+	const openOptionsDialog = useCallback((picker) => pushView({view: 'options', ...picker}), [pushView]);
 
 	// Lets a row on one screen open a screen that lives elsewhere in the schema, the
 	// way Progress Bar Time is reached from Video Playback Preferences.
@@ -1534,16 +1539,27 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 					homeRows={settings.homeRows}
 					serverUrl={serverUrl}
 					onToggleSlider={toggleSeerrSlider}
+					settings={settings}
+					onOpenOptions={openOptionsDialog}
 				/>
 			)}
 			{viewName === 'imdbLists' && (
-				<ImdbListsView settings={settings} onUpdateSettings={updateSettings} />
+				<ImdbListsView
+					settings={settings}
+					onUpdateSettings={updateSettings}
+					onOpenOptions={openOptionsDialog}
+				/>
 			)}
 			{viewName === 'seasonalRow' && (
 				<SeasonalRowView settings={settings} onUpdateSettings={updateSettings} />
 			)}
 			{viewName === 'externalTmdbLists' && (
-				<ExternalTmdbListsView enabledMap={homeRowEnabledMap} onToggleRow={toggleHomeRowEnabled} />
+				<ExternalTmdbListsView
+					enabledMap={homeRowEnabledMap}
+					onToggleRow={toggleHomeRowEnabled}
+					settings={settings}
+					onOpenOptions={openOptionsDialog}
+				/>
 			)}
 			{viewName === 'externalCalendars' && (
 				<ExternalCalendarsView
@@ -1612,7 +1628,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 					spotlightId='subtitle-download-languages-view'
 					rowIdPrefix='subtitle-download-language'
 					title={$L('Subtitle Download Languages')}
-					lead={$L('Languages to search when downloading subtitles, up to {max}. With none ticked, one language is picked from the video.').replace('{max}', MAX_SUBTITLE_DOWNLOAD_LANGUAGES)}
+					lead={$L('Languages to search when downloading subtitles, up to {max}. With none ticked, the default subtitle language is searched, or one language is picked from the video when that is not set.').replace('{max}', MAX_SUBTITLE_DOWNLOAD_LANGUAGES)}
 					options={getSubtitleLanguageOptions().filter((option) => option.value)}
 					picked={settings.subtitleDownloadLanguages || []}
 					max={MAX_SUBTITLE_DOWNLOAD_LANGUAGES}

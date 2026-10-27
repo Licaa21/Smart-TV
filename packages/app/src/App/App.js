@@ -88,7 +88,6 @@ const Player = lazy(() => import('../views/Player'));
 const Favorites = lazy(() => import('../views/Favorites'));
 const Genres = lazy(() => import('../views/Genres'));
 const GenreBrowse = lazy(() => import('../views/GenreBrowse'));
-const Person = lazy(() => import('../views/Person'));
 const LiveTV = lazy(() => import('../views/LiveTV'));
 const Recordings = lazy(() => import('../views/Recordings'));
 const SeerrDiscover = lazy(() => import('../views/SeerrDiscover'));
@@ -162,21 +161,20 @@ const PANELS = {
 	PLAYER: 6,
 	FAVORITES: 7,
 	GENRES: 8,
-	PERSON: 9,
-	LIVETV: 10,
-	SEERR_DISCOVER: 11,
-	SEERR_REQUESTS: 12,
-	GENRE_BROWSE: 13,
-	RECORDINGS: 14,
-	SEERR_BROWSE: 15,
-	SEERR_PERSON: 16,
-	ADD_SERVER: 17,
-	ADD_USER: 18,
-	GAMES: 19,
-	GAME_DETAILS: 20,
-	GAME_PLAYER: 21,
-	SEERR_COLLECTION: 22,
-	GAME_SYSTEM: 23
+	LIVETV: 9,
+	SEERR_DISCOVER: 10,
+	SEERR_REQUESTS: 11,
+	GENRE_BROWSE: 12,
+	RECORDINGS: 13,
+	SEERR_BROWSE: 14,
+	SEERR_PERSON: 15,
+	ADD_SERVER: 16,
+	ADD_USER: 17,
+	GAMES: 18,
+	GAME_DETAILS: 19,
+	GAME_PLAYER: 20,
+	SEERR_COLLECTION: 21,
+	GAME_SYSTEM: 22
 };
 
 const AppContent = (props) => {
@@ -265,7 +263,6 @@ const AppContent = (props) => {
 	const [selectedGameSystem, setSelectedGameSystem] = useState(null);
 	const [selectedGame, setSelectedGame] = useState(null);
 	const [gameStartFresh, setGameStartFresh] = useState(false);
-	const [selectedPerson, setSelectedPerson] = useState(null);
 	const [selectedGenre, setSelectedGenre] = useState(null);
 	const [genreFilter, setGenreFilter] = useState(null);
 	const [studioFilter, setStudioFilter] = useState(null);
@@ -295,11 +292,11 @@ const AppContent = (props) => {
 	const [panelHistory, setPanelHistory] = useState([]);
 	// Where the details screen sits in the history when a guest star was opened from one of its episode dialogs
 	const episodeReturnRef = useRef(null);
-	// The history holds only which panel was left. The item and person that panel was showing are kept beside it,
+	// The history holds only which panel was left. The item that panel was showing is kept beside it,
 	// entry for entry, so Back lands on the one it left and not on the last one picked since.
 	const navStateRef = useRef([]);
 	const shownRef = useRef({});
-	shownRef.current = {item: selectedItem, person: selectedPerson};
+	shownRef.current = {item: selectedItem};
 	const [seerrBrowse, setSeerrBrowse] = useState(null);
 	const [seerrPerson, setSeerrPerson] = useState(null);
 	const [authChecked, setAuthChecked] = useState(false);
@@ -920,7 +917,6 @@ const AppContent = (props) => {
 	const restoreShown = useCallback((index) => {
 		const shown = navStateRef.current[index];
 		if (shown?.item) setSelectedItem(shown.item);
-		if (shown?.person) setSelectedPerson(shown.person);
 	}, []);
 
 	const handleBack = useCallback(() => {
@@ -1299,16 +1295,18 @@ const AppContent = (props) => {
 		}
 		// Music left playing behind the screens reports its stop before the new item opens.
 		if (backgroundMusic) await remoteControl.releasePlayer();
-		if (isSyncPlayInGroup) {
+		// Plex has no SyncPlay, so a Plex item neither joins a group nor opens it.
+		const itemOnPlex = (item._serverType || serverType) === 'plex';
+		if (isSyncPlayInGroup && !itemOnPlex) {
 			syncPlaySetNewQueue([item.Id]);
-		} else if (settings.syncplayEnabled !== false && settings.syncplayAutoOpen) {
+		} else if (!itemOnPlex && settings.syncplayEnabled !== false && settings.syncplayAutoOpen) {
 			openSyncPlay();
 		}
 		setPlayingItem(item);
 		setPlaybackOptions(options || null);
 		setIsResume(!!resume);
 		navigateTo(PANELS.PLAYER);
-	}, [navigateTo, isSyncPlayInGroup, openSyncPlay, settings.syncplayAutoOpen, settings.syncplayEnabled, syncPlaySetNewQueue, backgroundMusic, openBook]);
+	}, [navigateTo, isSyncPlayInGroup, openSyncPlay, serverType, settings.syncplayAutoOpen, settings.syncplayEnabled, syncPlaySetNewQueue, backgroundMusic, openBook]);
 
 	const playSyncPlayItem = useCallback((item) => {
 		if (panelIndex === PANELS.PLAYER && playingItem?.Id === item.Id) return;
@@ -1520,16 +1518,12 @@ const AppContent = (props) => {
 		navigateTo(PANELS.GENRE_BROWSE);
 	}, [navigateTo]);
 
-	// Nouveau draws a person on the detail screen itself, so they open there rather than on the
-	// separate screen the other styles send them to.
+	// A cast entry comes without a type, so it's marked as a person to open in whichever detail style is chosen.
 	const handleSelectPerson = useCallback((person) => {
-		if (settings.detailScreenStyle === 'v4') {
-			handleSelectItem(person);
-			return;
-		}
-		setSelectedPerson(person);
-		navigateTo(PANELS.PERSON);
-	}, [navigateTo, settings.detailScreenStyle, handleSelectItem]);
+		if (!person?.Id) return;
+		const item = person.Type ? person : {...person, Type: 'Person'};
+		handleSelectItem(item);
+	}, [handleSelectItem]);
 
 	// The player closes for a person, but Back from there comes to it again at the same place. The history holds the
 	// player's place so Back finds it, and where it was is kept in the ref.
@@ -1555,14 +1549,10 @@ const AppContent = (props) => {
 		setPlayingItem(null);
 		setPlaybackOptions(null);
 		setIsResume(false);
-		if (settings.detailScreenStyle === 'v4') {
-			setSelectedItem(person);
-			navigateTo(PANELS.DETAILS);
-			return;
-		}
-		setSelectedPerson(person);
-		navigateTo(PANELS.PERSON);
-	}, [navigateTo, settings.detailScreenStyle, playingItem, playbackOptions, isResume, panelHistory.length]);
+		const item = person.Type ? person : {...person, Type: 'Person'};
+		setSelectedItem(item);
+		navigateTo(PANELS.DETAILS, false);
+	}, [navigateTo]);
 
 	const handleOpenRecordings = useCallback(() => {
 		navigateTo(PANELS.RECORDINGS);
@@ -1588,7 +1578,6 @@ const AppContent = (props) => {
 		setPanelHistory([]);
 		setSelectedItem(null);
 		setSelectedLibrary(null);
-		setSelectedPerson(null);
 		setSelectedGenre(null);
 		setGenreFilter(null);
 		setStudioFilter(null);
@@ -2112,11 +2101,6 @@ const AppContent = (props) => {
 						<Panel>
 							{panelIndex === PANELS.GENRES && (
 								<Genres onSelectGenre={handleSelectGenre} onHome={handleHome} backHandlerRef={backHandlerRef} />
-							)}
-						</Panel>
-						<Panel>
-							{panelIndex === PANELS.PERSON && (
-								<Person personId={selectedPerson?.Id} onSelectItem={handleSelectItem} onSelectSeerrItem={handleSelectSeerrItem} onSelectSeerrPerson={handleSelectSeerrPerson} backHandlerRef={backHandlerRef} />
 							)}
 						</Panel>
 						<Panel>

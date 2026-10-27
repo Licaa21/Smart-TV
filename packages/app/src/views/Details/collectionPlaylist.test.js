@@ -3,10 +3,14 @@ import {
 	compareReleaseAscending,
 	orderItemsByIds,
 	buildCollectionIndex,
-	fetchCollectionPage
+	fetchCollectionPage,
+	collectionPlaylistItems,
+	moveInCollection
 } from './collectionPlaylist';
+import {orderCollectionIndex} from './nouveau/nouveauCollectionSort';
 
 const entry = (over) => ({id: 'x', name: '', premiereDate: null, productionYear: null, ...over});
+const idsOf = (entries) => entries.map((e) => e.id);
 
 describe('indexEntryFor', () => {
 	it('keeps only the id and what it takes to sort', () => {
@@ -64,7 +68,9 @@ describe('buildCollectionIndex', () => {
 				{Id: 'e2', Type: 'Episode', Name: 'Ep 2', PremiereDate: '1985-01-08'}
 			]})
 		};
-		expect(await buildCollectionIndex(api, 'box')).toEqual(['m1', 'e1', 'e2', 'm2']);
+		const entries = await buildCollectionIndex(api, 'box');
+		expect(idsOf(entries)).toEqual(['m1', 'e1', 'e2', 'm2']);
+		expect(entries[0]).toEqual({id: 'm1', name: 'Movie', premiereDate: '1990-01-01', productionYear: null});
 		expect(api.getItems).toHaveBeenCalledWith(expect.objectContaining({ParentId: 'box', Limit: 2000}));
 		expect(api.getEpisodes).toHaveBeenCalledWith('s1');
 	});
@@ -78,7 +84,7 @@ describe('buildCollectionIndex', () => {
 			]}),
 			getEpisodes: jest.fn().mockResolvedValue({Items: [{Id: 'e1', Type: 'Episode'}, {Id: 'e2', Type: 'Episode'}]})
 		};
-		expect(await buildCollectionIndex(api, 'box')).toEqual(['e9', 'e1', 'e2']);
+		expect(idsOf(await buildCollectionIndex(api, 'box'))).toEqual(['e9', 'e1', 'e2']);
 	});
 
 	it('carries on when a series refuses to list its episodes', async () => {
@@ -86,7 +92,7 @@ describe('buildCollectionIndex', () => {
 			getItems: jest.fn().mockResolvedValue({Items: [{Id: 'm1', Type: 'Movie', Name: 'M'}, {Id: 's1', Type: 'Series'}]}),
 			getEpisodes: jest.fn().mockRejectedValue(new Error('nope'))
 		};
-		expect(await buildCollectionIndex(api, 'box')).toEqual(['m1']);
+		expect(idsOf(await buildCollectionIndex(api, 'box'))).toEqual(['m1']);
 	});
 
 	it('comes back empty when the scan itself fails', async () => {
@@ -100,12 +106,12 @@ describe('fetchCollectionPage', () => {
 
 	// The two halves have to agree on what an index holds, so the page is asked for using
 	// exactly what the scan produced rather than a shape made up for the test.
-	it('asks for the ids the scan produced, not the entries behind them', async () => {
+	it('asks for the ids the ordered scan produced, not the entries behind them', async () => {
 		const scan = {
 			getItems: jest.fn().mockResolvedValue({Items: [{Id: 'm1', Type: 'Movie', Name: 'M'}]}),
 			getEpisodes: jest.fn()
 		};
-		const index = await buildCollectionIndex(scan, 'box');
+		const index = orderCollectionIndex(await buildCollectionIndex(scan, 'box'));
 		const api = {getItems: jest.fn().mockResolvedValue({Items: [{Id: 'm1'}]})};
 		await fetchCollectionPage(api, index, 0);
 		expect(api.getItems).toHaveBeenCalledWith(expect.objectContaining({Ids: 'm1'}));
@@ -129,5 +135,35 @@ describe('fetchCollectionPage', () => {
 		const api = {getItems: jest.fn()};
 		expect(await fetchCollectionPage(api, ids, 60)).toEqual({items: [], fetchedCount: 60, hasMore: false});
 		expect(api.getItems).not.toHaveBeenCalled();
+	});
+});
+
+describe('collectionPlaylistItems', () => {
+	it('shows the playlist once it has items', () => {
+		expect(collectionPlaylistItems([{Id: 'p1'}], [{Id: 'm1', Type: 'Movie'}])).toEqual([{Id: 'p1'}]);
+	});
+
+	it('stands in with the collection\'s own playable members until then', () => {
+		const members = [{Id: 'm1', Type: 'Movie'}, {Id: 's1', Type: 'Series'}, {Id: 'b1', Type: 'BoxSet'}, {Id: 'e1', Type: 'Episode'}];
+		expect(collectionPlaylistItems([], members).map((item) => item.Id)).toEqual(['m1', 'e1']);
+	});
+});
+
+describe('moveInCollection', () => {
+	const loaded = [{Id: 'a'}, {Id: 'b'}, {Id: 'c'}];
+
+	it('moves a loaded row and keeps the rows not read yet behind it', () => {
+		const moved = moveInCollection(loaded, ['a', 'b', 'c', 'd', 'e'], 0, 1);
+		expect(moved.items.map((item) => item.Id)).toEqual(['b', 'a', 'c']);
+		expect(moved.order).toEqual(['b', 'a', 'c', 'd', 'e']);
+	});
+
+	it('puts a row the server left out of a page after the loaded ones', () => {
+		expect(moveInCollection(loaded, ['a', 'gone', 'b', 'c'], 2, 1).order).toEqual(['a', 'c', 'b', 'gone']);
+	});
+
+	it('gives nothing back for a move off either end', () => {
+		expect(moveInCollection(loaded, ['a', 'b', 'c'], 0, -1)).toBeNull();
+		expect(moveInCollection(loaded, ['a', 'b', 'c'], 2, 3)).toBeNull();
 	});
 });

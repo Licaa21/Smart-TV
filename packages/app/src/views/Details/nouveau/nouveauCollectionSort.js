@@ -1,6 +1,6 @@
 import $L from '@enact/i18n/$L';
 
-import {compareReleaseAscending, indexEntryFor, orderItemsByIds} from '../collectionPlaylist';
+import {compareReleaseAscending} from '../collectionPlaylist';
 
 // How a collection's contents are ordered. The server's own order is what Jellyfin's web client
 // shows, so it is the one everything falls back to.
@@ -23,24 +23,31 @@ export const sortLabel = (option) => {
 	return $L('Server Order');
 };
 
-// The custom option is only worth offering where an order can actually be kept, which means the
-// plugin answered.
-export const collectionSortOptions = (canReorder = false) => [
+export const collectionSortOptions = () => [
 	SORT_SERVER,
 	SORT_RELEASE_ASCENDING,
 	SORT_RELEASE_DESCENDING,
 	SORT_ALPHABETICAL,
-	...(canReorder ? [SORT_CUSTOM] : [])
+	SORT_CUSTOM
 ].map((id) => ({id, label: sortLabel(id)}));
 
-const byName = (a, b) => String(a?.Name || '').toLowerCase().localeCompare(String(b?.Name || '').toLowerCase());
+const byName = (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase());
 
-const byRelease = (a, b) => compareReleaseAscending(indexEntryFor(a), indexEntryFor(b));
+const uniqueIds = (ids) => [...new Set(ids)];
 
-export const applyCollectionSort = (items = [], option = DEFAULT_SORT, customOrder = []) => {
-	if (option === SORT_CUSTOM && customOrder.length) return orderItemsByIds(items, customOrder);
-	if (option === SORT_ALPHABETICAL) return [...items].sort(byName);
-	if (option === SORT_RELEASE_ASCENDING) return [...items].sort(byRelease);
-	if (option === SORT_RELEASE_DESCENDING) return [...items].sort((a, b) => byRelease(b, a));
-	return items;
+// Puts a whole collection's index entries in one of the fixed orders and hands back their ids.
+export const orderCollectionIndex = (entries = [], option = DEFAULT_SORT) => {
+	let sorted = entries;
+	if (option === SORT_ALPHABETICAL) sorted = [...entries].sort(byName);
+	if (option === SORT_RELEASE_ASCENDING) sorted = [...entries].sort(compareReleaseAscending);
+	if (option === SORT_RELEASE_DESCENDING) sorted = [...entries].sort((a, b) => compareReleaseAscending(b, a));
+	return uniqueIds(sorted.map((entry) => entry.id));
+};
+
+// A saved order still needs the scan to find members added since it was saved. They go on the end
+// in release order so they aren't lost.
+export const mergeSavedOrder = (saved = [], entries = []) => {
+	const listed = new Set(saved);
+	const added = entries.filter((entry) => !listed.has(entry.id)).sort(compareReleaseAscending);
+	return uniqueIds([...saved, ...added.map((entry) => entry.id)]);
 };
