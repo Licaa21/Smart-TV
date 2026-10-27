@@ -89,7 +89,6 @@ const Player = lazy(() => import('../views/Player'));
 const Favorites = lazy(() => import('../views/Favorites'));
 const Genres = lazy(() => import('../views/Genres'));
 const GenreBrowse = lazy(() => import('../views/GenreBrowse'));
-const Person = lazy(() => import('../views/Person'));
 const LiveTV = lazy(() => import('../views/LiveTV'));
 const Recordings = lazy(() => import('../views/Recordings'));
 const SeerrDiscover = lazy(() => import('../views/SeerrDiscover'));
@@ -157,21 +156,20 @@ const PANELS = {
 	PLAYER: 6,
 	FAVORITES: 7,
 	GENRES: 8,
-	PERSON: 9,
-	LIVETV: 10,
-	SEERR_DISCOVER: 11,
-	SEERR_REQUESTS: 12,
-	GENRE_BROWSE: 13,
-	RECORDINGS: 14,
-	SEERR_BROWSE: 15,
-	SEERR_PERSON: 16,
-	ADD_SERVER: 17,
-	ADD_USER: 18,
-	GAMES: 19,
-	GAME_DETAILS: 20,
-	GAME_PLAYER: 21,
-	SEERR_COLLECTION: 22,
-	GAME_SYSTEM: 23
+	LIVETV: 9,
+	SEERR_DISCOVER: 10,
+	SEERR_REQUESTS: 11,
+	GENRE_BROWSE: 12,
+	RECORDINGS: 13,
+	SEERR_BROWSE: 14,
+	SEERR_PERSON: 15,
+	ADD_SERVER: 16,
+	ADD_USER: 17,
+	GAMES: 18,
+	GAME_DETAILS: 19,
+	GAME_PLAYER: 20,
+	SEERR_COLLECTION: 21,
+	GAME_SYSTEM: 22
 };
 
 const AppContent = (props) => {
@@ -258,7 +256,6 @@ const AppContent = (props) => {
 	const [selectedGameSystem, setSelectedGameSystem] = useState(null);
 	const [selectedGame, setSelectedGame] = useState(null);
 	const [gameStartFresh, setGameStartFresh] = useState(false);
-	const [selectedPerson, setSelectedPerson] = useState(null);
 	const [selectedGenre, setSelectedGenre] = useState(null);
 	const [genreFilter, setGenreFilter] = useState(null);
 	const [studioFilter, setStudioFilter] = useState(null);
@@ -1117,16 +1114,18 @@ const AppContent = (props) => {
 		}
 		// Music left playing behind the screens reports its stop before the new item opens.
 		if (backgroundMusic) await remoteControl.releasePlayer();
-		if (isSyncPlayInGroup) {
+		// Plex has no SyncPlay, so a Plex item neither joins a group nor opens it.
+		const itemOnPlex = (item._serverType || serverType) === 'plex';
+		if (isSyncPlayInGroup && !itemOnPlex) {
 			syncPlaySetNewQueue([item.Id]);
-		} else if (settings.syncplayEnabled !== false && settings.syncplayAutoOpen) {
+		} else if (!itemOnPlex && settings.syncplayEnabled !== false && settings.syncplayAutoOpen) {
 			openSyncPlay();
 		}
 		setPlayingItem(item);
 		setPlaybackOptions(options || null);
 		setIsResume(!!resume);
 		navigateTo(PANELS.PLAYER);
-	}, [navigateTo, isSyncPlayInGroup, openSyncPlay, settings.syncplayAutoOpen, settings.syncplayEnabled, syncPlaySetNewQueue, backgroundMusic, openBook]);
+	}, [navigateTo, isSyncPlayInGroup, openSyncPlay, serverType, settings.syncplayAutoOpen, settings.syncplayEnabled, syncPlaySetNewQueue, backgroundMusic, openBook]);
 
 	const playSyncPlayItem = useCallback((item) => {
 		if (panelIndex === PANELS.PLAYER && playingItem?.Id === item.Id) return;
@@ -1332,16 +1331,12 @@ const AppContent = (props) => {
 		navigateTo(PANELS.GENRE_BROWSE);
 	}, [navigateTo]);
 
-	// Nouveau draws a person on the detail screen itself, so they open there rather than on the
-	// separate screen the other styles send them to.
+	// A cast entry comes without a type, so it's marked as a person to open in whichever detail style is chosen.
 	const handleSelectPerson = useCallback((person) => {
-		if (settings.detailScreenStyle === 'v4') {
-			handleSelectItem(person);
-			return;
-		}
-		setSelectedPerson(person);
-		navigateTo(PANELS.PERSON);
-	}, [navigateTo, settings.detailScreenStyle, handleSelectItem]);
+		if (!person?.Id) return;
+		const item = person.Type ? person : {...person, Type: 'Person'};
+		handleSelectItem(item);
+	}, [handleSelectItem]);
 
 	const handleSelectPersonFromPlayer = useCallback((person) => {
 		if (!person?.Id) return;
@@ -1349,14 +1344,10 @@ const AppContent = (props) => {
 		setPlayingItem(null);
 		setPlaybackOptions(null);
 		setIsResume(false);
-		if (settings.detailScreenStyle === 'v4') {
-			setSelectedItem(person);
-			navigateTo(PANELS.DETAILS, false);
-			return;
-		}
-		setSelectedPerson(person);
-		navigateTo(PANELS.PERSON, false);
-	}, [navigateTo, settings.detailScreenStyle]);
+		const item = person.Type ? person : {...person, Type: 'Person'};
+		setSelectedItem(item);
+		navigateTo(PANELS.DETAILS, false);
+	}, [navigateTo]);
 
 	const handleOpenRecordings = useCallback(() => {
 		navigateTo(PANELS.RECORDINGS);
@@ -1377,7 +1368,6 @@ const AppContent = (props) => {
 		setPanelHistory([]);
 		setSelectedItem(null);
 		setSelectedLibrary(null);
-		setSelectedPerson(null);
 		setSelectedGenre(null);
 		setGenreFilter(null);
 		setStudioFilter(null);
@@ -1878,11 +1868,6 @@ const AppContent = (props) => {
 						<Panel>
 							{panelIndex === PANELS.GENRES && (
 								<Genres onSelectGenre={handleSelectGenre} onHome={handleHome} backHandlerRef={backHandlerRef} />
-							)}
-						</Panel>
-						<Panel>
-							{panelIndex === PANELS.PERSON && (
-								<Person personId={selectedPerson?.Id} onSelectItem={handleSelectItem} onSelectSeerrItem={handleSelectSeerrItem} onSelectSeerrPerson={handleSelectSeerrPerson} backHandlerRef={backHandlerRef} />
 							)}
 						</Panel>
 						<Panel>

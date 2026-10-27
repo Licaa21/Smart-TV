@@ -3,6 +3,7 @@ import {memo, useEffect, useMemo, useRef} from 'react';
 import {getPerfTier} from '../../utils/perfTier';
 import {normalizeSeasonalDensity, normalizeSeasonalTheme} from '../../utils/seasonalEffects';
 import {buildSeasonalParticles} from './seasonalParticles';
+import SeasonalFollower from './SeasonalFollower';
 
 import css from './SeasonalTheme.module.less';
 
@@ -81,11 +82,14 @@ const SeasonalTheme = ({theme, density}) => {
 	if (!active) return null;
 
 	return (
-		<div ref={overlayRef} className={css.overlay} aria-hidden="true">
-			{particles.falling.map(particle => <Falling key={particle.key} particle={particle} />)}
-			{particles.flyers.map(flyer => <Flyer key={flyer.key} flyer={flyer} />)}
-			{particles.bursts.map(burst => <Burst key={burst.key} burst={burst} />)}
-		</div>
+		<>
+			<div ref={overlayRef} className={css.overlay} aria-hidden="true">
+				{particles.falling.map(particle => <Falling key={particle.key} particle={particle} />)}
+				{particles.flyers.map(flyer => <Flyer key={flyer.key} flyer={flyer} />)}
+				{particles.bursts.map(burst => <Burst key={burst.key} burst={burst} />)}
+			</div>
+			<SeasonalFollower key={effect} effect={effect} />
+		</>
 	);
 };
 

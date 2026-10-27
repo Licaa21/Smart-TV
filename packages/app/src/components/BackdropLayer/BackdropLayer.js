@@ -13,7 +13,7 @@ const clampBlur = (amount) => {
 	return Math.min(amount || 0, cap);
 };
 
-const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity}) => {
+const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, inCorner}) => {
 	const blurredUrl = serverBlurredUrl(requestedUrl, blurAmount);
 	const targetUrl = blurredUrl || requestedUrl;
 	const layerARef = useRef(null);
@@ -86,16 +86,21 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 
 	return (
 		<div className={css.globalBackdrop}>
-			<div
-				ref={layerARef}
-				className={css.globalBackdropImage}
-				style={layerStyle}
-			/>
-			<div
-				ref={layerBRef}
-				className={css.globalBackdropImage}
-				style={layerStyle}
-			/>
+			{/* The frames stay mounted either way, so the layers keep the picture they hold */}
+			<div className={inCorner ? css.cornerFadeLeft : css.fill}>
+				<div className={inCorner ? css.cornerFadeDown : css.fill}>
+					<div
+						ref={layerARef}
+						className={css.globalBackdropImage}
+						style={layerStyle}
+					/>
+					<div
+						ref={layerBRef}
+						className={css.globalBackdropImage}
+						style={layerStyle}
+					/>
+				</div>
+			</div>
 			<div className={css.globalBackdropOverlay} style={overlayStyle} />
 		</div>
 	);

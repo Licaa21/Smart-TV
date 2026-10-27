@@ -293,7 +293,7 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 
 	return (
 		<SpottableDiv {...menuHold} className={cardClass} data-media-card onClick={handleClick} onFocus={handleFocus} onBlur={onPreviewBlur} onMouseEnter={onPreviewFocus} onMouseLeave={handleMouseLeave} style={sizeStyle} spotlightId={spotlightId} onSpotlightLeft={onSpotlightLeft} onSpotlightRight={onSpotlightRight}>
-			<div className={previewPhase !== 'idle' ? `${css.imageContainer} ${css.previewHost}` : css.imageContainer}>
+			<div className={previewPhase !== 'idle' ? `${css.imageContainer} ${css.previewHost}` : css.imageContainer} data-card-art>
 				{imageUrl ? (
 					<>
 						<img

@@ -45,8 +45,9 @@
 
 // @drift and @amp are in vw, @swing and @spin in degrees. @flips is how many times
 // confetti or a petal turns over on the way down. A stop only carries the transform parts
-// its family moves, since the build writes every keyframe out twice for old engines.
-.fall(@name, @drift, @amp, @cycles, @swing, @spin, @flips, @steps) {
+// its family moves, since the build writes every keyframe out twice for old engines. @rise
+// sends it up from below the screen instead.
+.fall(@name, @drift, @amp, @cycles, @swing, @spin, @flips, @steps, @rise: false) {
 	.@{name} {
 		animation-name: @name;
 	}
@@ -56,7 +57,7 @@
 			@t: (@value / @steps);
 			@phase: (@t * @cycles * 2 * pi());
 			@x: round(@drift * @t + @amp * sin(@phase), 2);
-			@y: round(-12 + 124 * @t, 2);
+			@y: if((@rise = true), round(112 - 124 * @t, 2), round(-12 + 124 * @t, 2));
 			@r: round(@swing * cos(@phase) + @spin * @t, 1);
 			@s: round(0.12 + 0.88 * abs(cos(@t * @flips * pi())), 2);
 			@turn: if(((@swing = 0) and (@spin = 0)), ~"", ~" rotate(@{r}deg)");
@@ -91,6 +92,39 @@
 .fall(petals1, -6, -1.8, 3, -22, 0, 3, 24);
 .fall(petals2, 6, 1.8, 3, 22, 0, 3, 24);
 .fall(petals3, 6, -1.8, 3, -22, 0, 2, 24);
+
+// Lanterns and embers drift up, and a lantern only tilts a little with its sway.
+.fall(rise0, -3, 1, 3, 7, 0, 0, 18, true);
+.fall(rise1, -3, -1.4, 2, -7, 0, 0, 18, true);
+.fall(rise2, 3, 1, 3, 7, 0, 0, 18, true);
+.fall(rise3, 3, -1.4, 2, -7, 0, 0, 18, true);
+
+// Embers flicker and stars twinkle as a second animation on the same element, which
+// seasonalParticles.js times inline after the rise.
+.riseFlicker0 { animation-name: rise0, flicker; }
+.riseFlicker1 { animation-name: rise1, flicker; }
+.riseFlicker2 { animation-name: rise2, flicker; }
+.riseFlicker3 { animation-name: rise3, flicker; }
+.riseTwinkle0 { animation-name: rise0, twinkle; }
+.riseTwinkle1 { animation-name: rise1, twinkle; }
+.riseTwinkle2 { animation-name: rise2, twinkle; }
+.riseTwinkle3 { animation-name: rise3, twinkle; }
+
+.riseFlicker0, .riseFlicker1, .riseFlicker2, .riseFlicker3,
+.riseTwinkle0, .riseTwinkle1, .riseTwinkle2, .riseTwinkle3 {
+	animation-timing-function: linear, ease-in-out;
+	animation-direction: normal, alternate;
+}
+
+@keyframes flicker {
+	from { opacity: 0.3; }
+	to { opacity: 1; }
+}
+
+@keyframes twinkle {
+	from { opacity: 0.4; }
+	to { opacity: 1; }
+}
 
 // A firefly loops around its spot and pulses @pulses times on the way. Every term comes
 // back to where it started at the end of the cycle, so the loop has no seam.
@@ -260,6 +294,30 @@
 	background-image: url('./art/candy.svg');
 	background-repeat: no-repeat;
 	background-size: 100% 100%;
+}
+
+// Hearts and eggs take an image built in their color inline.
+.heart,
+.egg {
+	background-repeat: no-repeat;
+	background-size: 100% 100%;
+}
+
+.paleStar {
+	background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23fff3c4' d='M16 2L19.5 11.2L29.3 11.7L21.7 17.9L24.2 27.3L16 22L7.8 27.3L10.3 17.9L2.7 11.7L12.5 11.2Z'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-size: 100% 100%;
+}
+
+.lantern {
+	background-image: url('./art/lantern.png');
+	background-repeat: no-repeat;
+	background-size: 100% 100%;
+}
+
+// Its glow comes inline in its color.
+.ember {
+	border-radius: 50%;
 }
 
 .flyer {

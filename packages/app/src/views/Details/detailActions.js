@@ -5,6 +5,7 @@ import {DETAIL_ICON_PATHS} from './detailIcons';
 import {iconViewBox} from '../../components/icons/iconViewBox';
 import LoopMarquee from '../../components/LoopMarquee';
 import {personalRatingIconPath, personalRatingLabel} from './personalRatingAction';
+import {offersFavorite} from './personFavorite';
 import {SpottableDiv} from './detailsSpottables';
 
 import css from './ModernDetailContent.module.less';
@@ -49,7 +50,7 @@ export const ActionButton = ({path, label, detail, onClick, active, group, prima
 // them itself rather than arranging them alongside the rest.
 export const detailActionCatalogue = (props) => {
 	const {
-		item, seerr,
+		item, seerr, effectiveServerUrl,
 		isSeries, isSeason, isBoxSet, isEpisode, isBook, isPerson, isPlaylist, playlistTracks,
 		hasTrailer, played, isFavorite, inSyncPlayGroup, onWatchWithGroup,
 		supportsMediaSourceSelection, hasMultipleVersions, hasMultipleAudio,
@@ -57,7 +58,7 @@ export const detailActionCatalogue = (props) => {
 		showsPersonalRating, personalRatingStyle, handleOpenRatingDialog,
 		handleOpenVersionModal, handleOpenAudioModal, handleOpenSubtitleModal, handleOpenPlaylistModal,
 		handleOpenCollectionModal, handleOpenDeleteDialog, handleOpenIdentifyModal,
-		canChangeArtwork, handleOpenArtworkModal
+		canChangeArtwork, handleOpenArtworkModal, handleOpenPersonDisplayModal
 	} = props;
 
 	// Asking and taking back are separate buttons sharing one arrangement
@@ -107,9 +108,10 @@ export const detailActionCatalogue = (props) => {
 		{id: 'trailer', when: hasTrailer, render: () => <ActionButton path={DETAIL_ICON_PATHS.trailer} label={$L('Trailer')} onClick={handleTrailer} />},
 		// Offered while in a SyncPlay group and lit in the accent so it reads
 		// as the group's, next to a Play that stays as it is.
-		{id: 'watchWithGroup', when: inSyncPlayGroup && !isBook, render: () => <ActionButton path={DETAIL_ICON_PATHS.group} label={$L('Watch with group')} group onClick={onWatchWithGroup} spotlightId="details-watch-with-group-btn" />},
+		{id: 'watchWithGroup', when: inSyncPlayGroup && !isBook && !isPerson, render: () => <ActionButton path={DETAIL_ICON_PATHS.group} label={$L('Watch with group')} group onClick={onWatchWithGroup} spotlightId="details-watch-with-group-btn" />},
 		{id: 'watched', when: !isPerson, render: () => <ActionButton path={DETAIL_ICON_PATHS.watched} label={played ? $L('Watched') : $L('Mark as Watched')} active={played} onClick={handleToggleWatched} spotlightId="details-watched-btn" />},
-		{id: 'favorite', when: true, render: () => <ActionButton path={DETAIL_ICON_PATHS.favorite} label={isFavorite ? $L('Favorited') : $L('Favorite')} active={isFavorite} onClick={handleToggleFavorite} spotlightId="details-favorite-btn" />},
+		{id: 'favorite', when: offersFavorite(isPerson, effectiveServerUrl), render: () => <ActionButton path={DETAIL_ICON_PATHS.favorite} label={isFavorite ? $L('Favorited') : $L('Favorite')} active={isFavorite} onClick={handleToggleFavorite} spotlightId="details-favorite-btn" />},
+		{id: 'personDisplay', when: isPerson && Boolean(handleOpenPersonDisplayModal), render: () => <ActionButton path={DETAIL_ICON_PATHS.tune} label={$L('Display')} onClick={handleOpenPersonDisplayModal} />},
 		{id: 'personalRating', when: showsPersonalRating, render: () => <ActionButton path={personalRatingIconPath(personalRatingStyle, item.UserData)} label={personalRatingLabel(personalRatingStyle, item.UserData)} onClick={handleOpenRatingDialog} spotlightId="details-rating-btn" />},
 		{id: 'goToSeries', when: (isEpisode || isSeason) && item.SeriesId, render: () => <ActionButton path={DETAIL_ICON_PATHS.series} label={$L('Series')} onClick={handleGoToSeries} />},
 		{id: 'playlist', when: !isPerson, render: () => <ActionButton path={DETAIL_ICON_PATHS.playlist} label={$L('Add to Playlist')} onClick={handleOpenPlaylistModal} />},

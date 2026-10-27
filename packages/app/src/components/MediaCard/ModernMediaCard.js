@@ -407,7 +407,7 @@ const ModernMediaCard = ({
 			onSpotlightLeft={onSpotlightLeft}
 			onSpotlightRight={onSpotlightRight}
 		>
-			<div className={previewPhase !== 'idle' ? `${css.imageContainer} ${css.previewHost}` : css.imageContainer}>
+			<div className={previewPhase !== 'idle' ? `${css.imageContainer} ${css.previewHost}` : css.imageContainer} data-card-art>
 				{imageUrl ? (
 					<>
 						<img

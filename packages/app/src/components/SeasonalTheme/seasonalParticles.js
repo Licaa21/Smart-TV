@@ -12,9 +12,9 @@ export const FALL_COUNTS = {
 	high: {light: 16, normal: 32, heavy: 48}
 };
 
-// Fireflies and Halloween draw a share of the falling count. A flyer is two layers, so
-// Halloween's leaves and candy leave room for its bats and ghosts.
-export const COUNT_SHARE = {fireflies: 0.5, halloween: 0.6};
+// Fireflies, Halloween and Lunar New Year draw a share of the falling count. A flyer is two
+// layers, so Halloween's leaves and candy leave room for its bats and ghosts.
+export const COUNT_SHARE = {fireflies: 0.5, halloween: 0.6, lunar: 0.5};
 export const FLYER_COUNTS = {
 	petals: {light: 1, normal: 2, heavy: 3},
 	halloween: {light: 2, normal: 3, heavy: 5}
@@ -33,6 +33,11 @@ const PETAL_COLORS = ['#ffb7c5', '#f8bbd0', '#ffd1dc', '#fce4ec', '#ffffff', '#f
 const BAUBLE_COLORS = ['#d32f2f', '#2e7d32', '#ffc107', '#1565c0', '#c0c0c0'];
 const FIREFLY_COLORS = ['#e6ff70', '#fff59d', '#d4ff4f'];
 const FIREWORK_COLORS = ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#e040fb', '#ff6e40'];
+const HEART_COLORS = ['#e53950', '#d81b60', '#ff4d6d', '#ff8fab', '#c2185b', '#ffb3c6'];
+const EASTER_COLORS = ['#b3e5fc', '#f8bbd0', '#fff59d', '#c5e1a5', '#d1c4e9', '#ffccbc'];
+// The six rainbow stripes, then the light blue, pink and white of the transgender flag.
+const PRIDE_COLORS = ['#e40303', '#ff8c00', '#ffed00', '#008026', '#004dff', '#750787', '#5bcefa', '#f5a9b8', '#ffffff'];
+const EMBER_COLORS = ['#ffd54f', '#ffb300', '#ff8f00', '#ffe082', '#ff7043'];
 
 // mulberry32, small and good enough to scatter particles.
 const seededRandom = (seed) => {
@@ -58,12 +63,62 @@ const glow = (hex, alpha) => {
 	return `radial-gradient(circle closest-side, rgba(${rgb}, ${alpha}), rgba(${rgb}, 0))`;
 };
 
-const timing = (duration, delay) => ({
-	animationDuration: `${duration}s`,
-	WebkitAnimationDuration: `${duration}s`,
-	animationDelay: `${delay}s`,
-	WebkitAnimationDelay: `${delay}s`
-});
+// An ember has a solid middle and a short halo, like Moonfin-Core's glow sprite, so it still
+// reads when it's small.
+const emberGlow = (hex, alpha) => {
+	const n = parseInt(hex.slice(1), 16);
+	const rgb = `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+	const stop = (share, at) => `rgba(${rgb}, ${round(alpha * share, 2)}) ${at}%`;
+	return `radial-gradient(circle closest-side, ${stop(1, 0)}, ${stop(0.95, 30)}, ${stop(0.5, 50)}, ${stop(0.12, 75)}, ${stop(0, 100)})`;
+};
+
+// A pulse is a second animation on the same element, [seconds, delay], so a flickering
+// particle is still one layer.
+const timing = (duration, delay, pulse) => {
+	const durations = pulse ? `${duration}s, ${pulse[0]}s` : `${duration}s`;
+	const delays = pulse ? `${delay}s, ${pulse[1]}s` : `${delay}s`;
+	return {
+		animationDuration: durations,
+		WebkitAnimationDuration: durations,
+		animationDelay: delays,
+		WebkitAnimationDelay: delays
+	};
+};
+
+// Hearts and eggs are drawn white with grey shading in Moonfin-Core and tinted, so here each
+// is an SVG built in its particle's color, with the shading as darker shades of it.
+const shade = (hex, factor) => {
+	const n = parseInt(hex.slice(1), 16);
+	const part = (shift) => (256 + Math.round(((n >> shift) & 255) * factor)).toString(16).slice(1);
+	return `#${part(16)}${part(8)}${part(0)}`;
+};
+
+const svgImage = (body) =>
+	`url("data:image/svg+xml;charset=utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${body}</svg>`)}")`;
+
+const shading = (color, cx, cy, edge) =>
+	`<radialGradient id="g" cx="${cx}" cy="${cy}" r="20" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${color}"/><stop offset="1" stop-color="${shade(color, edge)}"/></radialGradient>`;
+
+const heartImage = (color) => svgImage(
+	`${shading(color, 11, 9, 0.78)}<path fill="url(#g)" d="M16 28C6 21 2 15 2 10C2 5 6 3 9.5 3C12.5 3 15 5 16 8C17 5 19.5 3 22.5 3C26 3 30 5 30 10C30 15 26 21 16 28Z"/>`
+);
+
+const EGG = '<ellipse cx="16" cy="17" rx="10" ry="13.5"/>';
+const EGG_BAND = '4,17 4,15.5 7,19.5 10,15.5 13,19.5 16,15.5 19,19.5 22,15.5 25,19.5 28,15.5';
+const EGG_DOTS = [[12, 9], [20, 10], [16, 25], [11, 24], [21, 24]]
+	.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3"/>`).join('');
+
+// A painted egg, with its zigzag band and dots a darker shade of its color.
+const eggImage = (color) => {
+	const paint = shade(color, 0.69);
+	return svgImage(
+		`${shading(color, 12, 11, 0.85)}<clipPath id="c">${EGG}</clipPath><g fill="url(#g)">${EGG}</g>` +
+		`<g clip-path="url(#c)" fill="${paint}"><polyline points="${EGG_BAND}" fill="none" stroke="${paint}" stroke-width="2.2" stroke-linejoin="round"/>${EGG_DOTS}</g>`
+	);
+};
+
+// Seconds for one fade of an ember's flicker or a star's twinkle, which runs back and forth.
+const PULSE_SECONDS = {Flicker: 0.45, Twinkle: 0.63};
 
 // Seconds to fall the height of the screen, from the nearest particle to the farthest.
 // These match Moonfin-Core's speeds.
@@ -73,7 +128,13 @@ const FALL_SECONDS = {
 	leaves: [18, 35],
 	halloween: [18, 35],
 	confetti: [9.5, 18],
-	petals: [16, 30]
+	pride: [9.5, 18],
+	petals: [16, 30],
+	valentines: [16, 30],
+	easter: [16, 30],
+	// These two rise instead.
+	lunar: [20.5, 41],
+	diwali: [20.5, 41]
 };
 
 // The keyframe family each falling effect uses, four variants each.
@@ -83,7 +144,12 @@ const PATHS = {
 	leaves: 'leaves',
 	halloween: 'leaves',
 	confetti: 'confetti',
-	petals: 'petals'
+	pride: 'confetti',
+	petals: 'petals',
+	valentines: 'petals',
+	easter: 'petals',
+	lunar: 'rise',
+	diwali: 'rise'
 };
 
 const fallParticle = (effect, random, key) => {
@@ -94,12 +160,14 @@ const fallParticle = (effect, random, key) => {
 	const fall = round(lerp(far, near, depth), 2);
 	const shapeRoll = random();
 	const drift = Math.floor(random() * 2);
-	const family = PATHS[effect];
+	let family = PATHS[effect];
 	// For snow the odd variants sway wider, so nearer flakes take those.
 	const odd = family === 'snow' ? depth > 0.5 : random() < 0.5;
 	const variant = drift * 2 + (odd ? 1 : 0);
 
 	let shape;
+	let image = null;
+	let pulse = '';
 	let size;
 	let opacity;
 	let color = null;
@@ -116,6 +184,32 @@ const fallParticle = (effect, random, key) => {
 		shape = 'candy';
 		size = lerp(1.8, 2.8, depth);
 		opacity = 1;
+	} else if (effect === 'valentines') {
+		shape = 'heart';
+		size = lerp(1.2, 2.4, depth);
+		opacity = lerp(0.75, 1, depth);
+		image = heartImage(pick(HEART_COLORS, random));
+	} else if (effect === 'easter' && shapeRoll < 0.35) {
+		// About one in three is a painted egg, which sways without turning over.
+		shape = 'egg';
+		family = 'leaves';
+		size = lerp(1.6, 2.6, depth);
+		opacity = lerp(0.85, 1, depth);
+		image = eggImage(pick(EASTER_COLORS, random));
+	} else if (effect === 'lunar' && shapeRoll < 0.45) {
+		shape = 'lantern';
+		size = lerp(1.8, 3.4, depth);
+		opacity = lerp(0.8, 1, depth);
+	} else if (effect === 'diwali' && shapeRoll < 0.2) {
+		shape = random() < 0.5 ? 'star' : 'paleStar';
+		size = lerp(1, 1.8, depth);
+		pulse = 'Twinkle';
+	} else if (family === 'rise') {
+		shape = 'ember';
+		const lunar = effect === 'lunar';
+		size = lunar ? lerp(0.7, 1.5, depth) : lerp(0.85, 2, depth);
+		image = emberGlow(pick(EMBER_COLORS, random), lunar ? lerp(0.5, 0.95, depth) : lerp(0.65, 1, depth));
+		pulse = 'Flicker';
 	} else if (effect === 'petals' && shapeRoll < 0.3) {
 		// About one in three is a whole blossom.
 		shape = 'blossom';
@@ -131,32 +225,37 @@ const fallParticle = (effect, random, key) => {
 		size = lerp(1.3, 2.6, depth);
 		opacity = lerp(0.7, 1, depth);
 		color = pick(effect === 'halloween' ? HALLOWEEN_COLORS : LEAF_COLORS, random);
-	} else if (effect === 'petals') {
+	} else if (family === 'petals') {
 		shape = 'petal';
 		size = lerp(1.2, 2, depth);
 		opacity = lerp(0.75, 1, depth);
-		color = pick(PETAL_COLORS, random);
+		color = pick(effect === 'easter' ? EASTER_COLORS : PETAL_COLORS, random);
 		widthScale = 0.75;
 	} else {
 		shape = shapeRoll < 0.6 ? 'strip' : 'disc';
 		size = lerp(0.65, 1.2, depth);
 		opacity = lerp(0.85, 1, depth);
-		color = pick(CONFETTI_COLORS, random);
+		color = pick(effect === 'pride' ? PRIDE_COLORS : CONFETTI_COLORS, random);
 		if (shape === 'strip') heightScale = 0.55;
 	}
 
+	const left = `${round(random() * 100, 2)}%`;
+	const delay = -round(random() * fall, 2);
+	const pulseSeconds = PULSE_SECONDS[pulse];
 	return {
 		key,
 		shape,
-		path: `${family}${variant}`,
+		path: `${family}${pulse}${variant}`,
 		style: {
-			left: `${round(random() * 100, 2)}%`,
+			left,
 			width: `${round(size * widthScale)}vh`,
 			height: `${round(size * heightScale)}vh`,
-			opacity: round(opacity, 2),
+			// An ember's flicker or a star's twinkle sets its opacity instead.
+			...(pulse ? null : {opacity: round(opacity, 2)}),
 			...(color ? {backgroundColor: color} : null),
+			...(image ? {backgroundImage: image} : null),
 			// A negative delay starts the particle part way down, so the screen starts full.
-			...timing(fall, -round(random() * fall, 2))
+			...timing(fall, delay, pulse ? [pulseSeconds, -round(random() * pulseSeconds * 2, 2)] : null)
 		}
 	};
 };

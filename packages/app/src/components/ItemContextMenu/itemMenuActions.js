@@ -38,7 +38,8 @@ const hasProgress = (item) => {
 };
 
 // `playlist` is set when the menu opened on a row of a playlist: `canManage` adds the entries
-// that change the playlist, `canMove` is false while the rows show some other order, and
+// that change the playlist, `canRemove` is false where a row can move but not leave, like a
+// collection's play order, `canMove` is false while the rows show some other order, and
 // `first` and `last` say which way the row can still move.
 export const itemMenuActions = (item, {
 	isAdmin = false,
@@ -95,7 +96,9 @@ export const itemMenuActions = (item, {
 		}
 		actions.push({id: 'addToPlaylist', icon: DETAIL_ICON_PATHS.playlist, label: $L('Add to Playlist')});
 		if (playlist?.canManage) {
-			actions.push({id: 'removeFromPlaylist', icon: MENU_ICON_PATHS.playlistRemove, label: $L('Delete from Playlist')});
+			if (playlist.canRemove !== false) {
+				actions.push({id: 'removeFromPlaylist', icon: MENU_ICON_PATHS.playlistRemove, label: $L('Delete from Playlist')});
+			}
 			const canMove = playlist.canMove !== false;
 			if (canMove && !playlist.first) actions.push({id: 'moveUp', icon: MENU_ICON_PATHS.arrowUpward, label: $L('Move Up')});
 			if (canMove && !playlist.last) actions.push({id: 'moveDown', icon: MENU_ICON_PATHS.arrowDownward, label: $L('Move Down')});
@@ -120,10 +123,10 @@ export const itemMenuActions = (item, {
 	return actions;
 };
 
-// Emby takes an item off resume and keeps its progress. Jellyfin can only clear the play state, and
+// Emby and Plex take an item off resume and keep its progress. Jellyfin can only clear the play state, and
 // the audiobook Continue row ignores Emby's flag, so audio is always cleared.
 export const hideFromResume = (api, item, serverType) => {
 	const audio = item.Type === 'Audio' || item.Type === 'AudioBook' || item.MediaType === 'Audio';
-	if (serverType === 'emby' && !audio) return api.hideFromResume(item.Id).catch(() => {});
+	if ((serverType === 'emby' || serverType === 'plex') && !audio) return api.hideFromResume(item.Id).catch(() => {});
 	return api.setWatched(item.Id, false).catch(() => {});
 };

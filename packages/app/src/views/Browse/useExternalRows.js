@@ -57,7 +57,12 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 				const presetData = await Promise.all(enabledPresets.map(async (id) => {
 					const cfg = presetConfigs.find((c) => c.id === id);
 					if (!cfg) return null;
-					const items = await fetchExternalPresetRow(id, {language: settings.uiLanguage});
+					const imdb = id.startsWith('imdb-');
+					const items = await fetchExternalPresetRow(id, {
+						language: settings.uiLanguage,
+						sortBy: imdb ? settings.imdbRowsSortBy : settings.tmdbRowsSortBy,
+						sortOrder: imdb ? settings.imdbRowsSortOrder : settings.tmdbRowsSortOrder
+					});
 					return {id, title: cfg.title, items: items || []};
 				}));
 
@@ -146,7 +151,8 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 		settings.seasonalRowEnabled, settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays,
 		settings.mergeRadarrSonarrCalendars,
 		settings.radarrCalendarShowCinema, settings.radarrCalendarShowDigital, settings.radarrCalendarShowPhysical,
-		settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo]);
+		settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo,
+		settings.imdbRowsSortBy, settings.imdbRowsSortOrder, settings.tmdbRowsSortBy, settings.tmdbRowsSortOrder]);
 
 	return {rows: externalRows, pending};
 };

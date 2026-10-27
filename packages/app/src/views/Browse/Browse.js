@@ -33,6 +33,7 @@ import useExternalRows from './useExternalRows';
 import useMediaPreview from './useMediaPreview';
 import {buildBrowseRows, sameRowList} from './buildBrowseRows';
 import {markHomeReady} from '../../utils/homeReady';
+import {homeBackdropStyle} from '../../utils/homeBackdropStyle';
 import {rem} from '../../utils/rootScale';
 import {rowImageType, rowPeekHeight} from './rowPeek';
 
@@ -100,7 +101,9 @@ const Browse = ({
 		seerrAuthenticated,
 		seerrUserId,
 		homeRows: homeRowsConfig,
-		serverUrl
+		serverUrl,
+		sortBy: settings.seerrRowsSortBy,
+		sortOrder: settings.seerrRowsSortOrder
 	});
 	const {rows: externalRows, pending: externalPending} = useExternalRows({settings, homeRows: homeRowsConfig, kidsMode});
 	const pendingRows = useMemo(() => [...seerrPending, ...externalPending], [seerrPending, externalPending]);
@@ -428,7 +431,7 @@ const Browse = ({
 	const handleNavigateUp = useCallback((fromRowIndex) => {
 		const targetIndex = focusableRowFrom(fromRowIndex - 1, -1);
 		if (targetIndex < 0) {
-			if (showFeaturedBar !== false) {
+			if (showFeaturedBar !== false && featuredItems.length > 0) {
 				setBrowseMode('featured');
 				setTimeout(() => Spotlight.focus('featured-banner'), 50);
 			} else if (settings.navbarPosition !== 'left') {
@@ -437,7 +440,7 @@ const Browse = ({
 			return;
 		}
 		scrollToRow(targetIndex, true);
-	}, [showFeaturedBar, settings.navbarPosition, scrollToRow, setBrowseMode, focusableRowFrom]);
+	}, [showFeaturedBar, featuredItems.length, settings.navbarPosition, scrollToRow, setBrowseMode, focusableRowFrom]);
 
 	filteredRowsRef.current = filteredRows;
 
@@ -773,6 +776,7 @@ const Browse = ({
 				<BackdropLayer
 					targetUrl={targetBackdropUrl}
 					blurAmount={settings.backdropBlurHome}
+					inCorner={homeBackdropStyle(settings) === 'corner'}
 				/>
 
 				{featuredItems.length > 0 && showFeaturedBar !== false && (
