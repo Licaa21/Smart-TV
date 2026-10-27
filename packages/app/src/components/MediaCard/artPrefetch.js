@@ -156,8 +156,8 @@ const pumpDecode = () => {
 		if (finished) return;
 		finished = true;
 		clearTimeout(timer);
-		if (ok) noteArtDecoded(url, Date.now() - since); // eslint-disable-line no-use-before-define
 		decoding = false;
+		if (ok) noteArtDecoded(url, Date.now() - since); // eslint-disable-line no-use-before-define
 		pumpDecode();
 	};
 	timer = setTimeout(() => finish(false), DECODE_TIMEOUT_MS);
