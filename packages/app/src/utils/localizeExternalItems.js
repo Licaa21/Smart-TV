@@ -7,35 +7,91 @@ const PARALLEL = 4;
 // What Seerr said of a title in a language this session, null for nothing, so a row built again does not ask again.
 const held = new Map();
 
+// What it said is also kept on the device for a week, so a start does not ask again for the titles it already knows
+// (a row of twenty is twenty requests, and the TV answers some of them late). Only an answer is kept, never a failure.
+const STORE_KEY = 'moonfin_title_language';
+const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
+const KEEP_MAX = 400;
+const SAVE_DELAY_MS = 2000;
+let saved = null;
+let saveTimer = null;
+
+const hasWords = (raw) => Boolean(raw && (raw.name || raw.overview || raw.posterPath || raw.backdropPath));
+
+const savedTitles = () => {
+	if (saved) return saved;
+	saved = {};
+	try {
+		const parsed = JSON.parse(window.localStorage.getItem(STORE_KEY) || '{}');
+		const now = Date.now();
+		Object.keys(parsed).forEach((key) => {
+			const entry = parsed[key];
+			// A time in the future is a clock that was wrong when it was written
+			if (Array.isArray(entry) && hasWords(entry[0]) && entry[1] <= now && now - entry[1] < KEEP_MS) saved[key] = entry;
+		});
+	} catch (err) {
+		// storage that cannot be read is the same as nothing kept
+	}
+	return saved;
+};
+
+const keepTitle = (key, raw) => {
+	savedTitles()[key] = [raw, Date.now()];
+	if (saveTimer) return;
+	saveTimer = setTimeout(() => {
+		saveTimer = null;
+		try {
+			const newest = Object.keys(saved).sort((a, b) => saved[b][1] - saved[a][1]).slice(0, KEEP_MAX);
+			const kept = {};
+			newest.forEach((name) => { kept[name] = saved[name]; });
+			saved = kept;
+			window.localStorage.setItem(STORE_KEY, JSON.stringify(kept));
+		} catch (err) {
+			// not kept this time
+		}
+	}, SAVE_DELAY_MS);
+};
+
 const tmdbIdOf = (item) => item?.providerIds?.tmdb || item?.providerIds?.Tmdb || item?.ProviderIds?.Tmdb || null;
 const isSeries = (item) => /series|tv/i.test(String(item?.type || item?.Type || ''));
 
-const localizedFields = (details) => {
-	if (!details) return null;
-	const name = details.title || details.name;
-	return {
-		name: name || undefined,
-		overview: details.overview || undefined,
-		posterUrl: details.posterPath ? seerrApi.getImageUrl(details.posterPath, 'w342') : undefined,
-		backdropUrl: details.backdropPath ? seerrApi.getImageUrl(details.backdropPath, 'w1280') : undefined
-	};
-};
+// What is kept of Seerr's answer: the words and the picture paths, not the addresses, which depend on how Seerr is reached.
+const rawFields = (details) => (details ? {
+	name: details.title || details.name || undefined,
+	overview: details.overview || undefined,
+	posterPath: details.posterPath || undefined,
+	backdropPath: details.backdropPath || undefined
+} : null);
+
+const localizedFields = (raw) => (raw ? {
+	name: raw.name,
+	overview: raw.overview,
+	posterUrl: raw.posterPath ? seerrApi.getImageUrl(raw.posterPath, 'w342') : undefined,
+	backdropUrl: raw.backdropPath ? seerrApi.getImageUrl(raw.backdropPath, 'w1280') : undefined
+} : null);
 
 // What Seerr holds of one title in the language, or null.
 const fieldsFor = async (item, language) => {
 	const id = tmdbIdOf(item);
 	const series = isSeries(item);
 	const key = `${series ? 'tv' : 'movie'}:${id}:${language}`;
-	let fields = held.get(key);
-	if (fields === undefined) {
-		try {
-			fields = localizedFields(await (series ? seerrApi.getTv(id, language) : seerrApi.getMovie(id, language)));
-		} catch (err) {
-			fields = null;
+	let raw = held.get(key);
+	if (raw === undefined) {
+		const kept = savedTitles()[key];
+		if (kept) {
+			raw = kept[0];
+		} else {
+			try {
+				raw = rawFields(await (series ? seerrApi.getTv(id, language) : seerrApi.getMovie(id, language)));
+			} catch (err) {
+				raw = null;
+			}
+			// An answer with nothing in it (a page where the data should be) is not kept for a week
+			if (hasWords(raw)) keepTitle(key, raw);
 		}
-		held.set(key, fields);
+		held.set(key, raw);
 	}
-	return fields;
+	return localizedFields(raw);
 };
 
 const present = (fields) => {

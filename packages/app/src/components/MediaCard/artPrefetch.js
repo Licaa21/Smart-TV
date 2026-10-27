@@ -23,7 +23,7 @@ const held = new Map();
 // The nearest pictures are decoded ahead. A held copy is only bytes: drawn the first time, a large picture was
 // decoded as it was painted, and a TV's slow decoder showed that as the picture drawing in from the top. The images
 // are kept here so what was decoded is not let go before the card draws it.
-const DECODED_MAX = 6;
+const DECODED_MAX = 16;
 const decoded = new Map();
 
 let heldBytes = 0;
@@ -128,7 +128,7 @@ export const touchArt = (url) => {
 // The nearest pictures are decoded ahead the plain way, one at a time and nearest first. A TV decodes slowly and on one
 // thread: several at once held it up for seconds, and so did making bitmaps of them (1.7.2 and 1.8.0 logged 0.6 to 3
 // seconds a picture), which stalled the rest of the app with it.
-const DECODE_QUEUE_MAX = 6;
+const DECODE_QUEUE_MAX = 10;
 const DECODE_TIMEOUT_MS = 3000;
 const decodeQueue = new Map();
 let decoding = false;

@@ -15,6 +15,7 @@ import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
 import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
 import {hasArt, rememberArt, artSource, artState, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived, noteArtShown} from './artPrefetch';
+import {decodesAhead} from '../MediaRow/warmWindow';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
 
@@ -56,9 +57,6 @@ const getMetadataLine = (item) => {
 // The same speeds and curve Moonfin Core opens its modern cards with
 const EXPAND_MS = {extraSlow: 450, slow: 300, medium: 180, fast: 90, off: 0};
 const EXPAND_CURVE = 'cubic-bezier(0.65, 0, 0.35, 1)';
-
-// The cards this near to focus have their art decoded ahead as well as held
-const DECODE_AHEAD_RANK = 4;
 
 const expandTransition = (speed) => {
 	const ms = EXPAND_MS[speed] || 0;
@@ -413,7 +411,7 @@ const ModernMediaCard = ({
 	}, [rank]);
 	// The art of the nearest cards is decoded ahead, so the card draws it at once and not as it decodes
 	useEffect(() => {
-		if (!(rank >= 0 && rank <= DECODE_AHEAD_RANK && !deferImage && swapsArt)) return undefined;
+		if (!(decodesAhead(rank) && !deferImage && swapsArt)) return undefined;
 		decodeArt(focusUrl, rank);
 		// A card focus has moved away from, or that is gone, is not decoded for
 		return () => dropDecode(focusUrl);
@@ -423,7 +421,7 @@ const ModernMediaCard = ({
 	const overlaysArt = expanded && swapsArt;
 	// The wide art of the nearest cards is already in the card, hidden, loaded and decoded where it is drawn: an image
 	// made as focus lands waited for its own load, a render and a fade, and the TV's slow paint on top of them
-	const holdsWide = !overlaysArt && swapsArt && !deferImage && rank >= 0 && rank <= DECODE_AHEAD_RANK && hasArt(focusUrl);
+	const holdsWide = !overlaysArt && swapsArt && !deferImage && decodesAhead(rank) && hasArt(focusUrl);
 	// The picture shows once it has loaded: a copy still coming in painted from the top
 	const wideArrived = arrivedUrl === focusUrl;
 	// Shown with no fade when the art had loaded by the time focus landed, whatever happened at an earlier focus

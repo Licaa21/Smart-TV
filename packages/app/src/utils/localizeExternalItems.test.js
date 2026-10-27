@@ -45,6 +45,99 @@ describe('localizeExternalItems', () => {
 	});
 });
 
+describe('titles kept on the device', () => {
+	beforeEach(() => {
+		jest.useFakeTimers();
+		window.localStorage.clear();
+	});
+	afterEach(() => {
+		jest.useRealTimers();
+		window.localStorage.clear();
+	});
+
+	// A fresh copy of the module is a fresh start of the app: nothing is held in memory
+	const start = (run) => {
+		let out;
+		jest.isolateModules(() => {
+			const api = jest.requireMock('../services/seerrApi').default;
+			api.getMovie.mockReset();
+			api.getTv.mockReset();
+			out = run(api, require('./localizeExternalItems'));
+		});
+		return out;
+	};
+
+	it('asks Seerr once, and a later start does not ask again for the same title', async () => {
+		const first = await start(async (api, mod) => {
+			api.getMovie.mockResolvedValue({title: 'Titlu', overview: 'O', posterPath: '/p.jpg'});
+			const [item] = await mod.localizeExternalItems([suggestion(500)], 'ro');
+			return {item, asked: api.getMovie.mock.calls.length};
+		});
+		expect(first.asked).toBe(1);
+		jest.advanceTimersByTime(3000);
+
+		const second = await start(async (api, mod) => {
+			api.getMovie.mockRejectedValue(new Error('not asked'));
+			const [item] = await mod.localizeExternalItems([suggestion(500)], 'ro');
+			return {item, asked: api.getMovie.mock.calls.length};
+		});
+		expect(second.asked).toBe(0);
+		expect(second.item).toMatchObject({name: 'Titlu', overview: 'O', posterUrl: 'tmdb/w342/p.jpg'});
+	});
+
+	it('does not keep a failure, so the title is asked for again at the next start', async () => {
+		await start(async (api, mod) => {
+			api.getMovie.mockRejectedValue(new Error('down'));
+			await mod.localizeExternalItems([suggestion(501)], 'ro');
+		});
+		jest.advanceTimersByTime(3000);
+		expect(window.localStorage.getItem('moonfin_title_language')).toBeNull();
+	});
+
+	it('does not use an answer older than a week, nor one for another language', async () => {
+		const stale = Date.now() - 8 * 24 * 60 * 60 * 1000;
+		window.localStorage.setItem('moonfin_title_language', JSON.stringify({
+			'movie:502:ro': [{name: 'Vechi'}, stale],
+			'movie:503:fr': [{name: 'Titre'}, Date.now()]
+		}));
+		const result = await start(async (api, mod) => {
+			api.getMovie.mockResolvedValue({title: 'Nou'});
+			const [old, other] = await mod.localizeExternalItems([suggestion(502), suggestion(503)], 'ro');
+			return {old, other, asked: api.getMovie.mock.calls.length};
+		});
+		expect(result.asked).toBe(2);
+		expect(result.old.name).toBe('Nou');
+	});
+
+	it('does not keep an answer with nothing in it, nor one stamped in the future', async () => {
+		await start(async (api, mod) => {
+			api.getMovie.mockResolvedValue('<html>login</html>');
+			await mod.localizeExternalItems([suggestion(505)], 'ro');
+		});
+		jest.advanceTimersByTime(3000);
+		expect(window.localStorage.getItem('moonfin_title_language')).toBeNull();
+
+		window.localStorage.setItem('moonfin_title_language', JSON.stringify({'movie:506:ro': [{name: 'Din viitor'}, Date.now() + 60000]}));
+		const result = await start(async (api, mod) => {
+			api.getMovie.mockResolvedValue({title: 'Acum'});
+			const [item] = await mod.localizeExternalItems([suggestion(506)], 'ro');
+			return item;
+		});
+		expect(result.name).toBe('Acum');
+	});
+
+	it('works with storage that cannot be read', async () => {
+		const spy = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+		const result = await start(async (api, mod) => {
+			api.getMovie.mockResolvedValue({title: 'Titlu'});
+			const [item] = await mod.localizeExternalItems([suggestion(504)], 'ro');
+			return item;
+		});
+		spy.mockRestore();
+		expect(result.name).toBe('Titlu');
+	});
+});
+
 describe('localizeSeerrCards', () => {
 	beforeEach(() => {
 		seerrApi.getMovie.mockReset();

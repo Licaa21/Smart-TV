@@ -1,9 +1,22 @@
 import {renderHook, act} from '@testing-library/react';
 
-import {warmRank, announceFocusedRow, isNearFocusedRow, watchFocusedRow, useWarmRow, cardPosition} from './warmWindow';
+import {warmRank, decodesAhead, announceFocusedRow, isNearFocusedRow, watchFocusedRow, useWarmRow, cardPosition} from './warmWindow';
 
 const ranked = (count, state) => Array.from({length: count}, (_, i) => [i, warmRank(i, state)]).filter(([, rank]) => rank >= 0);
 const warmed = (count, state) => ranked(count, state).map(([i]) => i);
+
+describe('decodesAhead', () => {
+	it('holds the nearest cards and the one a neighbouring row is entered on, and no others', () => {
+		[0, 1, 1.5, 2, 3, 4, 9].forEach((rank) => expect(decodesAhead(rank)).toBe(true));
+		[-1, 5, 6, 8, 10, 13].forEach((rank) => expect(decodesAhead(rank)).toBe(false));
+	});
+
+	it('gives the entry card of a neighbouring row rank 9, from the media bar and with a remembered card', () => {
+		const entry = (state) => [0, 1, 2, 3, 4, 5].filter((i) => decodesAhead(warmRank(i, {focusedIndex: -1, direction: 1, neighbour: true, ...state})));
+		expect(entry({restIndex: -1})).toEqual([0]);
+		expect(entry({restIndex: 3})).toEqual([0, 3]);
+	});
+});
 
 describe('warmRank', () => {
 	it('fetches eight cards ahead of the focused one and one behind, going right, nearest first', () => {

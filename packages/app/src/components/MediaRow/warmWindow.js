@@ -28,6 +28,12 @@ export const warmRank = (index, {focusedIndex, direction, neighbour, restIndex})
 	return rank < 0 ? -1 : WARM_AHEAD + 1 + rank;
 };
 
+// The cards that have their art decoded ahead and kept in the card: the ones nearest focus, and the one a neighbouring
+// row will be entered on (ranked first in it; the row's first card shares the rank when it was left on another), so
+// moving into a row finds its first card ready too.
+const DECODE_NEAR_RANK = 4;
+export const decodesAhead = (rank) => rank >= 0 && (rank <= DECODE_NEAR_RANK || rank === WARM_AHEAD + 1);
+
 // Where a card stands among its row's cards. Some cards come with a hidden helper node beside them, so the
 // position among all the children would count them twice.
 export const cardPosition = (card) => (card && card.parentNode
