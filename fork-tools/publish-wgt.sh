@@ -83,9 +83,18 @@ gh release create "fork-v$n" "$versioned" --repo "$REPO" --target "$from" \
 # line is the only thing committed to main besides the README and the ignore rules.
 MAIN_DIR="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 config=packages/build-tizen/tizen/config.xml
-if [ -f "$MAIN_DIR/$config" ] && ! grep -q "<widget [^>]* version=\"$n\"" "$MAIN_DIR/$config"; then
+# only when main is on its own branch with that file untouched, so nothing of someone's is thrown away
+if [ -f "$MAIN_DIR/$config" ] && ! grep -q "<widget [^>]* version=\"$n\"" "$MAIN_DIR/$config"   && [ "$(git -C "$MAIN_DIR" branch --show-current)" = "main" ] && git -C "$MAIN_DIR" diff --quiet HEAD -- "$config"; then
   sed -i -E "s/(<widget [^>]* version=\")[0-9.]+(\")/\1$n\2/" "$MAIN_DIR/$config"
-  git -C "$MAIN_DIR" -c user.name=Licaa21 -c user.email=184849302+Licaa21@users.noreply.github.com commit -q -m "config.xml: the fork's version $n" -- "$config"     && git -C "$MAIN_DIR" push -q origin main     || echo "The version $n was not committed to main. Do it by hand: config.xml in main, then push."
+  if ! grep -q "<widget [^>]* version=\"$n\"" "$MAIN_DIR/$config"; then
+    git -C "$MAIN_DIR" checkout -- "$config"
+    echo "config.xml in main did not take the version $n. Do it by hand."
+  elif ! git -C "$MAIN_DIR" -c user.name=Licaa21 -c user.email=184849302+Licaa21@users.noreply.github.com commit -q -m "config.xml: the fork's version $n" -- "$config"; then
+    git -C "$MAIN_DIR" checkout -- "$config"
+    echo "The version $n was not committed to main. Do it by hand: config.xml in main, then push."
+  elif ! git -C "$MAIN_DIR" push -q origin main; then
+    echo "The version $n is committed in main but was not pushed. Push main by hand."
+  fi
 fi
 echo "Published $versioned: https://github.com/$REPO/releases/tag/fork-v$n"
 echo "The newest one is always at https://github.com/$REPO/releases/latest"

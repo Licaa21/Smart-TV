@@ -12,11 +12,13 @@ export REACT_APP_BUILD_ID="$(git rev-parse --short HEAD)"
 # The fork's version of this build, worked out before it is compiled so the app knows it and can watch the fork's releases for a newer one
 forkversion="$(bash fork-tools/publish-wgt.sh --version)"
 [ -z "$forkversion" ] || export REACT_APP_FORK_VERSION="$forkversion" FORK_VERSION="$forkversion"
-# The TV and the TV-Store show the version in config.xml, so the package carries the fork's. The file goes back to what is
-# committed when the build ends (publish-wgt.sh puts the version on main once the release is out).
+# The TV and the TV-Store show the version in config.xml, so the package carries the fork's. The file goes back as it was
+# when the build ends (publish-wgt.sh puts the version on main once the release is out).
 config=packages/build-tizen/tizen/config.xml
 if [ -n "$forkversion" ]; then
-  trap 'git checkout -- "$config" 2>/dev/null || true' EXIT
+  configcopy="$(mktemp)"
+  cp "$config" "$configcopy"
+  trap 'cp "$configcopy" "$config"; rm -f "$configcopy"' EXIT
   sed -i -E "s/(<widget [^>]* version=\")[0-9.]+(\")/\1$forkversion\2/" "$config"
   grep -q "<widget [^>]* version=\"$forkversion\"" "$config" || { echo "config.xml did not take the version $forkversion."; exit 1; }
 fi
