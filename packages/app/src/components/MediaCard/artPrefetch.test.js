@@ -1,4 +1,4 @@
-import {hasArt, artSource, artState, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded, setArtLogSink} from './artPrefetch';
+import {hasArt, artSource, artState, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded, noteArtShown, setArtLogSink} from './artPrefetch';
 
 describe('prefetchArt', () => {
 	const RealImage = window.Image;
@@ -367,12 +367,17 @@ describe('prefetchArt reading the art as a blob', () => {
 			const url = `http://server/Items/x${i}/Images/Backdrop`;
 			noteArtFocus(url);
 			noteArtDecoded(url, 100 + i);
+			noteArtShown(url, 40 + i, i % 2 === 0);
 		}
 		const summaryLine = lines.filter(([message]) => message === 'Wide art summary').pop();
 		expect(summaryLine[1].library).toEqual(expect.objectContaining({late: expect.any(Number), plain: expect.any(Number)}));
 		expect(summaryLine[1].library.decoded).toBeGreaterThan(0);
 		expect(summaryLine[1].library.decodeMaxMs).toBeGreaterThanOrEqual(100);
 		expect(summaryLine[1].library.decodeAvgMs).toBeGreaterThanOrEqual(100);
+		expect(summaryLine[1].library.shown).toBeGreaterThan(0);
+		expect(summaryLine[1].library.shownAhead).toBeGreaterThan(0);
+		expect(summaryLine[1].library.shownMaxMs).toBeGreaterThanOrEqual(40);
+		expect(summaryLine[1].library.shownAvgMs).toBeGreaterThanOrEqual(40);
 	});
 
 	it('gives the oldest picture up, and takes its address back a while later, once too much is held', async () => {

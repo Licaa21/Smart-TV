@@ -14,7 +14,7 @@ import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
 import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
-import {hasArt, rememberArt, artSource, artState, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived} from './artPrefetch';
+import {hasArt, rememberArt, artSource, artState, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived, noteArtShown} from './artPrefetch';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
 
@@ -370,9 +370,13 @@ const ModernMediaCard = ({
 	const [arrivedUrl, setArrivedUrl] = useState(null);
 	// Set when the card was focused before its art was there, to tell the report how long it took
 	const lateSinceRef = useRef(0);
+	// Whether the wide art had loaded before the card was focused, and so shows with no fade
+	const arrivedAheadRef = useRef(false);
+	const overlaysRef = useRef(false);
 	const handleWideLoad = useCallback(() => {
 		// A held copy is remembered by being held; only art loaded the plain way is noted here
 		if (artSource(focusUrl) === focusUrl) rememberArt(focusUrl);
+		arrivedAheadRef.current = !overlaysRef.current;
 		setArrivedUrl(focusUrl);
 		if (lateSinceRef.current) {
 			noteArtArrived(focusUrl, Date.now() - lateSinceRef.current);
@@ -417,12 +421,23 @@ const ModernMediaCard = ({
 
 	const expanded = isFocused && canRenderExpanded;
 	const overlaysArt = expanded && swapsArt;
+	// The wide art of the nearest cards is already in the card, hidden, loaded and decoded where it is drawn: an image
+	// made as focus lands waited for its own load, a render and a fade, and the TV's slow paint on top of them
+	const holdsWide = !overlaysArt && swapsArt && !deferImage && rank >= 0 && rank <= DECODE_AHEAD_RANK && hasArt(focusUrl);
 	// The picture shows once it has loaded: a copy still coming in painted from the top
 	const wideArrived = arrivedUrl === focusUrl;
+	// Shown with no fade when the art had loaded by the time focus landed, whatever happened at an earlier focus
+	if (overlaysArt && !overlaysRef.current) arrivedAheadRef.current = wideArrived;
+	overlaysRef.current = overlaysArt;
+	// An image that left the card is not remembered as loaded: the next one made is not
+	useEffect(() => {
+		if (!overlaysArt && !holdsWide) setArrivedUrl(null);
+	}, [overlaysArt, holdsWide]);
 	const imageUrl = isFocused && !overlaysArt ? focusUrl : restingUrl;
 
 	// The report is told whether the art was there when the card was focused, and how long it took when it was not
 	const countedFocusRef = useRef(false);
+	const focusAtRef = useRef(0);
 	useEffect(() => {
 		if (!isFocused || !overlaysArt || !focusUrl) {
 			lateSinceRef.current = 0;
@@ -431,6 +446,7 @@ const ModernMediaCard = ({
 		}
 		if (!countedFocusRef.current) {
 			countedFocusRef.current = true;
+			focusAtRef.current = Date.now();
 			lateSinceRef.current = noteArtFocus(focusUrl) ? 0 : Date.now();
 		}
 		touchArt(focusUrl);
@@ -439,6 +455,17 @@ const ModernMediaCard = ({
 		const request = prefetchArt(focusUrl, 0, onArtFail, onArtDone);
 		return () => request.cancel();
 	}, [isFocused, overlaysArt, focusUrl, deferImage, onArtFail, onArtDone]);
+
+	// How long after focus the card had its wide art drawn (two frames on), for the report
+	useEffect(() => {
+		if (!overlaysArt || !wideArrived || !focusAtRef.current || typeof window.requestAnimationFrame !== 'function') return undefined;
+		const start = focusAtRef.current;
+		focusAtRef.current = 0;
+		let id = window.requestAnimationFrame(() => {
+			id = window.requestAnimationFrame(() => noteArtShown(focusUrl, Date.now() - start, arrivedAheadRef.current));
+		});
+		return () => window.cancelAnimationFrame(id);
+	}, [overlaysArt, wideArrived, focusUrl]);
 
 	const handleImageError = useCallback(() => {
 		if (seerrThumb && focusUrl === seerrThumb) failThumb(seerrThumb);
@@ -488,15 +515,16 @@ const ModernMediaCard = ({
 							style={{height: `${imageHeight}px`, ...(rowArtwork && rowImageType === 'logo' ? {objectFit: 'contain'} : null)}}
 							onError={imageUrl === focusUrl ? handleImageError : undefined}
 						/>
-						{overlaysArt && (
+						{(overlaysArt || holdsWide) && (
 							<img
-								className={wideArrived ? `${css.image} ${css.imageWide} ${css.imageWideIn}` : `${css.image} ${css.imageWide}`}
+								className={[css.image, css.imageWide, overlaysArt && wideArrived && css.imageWideIn, arrivedAheadRef.current && css.imageWideNow].filter(Boolean).join(' ')}
 								src={deferImage ? undefined : (artSource(focusUrl) || undefined)}
 								alt=""
-								width={cardWidth}
+								width={expandedWidth}
 								height={imageHeight}
-								// the poster under it already casts the shadow, and a theme's glow rule is only beaten from here
-								style={{height: `${imageHeight}px`, boxShadow: 'none'}}
+								// the poster under it already casts the shadow, and a theme's glow rule is only beaten from here.
+								// It is as wide as the card will be, so growing reveals it and never draws it again at another size.
+								style={{width: `${expandedWidth}px`, height: `${imageHeight}px`, boxShadow: 'none'}}
 								onLoad={handleWideLoad}
 								onError={handleImageError}
 							/>
