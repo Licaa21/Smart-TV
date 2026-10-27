@@ -54,6 +54,11 @@
 	opacity: 1;
 }
 
+// Art that had loaded before the card was focused shows at once, with no fade
+.imageWideNow {
+	transition: none;
+}
+
 // OLED mode darkens the chrome, so artwork is lifted to match. The values are
 // written out rather than read from a variable, because the build inlines
 // custom property fallbacks for the older sets.

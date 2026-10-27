@@ -196,6 +196,63 @@ describe('ModernMediaCard growing on focus', () => {
 		expect(loads).toHaveLength(1);
 	});
 
+	it('holds the wide art of a near card in the card, hidden, and shows that same picture the moment focus lands', () => {
+		const {rerender} = render(<ModernMediaCard item={thumbed('held')} serverUrl="http://server" warmRank={1} />);
+		expect(wide()).toBeNull();
+		act(() => loads[0].onload());
+		const ahead = wide();
+		expect(ahead).not.toBeNull();
+		expect(faded()).toBe(false);
+		fireEvent.load(ahead);
+
+		rerender(<ModernMediaCard item={thumbed('held')} serverUrl="http://server" warmRank={0} isFocused />);
+		// not made again at focus, and shown with no fade
+		expect(wide()).toBe(ahead);
+		expect(faded()).toBe(true);
+		expect(wide().className).toContain('imageWideNow');
+		// as wide as the card will be, so growing never draws it at another size
+		expect(wide().style.width).not.toBe('');
+
+		rerender(<ModernMediaCard item={thumbed('held')} serverUrl="http://server" warmRank={1} />);
+		expect(faded()).toBe(false);
+	});
+
+	it('shows the held art with no fade on a refocus, even when the first focus came before it had loaded', () => {
+		const {rerender} = render(<ModernMediaCard item={thumbed('refocus')} serverUrl="http://server" isFocused />);
+		fireEvent.load(wide());
+		expect(wide().className).not.toContain('imageWideNow');
+		rerender(<ModernMediaCard item={thumbed('refocus')} serverUrl="http://server" warmRank={1} />);
+		expect(wide()).not.toBeNull();
+		rerender(<ModernMediaCard item={thumbed('refocus')} serverUrl="http://server" warmRank={0} isFocused />);
+		expect(faded()).toBe(true);
+		expect(wide().className).toContain('imageWideNow');
+	});
+
+	it('does not take a new hidden picture for loaded because an earlier one was', () => {
+		const {rerender} = render(<ModernMediaCard item={thumbed('again2')} serverUrl="http://server" warmRank={1} />);
+		act(() => loads[0].onload());
+		fireEvent.load(wide());
+		rerender(<ModernMediaCard item={thumbed('again2')} serverUrl="http://server" warmRank={7} />);
+		expect(wide()).toBeNull();
+		rerender(<ModernMediaCard item={thumbed('again2')} serverUrl="http://server" warmRank={1} />);
+		expect(wide()).not.toBeNull();
+		rerender(<ModernMediaCard item={thumbed('again2')} serverUrl="http://server" warmRank={0} isFocused />);
+		// the new picture has not loaded yet, so it is not shown
+		expect(faded()).toBe(false);
+		fireEvent.load(wide());
+		expect(faded()).toBe(true);
+	});
+
+	it('holds no wide art in a card that is far from focus', () => {
+		const {rerender} = render(<ModernMediaCard item={thumbed('farther')} serverUrl="http://server" warmRank={1} />);
+		act(() => loads[0].onload());
+		expect(wide()).not.toBeNull();
+		rerender(<ModernMediaCard item={thumbed('farther')} serverUrl="http://server" warmRank={4} />);
+		expect(wide()).not.toBeNull();
+		rerender(<ModernMediaCard item={thumbed('farther')} serverUrl="http://server" warmRank={5} />);
+		expect(wide()).toBeNull();
+	});
+
 	it('drops the fetch of a card that is no longer asked to', () => {
 		const {rerender} = render(<ModernMediaCard item={thumbed('passed')} serverUrl="http://server" warmRank={1} />);
 		expect(loads[0].src).toContain('/Images/Thumb');

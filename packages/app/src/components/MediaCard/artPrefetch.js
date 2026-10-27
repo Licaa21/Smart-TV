@@ -353,7 +353,7 @@ let lateLines = 0;
 let arrivedLines = 0;
 let tally = {};
 
-const rowFor = (kind) => tally[kind] || (tally[kind] = {ready: 0, late: 0, plain: 0, decodes: 0, decodeMs: 0, decodeMax: 0});
+const rowFor = (kind) => tally[kind] || (tally[kind] = {ready: 0, late: 0, plain: 0, decodes: 0, decodeMs: 0, decodeMax: 0, shown: 0, shownMs: 0, shownMax: 0, ahead: 0});
 
 // What the summary says: per kind, the cards that had their art and those that had not, the pictures that were loaded
 // the plain way, and how long the TV took to decode a picture it drew.
@@ -361,7 +361,7 @@ const summary = () => {
 	const out = {};
 	Object.keys(tally).forEach((kind) => {
 		const row = tally[kind];
-		out[kind] = {ready: row.ready, late: row.late, plain: row.plain, decoded: row.decodes, decodeAvgMs: row.decodes ? Math.round(row.decodeMs / row.decodes) : 0, decodeMaxMs: row.decodeMax};
+		out[kind] = {ready: row.ready, late: row.late, plain: row.plain, decoded: row.decodes, decodeAvgMs: row.decodes ? Math.round(row.decodeMs / row.decodes) : 0, decodeMaxMs: row.decodeMax, shown: row.shown, shownAhead: row.ahead, shownAvgMs: row.shown ? Math.round(row.shownMs / row.shown) : 0, shownMaxMs: row.shownMax};
 	});
 	return out;
 };
@@ -398,6 +398,15 @@ export const noteArtDecoded = (url, ms) => {
 	row.decodes += 1;
 	row.decodeMs += ms;
 	if (ms > row.decodeMax) row.decodeMax = ms;
+};
+
+// The card had its wide art drawn, ms after focus landed; ahead is whether it was loaded in the card before that.
+export const noteArtShown = (url, ms, ahead) => {
+	const row = rowFor(kindOf(url));
+	row.shown += 1;
+	row.shownMs += ms;
+	if (ahead) row.ahead += 1;
+	if (ms > row.shownMax) row.shownMax = ms;
 };
 
 // It came in after the card was focused, ms later.
