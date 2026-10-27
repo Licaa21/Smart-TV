@@ -58,7 +58,8 @@ import TrailerPicker from './TrailerPicker';
 import ReviewDialog from './ReviewDialog';
 import PersonalRatingDialog from '../../components/PersonalRatingDialog';
 import {clampRating, clearedRatingPatch, isRatableItemType, normalizeRatingStyle, numericRatingPatch, thumbRatingPatch} from '../../utils/personalRating';
-import {personCalendarDate, personDateLines, splitFilmography} from '../../utils/personCredits';
+import usePersonSeerrCredits from '../../hooks/usePersonSeerrCredits';
+import {personCalendarDate, personDateLines, rankLibraryItems, splitFilmography} from '../../utils/personCredits';
 import {mergeCollectionWithMissing, mergeMissingByReleaseOrder} from './seerrMissingCollectionItems';
 import ClassicDetailScreen from './ClassicDetailScreen';
 import SpotlightDetailContent from './spotlight/SpotlightDetailContent';
@@ -1004,6 +1005,9 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		};
 	}, [item?.Type, playlistItems, canManagePlaylist, playTrack, handleRemoveFromPlaylist, handlePlaylistItemReorder, handleCollectionMove]);
 
+	// What Seerr says of a person's titles, which orders the filmography in every details style when Popularity is chosen
+	const {ranking: personRanking} = usePersonSeerrCredits(item?.Type === 'Person' ? item.ProviderIds?.Tmdb : undefined);
+
 	// No artwork, name or retry on purpose, since a retry would read as an invitation.
 	if (!seerrOnly && blockedByRating) {
 		return (
@@ -1138,7 +1142,16 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		? mergeMissingByReleaseOrder(collectionItems, missingCollectionItems)
 		: collectionItems;
 
-	const filmography = isPerson ? splitFilmography(similar, showsSection, settings.personPageSortOption) : null;
+	// With Popularity chosen, the most popular first by what Seerr says of the same titles, and the one the backdrop comes
+	// from ahead of them. Any other sort stands as the filmography came.
+	const splitCredits = isPerson ? splitFilmography(similar, showsSection, settings.personPageSortOption) : null;
+	const filmography = splitCredits && (settings.personPageSortOption || 'popularity') === 'popularity' ? {
+		...splitCredits,
+		movies: rankLibraryItems(splitCredits.movies, personRanking),
+		series: rankLibraryItems(splitCredits.series, personRanking),
+		guestAppearances: rankLibraryItems(splitCredits.guestAppearances, personRanking),
+		musicVideos: rankLibraryItems(splitCredits.musicVideos, personRanking)
+	} : splitCredits;
 	const personMovies = filmography?.movies || [];
 	const personSeries = filmography?.series || [];
 	const personDates = isPerson ? personDateLines(item.PremiereDate, item.EndDate) : [];

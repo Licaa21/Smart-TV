@@ -1551,7 +1551,7 @@ const AppContent = (props) => {
 		setIsResume(false);
 		const item = person.Type ? person : {...person, Type: 'Person'};
 		setSelectedItem(item);
-		navigateTo(PANELS.DETAILS, false);
+		navigateTo(PANELS.DETAILS);
 	}, [navigateTo, playingItem, playbackOptions, isResume, panelHistory.length]);
 
 	const handleOpenRecordings = useCallback(() => {

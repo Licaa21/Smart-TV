@@ -58,7 +58,8 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 			enabledPresets, customRows, radarrEnabled, sonarrEnabled, mergedCalendars, seasonalEnabled,
 			settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays,
 			settings.radarrCalendarShowCinema, settings.radarrCalendarShowDigital, settings.radarrCalendarShowPhysical,
-			settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo
+			settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo,
+			settings.imdbRowsSortBy, settings.imdbRowsSortOrder, settings.tmdbRowsSortBy, settings.tmdbRowsSortOrder
 		]);
 		const reusing = reuseRef.current && memoryCache.externalRows?.key === key && memoryCache.externalRows.owner === owner;
 		reuseRef.current = false;

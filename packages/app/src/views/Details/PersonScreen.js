@@ -6,7 +6,6 @@ import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDeco
 import MediaRow from '../../components/MediaRow';
 import RatingsRow from '../../components/RatingsRow';
 import usePersonSeerrCredits from '../../hooks/usePersonSeerrCredits';
-import {rankLibraryItems} from '../../utils/personCredits';
 import {getImageUrl} from '../../utils/helpers';
 import {isMdblistEnabled} from '../../services/mdblistApi';
 import {KEYS} from '../../utils/keys';
@@ -23,19 +22,9 @@ const PersonScreen = ({
 	item, serverUrl, settings, showsSection, filmography, personDates, birthPlace,
 	onSelectItem, onSelectSeerrItem, onOpenPersonDisplayModal, canFavorite, isFavorite, onToggleFavorite
 }) => {
-	const {appearances, crewCredits, ranking} = usePersonSeerrCredits(item.ProviderIds?.Tmdb);
-	// With Popularity chosen, the most popular first, by what Seerr says of the same titles, and the one the backdrop
-	// comes from ahead of them. Any other sort stands as the filmography came.
-	const {movies, series, guestAppearances, musicVideos} = useMemo(() => {
-		const split = filmography || {movies: [], series: [], guestAppearances: [], musicVideos: []};
-		if ((settings?.personPageSortOption || 'popularity') !== 'popularity') return split;
-		return {
-			movies: rankLibraryItems(split.movies, ranking),
-			series: rankLibraryItems(split.series, ranking),
-			guestAppearances: rankLibraryItems(split.guestAppearances, ranking),
-			musicVideos: rankLibraryItems(split.musicVideos, ranking)
-		};
-	}, [filmography, ranking, settings?.personPageSortOption]);
+	const {appearances, crewCredits} = usePersonSeerrCredits(item.ProviderIds?.Tmdb);
+	// Already in the popularity order when that is chosen (Details.js ranks it for every style)
+	const {movies, series, guestAppearances, musicVideos} = filmography || {movies: [], series: [], guestAppearances: [], musicVideos: []};
 
 	const handleSeerrSelect = useCallback((c) => {
 		if (c?._seerrRaw) onSelectSeerrItem?.(c._seerrRaw);
