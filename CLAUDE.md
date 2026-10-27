@@ -12,7 +12,7 @@ The rules that matter most, each explained further down:
 
 1. **Ask before every change.** Questions come first, with options and a recommendation. See "Working rules".
 2. **Before any coding on `implement`, bring upstream into `daily` first, and only then `daily` into `implement`.** Never pull from `daily` alone, since it may be behind upstream. The steps are in step 0 of "How changes flow".
-3. **Never commit to `main` or `daily`**, except the README and ignore rules on `main` and the upstream merges of step 0 (merge commits and conflict fixes). Work goes on `implement`.
+3. **Never commit to `main` or `daily`**, except the README and ignore rules on `main`, the one version line of `packages/build-tizen/tizen/config.xml` that `publish-wgt.sh` commits to `main` after each release (entry 18), and the upstream merges of step 0 (merge commits and conflict fixes). Work goes on `implement`.
 4. **Build only in `daily/`**, with `bash fork-tools/build-daily-wgt.sh`.
 5. **A change is done only when** lint and tests are clean, the code review found nothing real, every string has a
    Romanian one, and this file and the README are up to date.
@@ -335,6 +335,13 @@ The plugin chat works in `E:VSCode ProjectsMoonfin Plugin Forkimplement`. Never 
 - **On a merge:** take upstream's bar and keep the two options.
 - **Files:** `components/DetailsTabBar/DetailsTabBar.js` and `.module.less`.
 
+### 18. The version in config.xml
+
+- **Upstream:** `config.xml` carries Moonfin's own version (`version="2.10.0"` on the widget line), moved by upstream's version bump commits (`scripts/bump-version.js`).
+- **The fork keeps:** its own version there (1.7.1 and on), so the TV and the TV-Store show the fork's releases. `main` holds it (committed by `publish-wgt.sh` after each release), and `build-daily-wgt.sh` stamps the next one into the package.
+- **On a merge:** when upstream's bump conflicts on that line, keep the fork's `version=`. Moonfin's version stays in `package.json` and in the package's file name.
+- **Files:** `packages/build-tizen/tizen/config.xml`, `fork-tools/build-daily-wgt.sh`, `fork-tools/publish-wgt.sh`.
+
 ## When the user says Moonbase (the plugin) updated
 
 The fork works around things the Moonbase plugin (Moonfin-Client/Plugin) does not do yet. When the user says a new release is
@@ -359,6 +366,7 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
 - Only built in `daily/`, only the regular Tizen build. Never `--oblong` and never `--legacy`.
 - Build with `bash fork-tools/build-daily-wgt.sh`. It names the file like the upstream package with `_Lica_Fork` added:
   `Moonfin_Tizen_Regular_v<version>_Lica_Fork.wgt`, for example `Moonfin_Tizen_Regular_v2.10.0_Lica_Fork.wgt`.
+- The version the TV and the TV-Store show is the one on the widget line of `packages/build-tizen/tizen/config.xml`. The TV-Store (Apps2Samsung's) reads that file from the `main` branch every night, not the release name. `build-daily-wgt.sh` stamps the fork's version into it for the package and puts the file back when the build ends, and `publish-wgt.sh` commits the version to `main` once the release is out (a commit "config.xml: the fork's version x.y.z", left out of the release notes). A TV that holds a higher version, Moonfin's 2.10.0 from before, sees the fork's 1.x as older and may need an uninstall once. Asked and answered on 2026-10-27.
 - They are ignored by git and never committed, and no other folder keeps any. One file, rebuilt over the old one. A
   throwaway test build gets a clearly different name and is deleted after.
 - Each build is published as a GitHub release of its own by `fork-tools/publish-wgt.sh` (the build script runs it, and it can be run alone for a package already built). Releases are kept, a build never replaces another. They carry the fork's own version, starting at **1.0.0** (Lica's Fork 1.0.0 was the build of 2026-10-22). **The version is always written with three numbers** (1.0.0, 1.1.0, 1.1.1, never 1.0 or 1.1), in the tag, the title, the file name and the description: the tag is `fork-v<version>`, the title "Lica's Fork <version> (Moonfin <moonfin version>)", while the file name keeps `Lica_Fork` without the apostrophe, which shells and links do not like, the package file carries it too (`Moonfin_Tizen_Regular_v<moonfin version>_Lica_Fork_v<version>.wgt`, the one from the last build is removed locally), and the description says what was done since the last release, the fork's commits and upstream's apart, with the commit ids (commits whose message starts with "CLAUDE.md:" or "README:" are left out). The package itself still never goes in a branch. If `gh` is missing or signed out nothing is published and the file stays here (`gh` lives in `%LOCALAPPDATA%GitHubCLIin`, which the script adds to its path when a shell lacks it). The newest release is always at https://github.com/Licaa21/Smart-TV/releases/latest
