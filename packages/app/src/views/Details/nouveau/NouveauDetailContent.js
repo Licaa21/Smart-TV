@@ -23,7 +23,7 @@ import PersonDisplayDialog from '../PersonDisplayDialog';
 import NouveauDetailsFooter from './footer/NouveauDetailsFooter';
 import {buildDiscoveryRails} from './nouveauDiscovery';
 import {buildPersonRails} from './nouveauPersonRails';
-import {splitFilmography} from '../../../utils/personCredits';
+import {libraryRanking, rankLibraryItems, splitFilmography} from '../../../utils/personCredits';
 import {loadSeerrPersonCredits, seerrPersonCards} from '../seerrPersonCredits';
 import {useSeerr} from '../../../context/SeerrContext';
 import {
@@ -119,14 +119,24 @@ const NouveauDetailContent = (props) => {
 	// Keyed off the list itself rather than a filmography split upstream, which is rebuilt every
 	// render and would take the sections and the focus chain with it. A hidden rail has no
 	// items, so it never gets a stop.
-	const personRails = useMemo(
-		() => (isPerson ? buildPersonRails({
-			filmography: splitFilmography(similar, showsSection, settings.personPageSortOption),
+	const personRails = useMemo(() => {
+		if (!isPerson) return [];
+		const split = splitFilmography(similar, showsSection, settings.personPageSortOption);
+		// With Popularity chosen, the most popular first by what Seerr says of the same titles, once those are in
+		const ranking = personCredits === NO_PERSON_CREDITS ? null : libraryRanking(personCredits);
+		const ranked = (settings.personPageSortOption || 'popularity') === 'popularity' ? {
+			...split,
+			movies: rankLibraryItems(split.movies, ranking),
+			series: rankLibraryItems(split.series, ranking),
+			guestAppearances: rankLibraryItems(split.guestAppearances, ranking),
+			musicVideos: rankLibraryItems(split.musicVideos, ranking)
+		} : split;
+		return buildPersonRails({
+			filmography: ranked,
 			appearances: showsSeerrAppearances ? seerrPersonCards(personCredits.cast, false, settings) : [],
 			crewCredits: showsSeerrCrew ? seerrPersonCards(personCredits.crew, true, settings) : []
-		}) : []),
-		[isPerson, similar, personCredits, showsSection, showsSeerrAppearances, showsSeerrCrew, settings]
-	);
+		});
+	}, [isPerson, similar, personCredits, showsSection, showsSeerrAppearances, showsSeerrCrew, settings]);
 
 	const [windowWidth, setWindowWidth] = useState(
 		() => (typeof window === 'undefined' ? 1920 : window.innerWidth)

@@ -1551,6 +1551,8 @@ const AppContent = (props) => {
 		setIsResume(false);
 		const item = person.Type ? person : {...person, Type: 'Person'};
 		setSelectedItem(item);
+		// The person is the first item of a trail of its own, so Back on it does not pop the titles opened before the player
+		detailsItemStackRef.current = [];
 		navigateTo(PANELS.DETAILS);
 	}, [navigateTo, playingItem, playbackOptions, isResume, panelHistory.length]);
 
