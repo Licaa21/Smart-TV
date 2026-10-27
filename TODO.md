@@ -3,11 +3,15 @@
 ## Waiting on the user
 
 - **Restart Jellyfin.** Moonbase 2.4.0.7 (the thumb takes `size=w300|w780|w1280`) is installed on the server and waits for a restart: the install was accepted (204) on 2026-10-26, but the restart was blocked by the permission classifier, so it was not done. Until it is restarted, 2.4.0.6 stays active and the TV's `&size=w780` is ignored (nothing breaks, the thumbs are just the 1280 px ones). After the restart: check `/Plugins` shows 2.4.0.7 and that `Moonfin/Tmdb/Thumb?...&size=w780` redirects to `.../t/p/w780/...`.
-- Try 1.7.1 on the TV (see below) and send the diagnostic report taken right after scrolling a TMDB or IMDb row. Look at the 'Wide art summary' lines: `ready`/`late` (was the art held), `plain`, and `decodeAvgMs`/`decodeMaxMs` (how long the TV took to decode).
+- Try 1.7.2 on the TV (see below) and send the diagnostic report taken right after scrolling a TMDB or IMDb row. Look at the 'Wide art summary' lines: `ready`/`late` (was the art held), `plain`, and `decodeAvgMs`/`decodeMaxMs` (how long the TV took to decode).
 
-## 1.7.1: the picture drew in from the top on every row, even held
+## 1.7.2: the picture on every row drew in from the top, held or not
 
-The report from 1.7.0 (2026-10-27) showed the wide art held at all 75 card focuses (library 14, thumb 61, none late), and the user still saw the picture draw in from the top, on all rows. So it is the TV decoding and painting it, not a download. 1.7.1 decodes the nearest cards' art ahead (`decodeArt`) and shows a card's art only once `img.decode()` has finished (400 ms at most). Checked in a browser with the CPU slowed 6x (the art shows 40 to 100 ms after the key); not known on the TV. If it still draws in, the summary's `decodeMaxMs` says whether decoding is the slow part; the next suspects are the size of the picture (Moonbase 2.4.0.7's `size=w780` is not active until Jellyfin restarts), the raster of the focused card's own layer (`will-change: transform` in `ModernMediaCard.module.less`) and the width transition on the card.
+The report from 1.7.0 showed the art held at all 75 focuses and the picture still drew in from the top; with 1.7.1 (wait for `img.decode()`) it was worse: the decode took 109 to 196 ms on average (731 at most) and the picture waited for that. The user turned the backdrop off and the Performance level to Performance and it still happened, so it is the TV's slow decode and paint, not the backdrop. 1.7.2 makes each nearby card's art a bitmap of the card's size ahead of time (`createImageBitmap`) and draws it on a canvas at focus; the decode wait is gone. Checked in a browser with the CPU slowed 6x (a canvas on every focus, about 20 ms), not on the TV. The summary line says how many cards drew a bitmap (`bitmap`) and how long making one took (`decodeAvgMs`, `decodeMaxMs`). If it still draws in: the raster of the focused card's layer (`will-change: transform` in `ModernMediaCard.module.less`) and the width transition are the next suspects.
+
+## 1.7.2 too: backdrops of outside titles obey the blur setting
+
+IMDb, TMDB and Seerr titles had a sharp backdrop beside the library's blurred ones at the Low and Medium Performance levels, since only a CSS filter (capped by the level) could blur them. They now use a small copy scaled up (`utils/softBackdrop.js`), whatever the level, under the existing Browsing Background Blur setting (Off, Light, Medium, Strong, Heavy). Not seen on the TV.
 
 ## Modern cards: the wide picture on external rows (1.7.0, confirmed on the TV only in part)
 
