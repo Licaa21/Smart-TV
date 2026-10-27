@@ -28,6 +28,13 @@ IMDb, TMDB and Seerr titles had a sharp backdrop beside the library's blurred on
 
 **Not known until the TV:** whether the held pictures plus the decode of a first show keep up with a held key on the Q67A, and how much memory 24 MB of blobs costs it. If it stutters, narrow `WARM_AHEAD` (8) in `components/MediaRow/warmWindow.js`, `MAX_ACTIVE` (4) or `MAX_BYTES` in `artPrefetch.js`. If cards still miss, the report says which kind and in what state (waiting, running, none).
 
+## Upstream merge of 2026-10-27 (42 commits), decisions
+
+- Backdrops: upstream's Home Screen Backdrop (Off, Full Screen, Corner) with the fork's soft blur for outside titles. Asked and answered.
+- Person pages: upstream deleted `views/Person/Person.js`; the Popularity default and ranking are in `Details.js` and `NouveauDetailContent.js`. Asked and answered. The known-for backdrop of the old Person page is gone (`usePersonSeerrCredits` still computes it); ask before bringing it back.
+- Next Up fix (#557) ported by hand into `useSegmentPopups.js`. Row sorting of the IMDb, TMDB and Seerr rows taken inside the fork's Home memory. Plex taken as it came.
+- Open: on the Classic person page `usePersonSeerrCredits` runs twice for the same person (one extra Seerr request); pass `appearances` and `crewCredits` down from `Details.js` if that matters. Not tried on the TV: Plex, the Corner backdrop, the Next Up countdown.
+
 ## Open from the code reviews
 
 - A 5xx answer for a thumb sends the card to the plain image path, and only a 404 (or a plain load that fails) hands the card to its backdrop.
