@@ -199,6 +199,9 @@ describe('moving to another title', () => {
 		rerender({mediaId: 603, mediaType: 'movie', contextUser: null});
 		expect(seen.length).toBeGreaterThan(0);
 		expect(seen.every((render) => render.id === undefined && render.loading && render.recommendations === 0)).toBe(true);
+		// the title is asked for once the language lookup has answered
+		await elapse(0);
+		expect(seen.every((render) => render.id === undefined && render.loading && render.recommendations === 0)).toBe(true);
 
 		await act(async () => finish({id: 603, title: 'The Matrix', mediaInfo}));
 		await elapse(0);
