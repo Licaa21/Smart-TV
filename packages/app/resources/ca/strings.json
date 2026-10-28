@@ -2720,5 +2720,16 @@
     "Play a short clip or the trailer of the focused card after a moment.": "Reprodueix un clip curt o el tràiler de la targeta enfocada al cap d'un moment.",
     "Languages to search when downloading subtitles, up to {max}. With none ticked, the default subtitle language is searched, or one language is picked from the video when that is not set.": "Idiomes en què es cerquen subtítols en baixar-los, fins a {max}. Si no n'hi ha cap de marcat, es cerca l'idioma de subtítols predeterminat o, si no està definit, se'n tria un a partir del vídeo.",
     "space": "Espai",
-    "Go to Details": "Ves als detalls"
+    "Go to Details": "Ves als detalls",
+    "Default (List Order)": "Predeterminat (ordre de la llista)",
+    "IMDb Row Sorting": "Ordenació de les files d'IMDb",
+    "Seerr Row Sorting": "Ordenació de les files de Seerr",
+    "Sort IMDb rows by name, release date, rating, and more.": "Ordena les files d'IMDb per nom, data d'estrena, valoració i més.",
+    "Sort IMDb rows in ascending or descending order.": "Ordena les files d'IMDb en ordre ascendent o descendent.",
+    "Sort Seerr rows by name, release date, rating, and more.": "Ordena les files de Seerr per nom, data d'estrena, valoració i més.",
+    "Sort Seerr rows in ascending or descending order.": "Ordena les files de Seerr en ordre ascendent o descendent.",
+    "Sort TMDB rows by name, release date, rating, and more.": "Ordena les files de TMDB per nom, data d'estrena, valoració i més.",
+    "Sort TMDB rows in ascending or descending order.": "Ordena les files de TMDB en ordre ascendent o descendent.",
+    "Sorting": "Ordenació",
+    "TMDB Row Sorting": "Ordenació de les files de TMDB"
 }

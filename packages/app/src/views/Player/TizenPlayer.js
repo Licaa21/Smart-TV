@@ -398,6 +398,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const reloadRunningSinceRef = useRef(0);
 	// Which reload is the latest, so one that a newer attempt has replaced can stop before it reaches AVPlay.
 	const reloadRunRef = useRef(0);
+	// A reload that follows a pause puts the pause back once the stream is up
+	const repauseAfterReloadRef = useRef(false);
 	// index of a subtitle the server is currently burning into the stream
 	const burnInSubtitleRef = useRef(null);
 
@@ -1038,6 +1040,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		} finally {
 			clearTimeout(prepareTimer);
 		}
+		if (shouldAbort?.()) return;
 		avplayReadyRef.current = true;
 
 		// some firmware resets display state during prepare
@@ -1063,6 +1066,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (startDelayMs > 0) {
 			await new Promise((resolve) => setTimeout(resolve, startDelayMs));
 		}
+		if (shouldAbort?.()) return;
 
 		playIssued = true;
 		playbackMovingRef.current = false;
@@ -1149,20 +1153,23 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			url,
 			playMethod: options.playMethod || session?.playMethod,
 			mediaSource: options.mediaSource || session?.mediaSource,
-			resumeTicks: seekPositionTicks
+			resumeTicks: seekPositionTicks,
+			shouldAbort: options.shouldAbort
 		});
+		if (options.shouldAbort?.()) return false;
 
 		startTimeUpdatePolling();
+		return true;
 	}, [startTimeUpdatePolling, stopTimeUpdatePolling, openAndPrepare]);
 
 	// every stream reload restarts playback and session reporting the same way
-	const restartFromResult = useCallback(async (result, positionTicks) => {
+	const restartFromResult = useCallback(async (result, positionTicks, shouldAbort) => {
 		if (!result?.url) return false;
 		positionRef.current = positionTicks;
 		if (result.playMethod) setPlayMethod(result.playMethod);
 		setIsHdrContent(isHdrOutput(result.mediaSource, result.playMethod === playback.PlayMethod.Transcode));
 		if (result.playSessionId) playSessionRef.current = result.playSessionId;
-		await startAVPlayback(result.url, positionTicks, {playMethod: result.playMethod, mediaSource: result.mediaSource});
+		if (!await startAVPlayback(result.url, positionTicks, {playMethod: result.playMethod, mediaSource: result.mediaSource, shouldAbort})) return null;
 		playback.reportStart(positionRef.current);
 		playback.startProgressReporting(
 			() => positionRef.current,
@@ -1234,6 +1241,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			reloadInFlightRef.current = false;
 			serverLogger.playback('Standby diag: reloadPlaybackRef fallback result', {reloaded, attempt, tookMs: Date.now() - reloadStartedAt});
 			if (isUnmountedRef.current) return;
+			// Back, another item or a newer reload overtook this one, and the newer one has the outcome
+			if (reloaded === null) return;
 			if (reloaded) {
 				// The attempt this is recovering from may have kept running in the
 				// background and thrown its own error after this reload already
@@ -1327,18 +1336,29 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				() => {
 					console.log('[Player] App resumed');
 					const backgroundStopFired = playback.consumeBackgroundStopFired();
+					const suspended = suspendedRef.current;
+					suspendedRef.current = null;
 					serverLogger.playback('Standby diag: player foregrounded', {
-						hadSuspendedRecord: !!suspendedRef.current,
+						hadSuspendedRecord: !!suspended,
 						backgroundStopFired
 					});
+					// A reopened stream starts playing, so one that was paused is paused again once it is back
+					const reload = () => {
+						repauseAfterReloadRef.current = Boolean(suspended) && !suspended.wasPlaying;
+						recoverByReload();
+					};
+					// The background stop ended the session and restoreAsync never answers on some firmware, so it is opened again
+					if (suspended && backgroundStopFired) {
+						reload();
+						return;
+					}
 					if (backgroundStopFired) {
 						// the session was stopped on the server while we were
 						// backgrounded, so bring it back before we resume playback
 						resumeReportingRef.current?.();
 					}
-					const suspended = suspendedRef.current;
-					suspendedRef.current = null;
 					if (suspended) {
+						const generation = loadGenerationRef.current;
 						let restoreSettledInTime = false;
 						const restorePromise = avplayRestore(suspended.url, suspended.positionMs);
 						const restoreTimedOut = new Promise((resolve) => {
@@ -1352,6 +1372,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 						Promise.race([restorePromise, restoreTimedOut]).then((ok) => {
 							restoreSettledInTime = true;
 							serverLogger.playback('Standby diag: avplayRestore result', {ok, wasPlaying: suspended.wasPlaying});
+							// Back or another item during the restore leaves nothing to resume
+							if (generation !== loadGenerationRef.current) return;
 							if (ok) {
 								if (suspended.wasPlaying) {
 									let playError = null;
@@ -1363,7 +1385,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 									if (playError) {
 										// restoreAsync reported success but the session had already
 										// dropped back to IDLE, so there's nothing for play() to resume
-										recoverByReload();
+										reload();
 										return;
 									}
 									playback.reportProgress(positionRef.current, {isPaused: false, eventName: 'unpause'});
@@ -1374,12 +1396,12 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 									const stateAfterRestore = avplayGetState();
 									serverLogger.playback('Standby diag: state check after paused restore', {stateAfterRestore});
 									if (stateAfterRestore !== 'PAUSED' && stateAfterRestore !== 'READY') {
-										recoverByReload();
+										reload();
 									}
 								}
 							} else {
 								// the transcode session likely expired while backgrounded
-								recoverByReload();
+								reload();
 							}
 						});
 						return;
@@ -2571,7 +2593,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (hasPlayedRef.current && !hasReopenedRef.current && playMethod !== playback.PlayMethod.Transcode) {
 			hasReopenedRef.current = true;
 			console.warn('[Player] Playback died after running, reopening the same stream');
-			if (await reloadPlaybackRef.current?.()) return;
+			if (await reloadPlaybackRef.current?.() !== false) return;
 		}
 
 		if (!hasTriedTranscode && playMethod !== playback.PlayMethod.Transcode) {
@@ -2611,6 +2633,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// Reload the current item from its last position, used when a suspended
 	// session cant be restored after the app returns to the foreground
 	const reloadCurrentPlayback = useCallback(async (isSuperseded) => {
+		const generation = loadGenerationRef.current;
+		// Back or another item while this runs, or a newer reload, leaves nothing to reload
+		const superseded = () => generation !== loadGenerationRef.current || Boolean(isSuperseded?.());
 		try {
 			const result = await playback.getPlaybackInfo(item.Id, {
 				startPositionTicks: positionRef.current,
@@ -2618,16 +2643,30 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				mediaSourceId,
 				audioStreamIndex: selectedAudioIndex != null ? selectedAudioIndex : undefined,
 				directPlayOpensFirstAudio: true,
+				subtitleStreamIndex: burnInSubtitleRef.current != null ? burnInSubtitleRef.current : undefined,
 				item,
 				stereoUpmixEnabled: settings.stereoUpmixEnabled
 			});
-			if (isSuperseded?.()) return false;
-			return await restartFromResult(result, positionRef.current);
+			if (superseded()) return null;
+			const restarted = await restartFromResult(result, positionRef.current, superseded);
+			if (restarted) {
+				// a background stop or the old session's end left stall detection off
+				playback.startHealthMonitoring(handleUnhealthy);
+				healthMonitorRef.current = playback.getHealthMonitor();
+				if (repauseAfterReloadRef.current) {
+					repauseAfterReloadRef.current = false;
+					avplayPause();
+					setIsPaused(true);
+					healthMonitorRef.current?.setPaused(true);
+					playback.reportProgress(positionRef.current, {isPaused: true, eventName: 'pause'});
+				}
+			}
+			return restarted;
 		} catch (err) {
 			console.error('[Player] Stream reload failed:', err);
-			return false;
+			return superseded() ? null : false;
 		}
-	}, [item, selectedQuality, settings.maxBitrate, settings.stereoUpmixEnabled, mediaSourceId, selectedAudioIndex, restartFromResult]);
+	}, [item, selectedQuality, settings.maxBitrate, settings.stereoUpmixEnabled, mediaSourceId, selectedAudioIndex, restartFromResult, handleUnhealthy]);
 
 	// Keep callback refs in sync
 	handleEndedCallbackRef.current = handleEnded;
@@ -2638,6 +2677,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// Control Actions (AVPlay-based)
 	// ==============================
 	const teardownPlayback = useCallback(async () => {
+		loadGenerationRef.current++;
 		cancelNextEpisodeCountdown();
 		stopTimeUpdatePolling();
 		await playback.reportStop(positionRef.current);

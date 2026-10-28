@@ -59,7 +59,7 @@ export const initTizenAPI = async () => {
  * - Dolby Atmos: Not documented in Samsung audio specs
  * - DD+ (EAC3): Limited to 5.1 channels
  * - VP9: UHD models from 2018+, ALL models (incl FHD) from 2021+ (Tizen 6+)
- * - AV1: 2020+ (Tizen 5.5+) all tiers; WebM container for most, general containers on 8K Premium 2022+
+ * - AV1: ALL models from 2021+ (Tizen 6+), 2020 needs the model year this fallback doesnt have
  */
 const getDefaultCapabilities = () => {
 	const tizenVersion = getTizenVersion();
@@ -72,7 +72,7 @@ const getDefaultCapabilities = () => {
 		dolbyVision: false, // Detect via avinfo API at runtime, not by version
 		dolbyAtmos: false, // Not documented in Samsung audio specifications
 		hevc: true,
-		av1: tizenVersion >= 5.5,
+		av1: tizenVersion >= 6,
 		vp9: tizenVersion >= 4,
 		ac3: true,
 		eac3: true,
@@ -563,6 +563,8 @@ export const avplaySuspend = () => {
 	}
 };
 
+const RESTORE_TIMEOUT_MS = 10000;
+
 export const avplayRestore = (url, resumeMs = 0) => {
 	return new Promise((resolve) => {
 		if (!isAVPlayAvailable) {
@@ -572,8 +574,14 @@ export const avplayRestore = (url, resumeMs = 0) => {
 		resetSeekState();
 		const timeMs = Math.max(0, Math.floor(resumeMs));
 		if (typeof webapis.avplay.restoreAsync === 'function') {
+			// A restore that can't reach its stream calls neither callback and leaves the player idle
+			const timer = setTimeout(() => resolve(false), RESTORE_TIMEOUT_MS);
+			const settle = (ok) => {
+				clearTimeout(timer);
+				resolve(ok);
+			};
 			try {
-				webapis.avplay.restoreAsync(url, timeMs, true, () => resolve(true), () => resolve(false));
+				webapis.avplay.restoreAsync(url, timeMs, true, () => settle(true), () => settle(false));
 				return;
 			} catch (e) {
 				console.warn('[tizenVideo] restoreAsync failed, trying restore:', e.message);
