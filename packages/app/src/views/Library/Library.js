@@ -99,7 +99,7 @@ const MIN_ROW_GAP = 6;
 const FOCUS_SETTLE_MS = 150;
 
 // Opening an item takes the library off screen and it's built again on the way back, so the item
-// that was opened is noted here to come back to.
+// that was opened and the folder it was in are noted here to come back to.
 let returnTo = null;
 // The same for a book grid the item was opened from, so Back comes to the grid rather than the
 // book library.
@@ -309,7 +309,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	folderViewMode === 'on' ||
 	(folderViewMode !== 'off' && folderView === 'on') ||
 	Boolean(bookGridView?.folders);
-	const [folderStack, setFolderStack] = useState(() => restoredBookGrid?.folderStack || []);
+	const [folderStack, setFolderStack] = useState(() => (returnTo?.libraryId === libraryId && returnTo.folderStack) || []);
 	const currentFolderId = folderStack.length > 0 ? folderStack[folderStack.length - 1].id : library?.Id;
 	const currentFolderCollectionType = folderStack.length > 0 ? folderStack[folderStack.length - 1].collectionType?.toLowerCase() : null;
 	const isGenreMode = !!genreFilter;
@@ -768,8 +768,8 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 			if (item.Type === 'Photo' && onViewPhoto) {
 				onViewPhoto(item, itemsRef.current);
 			} else {
-				returnTo = {libraryId, itemId: item.Id, index};
-				bookGridReturn = bookGridView ? {libraryId, view: bookGridView, folderStack, genreFilters, search: searchQuery} : null;
+				returnTo = {libraryId, itemId: item.Id, index, folderStack};
+				bookGridReturn = bookGridView ? {libraryId, view: bookGridView, genreFilters, search: searchQuery} : null;
 				onSelectItem?.(item);
 			}
 		}
