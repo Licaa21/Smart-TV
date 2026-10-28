@@ -354,6 +354,13 @@ The plugin chat works in `E:VSCode ProjectsMoonfin Plugin Forkimplement`. Never 
 - **On a merge:** keep those, and never open that person with `navigateTo(PANELS.DETAILS, false)`.
 - **Files:** `views/Details/DetailActionButtons.js`, `detailActions.js`, `Details.js`, `App/App.js`.
 
+### 20. The Tizen standby recovery
+
+- **Upstream:** reworked how the Tizen player comes back from standby (the 2026-10-28 merge, "reopen a server-built stream when the Tizen app resumes" and the fixes after it): a resume after a background stop reopens the stream at once, a restore that Back or a new item overtook is dropped (`loadGenerationRef`), a paused stream is paused again, stall monitoring is started again, the burn-in subtitle is kept, and the picked audio track is set again.
+- **The fork keeps:** its own recovery from the standby work (`recoverByReload` with its retries and backoff, the single reload in flight, `reloadRunRef`, the `avplayRestore` timeout race `RESTORE_TIMEOUT_MS`, the key-press retry, the 'Standby diag' log lines, and `directPlayOpensFirstAudio: true` on the reload), and takes upstream's improvements inside it: `reload()` in the resume handler (sets `repauseAfterReloadRef`, then `recoverByReload`), the generation check inside the restore race, `reloadCurrentPlayback` returning `null` when overtaken (`recoverByReload` ignores `null`), and the re-pause, health monitoring and audio pick done after a successful reload.
+- **On a merge:** never replace the fork's recovery with upstream's `reload` closure. Take upstream's new fixes into `reloadCurrentPlayback`, `restartFromResult` and the resume handler, and keep the fork's structure around them.
+- **Files:** `views/Player/TizenPlayer.js`.
+
 ## When the user says Moonbase (the plugin) updated
 
 The fork works around things the Moonbase plugin (Moonfin-Client/Plugin) does not do yet. When the user says a new release is
