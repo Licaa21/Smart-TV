@@ -1740,6 +1740,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	useEffect(() => {
 		const loadMedia = async () => {
 			const generation = ++loadGenerationRef.current;
+			repauseAfterReloadRef.current = false;
 			const stillCurrent = () => generation === loadGenerationRef.current;
 			setIsLoading(true);
 			// A video taking over from music opens on its own screen, not the music player's.
@@ -2655,10 +2656,22 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				healthMonitorRef.current = playback.getHealthMonitor();
 				if (repauseAfterReloadRef.current) {
 					repauseAfterReloadRef.current = false;
-					avplayPause();
+					try { avplayPause(); } catch (e) { void e; }
 					setIsPaused(true);
 					healthMonitorRef.current?.setPaused(true);
 					playback.reportProgress(positionRef.current, {isPaused: true, eventName: 'pause'});
+				}
+				// AVPlay ignores the audio index outside a transcode, so the picked track is set again once it plays. The server
+				// builds a pick that is not the first track unless Force Direct Play is on, which leaves only this.
+				if (selectedAudioIndex != null && result.playMethod !== playback.PlayMethod.Transcode) {
+					pendingTracksRef.current = {
+						audioIndex: selectedAudioIndex,
+						audioApplied: false,
+						subApplied: true,
+						audioStreams: result.audioStreams || [],
+						subtitleStreams: result.subtitleStreams || [],
+						deadline: Date.now() + 5000
+					};
 				}
 			}
 			return restarted;
