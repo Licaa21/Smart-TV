@@ -3,6 +3,7 @@ import {act, fireEvent, render, screen} from '@testing-library/react';
 import ModernMediaCard from './ModernMediaCard';
 import MediaPreviewContext from './MediaPreviewContext';
 import {setTmdbThumbsAvailable} from '../../utils/tmdbThumb';
+import {warmBackdrop} from '../../utils/backdropWarm';
 
 // The CLI ships a second copy of React, so the components' JSX goes through the copy under test.
 jest.mock('react/jsx-dev-runtime', () => {
@@ -28,7 +29,9 @@ jest.mock('@enact/spotlight/Spottable', () => (type) => {
 		return React.createElement(type, rest);
 	};
 });
-jest.mock('../../context/SettingsContext', () => ({useSettings: () => ({settings: {}})}));
+const mockSettings = {};
+jest.mock('../../context/SettingsContext', () => ({useSettings: () => ({settings: mockSettings})}));
+jest.mock('../../utils/backdropWarm', () => ({warmBackdrop: jest.fn()}));
 jest.mock('../../services/jellyfinApi', () => ({
 	getServerUrl: () => 'http://server',
 	getApiKey: () => 'token',
@@ -415,4 +418,65 @@ it('holds the artwork back while its row is far from focus', () => {
 	expect(document.querySelector('img').hasAttribute('src')).toBe(false);
 	rerender(<ModernMediaCard item={seerrShow()} serverUrl="http://server" />);
 	expect(document.querySelector('img').getAttribute('src')).toBe(POSTER);
+});
+
+describe('ModernMediaCard loading its backdrop ahead', () => {
+	const movie = {Id: 'm1', Name: 'Film', Type: 'Movie', ImageTags: {Primary: 'p'}, BackdropImageTags: ['t']};
+	const drawn = (props) => render(<ModernMediaCard item={movie} serverUrl="http://server" {...props} />);
+
+	beforeEach(() => {
+		warmBackdrop.mockClear();
+		mockSettings.backdropBlurHome = 20;
+	});
+	afterEach(() => {
+		delete mockSettings.backdropBlurHome;
+		delete mockSettings.showHomeBackdrop;
+	});
+
+	const rest = () => act(() => {
+		jest.advanceTimersByTime(120);
+	});
+
+	it('does it for a card near focus, with the blur the backdrop will use, once it has stayed near for a moment', () => {
+		drawn({warmRank: 2});
+		expect(warmBackdrop).not.toHaveBeenCalled();
+		rest();
+		expect(warmBackdrop).toHaveBeenCalledWith(expect.stringContaining('/Items/m1/Images/Backdrop'), 20);
+	});
+
+	it('does it for the focused card too', () => {
+		drawn({isFocused: true});
+		rest();
+		expect(warmBackdrop).toHaveBeenCalled();
+	});
+
+	it('asks for nothing from a card that focus has passed by before the moment is over, and lets a loaded one go with the card', () => {
+		const stop = jest.fn();
+		warmBackdrop.mockReturnValue(stop);
+		const {unmount: passBy} = drawn({warmRank: 2});
+		passBy();
+		rest();
+		expect(warmBackdrop).not.toHaveBeenCalled();
+		const {unmount: letGo} = drawn({warmRank: 2});
+		rest();
+		expect(warmBackdrop).toHaveBeenCalledTimes(1);
+		letGo();
+		expect(stop).toHaveBeenCalledTimes(1);
+		warmBackdrop.mockReset();
+	});
+
+	it('leaves a card far from focus, or in no window, alone', () => {
+		drawn({warmRank: 6});
+		drawn({warmRank: -1});
+		rest();
+		expect(warmBackdrop).not.toHaveBeenCalled();
+	});
+
+	it('loads nothing while the row holds its images back, or when the backdrop is off', () => {
+		drawn({warmRank: 2, deferImage: true});
+		mockSettings.showHomeBackdrop = false;
+		drawn({warmRank: 2});
+		rest();
+		expect(warmBackdrop).not.toHaveBeenCalled();
+	});
 });

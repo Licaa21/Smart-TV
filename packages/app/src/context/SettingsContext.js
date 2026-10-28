@@ -380,7 +380,10 @@ export const SYNCABLE_KEYS = [
 	'muteChatBannersDuringPlayback', 'accentNavigation', 'accentHome', 'accentSettings', 'accentSettingsFocus',
 	'accentAchievements', 'accentDetails', 'accentPlayer', 'accentSkip', 'accentLiveTv', 'accentOther', 'skipOverlayLayout',
 	'nextUpLayout', 'skipOverlayPosition', 'skipOverlaySize', 'skipOverlayBackground', 'skipOverlayOpacity', 'skipOverlayAccent',
-	'skipOverlayText'
+	'skipOverlayText',
+	// The plugin holds a default for Auto Login. It is read when the viewer signs in and kept on the device, so it acts from the
+	// next start. The pinned account of Current User (autoLoginServerId, autoLoginUserId) is this device's own and stays out.
+	'autoLoginBehavior'
 ];
 
 export const profileToLocal = (serverProfile) => {
