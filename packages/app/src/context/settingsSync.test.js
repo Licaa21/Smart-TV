@@ -306,6 +306,21 @@ describe('SYNCABLE_KEYS', () => {
 		expect(SYNCABLE_KEYS).toContain('detailButtonsMaxVisible');
 	});
 
+	test('includes autoLoginBehavior, so the Auto Login default of the plugin reaches the app', () => {
+		expect(SYNCABLE_KEYS).toContain('autoLoginBehavior');
+		// the pinned account is this device's own, and the plugin has no field for it
+		expect(SYNCABLE_KEYS).not.toContain('autoLoginServerId');
+		expect(SYNCABLE_KEYS).not.toContain('autoLoginUserId');
+	});
+
+	test('takes Auto Login from the plugin profile, and from the admin defaults when the profile has none', () => {
+		expect(profileToLocal({autoLoginBehavior: 'disabled'}).autoLoginBehavior).toBe('disabled');
+		const resolved = resolveFromEnvelope({tv: {}, global: {}}, {autoLoginBehavior: 'disabled'}, '');
+		expect(resolved.autoLoginBehavior).toBe('disabled');
+		const own = resolveFromEnvelope({tv: {autoLoginBehavior: 'lastUser'}, global: {}}, {autoLoginBehavior: 'disabled'}, '');
+		expect(own.autoLoginBehavior).toBe('lastUser');
+	});
+
 	test('includes seasonalDensity', () => {
 		expect(SYNCABLE_KEYS).toContain('seasonalDensity');
 	});
@@ -726,7 +741,7 @@ test('Home rows read back from the webOS database still match the server copy', 
 // Every setting that is not tied to this device is synced, so the plugin can hold a default for it and a viewer's own choice wins.
 describe('the keys the app does not sync', () => {
 	const NOT_SYNCED = ['pinCode', 'pinCodeHash', 'pinFailedAttempts', 'pinLockedUntil', 'pinCodeProtection', 'kidsModeEnabled', 'kidsPinHash',
-		'kidsPinFailedAttempts', 'kidsPinLockedUntil', 'autoLoginBehavior', 'autoLoginServerId', 'autoLoginUserId', 'alwaysAuthenticate', 'allowInsecureCerts',
+		'kidsPinFailedAttempts', 'kidsPinLockedUntil', 'autoLoginServerId', 'autoLoginUserId', 'alwaysAuthenticate', 'allowInsecureCerts',
 		'syncProfile', 'useMoonfinPlugin'];
 
 	test('keep to the account, security and device ones', () => {

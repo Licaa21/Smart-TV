@@ -16,6 +16,8 @@ import IncompleteBadge from '../IncompleteBadge';
 import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
 import {hasArt, rememberArt, artSource, artState, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived, noteArtShown} from './artPrefetch';
 import {decodesAhead} from '../MediaRow/warmWindow';
+import {backdropUrlFor, isLegacyBuild} from '../ScreenBackdrop/ScreenBackdrop';
+import {warmBackdrop} from '../../utils/backdropWarm';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
 
@@ -53,6 +55,11 @@ const getMetadataLine = (item) => {
 	if (runtime) parts.push(runtime);
 	return parts.join(' • ');
 };
+
+// The cards this near focus (0 is the focused one) have the backdrop they put behind the screen loaded ahead
+const BACKDROP_WARM_RANK = 3;
+// The load starts once the card has stayed this near for a moment, so a held key asks for none of the cards it passes
+const BACKDROP_WARM_DELAY_MS = 120;
 
 // The same speeds and curve Moonfin Core opens its modern cards with
 const EXPAND_MS = {extraSlow: 450, slow: 300, medium: 180, fast: 90, off: 0};
@@ -409,6 +416,20 @@ const ModernMediaCard = ({
 	useEffect(() => {
 		prefetchRef.current?.setRank(rank);
 	}, [rank]);
+	// The backdrop a card puts behind the screen, for the cards nearest focus, so it is there when focus rests
+	const warmsBackdrop = rank >= 0 && rank <= BACKDROP_WARM_RANK && !deferImage && settings.showHomeBackdrop !== false;
+	const backdropBlur = settings.backdropBlurHome;
+	useEffect(() => {
+		if (!warmsBackdrop || isLegacyBuild()) return undefined;
+		let stop = null;
+		const timer = setTimeout(() => {
+			stop = warmBackdrop(backdropUrlFor(item, itemServerUrl), backdropBlur);
+		}, BACKDROP_WARM_DELAY_MS);
+		return () => {
+			clearTimeout(timer);
+			if (stop) stop();
+		};
+	}, [warmsBackdrop, item, itemServerUrl, backdropBlur]);
 	// The art of the nearest cards is decoded ahead, so the card draws it at once and not as it decodes
 	useEffect(() => {
 		if (!(decodesAhead(rank) && !deferImage && swapsArt)) return undefined;

@@ -8,7 +8,12 @@ import BackdropLayer from '../BackdropLayer';
 
 import css from './ScreenBackdrop.module.less';
 
-const isLegacyBuild = () => typeof document !== 'undefined' && document.documentElement.classList.contains('legacy');
+// These screens draw a picture sooner than the layer's own wait, and take it away from a card focus has left behind
+// rather than leave it there while focus is still moving
+export const FOCUS_SETTLE_MS = 150;
+export const FOCUS_MOVING_FADE_MS = 300;
+
+export const isLegacyBuild = () => typeof document !== 'undefined' && document.documentElement.classList.contains('legacy');
 
 // The wide picture of a focused card, whether it is a library item or one Seerr found on TMDB. Nothing
 // comes back for an item with no backdrop, and the layer then shows the plain page background.
@@ -40,7 +45,7 @@ const ScreenBackdrop = ({item, serverUrl}) => {
 	);
 	return (
 		<div className={css.host}>
-			<BackdropLayer targetUrl={url} blurAmount={settings.backdropBlurHome} />
+			<BackdropLayer targetUrl={url} blurAmount={settings.backdropBlurHome} settleMs={FOCUS_SETTLE_MS} fadeWhileMovingMs={FOCUS_MOVING_FADE_MS} />
 		</div>
 	);
 };
@@ -61,7 +66,7 @@ export const FocusBackdrop = memo(forwardRef(({serverUrl, active = true}, ref) =
 		[active, item, serverUrl, settings.showHomeBackdrop]
 	);
 	// With nothing to show it draws no scrim either, so it does not darken what a layer beneath it is showing
-	return <BackdropLayer targetUrl={url} blurAmount={settings.backdropBlurHome} scrimWhenEmpty={false} />;
+	return <BackdropLayer targetUrl={url} blurAmount={settings.backdropBlurHome} scrimWhenEmpty={false} settleMs={FOCUS_SETTLE_MS} fadeWhileMovingMs={FOCUS_MOVING_FADE_MS} />;
 }));
 
 export default memo(ScreenBackdrop);

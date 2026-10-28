@@ -5,6 +5,7 @@ import {canSoften, softBackdropUrl} from '../../utils/softBackdrop';
 
 import css from './BackdropLayer.module.less';
 
+// How long focus has to rest on a card before its picture is asked for, unless the screen gives its own
 const BACKDROP_DEBOUNCE_MS = 500;
 
 const TIER_BLUR_CAPS = {low: 0, mid: 8, high: 20};
@@ -18,7 +19,9 @@ const SHARP_LOOK = {WebkitFilter: 'none', filter: 'none', top: 0, left: 0, width
 // The oversize of a layer that is blurred by a filter or by the server, which hides the edges it darkens
 const OVERSIZE_LOOK = {top: '', left: '', width: '', height: ''};
 
-const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, inCorner, scrimWhenEmpty = true}) => {
+// settleMs is how long focus rests before the picture is asked for. fadeWhileMovingMs, when set, fades the picture on screen
+// out once focus has kept moving that long without resting, so a picture is not left behind a card it does not belong to.
+const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, inCorner, scrimWhenEmpty = true, settleMs = BACKDROP_DEBOUNCE_MS, fadeWhileMovingMs = 0}) => {
 	const blurredUrl = serverBlurredUrl(requestedUrl, blurAmount);
 	const targetUrl = blurredUrl || requestedUrl;
 	// A picture the server cannot blur is made soft by the screen, at any performance level
@@ -36,12 +39,22 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 	const timeoutRef = useRef(null);
 	// What the screen wants now. A picture still loading for an earlier card is not drawn once focus has moved on.
 	const wantedUrlRef = useRef('');
+	// Runs from the first move of a stretch of moves, and is dropped when focus rests on a card, a picture is drawn or the
+	// picture on screen is the one wanted again
+	const movingTimerRef = useRef(null);
+	const stopMoving = useCallback(() => {
+		if (movingTimerRef.current) {
+			clearTimeout(movingTimerRef.current);
+			movingTimerRef.current = null;
+		}
+	}, []);
 
 	useEffect(() => {
 		return () => {
 			if (timeoutRef.current) clearTimeout(timeoutRef.current);
+			stopMoving();
 		};
-	}, []);
+	}, [stopMoving]);
 
 	// What is drawn, and how: a changed blur amount draws the same picture again
 	const drawKey = targetUrl ? `${targetUrl}|${soften ? 'soft' : 'plain'}|${blurAmount}` : '';
@@ -49,6 +62,7 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 	useEffect(() => {
 		wantedUrlRef.current = drawKey;
 		if (!targetUrl) {
+			stopMoving();
 			if (currentUrlRef.current) {
 				currentUrlRef.current = '';
 				if (layerARef.current) layerARef.current.style.opacity = '0';
@@ -61,11 +75,31 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 			return;
 		}
 
-		if (drawKey === currentUrlRef.current) return;
+		if (drawKey === currentUrlRef.current) {
+			// Back on the picture on screen: what was pending for the card passed over is dropped, not loaded for nothing
+			stopMoving();
+			if (timeoutRef.current) {
+				clearTimeout(timeoutRef.current);
+				timeoutRef.current = null;
+			}
+			return;
+		}
 
 		if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
+		// Focus is moving on from the picture on screen: if it goes on without resting, the picture leaves
+		if (fadeWhileMovingMs > 0 && currentUrlRef.current && !movingTimerRef.current) {
+			movingTimerRef.current = setTimeout(() => {
+				movingTimerRef.current = null;
+				currentUrlRef.current = '';
+				if (layerARef.current) layerARef.current.style.opacity = '0';
+				if (layerBRef.current) layerBRef.current.style.opacity = '0';
+			}, fadeWhileMovingMs);
+		}
+
 		timeoutRef.current = setTimeout(() => {
+			// Focus has rested on this card, so what comes next is a load and not a move
+			stopMoving();
 			// How the layer is drawn, by how the picture was made soft: by the server already ('plain'), by the screen
 			// scaling a small copy up ('soft'), or, where neither can be, by a CSS filter that the performance level holds
 			// back ('css')
@@ -90,6 +124,7 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 
 					activeLayerRef.current = isA ? 'b' : 'a';
 					currentUrlRef.current = drawKey;
+					stopMoving();
 				};
 				img.onload = apply;
 				img.onerror = apply;
@@ -103,8 +138,8 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 			} else {
 				show(targetUrl, 'plain');
 			}
-		}, BACKDROP_DEBOUNCE_MS);
-	}, [targetUrl, drawKey, soften, blurAmount, layerLook]);
+		}, settleMs);
+	}, [targetUrl, drawKey, soften, blurAmount, layerLook, settleMs, fadeWhileMovingMs, stopMoving]);
 
 	// The layers start with the look of the first picture. Each picture then sets its own as it is drawn, so a layer on
 	// screen is not restyled before the next one comes.

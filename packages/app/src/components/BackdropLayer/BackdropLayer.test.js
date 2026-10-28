@@ -97,3 +97,109 @@ describe('BackdropLayer', () => {
 		expect(drawn().style.backgroundImage).toContain(OUTSIDE);
 	});
 });
+
+describe('BackdropLayer timing', () => {
+	const RealImage = window.Image;
+	let images;
+	const own = (id) => `http://server/Items/${id}/Images/Backdrop?maxWidth=1280`;
+	const layers = () => [...document.querySelectorAll('[class~="globalBackdropImage"]')];
+	const drawn = () => layers().find((layer) => layer.style.opacity === '1');
+	const advance = (ms) => act(async () => {
+		jest.advanceTimersByTime(ms);
+		await Promise.resolve();
+	});
+	const loadAll = () => act(async () => {
+		images.forEach((art) => art.onload?.());
+	});
+	const props = {blurAmount: 20, settleMs: 150, fadeWhileMovingMs: 300};
+
+	beforeEach(() => {
+		jest.useFakeTimers();
+		images = [];
+		window.Image = function FakeImage () {
+			const art = {};
+			images.push(art);
+			return art;
+		};
+	});
+	afterEach(() => {
+		window.Image = RealImage;
+		jest.useRealTimers();
+	});
+
+	// the first picture is on screen
+	const showFirst = async (id) => {
+		const view = render(<BackdropLayer targetUrl={own(id)} {...props} />);
+		await advance(150);
+		await loadAll();
+		expect(drawn()).toBeTruthy();
+		images.length = 0;
+		return view;
+	};
+
+	it('waits for the settle time it is given and no longer', async () => {
+		render(<BackdropLayer targetUrl={own('a')} {...props} />);
+		await advance(149);
+		expect(images).toHaveLength(0);
+		await advance(1);
+		expect(images).toHaveLength(1);
+	});
+
+	it('keeps the old picture while one step is followed by a rest, even when the new one is slow to load', async () => {
+		const {rerender} = await showFirst('a');
+		rerender(<BackdropLayer targetUrl={own('b')} {...props} />);
+		await advance(150);
+		expect(images).toHaveLength(1);
+		// the new picture takes its time, longer than the fade-out time
+		await advance(600);
+		expect(drawn().style.backgroundImage).toContain('/a/');
+		await loadAll();
+		expect(drawn().style.backgroundImage).toContain('/b/');
+	});
+
+	it('fades the old picture out when focus keeps moving without resting, and draws the new one once it rests', async () => {
+		const {rerender} = await showFirst('a');
+		rerender(<BackdropLayer targetUrl={own('b')} {...props} />);
+		await advance(100);
+		rerender(<BackdropLayer targetUrl={own('c')} {...props} />);
+		await advance(100);
+		expect(drawn()).toBeTruthy();
+		rerender(<BackdropLayer targetUrl={own('d')} {...props} />);
+		await advance(100);
+		expect(drawn()).toBeUndefined();
+		expect(images).toHaveLength(0);
+		await advance(150);
+		await loadAll();
+		expect(drawn().style.backgroundImage).toContain('/d/');
+	});
+
+	it('never fades without a time to fade in, as before', async () => {
+		const {rerender} = render(<BackdropLayer targetUrl={own('a')} blurAmount={20} settleMs={150} />);
+		await advance(150);
+		await loadAll();
+		images.length = 0;
+		for (const id of ['b', 'c', 'd', 'e', 'f']) {
+			rerender(<BackdropLayer targetUrl={own(id)} blurAmount={20} settleMs={150} />);
+			await advance(100);
+		}
+		expect(drawn()).toBeTruthy();
+	});
+
+	it('loads nothing for a card focus passed over on its way back to the picture on screen', async () => {
+		const {rerender} = await showFirst('a');
+		rerender(<BackdropLayer targetUrl={own('b')} {...props} />);
+		await advance(100);
+		rerender(<BackdropLayer targetUrl={own('a')} {...props} />);
+		await advance(400);
+		expect(images).toHaveLength(0);
+	});
+
+	it('does not fade when focus comes back to the picture on screen', async () => {
+		const {rerender} = await showFirst('a');
+		rerender(<BackdropLayer targetUrl={own('b')} {...props} />);
+		await advance(100);
+		rerender(<BackdropLayer targetUrl={own('a')} {...props} />);
+		await advance(400);
+		expect(drawn().style.backgroundImage).toContain('/a/');
+	});
+});
