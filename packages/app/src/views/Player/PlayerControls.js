@@ -27,6 +27,7 @@ import {
 } from './PlayerConstants';
 import {MARK_SKIPPED_GREY} from '../LiveTV/GuideIcons';
 import LiveRecordingDialog, {LiveRecordingToast} from './LiveRecordingDialog';
+import {recordPromptChannel} from '../../utils/recordAiring';
 import {formatClockTime} from '../../utils/clock';
 import {AT_LIVE_SECONDS} from './liveWindow';
 import {episodeLine} from '../../utils/liveTvGuide';
@@ -645,7 +646,7 @@ const PlayerControls = ({
 								actions={[
 									{label: $L('Offset'), detail: offsetLabel(subtitleOffset), spotlightId: 'btn-subtitle-offset', onClick: handleOpenSubtitleOffset},
 									{label: $L('Appearance'), spotlightId: 'btn-subtitle-appearance', onClick: handleOpenSubtitleSettings},
-									...(canDownloadRemoteSubtitles ? [{label: $L('Download subtitles...'), detail: $L('Search using the OpenSubtitles plugin'), spotlightId: 'btn-subtitle-download', onClick: handleOpenRemoteSubtitleSearch}] : []),
+									...(canDownloadRemoteSubtitles ? [{label: $L('Download subtitles...'), detail: $L('Search using OpenSubtitles'), spotlightId: 'btn-subtitle-download', onClick: handleOpenRemoteSubtitleSearch}] : []),
 									{label: $L('Cancel'), dimmed: true, onClick: closeModal}
 								]}
 							/>
@@ -765,6 +766,7 @@ const PlayerControls = ({
 					css={css}
 					recording={liveRecording}
 					clockDisplay={settings.clockDisplay}
+					channel={recordPromptChannel(item?.ChannelNumber, item?.Name)}
 					onClose={closeModal}
 					stopPropagation={stopPropagation}
 				/>

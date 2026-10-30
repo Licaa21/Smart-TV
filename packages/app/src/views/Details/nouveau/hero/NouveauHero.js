@@ -3,6 +3,7 @@ import $L from '@enact/i18n/$L';
 
 import RatingsRow from '../../../../components/RatingsRow';
 import {AnimeItemPills} from '../../../../components/AnimeMarkerPills';
+import {IncompleteDetailLine} from '../../../../components/IncompleteBadge';
 import {SeerrStatusBadge} from '../../../../components/seerr/SeerrStatusBadge';
 import {isMdblistEnabled} from '../../../../services/mdblistApi';
 import {formatPlaybackEndsAt} from '../../../../utils/playbackTimeLabels';
@@ -126,6 +127,7 @@ const NouveauHero = (props) => {
 					))}
 				</div>
 			)}
+			<IncompleteDetailLine itemId={item.Id} clockDisplay={settings.clockDisplay} />
 			{!isPerson && <AnimeItemPills item={item} serverUrl={effectiveServerUrl} large className={css.markers} />}
 			{(techBadges.length > 0 || techSize) && (
 				<div className={css.tech}>

@@ -276,7 +276,8 @@ const MakdBanner = memo(({
 							item={currentFeatured}
 							serverUrl={getItemServerUrl(currentFeatured)}
 							compact
-							pluginEnabled={isMdblistEnabled(settings)}
+							surface='mediaBar'
+							pluginEnabled={isMdblistEnabled(settings, 'mediaBar')}
 						/>
 
 						{!settings.hideHomeMediaDescription && (

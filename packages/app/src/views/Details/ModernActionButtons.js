@@ -19,6 +19,10 @@ const MenuContainer = SpotlightContainerDecorator({
 	leaveFor: {left: '', right: '', up: '', down: ''}
 }, 'div');
 
+// A host that hands over handleOpenExtras gets an Extras button straight after Play, outside the
+// viewer's arrangement, and can send focus back to it by this id.
+export const EXTRAS_BUTTON_ID = 'details-extras-btn';
+
 // The action row shared by the Modern and Spotlight detail screens. Play and Resume always
 // lead it, and everything after them is in whatever order the viewer arranged in settings,
 // with anything they hid left out.
@@ -31,7 +35,7 @@ const ModernActionButtons = (props) => {
 	const {
 		settings, seerrOnly, isBook, isReadableBook, isPlaylist, playlistTracks, isPerson,
 		hasPlaybackPosition, resumeTimeText, hasTech,
-		handlePlay, handleResume,
+		handlePlay, handleResume, handleOpenExtras,
 		onFocusRow, downTarget, maxVisibleButtons, overflowAsMenu, menuBackRef
 	} = props;
 
@@ -119,7 +123,7 @@ const ModernActionButtons = (props) => {
 	// leading slots are counted rather than assumed to be one. A person has nothing to play.
 	const showsResume = !seerrOnly && !isPerson && hasPlaybackPosition && !isBook;
 	const showsPlay = !seerrOnly && !isPerson && (isBook ? isReadableBook : true) && (!isPlaylist || (playlistTracks ? playlistTracks.length > 0 : true));
-	const leading = (showsResume ? 1 : 0) + (showsPlay ? 1 : 0);
+	const leading = (showsResume ? 1 : 0) + (showsPlay ? 1 : 0) + (handleOpenExtras ? 1 : 0);
 
 	// Kids Mode's row is its own short allow list and always fits, so the viewer's cap is one more
 	// of the settings the mode sets aside. Reading it would fold a button the mode does allow behind
@@ -155,6 +159,9 @@ const ModernActionButtons = (props) => {
 						onClick={handlePlay}
 						spotlightId={hasPlaybackPosition ? undefined : 'details-primary-btn'}
 					/>
+				)}
+				{handleOpenExtras && (
+					<ActionButton path={DETAIL_ICON_PATHS.videoLibraryOutlined} label={$L('Extras')} onClick={handleOpenExtras} spotlightId={EXTRAS_BUTTON_ID} />
 				)}
 				{inline.map((btn) => <Fragment key={btn.id}>{btn.render()}</Fragment>)}
 				{behindMenu.length > 0 && (

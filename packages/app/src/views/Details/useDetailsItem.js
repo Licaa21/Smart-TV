@@ -9,6 +9,7 @@ import {fromServerAudio, selectPreferredAudioStream} from '../../utils/audioTrac
 import {fromServerStream, matchSeriesTrackIndex} from '../../utils/seriesTrackPrefs';
 import {detailsSubtitlePosition} from '../Player/initialSubtitle';
 import {findParentCollections} from './parentCollection';
+import {compareFeatures} from './extraCategories';
 import {fetchAllPlaylistItems} from './playlistItems';
 import {canScoreSeedLocally, getOnlineRecommendations, getRecommendations, mergeRecommendations} from '../../services/homeRecommendations';
 import {fetchMissingCollectionItems} from './seerrMissingCollectionItems';
@@ -458,7 +459,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				setSimilarLoaded(true);
 				const parts = (partsData?.Items || []).map((part) => ({...part, _additionalPart: true}));
 				if (extrasData || parts.length) {
-					setExtras(tagWithServerInfo(withoutBlockedItems([...parts, ...(extrasData || []).filter(e => e.Id !== itemId)])));
+					setExtras(tagWithServerInfo(withoutBlockedItems([...parts, ...(extrasData || []).filter(e => e.Id !== itemId).sort(compareFeatures)])));
 				}
 				const collections = await collectionsLookup;
 				for (const boxSet of collections) {

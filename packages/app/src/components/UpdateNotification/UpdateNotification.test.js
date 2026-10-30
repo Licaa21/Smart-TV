@@ -1,4 +1,4 @@
-import {render, screen} from '@testing-library/react';
+import {fireEvent, render, screen} from '@testing-library/react';
 import Spotlight from '@enact/spotlight';
 
 import UpdateNotification from './UpdateNotification';
@@ -15,28 +15,48 @@ jest.mock('react/jsx-dev-runtime', () => {
 		}
 	};
 });
-jest.mock('@enact/spotlight', () => ({focus: jest.fn(), getCurrent: jest.fn(() => null)}));
 
-jest.mock('@enact/sandstone/Popup', () => ({children}) => require('react').createElement('div', null, children));
-jest.mock('@enact/sandstone/Button', () => ({children, onClick}) => require('react').createElement('button', {onClick}, children));
-jest.mock('@enact/sandstone/Heading', () => ({children}) => require('react').createElement('h2', null, children));
-jest.mock('@enact/sandstone/Scroller', () => ({children}) => require('react').createElement('div', null, children));
+// The app's react-dom would pull in the CLI's React, so the portal draws in place instead.
+jest.mock('react-dom', () => ({createPortal: (node) => node}));
+jest.mock('@enact/spotlight/Spottable', () => (type) => {
+	const React = require('react');
+	return ({spotlightId, children, ...props}) => React.createElement(type, props, children); // eslint-disable-line no-unused-vars
+});
+jest.mock('@enact/spotlight/SpotlightContainerDecorator', () => (config, type) => {
+	const React = require('react');
+	return ({spotlightId, children, ...props}) => React.createElement(type, props, children); // eslint-disable-line no-unused-vars
+});
+jest.mock('@enact/spotlight', () => ({focus: jest.fn(), getCurrent: jest.fn()}));
 
-const info = {latestVersion: '1.2.0', currentVersion: '1.1.4'};
+const updateInfo = {currentVersion: '2.1.0', latestVersion: '2.2.0'};
 
 describe('UpdateNotification', () => {
-	beforeEach(() => Spotlight.focus.mockClear());
+	test('offers the notes, then shows them in place of the offer', () => {
+		render(<UpdateNotification updateInfo={updateInfo} formattedNotes="Faster **home**" onDismiss={() => {}} />);
+		expect(screen.getByText('v2.2.0 Available')).toBeTruthy();
+		expect(screen.getByText('Cancel')).toBeTruthy();
 
-	test('takes focus back when something behind it takes it later, as Home\'s media bar does', () => {
-		render(<div><button>behind</button><UpdateNotification updateInfo={info} formattedNotes="notes" onDismiss={() => {}} /></div>);
-		screen.getByText('behind').focus();
-		expect(Spotlight.focus).toHaveBeenCalledWith('update-ok-btn');
+		fireEvent.click(screen.getByText('Read Release Notes'));
+		expect(screen.queryByText('Read Release Notes')).toBeNull();
+		expect(screen.getByText('home').tagName).toBe('STRONG');
 	});
 
-	test('leaves focus alone while it is inside the panel', () => {
-		render(<UpdateNotification updateInfo={info} formattedNotes="notes" onDismiss={() => {}} />);
+	test('Cancel counts the update as seen', () => {
+		const onDismiss = jest.fn();
+		render(<UpdateNotification updateInfo={updateInfo} formattedNotes="" onDismiss={onDismiss} />);
+		fireEvent.click(screen.getByText('Cancel'));
+		expect(onDismiss).toHaveBeenCalled();
+	});
+
+	test('takes focus back when something behind it takes it later, as Home's media bar does', () => {
 		Spotlight.focus.mockClear();
-		screen.getByText('OK').focus();
-		expect(Spotlight.focus).not.toHaveBeenCalled();
+		render(<div><button>behind</button><UpdateNotification updateInfo={updateInfo} formattedNotes="notes" onDismiss={() => {}} /></div>);
+		screen.getByText('behind').focus();
+		expect(Spotlight.focus).toHaveBeenCalledWith('update-dialog');
+	});
+
+	test('draws nothing without an update', () => {
+		const {container} = render(<UpdateNotification updateInfo={null} onDismiss={() => {}} />);
+		expect(container.innerHTML).toBe('');
 	});
 });

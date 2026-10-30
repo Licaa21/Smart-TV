@@ -527,7 +527,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		primaryIndex: selectedSubtitleIndex,
 		preferExternal: settings.preferExternalSubtitles === true,
 		preferredLanguage: settings.preferredSecondarySubtitleLanguage,
-		available: !isLiveTV && !isAudioMode
+		available: !isLiveTV && !isAudioMode,
+		enabled: settings.secondarySubtitlesEnabled === true
 	});
 	const {
 		prepareForItem: prepareSecondaryForItem, restore: restoreSecondary, update: updateSecondary,

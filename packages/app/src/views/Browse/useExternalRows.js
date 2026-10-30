@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import $L from '@enact/i18n/$L';
 
-import {memoryCache} from './browseCache';
+import {memoryCache, settleSections} from './browseCache';
 import {getExternalHomeRowConfigs, fetchExternalPresetRow, fetchCustomHomeRow, fetchCalendarRows, buildSeasonalRow} from '../../utils/externalHomeRows';
 import {fetchSeasonalRow} from '../../services/externalRowsApi';
 import {resolveItemsByProviderIds} from '../../services/jellyfinApi';
@@ -71,7 +71,7 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 
 		let cancelled = false;
 		const presetConfigs = getExternalHomeRowConfigs();
-		setPending([
+		const pendingRows = [
 			...enabledPresets
 				.map((id) => presetConfigs.find((c) => c.id === id))
 				.filter(Boolean)
@@ -81,7 +81,8 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 			...(mergedCalendars ? [{id: 'radarr_calendar', title: $L('Upcoming Releases'), isCalendarMerged: true}] : []),
 			...(radarrEnabled && !mergedCalendars ? [{id: 'radarr_calendar', title: $L('Upcoming Movies')}] : []),
 			...(sonarrEnabled && !mergedCalendars ? [{id: 'sonarr_calendar', title: $L('Upcoming Episodes')}] : [])
-		]);
+		];
+		setPending(pendingRows);
 
 		(async () => {
 			try {
@@ -183,6 +184,7 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 				)));
 				if (!cancelled) {
 					memoryCache.externalRows = {key, owner, rows: built};
+					settleSections(pendingRows.map((row) => row.id), built);
 					setExternalRows(built);
 					setPending([]);
 				}

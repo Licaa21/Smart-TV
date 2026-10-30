@@ -256,7 +256,8 @@ export const getHomeRowsStyleOptions = () => [
 export const getHomeBackdropStyleOptions = () => [
 	{ value: 'off', label: $L('Off') },
 	{ value: 'fullScreen', label: $L('Full Screen') },
-	{ value: 'corner', label: $L('Corner') }
+	{ value: 'corner', label: $L('Corner') },
+	{ value: 'top', label: $L('Top') }
 ];
 
 export const getMediaPreviewModeOptions = () => [
@@ -366,12 +367,6 @@ export const getServerSortOptions = () => [
 	{ value: 'name', label: $L('Server name') },
 	{ value: 'recent', label: $L('Recently Used') },
 	{ value: 'added', label: $L('Date Added') }
-];
-
-export const getFolderViewModeOptions = () => [
-	{ value: 'local', label: $L('Per Library') },
-	{ value: 'on', label: $L('Always on.') },
-	{ value: 'off', label: $L('Always Off') }
 ];
 
 export const getContinueWatchingDefaultActionOptions = () => [

@@ -183,7 +183,7 @@ const DetailTrackModals = ({
 								entries={subtitleEntries}
 								rows={subtitleRows}
 								actions={[
-									{label: $L('Download subtitles...'), detail: $L('Search using the OpenSubtitles plugin'), spotlightId: 'btn-subtitle-download', onClick: onOpenRemoteSubtitleSearch},
+									{label: $L('Download subtitles...'), detail: $L('Search using OpenSubtitles'), spotlightId: 'btn-subtitle-download', onClick: onOpenRemoteSubtitleSearch},
 									{label: $L('Cancel'), dimmed: true, onClick: onCloseModal}
 								]}
 							/>

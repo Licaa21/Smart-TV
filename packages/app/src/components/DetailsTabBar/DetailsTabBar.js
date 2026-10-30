@@ -58,6 +58,7 @@ const DetailsTabBar = ({tabs, activeId, activeSpotlightId, onSelect, onActivate,
 						spotlightId={tab.id === activeId ? activeSpotlightId : undefined}
 						data-id={tab.id}
 						data-enter-from-above={entryFromAbove && tab.id === activeId ? 'true' : undefined}
+						data-active-tab={tab.id === activeId ? 'true' : undefined}
 						className={`${css.tab} ${tab.id === activeId ? css.tabActive : ''}`}
 						onClick={handleClick}
 						onFocus={handleFocus}

@@ -590,14 +590,24 @@ const loadPluginsAndRewatch = async (ctx) => {
 };
 // Fired together rather than in sequence: their requests queue on the media server anyway, so
 // holding the later ones back would only delay those rows without easing the load. Each names
-// the home sections it answers for, so a section still waiting on its loader can hold its place.
+// the home sections it fetches, so a section still waiting on its loader can hold its place and
+// one it skips is never taken for empty.
+const fetched = (flags) => Object.keys(flags).filter((id) => flags[id]);
 export const BROWSE_ROW_LOADERS = [
 	{load: loadLatestAndRecentlyReleased, sections: () => ['latest-media', 'recently-released']},
-	{load: loadCollections, sections: () => ['collections']},
-	{load: loadStudios, sections: () => ['studios']},
-	{load: loadFavorites, sections: () => FAVORITE_ROW_CONFIGS.map((row) => row.id)},
-	{load: loadGenres, sections: () => ['genres']},
-	{load: loadPlaylistsAndMusic, sections: () => ['playlists', 'audioartists', 'audioalbums', 'audioplaylists', 'resumeaudio', 'activerecordings', 'onnow']},
-	{load: loadPluginsAndRewatch, sections: (ctx) => [...ctx.enabledPluginSections.map((section) => section.id), 'rewatch']},
+	{load: loadCollections, sections: (ctx) => fetched({collections: ctx.settings.displayCollectionsRows})},
+	{load: loadStudios, sections: (ctx) => fetched({studios: ctx.studiosEnabled})},
+	{load: loadFavorites, sections: (ctx) => (ctx.settings.displayFavoritesRows ? FAVORITE_ROW_CONFIGS.map((row) => row.id) : [])},
+	{load: loadGenres, sections: (ctx) => fetched({genres: ctx.settings.displayGenresRows})},
+	{load: loadPlaylistsAndMusic, sections: (ctx) => fetched({
+		playlists: ctx.settings.displayPlaylistsRows,
+		audioartists: ctx.audioArtistsEnabled,
+		audioalbums: ctx.audioAlbumsEnabled,
+		audioplaylists: ctx.audioPlaylistsEnabled,
+		resumeaudio: ctx.resumeAudioEnabled,
+		activerecordings: ctx.recordingsEnabled,
+		onnow: ctx.onNowEnabled
+	})},
+	{load: loadPluginsAndRewatch, sections: (ctx) => [...ctx.enabledPluginSections.map((section) => section.id), ...fetched({rewatch: ctx.rewatchEnabled})]},
 	{load: loadSinceYouWatched, sections: (ctx) => ctx.sinceYouWatchedIndexes.map((index) => `sinceyouwatched${index}`)}
 ];

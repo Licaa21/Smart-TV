@@ -30,6 +30,7 @@ import {fetchUpcomingEpisode, formatUpcomingEpisode} from '../../utils/upcomingE
 import {episodeCardTitle} from '../../utils/episodeCardTitle';
 import useItemMenuHold, {itemWithIdAt} from '../../hooks/useItemMenuHold';
 import {AnimeEpisodePills, AnimeItemPills} from '../../components/AnimeMarkerPills';
+import IncompleteBadge, {IncompleteDetailLine} from '../../components/IncompleteBadge';
 import {scrimStyle} from '../../utils/scrimImage';
 import PlaylistSortFilterBar, {EmptyPlaylistFilterState, EmptyPlaylistState} from '../../components/PlaylistSortFilterBar';
 import {
@@ -548,7 +549,10 @@ const ModernDetailContent = (props) => {
 						</div>
 						<div className={css.episodeBody}>
 							<span className={css.episodeName}>{episodeCardTitle(ep.Name, ep.IndexNumber)}</span>
-							{epRuntime && <span className={css.episodeMeta}>{epRuntime}</span>}
+							<div className={css.episodeMetaRow}>
+								{epRuntime && <span className={css.episodeMeta}>{epRuntime}</span>}
+								<IncompleteBadge itemId={ep.Id} inline />
+							</div>
 							<AnimeEpisodePills episode={ep} serverUrl={effectiveServerUrl} large />
 							{ep.Overview && !hidesMediaDescription(ep, settings) && <p className={css.episodeOverview}>{ep.Overview}</p>}
 						</div>
@@ -901,6 +905,7 @@ const ModernDetailContent = (props) => {
 					})}
 				</div>
 			)}
+			<IncompleteDetailLine itemId={item.Id} clockDisplay={settings.clockDisplay} />
 			<AnimeItemPills item={item} serverUrl={effectiveServerUrl} large />
 			{hasTech && (
 				<div className={css.techRow}>

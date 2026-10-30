@@ -295,12 +295,10 @@ const GenreBrowse = ({genre, libraryId, onSelectItem, backHandlerRef}) => {
 		};
 	}, []);
 
+	// A pick applies right away and the dialog stays up until Back, like the library's sort panel.
 	const handleSortSelect = useCallback((ev) => {
 		const key = ev.currentTarget?.dataset?.sortKey;
-		if (key) {
-			setSortBy(key);
-			setShowSortModal(false);
-		}
+		if (key) setSortBy(key);
 	}, []);
 
 	// Holding OK on a card opens its menu, found from the card the press landed on.

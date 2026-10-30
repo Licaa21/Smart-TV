@@ -60,11 +60,14 @@ const SERVER_TO_LOCAL = {
 	homeImageUseSeriesImage: 'useSeriesThumbnails',
 	mdblistShowRatingNames: 'showRatingLabels',
 	mdblistShowRatingBadges: 'showRatingBadges',
+	homeRowsMdblistShowRatingNames: 'homeRowsShowRatingLabels',
+	homeRowsMdblistShowRatingBadges: 'homeRowsShowRatingBadges',
+	mediaBarMdblistShowRatingNames: 'mediaBarShowRatingLabels',
+	mediaBarMdblistShowRatingBadges: 'mediaBarShowRatingBadges',
 	languageOverride: 'uiLanguage',
 	syncPlayEnabled: 'syncplayEnabled',
 	syncPlayAutoOpen: 'syncplayAutoOpen',
 	clockBehavior: 'showClock',
-	enableFolderView: 'folderViewMode',
 	homeRowInfoOverlay: 'homeRowOverlay',
 	autoplayNextEpisode: 'autoPlay',
 	mediaSegmentCountdown: 'nextUpCountdownStyle',
@@ -157,6 +160,15 @@ const oneOf = (values) => ({fromServer: v => (values.includes(v) ? v : undefined
 const POSTER_SIZES_TO_SERVER = {default: 'medium', xlarge: 'extraLarge'};
 const POSTER_SIZES_FROM_SERVER = {medium: 'default', extraLarge: 'xlarge'};
 const posterSizeFromServer = oneOf(['small', 'default', 'large', 'xlarge', 'grandparents']).fromServer;
+// Synced as is, unlike the home card sizes, and with no Grandparents size.
+const LIBRARY_POSTER_SIZES = ['small', 'medium', 'large', 'extraLarge'];
+
+// The plugin's admin defaults store an unset list as an empty one, which would hide every
+// rating, so an empty list from the server leaves the one we have.
+const surfaceRatingSources = {
+	toServer: ratingSourcesToServer,
+	fromServer: (v) => (Array.isArray(v) && v.length === 0 ? undefined : normalizeRatingSources(v))
+};
 
 const VALUE_CONVERSIONS = {
 	homeRowsPosterSize: {
@@ -205,6 +217,8 @@ const VALUE_CONVERSIONS = {
 	},
 	seasonalDensity: oneOf(SEASONAL_DENSITIES),
 	libraryStyle: oneOf(['classic', 'modern', 'docked']),
+	libraryPosterSize: oneOf(LIBRARY_POSTER_SIZES),
+	playlistPosterSize: oneOf(LIBRARY_POSTER_SIZES),
 	bookLibraryStyle: oneOf(['classic', 'readingRoom', 'bookstore']),
 	musicLibraryStyle: oneOf(['classic', 'quickAccess', 'immersive']),
 	keyboardStyle: oneOf(['native', 'classic', 'glass', 'docked']),
@@ -224,12 +238,6 @@ const VALUE_CONVERSIONS = {
 	// turning it off. There is nothing to draw for "off", so leave the mode we already have.
 	screensaverMode: {
 		fromServer: v => (v === 'off' ? undefined : v)
-	},
-	// Three states here against a boolean elsewhere. "Per Library" has no equivalent, so it
-	// declines to push and leaves whatever the server holds.
-	folderViewMode: {
-		toServer: v => (v === 'local' ? undefined : v === 'on'),
-		fromServer: v => (v ? 'on' : 'off')
 	},
 	nextUpTimeout: {
 		toServer: secondsToMs,
@@ -265,6 +273,8 @@ const VALUE_CONVERSIONS = {
 		toServer: ratingSourcesToServer,
 		fromServer: normalizeRatingSources
 	},
+	homeRowsMdblistRatingSources: surfaceRatingSources,
+	mediaBarMdblistRatingSources: surfaceRatingSources,
 	homeRowImageTypes: {
 		toServer: homeRowImageTypesToServer,
 		fromServer: homeRowImageTypesFromServer
@@ -275,7 +285,7 @@ const VALUE_CONVERSIONS = {
 
 export const SYNCABLE_KEYS = [
 	'showShuffleButton', 'shuffleContentType', 'showGenresButton',
-	'showFavoritesButton', 'showLiveTvButton', 'showLibrariesInToolbar',
+	'showFavoritesButton', 'showLiveTvButton', 'showLibrariesInToolbar', 'showLibrariesIndividually',
 	'mergeContinueWatchingNextUp',
 	'continueWatchingDefaultAction',
 	'nextUpMaxDays',
@@ -287,14 +297,17 @@ export const SYNCABLE_KEYS = [
 	'sinceYouWatchedSource', 'sinceYouWatchedSourceItem', 'sinceYouWatchedSourceType', 'sinceYouWatchedIncludeWatched',
 	'rewatchIncludeMovies', 'rewatchIncludeShows', 'rewatchIncludeCollections', 'rewatchSortBy',
 	'navbarPosition', 'featuredBarStyle', 'mediaBarRowPeek', 'featuredContentType', 'featuredItemCount',
-	'featuredTrailerPreview', 'featuredTrailerMuted', 'trailerVolume', 'mediaBarTrailerCaptions', 'unifiedLibraryMode', 'seasonalTheme', 'seasonalDensity',
+	'featuredTrailerPreview', 'featuredTrailerMuted', 'trailerVolume', 'mediaBarTrailerCaptions', 'unifiedLibraryMode', 'seasonalTheme', 'seasonalDensity', 'seasonalFollower',
 	'seasonalRowEnabled', 'seasonalRowCountry', 'seasonalRowHiddenHolidays',
 	'visualTheme', 'customThemeId',
 	'showRatingLabels',
 	'showRatingBadges',
+	'homeRowsMdblistEnabled', 'homeRowsMdblistRatingSources', 'homeRowsTmdbEpisodeRatingsEnabled',
+	'homeRowsShowRatingLabels', 'homeRowsShowRatingBadges',
+	'mediaBarMdblistEnabled', 'mediaBarMdblistRatingSources', 'mediaBarShowRatingLabels', 'mediaBarShowRatingBadges',
 	'themeMusicEnabled', 'themeMusicVolume', 'themeMusicOnHomeRows',
 	'homeRowsImageType', 'homeRowImageTypes', 'showClock', 'clockDisplay',
-	'homeRowOverlay', 'folderViewMode',
+	'homeRowOverlay',
 	'excludedGenres',
 	'autoAdvance', 'autoAdvanceInterval',
 	'displayFavoritesRows', 'displayCollectionsRows', 'displayGenresRows', 'displayPlaylistsRows',
@@ -316,7 +329,8 @@ export const SYNCABLE_KEYS = [
 	'hideDetailsMediaDescription', 'detailUseSeriesThumbnails', 'hideHomeMediaDescription',
 	'personPageSortOption', 'personPageGroupItems',
 	'personalRatingStyle', 'recentlyReleasedSeriesType', 'mergeRecentRowsByType', 'playlistsGroupByType', 'groupItemsIntoCollections',
-	'useDetailedSubHeadings', 'showMediaDetailsOnLibraryPage', 'hideBackdropsInLibraries', 'libraryStyle', 'bookLibraryStyle', 'musicLibraryStyle',
+	'useDetailedSubHeadings', 'showMediaDetailsOnLibraryPage', 'libraryCardTitles', 'hideBackdropsInLibraries', 'libraryStyle', 'bookLibraryStyle', 'showBookDiscoverTab', 'musicLibraryStyle',
+	'libraryPosterSize', 'playlistPosterSize',
 	'keyboardStyle',
 	'preferredSecondarySubtitleLanguage', 'secondarySubtitleSize', 'secondarySubtitleOffset', 'secondarySubtitleColor',
 	'syncplayEnabled', 'syncplayAutoOpen',

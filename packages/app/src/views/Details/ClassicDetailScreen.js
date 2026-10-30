@@ -24,6 +24,7 @@ import {fetchUpcomingEpisode, formatUpcomingEpisode} from '../../utils/upcomingE
 import {DETAIL_ICON_PATHS} from './detailIcons';
 import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeEpisodePills, AnimeItemPills} from '../../components/AnimeMarkerPills';
+import IncompleteBadge, {IncompleteDetailLine} from '../../components/IncompleteBadge';
 import useItemMenuHold, {itemWithIdAt} from '../../hooks/useItemMenuHold';
 
 import css from './Details.module.less';
@@ -269,6 +270,7 @@ const ClassicDetailScreen = ({
 							</div>
 						)}
 					</div>
+					<IncompleteDetailLine itemId={item.Id} clockDisplay={settings.clockDisplay} />
 					<div className={css.detailMarkers}>
 						<AnimeItemPills item={item} serverUrl={serverUrl} />
 					</div>
@@ -430,6 +432,7 @@ const ClassicDetailScreen = ({
 											</span>
 										)}
 										<AnimeEpisodePills episode={ep} serverUrl={serverUrl} compact className={css.episodeMarkers} />
+										<IncompleteBadge itemId={ep.Id} inline />
 									</div>
 								</SpottableDiv>
 							);

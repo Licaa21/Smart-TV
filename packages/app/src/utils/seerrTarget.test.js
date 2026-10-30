@@ -1,4 +1,4 @@
-import {seerrTargetFor, seerrDetailStub, isSeerrOnlyItem, bestSearchMatch, personRouteFor, seerrCardTarget} from './seerrTarget';
+import {seerrTargetFor, seerrDetailStub, isSeerrOnlyItem, bestSearchMatch, personRouteFor, seerrCardTarget, isSeriesPart, seriesTargetFrom} from './seerrTarget';
 
 const movie = (providerIds) => ({Type: 'Movie', ProviderIds: providerIds});
 
@@ -124,5 +124,21 @@ describe('seerrCardTarget', () => {
 		const resolved = card({_resolvedFromExternal: true});
 		expect(seerrCardTarget(resolved)).toBe(resolved);
 		expect(seerrCardTarget(null)).toBe(null);
+	});
+});
+
+describe('a season or episode', () => {
+	it('stands for its series when it knows which one', () => {
+		expect(isSeriesPart({Type: 'Episode', SeriesId: 's1'})).toBe(true);
+		expect(isSeriesPart({Type: 'Season', SeriesId: 's1'})).toBe(true);
+		expect(isSeriesPart({Type: 'Episode'})).toBe(false);
+		expect(isSeriesPart({Type: 'Series', SeriesId: 's1'})).toBe(false);
+	});
+
+	it('takes the series TMDB id, or its IMDb id and name to search with', () => {
+		expect(seriesTargetFrom({ProviderIds: {Tmdb: '1399'}})).toEqual({mediaId: 1399, mediaType: 'tv'});
+		expect(seriesTargetFrom({Name: 'Lupin', ProviderIds: {Imdb: 'tt2531336'}}))
+			.toEqual({mediaId: null, mediaType: 'tv', imdbId: 'tt2531336', title: 'Lupin'});
+		expect(seriesTargetFrom({ProviderIds: {}})).toEqual({mediaId: null, mediaType: null});
 	});
 });

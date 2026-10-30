@@ -211,9 +211,9 @@ const sectionTitle = (id, homeRowsConfig, pluginSection, favoriteLabelMap) => {
 };
 
 // A section still loading holds its place with its title over placeholder cards, then gives way
-// to whatever rows it turns out to have. [pendingRows] come already titled from the sources that
-// only ever report enabled rows.
-const placeholderRows = ({pendingSections, pendingRows, placedIds, gates, homeRowsConfig, pluginSectionsConfig, favoriteLabelMap}) => {
+// to whatever rows it turns out to have. One known to come back empty shows nothing while it
+// loads. [pendingRows] come already titled from the sources that only ever report enabled rows.
+const placeholderRows = ({pendingSections, pendingRows, placedIds, emptySections, gates, homeRowsConfig, pluginSectionsConfig, favoriteLabelMap}) => {
 	const fromSections = pendingSections
 		.map((id) => {
 			const pluginSection = pluginSectionsConfig.find((section) => section.id === id);
@@ -221,7 +221,7 @@ const placeholderRows = ({pendingSections, pendingRows, placedIds, gates, homeRo
 		})
 		.filter((row) => isRowEnabled(row, gates));
 	return [...fromSections, ...pendingRows]
-		.filter((row) => !placedIds.has(row.id))
+		.filter((row) => !placedIds.has(row.id) && !emptySections.has(row.id))
 		.map((row) => ({
 			...row,
 			items: [],
@@ -230,7 +230,7 @@ const placeholderRows = ({pendingSections, pendingRows, placedIds, gates, homeRo
 		}));
 };
 
-export const buildBrowseRows = ({allRowData, seerrRows, externalRows, homeRowsConfig, pluginSectionsConfig, settings, pendingSections = [], pendingRows = []}) => {
+export const buildBrowseRows = ({allRowData, seerrRows, externalRows, homeRowsConfig, pluginSectionsConfig, settings, pendingSections = [], pendingRows = [], emptySections = new Set()}) => {
 	const enabledRowIdsSet = buildEnabledIds(homeRowsConfig);
 	const enabledPluginIds = pluginSectionsConfig.filter((section) => section.enabled).map((section) => section.id);
 	const rowOrderMap = buildRowOrder(homeRowsConfig);
@@ -287,6 +287,7 @@ export const buildBrowseRows = ({allRowData, seerrRows, externalRows, homeRowsCo
 		pendingSections,
 		pendingRows,
 		placedIds: new Set(rows.map((row) => row.id)),
+		emptySections,
 		gates,
 		homeRowsConfig,
 		pluginSectionsConfig,

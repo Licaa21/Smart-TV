@@ -10,6 +10,7 @@ import {useSeerr} from '../../context/SeerrContext';
 import {useSyncPlay} from '../../context/SyncPlayContext';
 import * as jellyfinApi from '../../services/jellyfinApi';
 import {searchesForTrailer} from '../../services/youtubeTrailer';
+import {canKeepAsComplete, keepAsComplete, useIncompleteRecording} from '../../services/incompleteRecordings';
 import {saveAudioPref, saveSubtitlePref} from '../../services/subtitlePrefs';
 import {fromServerStream} from '../../utils/seriesTrackPrefs';
 import ModernDetailContent from './ModernDetailContent';
@@ -181,7 +182,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		selectedSubtitleIndex, setSelectedSubtitleIndex
 	} = data;
 
-	const seerr = useSeerrOverlay({item: seerrOnly ? initialItem : data.item, seerrOnly, showsSection});
+	const seerr = useSeerrOverlay({item: seerrOnly ? initialItem : data.item, seerrOnly, showsSection, api: effectiveApi});
 
 	// A title the library lacks has its seasons and episodes from Seerr, in the metadata language.
 	const seerrEpisodes = useSeerrEpisodes({details: seerr.details, enabled: seerrOnly && seerr.mediaType === 'tv', language: seerr.language});
@@ -948,6 +949,19 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 		}
 	}, [effectiveApi, item?.Id, onItemDeleted, closeDeleteDialog]);
 
+	const incompleteRecording = useIncompleteRecording(item?.Id);
+	const handleKeepAsComplete = useCallback(async () => {
+		try {
+			await keepAsComplete(item.Id);
+			showToast($L('Marked as complete'));
+			// The button goes away with the mark, so focus moves to Play rather than out of the row.
+			setTimeout(() => Spotlight.focus('details-primary-btn'), 0);
+		} catch {
+			showToast($L('Unable to mark as complete'));
+		}
+	}, [item?.Id, showToast]);
+	const keepAsCompleteAction = incompleteRecording && canKeepAsComplete() ? handleKeepAsComplete : null;
+
 	const handleButtonRowFocus = useCallback(() => {
 		if (pageScrollToRef.current) {
 			pageScrollToRef.current({position: {y: 0}, animate: true});
@@ -1228,7 +1242,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 				onClose={modals.handleCloseRatingDialog}
 			/>
 			{modals.showPersonDisplayModal && <PersonDisplayDialog onClose={modals.handleClosePersonDisplayModal} />}
-			<SeerrDialogs seerr={seerr} title={item.Name} />
+			<SeerrDialogs seerr={seerr} item={item} />
 			<ReviewDialog review={reviews.openReview} onClose={reviews.handleCloseReview} />
 		</>
 	);
@@ -1325,6 +1339,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 					handleOpenCollectionModal={canAddToCollection ? modals.handleOpenCollectionModal : null}
 					handleOpenIdentifyModal={canIdentify ? modals.handleOpenIdentifyModal : null}
 					handleOpenDeleteDialog={modals.handleOpenDeleteDialog}
+					handleKeepAsComplete={keepAsCompleteAction}
 					handleChapterSelect={handleChapterSelect}
 					handleEpisodePlay={handleEpisodePlay}
 					handleExtraSelect={handleExtraSelect}
@@ -1512,6 +1527,7 @@ const Details = ({itemId: itemIdProp, initialItem, onPlay: onPlayProp, onSelectI
 			onOpenDeleteDialog={modals.handleOpenDeleteDialog}
 			onOpenIdentifyModal={modals.handleOpenIdentifyModal}
 			onOpenArtworkModal={modals.handleOpenArtworkModal}
+			onKeepAsComplete={keepAsCompleteAction}
 		/>
 	);
 

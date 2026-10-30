@@ -8,6 +8,7 @@ import {showsWatchedCheck} from '../../utils/playedState';
 import SeerrIcon from '../icons/SeerrIcon';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
+import LoopMarquee from '../LoopMarquee';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
@@ -99,7 +100,7 @@ export const episodeArtwork = (item, serverUrl, imageType, useSeriesArt, width =
 	return preferred || still;
 };
 
-const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'poster', onSelect, onFocusItem, showServerBadge = false, eagerLoad = false, deferImage = false, seerrSeasonStatus, spotlightId, onSpotlightLeft, onSpotlightRight, menuOptions, size, current = false}) => {
+const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'poster', onSelect, onFocusItem, showServerBadge = false, eagerLoad = false, deferImage = false, seerrSeasonStatus, spotlightId, onSpotlightLeft, onSpotlightRight, menuOptions, size, current = false, homeText = false}) => {
 	const {settings} = useSettings();
 	const focusTimeoutRef = useRef(null);
 
@@ -226,6 +227,9 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 	const itemAt = useCallback(() => item, [item]);
 	const {onMouseLeave: onMenuMouseLeave, ...menuHold} = useItemMenuHold(itemAt, menuOptions);
 
+	// Only home cards track focus, for their marquee, so other cards don't render again on every move.
+	const [focused, setFocused] = useState(false);
+
 	const handleFocus = useCallback(() => {
 		if (focusTimeoutRef.current) {
 			clearTimeout(focusTimeoutRef.current);
@@ -234,7 +238,13 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 			onFocusItem?.(item);
 		}, 50);
 		onPreviewFocus();
-	}, [item, onFocusItem, onPreviewFocus]);
+		if (homeText) setFocused(true);
+	}, [item, onFocusItem, onPreviewFocus, homeText]);
+
+	const handleBlur = useCallback(() => {
+		onPreviewBlur();
+		setFocused(false);
+	}, [onPreviewBlur]);
 
 	// The menu hold watches the pointer leaving too, so both hear it.
 	const handleMouseLeave = useCallback((e) => {
@@ -275,8 +285,17 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 		return null;
 	}, [item.Type, item.AlbumArtist, item.AlbumArtists, item.Artists]);
 
+	// Classic home rows give a movie or series its year as the second line.
+	const yearInfo = homeText && (item.Type === 'Movie' || item.Type === 'Series') && item.ProductionYear
+		? String(item.ProductionYear)
+		: null;
+	// A home card's line that doesn't fit scrolls while the card has focus.
+	const line = (className, text) => (homeText
+		? <LoopMarquee className={className} text={text} active={focused} />
+		: <div className={className}>{text}</div>);
+
 	// The zoom comes off while the video shows so the card holds still under it.
-	const cardClass = `${css.card} ${isBanner ? css.banner : isLandscape ? css.landscape : isSquare ? css.square : css.portrait}${isCircle ? ' ' + css.circle : ''}${settings.cardFocusZoom ? '' : ' ' + css.noZoom}${previewPhase === 'playing' ? ' ' + css.previewing : ''}${current ? ' ' + css.current : ''}`;
+	const cardClass = `${css.card} ${isBanner ? css.banner : isLandscape ? css.landscape : isSquare ? css.square : css.portrait}${isCircle ? ' ' + css.circle : ''}${settings.cardFocusZoom ? '' : ' ' + css.noZoom}${previewPhase === 'playing' ? ' ' + css.previewing : ''}${current ? ' ' + css.current : ''}${homeText ? ' ' + css.homeText : ''}`;
 
 	const sizeMultiplier = POSTER_SIZE_MULTIPLIERS[settings.homeRowsPosterSize] || 1;
 	const shapeKey = isBanner ? 'banner' : isLandscape ? 'landscape' : isSquare ? 'square' : 'portrait';
@@ -295,7 +314,7 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 		: imgSizeStyle;
 
 	return (
-		<SpottableDiv {...menuHold} className={cardClass} data-media-card onClick={handleClick} onFocus={handleFocus} onBlur={onPreviewBlur} onMouseEnter={onPreviewFocus} onMouseLeave={handleMouseLeave} style={sizeStyle} spotlightId={spotlightId} onSpotlightLeft={onSpotlightLeft} onSpotlightRight={onSpotlightRight}>
+		<SpottableDiv {...menuHold} className={cardClass} data-media-card onClick={handleClick} onFocus={handleFocus} onBlur={handleBlur} onMouseEnter={onPreviewFocus} onMouseLeave={handleMouseLeave} style={sizeStyle} spotlightId={spotlightId} onSpotlightLeft={onSpotlightLeft} onSpotlightRight={onSpotlightRight}>
 			<div className={previewPhase !== 'idle' ? `${css.imageContainer} ${css.previewHost}` : css.imageContainer} data-card-art>
 				{imageUrl ? (
 					<>
@@ -376,24 +395,24 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 
 			<div className={css.info}>
 				{isBanner ? (
-					<div className={css.title}>{[displayTitle, episodeInfo || musicInfo || item.Subtitle].filter(Boolean).join('  \u2022  ')}</div>
+					line(css.title, [displayTitle, episodeInfo || musicInfo || item.Subtitle].filter(Boolean).join('  \u2022  '))
 				) : episodeInfo ? (
 					<>
-						<div className={css.seriesName}>{displayTitle}</div>
-						<div className={css.episodeInfo}>{episodeInfo}</div>
+						{line(css.seriesName, displayTitle)}
+						{line(css.episodeInfo, episodeInfo)}
 					</>
 				) : musicInfo ? (
 					<>
-						<div className={css.title}>{displayTitle}</div>
-						<div className={css.episodeInfo}>{musicInfo}</div>
+						{line(css.title, displayTitle)}
+						{line(css.episodeInfo, musicInfo)}
 					</>
-				) : item.Subtitle ? (
+				) : (yearInfo || item.Subtitle) ? (
 					<>
-						<div className={css.title}>{displayTitle}</div>
-						<div className={css.episodeInfo}>{item.Subtitle}</div>
+						{line(css.title, displayTitle)}
+						{line(css.episodeInfo, yearInfo || item.Subtitle)}
 					</>
 				) : (
-					<div className={css.title}>{displayTitle}</div>
+					line(css.title, displayTitle)
 				)}
 			</div>
 		</SpottableDiv>

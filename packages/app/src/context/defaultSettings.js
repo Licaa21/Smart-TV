@@ -66,7 +66,8 @@ export const defaultSettings = {
 	preferTextSubtitles: false,
 	preferExternalSubtitles: false,
 	// The second subtitle track's settings, synced like the rest so the plugin can hold a default. A size of 0 and an
-	// empty color follow the first track.
+	// empty color follow the first track. The switch for it is upstream's and stays on this device.
+	secondarySubtitlesEnabled: false,
 	preferredSecondarySubtitleLanguage: '',
 	secondarySubtitleSize: 0,
 	secondarySubtitleOffset: 8,
@@ -157,6 +158,7 @@ export const defaultSettings = {
 	showFavoritesButton: true,
 	showLiveTvButton: true,
 	showLibrariesInToolbar: true,
+	showLibrariesIndividually: false,
 	mergeContinueWatchingNextUp: true,
 	continueWatchingDefaultAction: 'details',
 	mergeRecentRowsByType: false,
@@ -194,6 +196,16 @@ export const defaultSettings = {
 	mdblistEnabled: true,
 	mdblistRatingSources: ['stars', 'imdb', 'tmdb', 'tomatoes', 'metacritic'],
 	tmdbEpisodeRatingsEnabled: true,
+	// Home rows start with labels off so their info area stays compact.
+	homeRowsMdblistEnabled: true,
+	homeRowsMdblistRatingSources: ['stars', 'imdb', 'tmdb', 'tomatoes', 'metacritic'],
+	homeRowsTmdbEpisodeRatingsEnabled: true,
+	homeRowsShowRatingLabels: false,
+	homeRowsShowRatingBadges: true,
+	mediaBarMdblistEnabled: true,
+	mediaBarMdblistRatingSources: ['stars', 'imdb', 'tmdb', 'tomatoes', 'metacritic'],
+	mediaBarShowRatingLabels: true,
+	mediaBarShowRatingBadges: true,
 	imdbTop250MoviesEnabled: false,
 	imdbTop250TvShowsEnabled: false,
 	imdbMostPopularMoviesEnabled: false,
@@ -270,8 +282,17 @@ export const defaultSettings = {
 	cardFocusZoom: true,
 	useDetailedSubHeadings: true,
 	showMediaDetailsOnLibraryPage: true,
+	libraryCardTitles: true,
+	// Null until someone picks a size, so library grids follow the home card size.
+	libraryPosterSize: null,
+	playlistPosterSize: null,
+	// Follows the library size until one is picked on the Seerr browse screen, and doesn't sync.
+	seerrPosterSize: null,
+	// Not synced, so each device keeps its own.
+	showAlphabeticalFilters: false,
 	libraryStyle: 'classic',
 	bookLibraryStyle: 'bookstore',
+	showBookDiscoverTab: true,
 	musicLibraryStyle: 'immersive',
 	hideBackdropsInLibraries: false,
 	useSeriesThumbnails: false,
@@ -282,7 +303,7 @@ export const defaultSettings = {
 	previewVolume: 100,
 	homeRowsPosterSize: 'default',
 	classicHomeRowsPadding: 30,
-	modernHomeRowsPadding: 420,
+	modernHomeRowsPadding: 360,
 	homeRowsImageType: 'poster',
 	// Per row overrides keyed by row id. An absent id uses the global type above.
 	homeRowImageTypes: {},
@@ -297,7 +318,6 @@ export const defaultSettings = {
 	detailUseSeriesThumbnails: false,
 	hideHomeMediaDescription: false,
 	homeRowOverlay: true,
-	folderViewMode: 'local',
 	excludedGenres: [],
 	autoAdvance: true,
 	autoAdvanceInterval: 8,
@@ -321,6 +341,7 @@ export const defaultSettings = {
 	replaceSkipOutroWithNextUp: false,
 	seasonalTheme: 'none',
 	seasonalDensity: 'normal',
+	seasonalFollower: true,
 	themeMusicEnabled: false,
 	themeMusicVolume: 30,
 	themeMusicOnHomeRows: false,

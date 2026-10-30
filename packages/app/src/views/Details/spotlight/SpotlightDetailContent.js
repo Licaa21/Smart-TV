@@ -5,6 +5,7 @@ import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDeco
 import {isMdblistEnabled} from '../../../services/mdblistApi';
 
 import RatingsRow from '../../../components/RatingsRow';
+import {IncompleteDetailLine} from '../../../components/IncompleteBadge';
 import {SeerrStatusBadge, SeerrDownloadBars} from '../../../components/seerr/SeerrStatusBadge';
 import {seerrChipCount} from '../../../components/seerr/SeerrSections';
 import {DETAIL_ICON_PATHS} from '../detailIcons';
@@ -310,7 +311,7 @@ const SpotlightDetailContent = (props) => {
 	const hideMediaDescription = hidesMediaDescription(item, settings) || (isPerson && !showsSection('biography'));
 
 	const renderVersionBadge = () => {
-		if (!hasMultipleVersions || !mediaSource) return null;
+		if (!hasMultipleVersions || !mediaSource || !showsSection('versionBadge')) return null;
 		const versionName = mediaSource.Name || $L('Default');
 		return (
 			<span className={css.versionBadge}>
@@ -420,6 +421,7 @@ const SpotlightDetailContent = (props) => {
 							})}
 						</div>
 					)}
+					{!isPerson && <IncompleteDetailLine itemId={item.Id} clockDisplay={settings.clockDisplay} />}
 					{!isPerson && <AnimeItemPills item={item} serverUrl={effectiveServerUrl} large />}
 					{hasTech && !isPerson && (
 						<div className={css.techRow}>

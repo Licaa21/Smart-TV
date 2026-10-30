@@ -35,6 +35,16 @@
 // Frosted panel matching moonfin-core. backdrop-filter needs Chrome 76 and the
 // floor here is 38, so the tint carries legibility on its own and blur is layered
 // on only where it exists.
+// A row with its items centered across it
+.flex-center() {
+	display: -webkit-box;
+	display: -webkit-flex;
+	display: flex;
+	-webkit-box-align: center;
+	-webkit-align-items: center;
+	align-items: center;
+}
+
 .glass-panel(@radius: 16px) {
 	border-radius: @radius;
 	border: 1px solid rgba(255, 255, 255, 0.16);

@@ -18,10 +18,11 @@ const clampBlur = (amount) => {
 const SHARP_LOOK = {WebkitFilter: 'none', filter: 'none', top: 0, left: 0, width: '100%', height: '100%'};
 // The oversize of a layer that is blurred by a filter or by the server, which hides the edges it darkens
 const OVERSIZE_LOOK = {top: '', left: '', width: '', height: ''};
+const FADE_CLASS = {corner: css.cornerFadeDown, top: css.topFade};
 
 // settleMs is how long focus rests before the picture is asked for. fadeWhileMovingMs, when set, fades the picture on screen
 // out once focus has kept moving that long without resting, so a picture is not left behind a card it does not belong to.
-const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, inCorner, scrimWhenEmpty = true, settleMs = BACKDROP_DEBOUNCE_MS, fadeWhileMovingMs = 0}) => {
+const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, placement, scrimWhenEmpty = true, settleMs = BACKDROP_DEBOUNCE_MS, fadeWhileMovingMs = 0}) => {
 	const blurredUrl = serverBlurredUrl(requestedUrl, blurAmount);
 	const targetUrl = blurredUrl || requestedUrl;
 	// A picture the server cannot blur is made soft by the screen, at any performance level
@@ -155,8 +156,8 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 	return (
 		<div className={css.globalBackdrop}>
 			{/* The frames stay mounted either way, so the layers keep the picture they hold */}
-			<div className={inCorner ? css.cornerFadeLeft : css.fill}>
-				<div className={inCorner ? css.cornerFadeDown : css.fill}>
+			<div className={placement === 'corner' ? css.cornerFadeLeft : css.fill}>
+				<div className={FADE_CLASS[placement] || css.fill}>
 					<div
 						ref={layerARef}
 						className={css.globalBackdropImage}

@@ -206,13 +206,15 @@ const Browse = ({
 	const RowComponent = useModernRows ? ModernMediaRow : ClassicMediaRow;
 	const showTopInfoArea = !useModernRows && settings.homeRowOverlay !== false;
 	// The other clients size these sliders in their own units, so the stored value
-	// lands here as the space below each row. Full screen rows pace themselves.
+	// lands here as the space below each row. Classic rows count from the slider's
+	// lowest step, so they sit a little closer at every setting. Full screen rows pace
+	// themselves.
 	const rowSpacing = settings.fullScreenRows ? null : useModernRows
 		? modernRowSpacing(settings)
-		: Math.max(0, settings.classicHomeRowsPadding ?? 30);
+		: Math.max(0, (settings.classicHomeRowsPadding ?? 30) - 10);
 
 	const {
-		isLoading, browseMode, allRowData, featuredItems: loadedFeaturedItems, pendingSections,
+		isLoading, browseMode, allRowData, featuredItems: loadedFeaturedItems, pendingSections, emptySections,
 		setBrowseMode, fetchFreshFeaturedItems, refreshVolatileData, loadSectionsNear
 	} = useBrowseData({
 		api,
@@ -289,13 +291,14 @@ const Browse = ({
 			pluginSectionsConfig,
 			settings: rowBuildSettings,
 			pendingSections,
-			pendingRows
+			pendingRows,
+			emptySections
 		});
 		const prev = prevFilteredRowsRef.current;
 		if (sameRowList(prev, result)) return prev;
 		prevFilteredRowsRef.current = result;
 		return result;
-	}, [allRowData, seerrRows, externalRows, homeRowsConfig, pluginSectionsConfig, rowBuildSettings, pendingSections, pendingRows]);
+	}, [allRowData, seerrRows, externalRows, homeRowsConfig, pluginSectionsConfig, rowBuildSettings, pendingSections, pendingRows, emptySections]);
 	// The rows can come back from a cache built before the watched state last moved, so what's
 	// known now is laid over them rather than fetched again.
 	const filteredRows = useUserDataRows(builtRows);
@@ -924,7 +927,7 @@ const Browse = ({
 				<BackdropLayer
 					targetUrl={useModernRows && browseMode === 'rows' ? '' : targetBackdropUrl}
 					blurAmount={settings.backdropBlurHome}
-					inCorner={homeBackdropStyle(settings) === 'corner'}
+					placement={homeBackdropStyle(settings)}
 				/>
 				{useModernRows && <FocusBackdrop ref={focusBackdropRef} serverUrl={serverUrl} active={browseMode === 'rows'} />}
 
@@ -1121,6 +1124,7 @@ const Browse = ({
 								registerRowRef={registerRowRef}
 								deferImages={!NATIVE_LAZY_IMAGES && index >= imageRows}
 								menuOptions={rowMenuOptions}
+								ratingsSurface='homeRows'
 							/>
 						);
 					})}

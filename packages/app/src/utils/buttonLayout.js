@@ -28,7 +28,7 @@ export const DETAIL_BUTTONS = [
 	{id: 'subtitles', label: 'Subtitle'},
 	{id: 'playbackInfo', label: 'Playback Info'},
 	{id: 'trailer', label: 'Trailer'},
-	{id: 'watchWithGroup', label: 'Watch with group'},
+	{id: 'watchWithGroup', label: 'Watch with group', subtitle: "Only shows while you're in a SyncPlay group"},
 	{id: 'watched', label: 'Mark Watched'},
 	{id: 'favorite', label: 'Favorite'},
 	{id: 'personalRating', label: 'Rate'},
@@ -40,6 +40,7 @@ export const DETAIL_BUTTONS = [
 	{id: 'seerrWatchlist', label: 'Watchlist'},
 	{id: 'seerrReportIssue', label: 'Report Issue'},
 	{id: 'seerrManage', label: 'Manage Requests'},
+	{id: 'keepAsComplete', label: 'Keep as Complete'},
 	{id: 'admin', label: 'Admin Controls'}
 ];
 

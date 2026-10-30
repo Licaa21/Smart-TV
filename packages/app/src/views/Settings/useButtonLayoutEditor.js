@@ -9,11 +9,12 @@ import {
 } from '../../utils/detailMetadataLayout';
 import {AUDIO_CODECS, AUDIO_CODEC_ORDER_KEY} from '../../utils/audioCodecs';
 import {editedListKey} from './settingsRows';
+import {canKeepAsComplete} from '../../services/incompleteRecordings';
 
 // The details row, the player controls, and the details metadata row are arranged the same way,
 // so one view drives all three and only the storage keys and catalogue differ. The audio codec
 // ranking rides on it too, as an order with nothing to switch off.
-const buttonLayoutKeys = (kind) => {
+const buttonLayoutKeys = (kind, hasLiveTv) => {
 	if (kind === 'audioCodec') {
 		return {catalogue: AUDIO_CODECS, orderKey: AUDIO_CODEC_ORDER_KEY, hiddenKey: null};
 	}
@@ -23,7 +24,11 @@ const buttonLayoutKeys = (kind) => {
 	if (kind === 'metadata') {
 		return {catalogue: DETAIL_METADATA, orderKey: DETAIL_METADATA_ORDER_KEY, hiddenKey: DETAIL_METADATA_HIDDEN_KEY};
 	}
-	return {catalogue: DETAIL_BUTTONS, orderKey: DETAIL_ORDER_KEY, hiddenKey: DETAIL_HIDDEN_KEY};
+	// Keep as Complete is only offered when the server has Live TV, its plugin tracks incomplete
+	// recordings and the user can manage them. A save still keeps its place, since ids outside the
+	// catalogue are carried through.
+	const catalogue = canKeepAsComplete() && hasLiveTv ? DETAIL_BUTTONS : DETAIL_BUTTONS.filter((item) => item.id !== 'keepAsComplete');
+	return {catalogue, orderKey: DETAIL_ORDER_KEY, hiddenKey: DETAIL_HIDDEN_KEY};
 };
 
 const returnFocusMap = {
@@ -35,20 +40,20 @@ const returnFocusMap = {
 
 // Edits go to a scratch copy that's written back once the screen closes, and only if it ended up
 // different, so stepping through the list doesn't redraw the screens that read it at every press.
-const useButtonLayoutEditor = ({settings, updateSettings, pushView}) => {
+const useButtonLayoutEditor = ({settings, updateSettings, pushView, hasLiveTv}) => {
 	const [tempButtons, setTempButtons] = useState([]);
 	const [buttonLayoutKind, setButtonLayoutKind] = useState('detail');
 	const openedRef = useRef('');
 
 	const openButtonLayout = useCallback((kind) => {
-		const {catalogue, orderKey, hiddenKey} = buttonLayoutKeys(kind);
+		const {catalogue, orderKey, hiddenKey} = buttonLayoutKeys(kind, hasLiveTv);
 		const off = hiddenSet(hiddenKey ? settings[hiddenKey] : []);
 		const buttons = ordered(catalogue, settings[orderKey]).map((btn) => ({...btn, enabled: !off.has(btn.id)}));
 		openedRef.current = editedListKey(buttons);
 		setButtonLayoutKind(kind);
 		setTempButtons(buttons);
 		pushView({view: 'buttonLayout', returnFocusTo: returnFocusMap[kind] || 'setting-detailButtons'});
-	}, [settings, pushView]);
+	}, [settings, pushView, hasLiveTv]);
 
 	const openDetailButtons = useCallback(() => openButtonLayout('detail'), [openButtonLayout]);
 	const openOsdButtons = useCallback(() => openButtonLayout('osd'), [openButtonLayout]);
@@ -58,7 +63,7 @@ const useButtonLayoutEditor = ({settings, updateSettings, pushView}) => {
 	const commitButtonLayout = useCallback(() => {
 		if (editedListKey(tempButtons) === openedRef.current) return;
 		openedRef.current = editedListKey(tempButtons);
-		const {catalogue, orderKey, hiddenKey} = buttonLayoutKeys(buttonLayoutKind);
+		const {catalogue, orderKey, hiddenKey} = buttonLayoutKeys(buttonLayoutKind, hasLiveTv);
 		if (!hiddenKey) {
 			updateSettings({[orderKey]: tempButtons.map((btn) => btn.id)});
 			return;
@@ -72,11 +77,11 @@ const useButtonLayoutEditor = ({settings, updateSettings, pushView}) => {
 			{order: settings[orderKey], hidden: settings[hiddenKey]}
 		);
 		updateSettings({[orderKey]: merged.order, [hiddenKey]: merged.hidden});
-	}, [buttonLayoutKind, tempButtons, settings, updateSettings]);
+	}, [buttonLayoutKind, tempButtons, settings, updateSettings, hasLiveTv]);
 
 	const resetButtonLayout = useCallback(() => {
-		setTempButtons(buttonLayoutKeys(buttonLayoutKind).catalogue.map((btn) => ({...btn, enabled: true})));
-	}, [buttonLayoutKind]);
+		setTempButtons(buttonLayoutKeys(buttonLayoutKind, hasLiveTv).catalogue.map((btn) => ({...btn, enabled: true})));
+	}, [buttonLayoutKind, hasLiveTv]);
 
 	const toggleLayoutButton = useCallback((id) => {
 		setTempButtons((prev) => prev.map((btn) => (btn.id === id ? {...btn, enabled: !btn.enabled} : btn)));

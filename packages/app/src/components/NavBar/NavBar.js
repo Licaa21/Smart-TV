@@ -10,7 +10,7 @@ import {useServerMessages} from '../../context/ServerMessagesContext';
 import {useAchievements} from '../../context/AchievementsContext';
 import SeerrIcon from '../icons/SeerrIcon';
 import SyncPlayIcon from '../icons/SyncPlayIcon';
-import {FavoritesIcon, FriendsIcon, GenresIcon, HomeIcon, LiveTvIcon, MessagesIcon, SearchIcon, SettingsIcon, ShuffleIcon} from '../icons/navIcons';
+import {FavoritesIcon, FriendsIcon, GenresIcon, HomeIcon, LiveTvIcon, MessagesIcon, SearchIcon, SettingsIcon, ShuffleIcon, libraryNavIcon} from '../icons/navIcons';
 import useClock from '../../hooks/useClock';
 import {librariesForNav} from '../../utils/liveTvLibrary';
 import {isKidsMode} from '../../utils/kidsMode';
@@ -25,6 +25,13 @@ import NavPillButton from './NavPillButton';
 import NavUserButton from './NavUserButton';
 
 import css from './NavBar.module.less';
+
+// A library as a pill of its own, for Show Libraries Individually. It holds the library itself
+// rather than its id, since two servers, or two users of one server, can list the same id.
+const NavLibraryPill = ({library, slot, onSelectLibrary}) => {
+	const handleClick = useCallback(() => onSelectLibrary?.(library), [library, onSelectLibrary]);
+	return <NavPillButton Icon={libraryNavIcon(library)} slot={slot} label={library.Name} onClick={handleClick} />;
+};
 
 const NavContainer = SpotlightContainerDecorator({
 	enterTo: 'default-element',
@@ -172,7 +179,16 @@ const NavBar = ({
 						<NavPillButton Icon={SeerrIcon} slot={nextSlot()} label={displayName} onClick={onDiscover} spotlightId="navbar-discover" />
 					)}
 
-					{showLibraries && (
+					{showLibraries && (settings.showLibrariesIndividually === true ? (
+						navLibraries.map((library) => (
+							<NavLibraryPill
+								key={`${library._serverId || ''}:${library._serverUserId || ''}:${library.Id}`}
+								library={library}
+								slot={nextSlot()}
+								onSelectLibrary={onSelectLibrary}
+							/>
+						))
+					) : (
 						<NavLibraries
 							libraries={navLibraries}
 							slot={nextSlot()}
@@ -181,7 +197,7 @@ const NavBar = ({
 							leftTargetId={librariesLeftTargetId}
 							onMenuOpen={setLibraryMenuOpen}
 						/>
-					)}
+					))}
 
 					{showMessages && (
 						<NavPillButton Icon={MessagesIcon} slot={nextSlot()} label={$L('Messages')} onClick={onMessages} spotlightId="navbar-messages" badge={unreadCount} />
