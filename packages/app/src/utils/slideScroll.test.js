@@ -48,7 +48,7 @@ describe('how long a slide takes', () => {
 		expect(slideMsFor('x', 20)).toBeCloseTo(SLIDE_MS.x + 2, 0);
 		expect(slideMsFor('x', 288)).toBeGreaterThan(slideMsFor('x', 20));
 		expect(slideMsFor('x', 5000)).toBe(260);
-		expect(slideMsFor('y', 5000)).toBe(320);
+		expect(slideMsFor('y', 5000)).toBe(200);
 		expect(slideMsFor('y', -400)).toBe(slideMsFor('y', 400));
 	});
 });

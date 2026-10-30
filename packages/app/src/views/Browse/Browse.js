@@ -478,7 +478,9 @@ const Browse = ({
 		return -1;
 	}, []);
 
-	const handleNavigateUp = useCallback((fromRowIndex) => {
+	// closeRow, from a row that grows with the card in focus, closes it before the list is scrolled, so the list is scrolled
+	// once, to where it ends up, and not for a row that is about to shrink
+	const handleNavigateUp = useCallback((fromRowIndex, closeRow) => {
 		const targetIndex = focusableRowFrom(fromRowIndex - 1, -1);
 		if (targetIndex < 0) {
 			if (showFeaturedBar !== false && featuredItems.length > 0) {
@@ -489,6 +491,7 @@ const Browse = ({
 			}
 			return;
 		}
+		if (closeRow) closeRow();
 		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current));
 	}, [showFeaturedBar, featuredItems.length, settings.navbarPosition, scrollToRow, setBrowseMode, focusableRowFrom]);
 
@@ -517,9 +520,10 @@ const Browse = ({
 		};
 	}, [isLoading]);
 
-	const handleNavigateDown = useCallback((fromRowIndex) => {
+	const handleNavigateDown = useCallback((fromRowIndex, closeRow) => {
 		const targetIndex = focusableRowFrom(fromRowIndex + 1, 1);
 		if (targetIndex < 0) return;
+		if (closeRow) closeRow();
 		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current));
 	}, [scrollToRow, focusableRowFrom]);
 
