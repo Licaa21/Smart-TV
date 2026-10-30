@@ -73,29 +73,30 @@ import m66 from '../views/LiveTV/LiveTV.module.less';
 import m67 from '../views/Login/Login.module.less';
 import m68 from '../views/MusicBrowse/MusicBrowse.module.less';
 import m69 from '../views/MusicBrowse/MusicChips.module.less';
-import m70 from '../views/MusicBrowse/MusicHero.module.less';
-import m71 from '../views/Player/ChannelCarousel.module.less';
-import m72 from '../views/Player/EpisodeBrowser.module.less';
-import m73 from '../views/Player/NextUpOverlay.module.less';
-import m74 from '../views/Player/Player.module.less';
-import m75 from '../views/Player/SkipSegmentOverlay.module.less';
-import m76 from '../views/Player/StillWatchingDialog.module.less';
-import m77 from '../views/Player/TizenPlayer.module.less';
-import m78 from '../views/Player/WebOSPlayer.module.less';
-import m79 from '../views/Player/audio/AudioMode.module.less';
-import m80 from '../views/Player/audio/AudioQualityBadge.module.less';
-import m81 from '../views/Player/audio/LyricsPanel.module.less';
-import m82 from '../views/Player/audio/QueuePanel.module.less';
-import m83 from '../views/Recordings/Recordings.module.less';
-import m84 from '../views/Search/Search.module.less';
-import m85 from '../views/SeerrBrowse/SeerrBrowse.module.less';
-import m86 from '../views/SeerrCollection/SeerrCollection.module.less';
-import m87 from '../views/SeerrDiscover/SeerrDiscover.module.less';
-import m88 from '../views/SeerrPerson/SeerrPerson.module.less';
-import m89 from '../views/SeerrRequests/SeerrRequests.module.less';
-import m90 from '../views/Settings/Settings.module.less';
-import m91 from '../views/Settings/achievements/Achievements.module.less';
-import m92 from '../views/Settings/friends/Friends.module.less';
+import m70 from '../views/MusicBrowse/MusicFilterPanel.module.less';
+import m71 from '../views/MusicBrowse/MusicHero.module.less';
+import m72 from '../views/Player/ChannelCarousel.module.less';
+import m73 from '../views/Player/EpisodeBrowser.module.less';
+import m74 from '../views/Player/NextUpOverlay.module.less';
+import m75 from '../views/Player/Player.module.less';
+import m76 from '../views/Player/SkipSegmentOverlay.module.less';
+import m77 from '../views/Player/StillWatchingDialog.module.less';
+import m78 from '../views/Player/TizenPlayer.module.less';
+import m79 from '../views/Player/WebOSPlayer.module.less';
+import m80 from '../views/Player/audio/AudioMode.module.less';
+import m81 from '../views/Player/audio/AudioQualityBadge.module.less';
+import m82 from '../views/Player/audio/LyricsPanel.module.less';
+import m83 from '../views/Player/audio/QueuePanel.module.less';
+import m84 from '../views/Recordings/Recordings.module.less';
+import m85 from '../views/Search/Search.module.less';
+import m86 from '../views/SeerrBrowse/SeerrBrowse.module.less';
+import m87 from '../views/SeerrCollection/SeerrCollection.module.less';
+import m88 from '../views/SeerrDiscover/SeerrDiscover.module.less';
+import m89 from '../views/SeerrPerson/SeerrPerson.module.less';
+import m90 from '../views/SeerrRequests/SeerrRequests.module.less';
+import m91 from '../views/Settings/Settings.module.less';
+import m92 from '../views/Settings/achievements/Achievements.module.less';
+import m93 from '../views/Settings/friends/Friends.module.less';
 
 export const MODULES = {
 	'components/AccountModal/AccountModal.module.less': m0,
@@ -168,29 +169,30 @@ export const MODULES = {
 	'views/Login/Login.module.less': m67,
 	'views/MusicBrowse/MusicBrowse.module.less': m68,
 	'views/MusicBrowse/MusicChips.module.less': m69,
-	'views/MusicBrowse/MusicHero.module.less': m70,
-	'views/Player/ChannelCarousel.module.less': m71,
-	'views/Player/EpisodeBrowser.module.less': m72,
-	'views/Player/NextUpOverlay.module.less': m73,
-	'views/Player/Player.module.less': m74,
-	'views/Player/SkipSegmentOverlay.module.less': m75,
-	'views/Player/StillWatchingDialog.module.less': m76,
-	'views/Player/TizenPlayer.module.less': m77,
-	'views/Player/WebOSPlayer.module.less': m78,
-	'views/Player/audio/AudioMode.module.less': m79,
-	'views/Player/audio/AudioQualityBadge.module.less': m80,
-	'views/Player/audio/LyricsPanel.module.less': m81,
-	'views/Player/audio/QueuePanel.module.less': m82,
-	'views/Recordings/Recordings.module.less': m83,
-	'views/Search/Search.module.less': m84,
-	'views/SeerrBrowse/SeerrBrowse.module.less': m85,
-	'views/SeerrCollection/SeerrCollection.module.less': m86,
-	'views/SeerrDiscover/SeerrDiscover.module.less': m87,
-	'views/SeerrPerson/SeerrPerson.module.less': m88,
-	'views/SeerrRequests/SeerrRequests.module.less': m89,
-	'views/Settings/Settings.module.less': m90,
-	'views/Settings/achievements/Achievements.module.less': m91,
-	'views/Settings/friends/Friends.module.less': m92
+	'views/MusicBrowse/MusicFilterPanel.module.less': m70,
+	'views/MusicBrowse/MusicHero.module.less': m71,
+	'views/Player/ChannelCarousel.module.less': m72,
+	'views/Player/EpisodeBrowser.module.less': m73,
+	'views/Player/NextUpOverlay.module.less': m74,
+	'views/Player/Player.module.less': m75,
+	'views/Player/SkipSegmentOverlay.module.less': m76,
+	'views/Player/StillWatchingDialog.module.less': m77,
+	'views/Player/TizenPlayer.module.less': m78,
+	'views/Player/WebOSPlayer.module.less': m79,
+	'views/Player/audio/AudioMode.module.less': m80,
+	'views/Player/audio/AudioQualityBadge.module.less': m81,
+	'views/Player/audio/LyricsPanel.module.less': m82,
+	'views/Player/audio/QueuePanel.module.less': m83,
+	'views/Recordings/Recordings.module.less': m84,
+	'views/Search/Search.module.less': m85,
+	'views/SeerrBrowse/SeerrBrowse.module.less': m86,
+	'views/SeerrCollection/SeerrCollection.module.less': m87,
+	'views/SeerrDiscover/SeerrDiscover.module.less': m88,
+	'views/SeerrPerson/SeerrPerson.module.less': m89,
+	'views/SeerrRequests/SeerrRequests.module.less': m90,
+	'views/Settings/Settings.module.less': m91,
+	'views/Settings/achievements/Achievements.module.less': m92,
+	'views/Settings/friends/Friends.module.less': m93
 };
 
 export const ACCENT_RULES = {
@@ -361,6 +363,11 @@ export const ACCENT_RULES = {
 		["views/MusicBrowse/MusicChips.module.less","",".{chip}:focus","background","{accent}"],
 		["views/MusicBrowse/MusicChips.module.less","",".{chip}:focus","border-color","{accent}"],
 		["views/MusicBrowse/MusicChips.module.less","",".{chip}:focus","box-shadow","0 0 14px 1px rgba({rgb}, 0.45)"],
+		["views/MusicBrowse/MusicFilterPanel.module.less","",".{option}:focus","border-color","{accent}"],
+		["views/MusicBrowse/MusicFilterPanel.module.less","",".{optionActive} .{radio}","border-color","{accent}"],
+		["views/MusicBrowse/MusicFilterPanel.module.less","",".{radioFill}","background","{accent}"],
+		["views/MusicBrowse/MusicFilterPanel.module.less","",".{optionActive} .{check}","border-color","{accent}"],
+		["views/MusicBrowse/MusicFilterPanel.module.less","",".{optionActive} .{check}","background","{accent}"],
 		["views/MusicBrowse/MusicHero.module.less","",".{hero}:focus","border-color","{accent}"],
 		["views/MusicBrowse/MusicHero.module.less","",".{hero}:focus","box-shadow","0 0 18px 1px rgba({rgb}, 0.47)"],
 		["views/MusicBrowse/MusicHero.module.less","",".{kicker}","color","{accent}"],

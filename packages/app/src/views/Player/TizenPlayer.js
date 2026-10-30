@@ -2503,7 +2503,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	}, []);
 
 	const {
-		skipSegment, suppressSeekPrompts, showSkipCredits, showNextEpisode, nextEpisodeCountdown,
+		skipSegment, skipPromptShown, suppressSeekPrompts, showSkipCredits, showNextEpisode, nextEpisodeCountdown,
 		handleSkipSegment, handlePlayNextNow, shouldHoldForStillWatching,
 		askStillWatching, handleStillWatchingContinue, handleStillWatchingStop, cancelNextEpisodeCountdown,
 		checkSegments, handlePopupKeyDown, resetPopups, noteViewerActivity
@@ -4159,7 +4159,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				</NextEpisodeContainer>
 			)}
 
-			{skipSegment && !isAudioMode && !isLiveTV && !activeModal && (
+			{skipPromptShown && !isAudioMode && !isLiveTV && !activeModal && (
 				<SkipSegmentOverlay
 					key={skipSegment.start}
 					type={skipSegment.type}

@@ -20,6 +20,8 @@ const nearEndTicksOf = (autoPlay, nextUpTimeout) => (autoPlay ? (nextUpTimeout ?
 // The prompt's own button, which the key handler tells apart from the controls underneath.
 // How long after a skip a reading short of the segment's end is still the skip landing.
 const SKIP_SETTLE_MS = 5000;
+// How long after Back took the prompt down a second Back is left alone, so it does not also close the controls.
+const BACK_AFTER_DISMISS_MS = 500;
 
 export const SKIP_PROMPT_ID = 'skip-segment-btn';
 export const isSkipPromptFocused = () => {
@@ -55,6 +57,15 @@ const useSegmentPopups = ({
 }) => {
 	// The segment being offered right now, as {type, start, end, remainingSeconds, progress}.
 	const [skipSegment, setSkipSegment] = useState(null);
+	// The prompt's few seconds have run out. It is still the segment's prompt, and it shows again with the controls.
+	const [skipPromptLapsed, setSkipPromptLapsedState] = useState(false);
+	const promptLapsedRef = useRef(false);
+	const setSkipPromptLapsed = useCallback((lapsed) => {
+		promptLapsedRef.current = lapsed;
+		setSkipPromptLapsedState(lapsed);
+	}, []);
+	// A Back that took the prompt down is not taken twice, since the remote can send it again at once.
+	const backHeldUntilRef = useRef(0);
 	const [showSkipCredits, setShowSkipCredits] = useState(false);
 	const [showNextEpisode, setShowNextEpisode] = useState(false);
 	const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState(null);
@@ -157,6 +168,7 @@ const useSegmentPopups = ({
 
 	const resetPopups = useCallback(() => {
 		setSkipSegment(null);
+		setSkipPromptLapsed(false);
 		setShowSkipCredits(false);
 		setShowNextEpisode(false);
 		setNextEpisodeCountdown(null);
@@ -169,7 +181,7 @@ const useSegmentPopups = ({
 		// run out and was hidden the moment it appeared.
 		promptShownAtRef.current = null;
 		hasTriggeredNextEpisodeRef.current = false;
-	}, []);
+	}, [setSkipPromptLapsed]);
 
 	// --- Segment checking (call from timeupdate) ---
 
@@ -232,29 +244,28 @@ const useSegmentPopups = ({
 				if (autoSkip) {
 					handleSkipSegment(active);
 				} else {
-					// The prompt stops covering the picture after a while when asked to,
-					// and seeking back before the segment offers it again.
+					// The prompt stops covering the picture after a while when asked to. It is still the segment's
+					// prompt, and comes back with the controls until the segment ends. Seeking back before the
+					// segment offers it again with a fresh clock.
 					const autoHideSeconds = settings.mediaSegmentAutoHide === 's5' ? 5
 						: settings.mediaSegmentAutoHide === 's10' ? 10 : 0;
 					if (promptShownAtRef.current?.start !== active.start) {
 						promptShownAtRef.current = {start: active.start, at: Date.now()};
 					}
-					if (autoHideSeconds > 0 && Date.now() - promptShownAtRef.current.at > autoHideSeconds * 1000) {
-						dismissedSegmentsRef.current.add(active.start);
-						setSkipSegment((prev) => (prev ? null : prev));
-					} else {
-						skipPromptVisible = true;
-						const total = Math.max(1, (active.end - active.start) / 10000000);
-						const remaining = Math.max(0, Math.round((active.end - ticks) / 10000000));
-						setSkipSegment((prev) => (
-							prev && prev.type === active.type && prev.remainingSeconds === remaining
-								? prev
-								: {type: active.type, start: active.start, end: active.end, remainingSeconds: remaining, progress: remaining / total}
-						));
-					}
+					const lapsed = autoHideSeconds > 0 && Date.now() - promptShownAtRef.current.at > autoHideSeconds * 1000;
+					if (lapsed !== promptLapsedRef.current) setSkipPromptLapsed(lapsed);
+					skipPromptVisible = !lapsed;
+					const total = Math.max(1, (active.end - active.start) / 10000000);
+					const remaining = Math.max(0, Math.round((active.end - ticks) / 10000000));
+					setSkipSegment((prev) => (
+						prev && prev.type === active.type && prev.remainingSeconds === remaining
+							? prev
+							: {type: active.type, start: active.start, end: active.end, remainingSeconds: remaining, progress: remaining / total}
+					));
 				}
 			} else if (!active) {
 				promptShownAtRef.current = null;
+				if (promptLapsedRef.current) setSkipPromptLapsed(false);
 				setSkipSegment((prev) => (prev ? null : prev));
 			}
 
@@ -292,7 +303,7 @@ const useSegmentPopups = ({
 				if (!nearEnd) setShowNextEpisode(false);
 			}
 		}
-	}, [mediaSegments, settings.introAction, settings.nextUpBehavior, settings.outroAction, settings.replaceSkipOutroWithNextUp, settings.mediaSegmentAutoHide, settings.nextUpTimeout, settings.autoPlay, nextEpisode, currentIsPreroll, runTimeRef, handlePlayNextEpisode, handleSkipSegment]);
+	}, [mediaSegments, settings.introAction, settings.nextUpBehavior, settings.outroAction, settings.replaceSkipOutroWithNextUp, settings.mediaSegmentAutoHide, settings.nextUpTimeout, settings.autoPlay, nextEpisode, currentIsPreroll, runTimeRef, handlePlayNextEpisode, handleSkipSegment, setSkipPromptLapsed]);
 
 	// --- Bringing the prompt back by hand ---
 
@@ -300,7 +311,14 @@ const useSegmentPopups = ({
 	// after it was sent away or hid itself. False when there is nothing hidden to bring back, which leaves the key alone.
 	const reofferPrompt = useCallback(() => {
 		const ticks = lastTicksRef.current;
-		if (ticks == null || skipSegmentRef.current) return false;
+		if (ticks == null) return false;
+		if (skipSegmentRef.current) {
+			// A prompt whose few seconds ran out is still there, away. The key brings it back with a clock of its own again.
+			if (!promptLapsedRef.current) return false;
+			promptShownAtRef.current = null;
+			setSkipPromptLapsed(false);
+			return true;
+		}
 		// Only a segment that would really offer a prompt, the way checkSegments judges it
 		const introAction = settings.introAction || 'ask';
 		const outroAction = settings.outroAction || 'ask';
@@ -321,13 +339,15 @@ const useSegmentPopups = ({
 		}
 		if (found) checkSegments(ticks);
 		return found;
-	}, [mediaSegments, nextEpisode, runTimeRef, checkSegments, settings.introAction, settings.outroAction, settings.nextUpBehavior, settings.replaceSkipOutroWithNextUp, settings.nextUpTimeout, settings.autoPlay, currentIsPreroll]);
+	}, [mediaSegments, nextEpisode, runTimeRef, checkSegments, settings.introAction, settings.outroAction, settings.nextUpBehavior, settings.replaceSkipOutroWithNextUp, settings.nextUpTimeout, settings.autoPlay, currentIsPreroll, setSkipPromptLapsed]);
 
 	// --- Clearing the way for a popup ---
 
 	// Keyed on which segment it is, not the object, because that carries a countdown that ticks every second.
 	// The skip prompt shows over the controls and moves up out of their way, so it clears nothing.
 	const skipSegmentStart = skipSegment?.start ?? null;
+	// On screen unless its few seconds have run out and the controls are away.
+	const skipPromptShown = skipSegmentStart != null && (!skipPromptLapsed || controlsVisible);
 
 	useEffect(() => {
 		if (!(showSkipCredits || showNextEpisode) || !nextEpisode || activeModal) return;
@@ -359,7 +379,14 @@ const useSegmentPopups = ({
 			return true;
 		}
 
-		const skipPromptUp = skipSegmentStart != null && !activeModal;
+		// The Back that took the prompt down is over, and the next one is the player's
+		if (back && Date.now() < backHeldUntilRef.current) {
+			e.preventDefault();
+			e.stopPropagation();
+			return true;
+		}
+
+		const skipPromptUp = skipPromptShown && !activeModal;
 		const nextEpisodeVisible = (showSkipCredits || showNextEpisode) && nextEpisode && !activeModal && !controlsVisible;
 		const isEnter = key === 'Enter' || e.keyCode === 13;
 		const isUp = key === 'ArrowUp' || e.keyCode === 38;
@@ -376,6 +403,7 @@ const useSegmentPopups = ({
 				// any other key is the viewer reaching for the controls, which come up with the prompt still showing.
 				if (back) {
 					consume();
+					backHeldUntilRef.current = Date.now() + BACK_AFTER_DISMISS_MS;
 					dismissedSegmentsRef.current.add(skipSegmentStart);
 					setSkipSegment(null);
 					return true;
@@ -387,8 +415,16 @@ const useSegmentPopups = ({
 				}
 				return false;
 			}
-			// With the controls up, Back closes them and leaves the prompt, which is the player's own handling. Up from
-			// the playback bar reaches the prompt, and it stays put under the arrows until Down goes back to the bar.
+			// With the controls up, Back takes the prompt down before it closes them or leaves the player, the way
+			// Core's does.
+			if (back) {
+				consume();
+				backHeldUntilRef.current = Date.now() + BACK_AFTER_DISMISS_MS;
+				dismissedSegmentsRef.current.add(skipSegmentStart);
+				setSkipSegment(null);
+				return true;
+			}
+			// Up from the playback bar reaches the prompt, and it stays put under the arrows until Down goes back to the bar.
 			if (isSkipPromptFocused()) {
 				if (isDown) {
 					consume();
@@ -425,7 +461,7 @@ const useSegmentPopups = ({
 		e.preventDefault();
 		e.stopPropagation();
 		return true;
-	}, [askStillWatching, handleStillWatchingContinue, handleSkipSegment, reofferPrompt, focusRow, onLeavePromptDown, skipSegmentStart, showSkipCredits, showNextEpisode, nextEpisode, activeModal, controlsVisible, showControls, cancelNextEpisodeCountdown]);
+	}, [askStillWatching, handleStillWatchingContinue, handleSkipSegment, reofferPrompt, focusRow, onLeavePromptDown, skipSegmentStart, skipPromptShown, showSkipCredits, showNextEpisode, nextEpisode, activeModal, controlsVisible, showControls, cancelNextEpisodeCountdown]);
 
 	const suppressSeekPrompts = useCallback(() => {}, []);
 
@@ -434,6 +470,7 @@ const useSegmentPopups = ({
 		handleStillWatchingContinue,
 		handleStillWatchingStop,
 		skipSegment,
+		skipPromptShown,
 		showSkipCredits,
 		showNextEpisode,
 		nextEpisodeCountdown,
