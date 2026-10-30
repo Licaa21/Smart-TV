@@ -366,7 +366,7 @@ const DiscoverRow = memo(function DiscoverRow({
 			style={typeof rowSpacing === 'number' ? {marginBottom: rowSpacing} : undefined}
 		>
 			<h2 className={css.rowTitle}>{config.title}</h2>
-			<div className={css.rowScroller} ref={scrollerRef}>
+			<div className={css.rowScroller} ref={scrollerRef} data-slide-scroll="x">
 				<RowContainer
 					className={css.rowItems}
 					spotlightId={spotlightId}
@@ -794,6 +794,8 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 					<div
 						className={`${css.rowsContainer} ${showDetailSection || settings.navbarPosition === 'left' ? '' : css.rowsBelowNav}`}
 						ref={rowsContainerRef}
+						data-slide-scroll="y"
+						data-slide-content="children"
 					>
 						{visibleRows.map((config, index) => (
 							<DiscoverRow

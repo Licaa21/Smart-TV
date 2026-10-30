@@ -251,7 +251,7 @@ const ModernMediaRow = ({
 		>
 			<h2 className={css.title}>{title}</h2>
 			{subtitle && <div className={css.subtitle}>{subtitle}</div>}
-			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus}>
+			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus} data-slide-scroll="x">
 				<div className={css.items}>
 					{items.slice(0, limit).map((item, index) => {
 						const spotlightId = `media-${keyPrefix}-${item.Id}`;

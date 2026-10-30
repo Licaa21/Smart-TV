@@ -755,6 +755,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 									<h2 className={css.rowTitle}>{row.title}<span className={css.rowCount}> ({row.items.length})</span></h2>
 									<div
 										className={css.rowScroller}
+										data-slide-scroll="x"
 										ref={(el) => { scrollerRefs.current[row.id] = el; }}
 										onFocus={handleRowFocus(row.id, row.items.length)}
 									>
@@ -810,7 +811,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	return (
 		<div className={css.searchPage}>
 		<ScreenBackdrop item={backdropItem} serverUrl={serverUrl} />
-		<div ref={containerRef} className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : musicBar ? css.musicBarOffset : ''}`}>
+		<div ref={containerRef} className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : musicBar ? css.musicBarOffset : ''}`} data-slide-scroll="y" data-slide-content="children">
 			<div className={css.searchInputSection} onFocus={scrollToTop}>
 				<div
 					className={`${css.searchInputWrapper} ${searchInputFocused ? css.searchInputFocused : ''}`}

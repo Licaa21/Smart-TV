@@ -1034,6 +1034,8 @@ const Browse = ({
 					onBlur={handleRowsBlur}
 					style={rowPeek ? {height: rem(rowPeek)} : undefined}
 					data-pointer-rows
+					data-slide-scroll="y"
+					data-slide-content="children"
 				>
 					{filteredRows.map((row, index) => {
 						if (filling && Math.abs(index - landingIndex) > fillStep + 1) {

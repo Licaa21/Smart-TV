@@ -188,7 +188,7 @@ const MediaRow = ({
 		>
 			<h2 className={css.title}>{title}</h2>
 			{subtitle && <div className={css.subtitle}>{subtitle}</div>}
-			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus}>
+			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus} data-slide-scroll="x">
 				<div className={css.items}>
 						{onSeeAll && (
 							<SpottableDiv

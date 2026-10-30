@@ -171,7 +171,7 @@ const LibraryButtonRow = ({
 			onKeyDown={handleKeyDown}
 		>
 			<h2 className={css.title}>{title}</h2>
-			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus}>
+			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus} data-slide-scroll="x">
 				<div className={css.items}>
 					{items.map((item, index) => (
 						<LibraryButton

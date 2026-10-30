@@ -12,6 +12,7 @@ import {registerKeys, ESSENTIAL_KEY_NAMES, paceArrowKeys, watchArrowHolds} from 
 import {registerBlockedKeys} from './utils/blockedKeys';
 import serverLogger from './services/serverLogger';
 import {scrollAtPointerEdges} from './utils/pointerEdgeScroll';
+import {installSlideScroll} from './utils/slideScroll';
 import {setArtLogSink} from './components/MediaCard/artPrefetch';
 
 const enforceTizenViewport = () => {
@@ -59,6 +60,8 @@ if (typeof window !== 'undefined') {
 	setArtLogSink((message, context) => serverLogger.info('Navigation', message, context));
 	paceArrowKeys();
 	scrollAtPointerEdges();
+	// Rows and lists slide to where a key press scrolled them, and do not jump
+	installSlideScroll();
 	// The locale strings arrive in their own chunk, so hold the first render until
 	// they land. Otherwise the app paints English and swaps a frame later.
 	localeStringsReady.then(() => {
