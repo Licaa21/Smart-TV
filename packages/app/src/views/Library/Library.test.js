@@ -146,7 +146,6 @@ describe('the filters of a library', () => {
 		slowStorage();
 		render(<Library library={{Id: 'music1', Name: 'Music', CollectionType: 'music'}} backHandlerRef={{current: null}} />);
 		await settle();
-		expect(getFromStorage.mock.calls.filter(([key]) => /^library_filters_music1/.test(key)).length).toBeGreaterThanOrEqual(0);
 		expect(saveToStorage.mock.calls.filter(([key]) => /^library_filters_/.test(key))).toHaveLength(0);
 	});
 });
