@@ -89,7 +89,7 @@ describe('the auto hide of the skip prompt', () => {
 		for (let at = from + 1; at <= to; at += 1) act(() => result.current.checkSegments(at * SECOND));
 	};
 
-	const setupAutoHide = () => renderHook(() => useSegmentPopups({
+	const setupAutoHide = () => renderHook((current) => useSegmentPopups({
 		mediaSegments: {list: [{type: 'intro', start: 0, end: 60 * SECOND}]},
 		nextEpisode: null,
 		settings: {autoPlay: false, introAction: 'ask', mediaSegmentAutoHide: 's5'},
@@ -100,40 +100,51 @@ describe('the auto hide of the skip prompt', () => {
 		showControls: () => {},
 		onSeekToSegmentEnd: () => {},
 		onPlayNext: () => {},
-		onPausePlayback: () => {}
-	})).result;
+		onPausePlayback: () => {},
+		...current
+	}), {initialProps: {}});
 
-	test('hides the prompt after the time set', () => {
-		const result = setupAutoHide();
+	test('takes the prompt off the picture after the time set, and brings it back with the controls until the segment ends', () => {
+		const {result, rerender} = setupAutoHide();
 		act(() => result.current.checkSegments(1 * SECOND));
-		expect(result.current.skipSegment).not.toBeNull();
+		expect(result.current.skipPromptShown).toBe(true);
 		now += 6000;
 		playTo(result, 1, 7);
+		// Still the segment's prompt, but away while the controls are
+		expect(result.current.skipSegment).not.toBeNull();
+		expect(result.current.skipPromptShown).toBe(false);
+		rerender({controlsVisible: true});
+		expect(result.current.skipPromptShown).toBe(true);
+		rerender({controlsVisible: false});
+		expect(result.current.skipPromptShown).toBe(false);
+		// The segment ends, and so does the prompt
+		act(() => result.current.checkSegments(70 * SECOND));
 		expect(result.current.skipSegment).toBeNull();
+		expect(result.current.skipPromptShown).toBe(false);
 	});
 
 	test('the next episode gets its prompt even when its intro starts at the same tick', () => {
-		const result = setupAutoHide();
+		const {result} = setupAutoHide();
 		act(() => result.current.checkSegments(1 * SECOND));
 		now += 6000;
 		playTo(result, 1, 7);
-		expect(result.current.skipSegment).toBeNull();
+		expect(result.current.skipPromptShown).toBe(false);
 
 		// The next episode: a new load, then its intro at the same position as the last one's.
 		now += 120000;
 		act(() => result.current.resetPopups());
 		act(() => result.current.checkSegments(1 * SECOND));
-		expect(result.current.skipSegment).not.toBeNull();
+		expect(result.current.skipPromptShown).toBe(true);
 	});
 
 	test('an intro that comes round again after leaving it gets a fresh clock', () => {
-		const result = setupAutoHide();
+		const {result} = setupAutoHide();
 		act(() => result.current.checkSegments(1 * SECOND));
 		now += 6000;
 		act(() => result.current.checkSegments(70 * SECOND));
 		now += 60000;
 		act(() => result.current.checkSegments(2 * SECOND));
-		expect(result.current.skipSegment).not.toBeNull();
+		expect(result.current.skipPromptShown).toBe(true);
 	});
 });
 
@@ -204,9 +215,35 @@ describe('the skip prompt over the controls, on a seek and under the remote', ()
 		act(() => result.current.checkSegments(61 * SECOND));
 		now += 6000;
 		playTo(result, 61, 67);
-		expect(result.current.skipSegment).toBeNull();
+		expect(result.current.skipPromptShown).toBe(false);
 		act(() => result.current.checkSegments(62 * SECOND));
-		expect(result.current.skipSegment).not.toBeNull();
+		expect(result.current.skipPromptShown).toBe(true);
+	});
+
+	test('Back with the controls up takes the prompt down first, and the Back after it is left to the player', () => {
+		const {result} = setupPrompt({controlsVisible: true});
+		playTo(result, 60, 70);
+		let consumed;
+		act(() => { consumed = result.current.handlePopupKeyDown(key(BACK)); });
+		expect(consumed).toBe(true);
+		expect(result.current.skipSegment).toBeNull();
+		// A second Back that follows at once is swallowed too, so it does not also close the controls
+		act(() => { consumed = result.current.handlePopupKeyDown(key(BACK)); });
+		expect(consumed).toBe(true);
+		now += 600;
+		act(() => { consumed = result.current.handlePopupKeyDown(key(BACK)); });
+		expect(consumed).toBe(false);
+	});
+
+	test('a prompt whose time ran out leaves Back to the player while the controls are away', () => {
+		const {result} = setupPrompt({}, {mediaSegmentAutoHide: 's5'});
+		playTo(result, 60, 62);
+		now += 6000;
+		playTo(result, 62, 64);
+		expect(result.current.skipPromptShown).toBe(false);
+		let consumed;
+		act(() => { consumed = result.current.handlePopupKeyDown(key(BACK)); });
+		expect(consumed).toBe(false);
 	});
 
 	test('skipping and landing a little short of the end does not offer it again, but a seek into it afterwards does', () => {
@@ -289,9 +326,11 @@ describe('the skip prompt over the controls, on a seek and under the remote', ()
 			playTo(result, 60, 62);
 			now += 6000;
 			playTo(result, 62, 64);
-			expect(result.current.skipSegment).toBeNull();
-			act(() => { result.current.handlePopupKeyDown(key(CHANNEL_LIST)); });
-			expect(result.current.skipSegment).not.toBeNull();
+			expect(result.current.skipPromptShown).toBe(false);
+			let consumed;
+			act(() => { consumed = result.current.handlePopupKeyDown(key(CHANNEL_LIST)); });
+			expect(consumed).toBe(true);
+			expect(result.current.skipPromptShown).toBe(true);
 		});
 
 		test('is left alone outside every segment, and while the prompt is already up', () => {
@@ -356,15 +395,6 @@ describe('the skip prompt over the controls, on a seek and under the remote', ()
 		act(() => result.current.checkSegments(70 * SECOND));
 		let consumed;
 		act(() => { consumed = result.current.handlePopupKeyDown(key(39)); });
-		expect(consumed).toBe(false);
-		expect(result.current.skipSegment).not.toBeNull();
-	});
-
-	test('with the controls up, Back is left to close them and the prompt stays', () => {
-		const {result} = setupPrompt({controlsVisible: true});
-		act(() => result.current.checkSegments(70 * SECOND));
-		let consumed;
-		act(() => { consumed = result.current.handlePopupKeyDown(key(BACK)); });
 		expect(consumed).toBe(false);
 		expect(result.current.skipSegment).not.toBeNull();
 	});
