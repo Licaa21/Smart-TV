@@ -27,6 +27,7 @@ const ARROW_UP_ICON = 'M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-22
 const ARROW_DOWN_ICON = 'M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z';
 const GROUP_ICON = 'M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9h-3.87L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5s2.01 4.5 4.5 4.5 4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z';
 const SHOW_ICON = 'M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z';
+export const SHUFFLE_ICON = 'M10.59 9.19 5.39 3.98 3.98 5.39 9.19 10.59 10.59 9.19ZM14.48 3.98 16.55 6.05 3.98 18.61 5.39 20.02 17.95 7.45 20.02 9.52V3.98H14.48ZM14.81 13.41 13.41 14.81 16.55 17.95 14.48 20.02H20.02V14.48L17.95 16.55L14.81 13.41Z';
 const DISPLAY_ICON = 'M3 3v8h8V3H3zm6 6H5V5h4v4zm-6 4v8h8v-8H3zm6 6H5v-4h4v4zm4-16v8h8V3h-8zm6 6h-4V5h4v4zm-6 4v8h8v-8h-8zm6 6h-4v-4h4v4z';
 
 // The Modern letter row sits under the bar, so Up goes back to it rather than to
@@ -125,7 +126,7 @@ const IconButton = ({path, small, onClick, spotlightId}) => (
 // One bar with every control in it, each labelled with what it is set to.
 export const ModernBar = memo(({
 	canGroup, sortLabel, sortAscending, groupLabel, showLabel, showTitle, searchQuery, searchPlaceholder,
-	onSearchChange, onHome, onSort, onGroup, onShow, onSettings, onKeyDown
+	onSearchChange, onHome, onSort, onGroup, onShow, onShuffle, onSettings, onKeyDown
 }) => (
 	<ToolbarContainer className={css.modernBar} spotlightId="library-bar" onKeyDown={onKeyDown}>
 		{onHome && <IconButton path={HOME_ICON} small onClick={onHome} spotlightId="library-home-btn" />}
@@ -150,6 +151,7 @@ export const ModernBar = memo(({
 				<span className={css.pillValue}>{showLabel}</span>
 			</SpottableButton>
 		)}
+		{onShuffle && <IconButton path={SHUFFLE_ICON} onClick={onShuffle} spotlightId="library-shuffle-btn" />}
 		{onSettings && <IconButton path={SETTINGS_ICON} onClick={onSettings} spotlightId="library-settings-btn" />}
 	</ToolbarContainer>
 ));
@@ -175,7 +177,7 @@ export const LibraryDock = memo(({
 	isFolderView, folderStack, rootName, displayName, shownCount, onBreadcrumb,
 	canGroup, sortLabel, sortAscending, groupLabel, showLabel, showTitle, displayLabel, searchQuery, searchPlaceholder,
 	showLetters, startLetter, onLetterSelect,
-	onSearchChange, onHome, onSort, onGroup, onShow, onSettings
+	onSearchChange, onHome, onSort, onGroup, onShow, onShuffle, onSettings
 }) => (
 	<ToolbarContainer className={css.dock} spotlightId="library-dock" onKeyDown={handleDockKeyDown}>
 		<div className={css.dockHeader}>
@@ -198,6 +200,7 @@ export const LibraryDock = memo(({
 			</DockRow>
 			{canGroup && <DockRow path={GROUP_ICON} small label={$L('Group By')} value={groupLabel} onClick={onGroup} spotlightId="library-group-btn" />}
 			{onShow && <DockRow path={SHOW_ICON} small label={showTitle || $L('Show')} value={showLabel} onClick={onShow} spotlightId="library-show-btn" />}
+			{onShuffle && <DockRow path={SHUFFLE_ICON} small label={$L('Shuffle')} onClick={onShuffle} spotlightId="library-shuffle-btn" />}
 			{onSettings && <DockRow path={DISPLAY_ICON} small label={$L('Display')} value={displayLabel} onClick={onSettings} spotlightId="library-settings-btn" />}
 		</div>
 		{showLetters && (
