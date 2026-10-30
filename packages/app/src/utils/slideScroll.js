@@ -32,7 +32,7 @@ export const slidesAtLevel = (levelIndex) => levelIndex < LEAN_FROM_LEVEL;
 
 // extent is the size of the container along the axis: a jump past it is a long one, a Back to the first row or a
 // letter, which flies past more than it shows. auto is the viewer leaving the level to the app, which is not held back
-// by what a set's user agent makes of it. keyAxis is the axis of the key pressed, when that is known.
+// by what a user agent makes of it. keyAxis is the axis of the key pressed, when that is known.
 export const shouldSlide = ({distance, extent, sinceKey, held: keyHeld, levelIndex, auto = false, axis, keyAxis}) => (
 	(auto || slidesAtLevel(levelIndex)) &&
 	!keyHeld &&
