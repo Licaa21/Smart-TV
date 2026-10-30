@@ -29,6 +29,10 @@ export const getDetectedPerfTier = () => {
 
 export const getPerfTier = () => overrideTier || getDetectedPerfTier();
 
+// The level the viewer picked, or null for Auto. Auto on a Samsung set reads as the lowest level, since its user agent has no
+// Chrome token to read the engine from, so code that must not be held back by that asks whether a level was picked at all.
+export const getPerfLevelChoice = () => currentLevel;
+
 // Position in PERF_LEVELS, 0 being Ultra. Auto lands on the level that matches the engine.
 export const getPerfLevelIndex = () => {
 	const level = currentLevel || (getDetectedPerfTier() === 'high' ? 'high' : getDetectedPerfTier());
