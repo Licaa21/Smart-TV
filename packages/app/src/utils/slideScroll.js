@@ -13,7 +13,11 @@ const KEY_WINDOW_MS = 350;
 const HELD_GAP_MS = 200;
 // A move shorter than this is not worth drawing
 const MIN_DISTANCE = 6;
+// A short move is quick, and a long one, a row that scrolled several cards at once, takes longer so it can be followed
 export const SLIDE_MS = {x: 130, y: 180};
+const MAX_SLIDE_MS = {x: 260, y: 320};
+const MS_PER_PX = 0.1;
+export const slideMsFor = (axis, distance) => Math.round(Math.min(MAX_SLIDE_MS[axis], SLIDE_MS[axis] + Math.abs(distance) * MS_PER_PX));
 const EASE = 'cubic-bezier(0.2, 0.7, 0.2, 1)';
 // Low and Performance have nothing to spare
 const LEAN_FROM_LEVEL = 4;
@@ -60,7 +64,9 @@ const onKeyDown = (e) => {
 	lastKeyAt = now;
 };
 
-// The content shows where it was, before the page is drawn, and the next frame lets it go to where it is
+// The content is put where it was, the page is told to take that in, and it is let go at once with a transition, so
+// the first frame drawn is where it was. A transition only starts from a style the page has worked out, and a scroll
+// set from a key press or a timer is not followed by that before the next frame, so the page is asked for it here.
 const slide = (container, axis, distance) => {
 	const ok = shouldSlide({
 		distance,
@@ -70,6 +76,8 @@ const slide = (container, axis, distance) => {
 		levelIndex: getPerfLevelIndex()
 	});
 	if (!ok) return;
+	// A container that scrolls smoothly by itself is not slid on top of that
+	if (window.getComputedStyle(container).scrollBehavior === 'smooth') return;
 	const nodes = contentOf(container);
 	if (!nodes.length) return;
 	nodes.forEach((node) => {
@@ -77,12 +85,41 @@ const slide = (container, axis, distance) => {
 		node.style.transition = 'none';
 		node.style.transform = translate(axis, start);
 	});
-	window.requestAnimationFrame(() => {
-		nodes.forEach((node) => {
-			node.style.transition = `transform ${SLIDE_MS[axis]}ms ${EASE}`;
-			node.style.transform = '';
-		});
+	// Takes the starts in
+	window.getComputedStyle(nodes[0]).transform; // eslint-disable-line @babel/no-unused-expressions
+	const ms = slideMsFor(axis, distance);
+	nodes.forEach((node) => {
+		node.style.transition = `transform ${ms}ms ${EASE}`;
+		node.style.transform = '';
 	});
+};
+
+// Where a node is without the slide that is moving it, for code that measures with getBoundingClientRect. The slide
+// is on the child of the marked container that the node is in, along the axis the container slides on.
+export const slideShiftOf = (node) => {
+	let child = node;
+	while (child && child.parentNode && !(child.parentNode.getAttribute && child.parentNode.getAttribute('data-slide-scroll'))) {
+		child = child.parentNode;
+	}
+	const parent = child && child.parentNode;
+	const axis = parent && parent.getAttribute ? parent.getAttribute('data-slide-scroll') : null;
+	if (axis !== 'x' && axis !== 'y') return {x: 0, y: 0};
+	const offset = offsetOf(window.getComputedStyle(child).transform, axis);
+	return axis === 'x' ? {x: offset, y: 0} : {x: 0, y: offset};
+};
+
+// getBoundingClientRect without the slide, so a card or a row is measured where it stands and not where it is drawn
+export const layoutRectOf = (node) => {
+	const rect = node.getBoundingClientRect();
+	const shift = slideShiftOf(node);
+	return {
+		left: rect.left - shift.x,
+		right: rect.right - shift.x,
+		top: rect.top - shift.y,
+		bottom: rect.bottom - shift.y,
+		width: rect.width,
+		height: rect.height
+	};
 };
 
 // The position a container was last seen at. Nothing is known of one before its first scroll, and it starts at its edge.

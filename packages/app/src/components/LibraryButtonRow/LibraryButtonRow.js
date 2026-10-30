@@ -3,6 +3,7 @@ import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import Spotlight from '@enact/spotlight';
 import {KEYS} from '../../utils/keys';
+import {layoutRectOf} from '../../utils/slideScroll';
 import {isGameLibrary} from '../../utils/gameLibrary';
 import {useSettings} from '../../context/SettingsContext';
 import {MATERIAL_ICON_PATHS} from '../../views/Settings/materialIconMap';
@@ -116,7 +117,7 @@ const LibraryButtonRow = ({
 				window.cancelAnimationFrame(scrollTimeoutRef.current);
 			}
 			scrollTimeoutRef.current = window.requestAnimationFrame(() => {
-				const cardRect = card.getBoundingClientRect();
+				const cardRect = layoutRectOf(card);
 				if (!scrollerRectRef.current) {
 					scrollerRectRef.current = scroller.getBoundingClientRect();
 				}
