@@ -4,6 +4,7 @@ import {getSeerrHomeRowConfigs, fetchSeerrHomeRow, normalizeMediaItem, SEERR_SEC
 import {loadSliderHomeRow} from '../../utils/seerrSliders';
 import {isSameServer, isSeerrSliderRow} from '../../utils/pickedRows';
 import {sortExternalItems} from '../../utils/externalHomeRows';
+import {settleSections} from './browseCache';
 
 // The discover rows Seerr provides. They are fetched separately from the library rows because
 // they come from a different server and only exist while Seerr is connected and signed in. The
@@ -29,10 +30,11 @@ const useSeerrRows = ({seerrEnabled, seerrAuthenticated, seerrUserId, homeRows, 
 		let cancelled = false;
 		const configs = getSeerrHomeRowConfigs();
 		const configFor = (section) => configs.find((c) => c.id === SEERR_SECTION_TO_CONFIG[section.id]);
-		setPending([
+		const pendingRows = [
 			...enabledSections.filter(configFor).map((section) => ({id: section.id, title: configFor(section).title})),
 			...sliderRows.map((row) => ({id: row.id, title: row.name}))
-		]);
+		];
+		setPending(pendingRows);
 
 		const settle = () => {
 			if (!cancelled) setPending([]);
@@ -65,7 +67,10 @@ const useSeerrRows = ({seerrEnabled, seerrAuthenticated, seerrUserId, homeRows, 
 					isSeerrRow: true
 				};
 			}));
-			if (!cancelled) setSeerrRows([...built, ...builtSliders].filter(Boolean));
+			if (cancelled) return;
+			const rows = [...built, ...builtSliders].filter(Boolean);
+			settleSections(pendingRows.map((row) => row.id), rows);
+			setSeerrRows(rows);
 		})().then(settle, settle);
 
 		return () => {

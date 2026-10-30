@@ -450,7 +450,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		primaryIndex: selectedSubtitleIndex,
 		preferExternal: settings.preferExternalSubtitles === true,
 		preferredLanguage: settings.preferredSecondarySubtitleLanguage,
-		available: !isLiveTV && !isAudioMode
+		available: !isLiveTV && !isAudioMode,
+		enabled: settings.secondarySubtitlesEnabled === true
 	});
 	const {
 		prepareForItem: prepareSecondaryForItem, restore: restoreSecondary, update: updateSecondary,
@@ -992,8 +993,9 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				let audioNegotiated = false;
 				// A track in a codec the user has the server convert can't be switched to
 				// locally either, and the server only reads the track along with its source.
+				// The Fire TV WebView has no audioTracks, so there the server has to pick it too.
 				if (initialAudioIndex == null && autoAudio && !isLiveTV
-					&& (result.playMethod !== playback.PlayMethod.DirectPlay || transcodesAudioCodec(settings, autoAudio.codec))
+					&& (result.playMethod !== playback.PlayMethod.DirectPlay || transcodesAudioCodec(settings, autoAudio.codec) || isVega())
 					&& autoAudio.index !== result.selectedAudioStreamIndex) {
 					try {
 						playbackInfoOptions.audioStreamIndex = autoAudio.index;

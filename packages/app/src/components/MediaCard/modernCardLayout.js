@@ -26,7 +26,7 @@ export const modernCardMetrics = ({posterSize, platform, isSquareItem, isStatic}
 // captions of the row above. Full screen rows pace themselves.
 export const modernRowSpacing = (settings) => {
 	if (settings?.fullScreenRows) return null;
-	const offset = Math.min(Math.max((settings?.modernHomeRowsPadding ?? 420) - 400, -40), 200);
+	const offset = Math.min(Math.max((settings?.modernHomeRowsPadding ?? 360) - 400, -40), 200);
 	return offset < 20 ? Math.round((offset - 20) * 34 / 60) : Math.max(0, offset - 34);
 };
 

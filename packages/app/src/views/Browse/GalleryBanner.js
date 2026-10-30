@@ -291,7 +291,8 @@ const GalleryBanner = memo(({
 												item={item}
 												serverUrl={getItemServerUrl(item)}
 												compact
-												pluginEnabled={isMdblistEnabled(settings)}
+												surface='mediaBar'
+												pluginEnabled={isMdblistEnabled(settings, 'mediaBar')}
 											/>
 
 											{!settings.hideHomeMediaDescription && item.Overview && (

@@ -391,6 +391,7 @@ const AppContent = (props) => {
 	useEffect(() => {
 		configureIncompleteRecordings({
 			supported: !!settings.useMoonfinPlugin && pluginInfo?.incompleteRecordingsSupported === true,
+			extended: pluginInfo?.extendedCompleteShowingsSupported === true,
 			canManage: user?.Policy?.EnableLiveTvManagement === true
 		});
 	}, [pluginInfo, settings.useMoonfinPlugin, user]);
@@ -1855,6 +1856,7 @@ const AppContent = (props) => {
 									onLibrariesChanged={fetchLibraries}
 									onRunSetupWizard={handleRunSetupWizard}
 									onSelectItem={handleSelectItemFromSettings}
+									hasLiveTv={hasLiveTv}
 								/>
 							)}
 						</Panel>
@@ -2166,7 +2168,7 @@ const AppContent = (props) => {
 			never keeps animating behind them. */}
 			{panelIndex === PANELS.BROWSE && !showScreensaver && !showShuffleOverlay &&
 				!photoViewerItem && !reading && (
-				<SeasonalTheme theme={settings.seasonalTheme} density={settings.seasonalDensity} />
+				<SeasonalTheme theme={settings.seasonalTheme} density={settings.seasonalDensity} follower={settings.seasonalFollower} />
 			)}
 			<NoConnection />
 			<DebugOverlay />
@@ -2185,6 +2187,7 @@ const AppContent = (props) => {
 					onLibrariesChanged={fetchLibraries}
 					onRunSetupWizard={handleRunSetupWizard}
 					onSelectItem={handleSelectItemFromSettings}
+					hasLiveTv={hasLiveTv}
 				/>
 			)}
 			<TVKeyboard />

@@ -44,7 +44,8 @@ const MediaRow = ({
 	menuOptions,
 	loading,
 	titleWidth,
-	deferImages = false
+	deferImages = false,
+	homeText = false
 }) => {
 	const {settings} = useSettings();
 	const scrollerRef = useRef(null);
@@ -204,6 +205,7 @@ const MediaRow = ({
 									onSpotlightLeft={isFirst && !onSeeAll ? handleWrapLeft : null}
 									onSpotlightRight={isLast ? handleWrapRight : null}
 									menuOptions={menuOptions}
+									homeText={homeText}
 								/>
 							);
 						})}

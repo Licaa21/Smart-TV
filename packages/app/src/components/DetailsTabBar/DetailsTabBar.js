@@ -56,6 +56,7 @@ const DetailsTabBar = ({tabs, activeId, activeSpotlightId, onSelect, onActivate,
 						key={tab.id}
 						spotlightId={tab.id === activeId ? activeSpotlightId : undefined}
 						data-id={tab.id}
+						data-active-tab={tab.id === activeId ? 'true' : undefined}
 						className={`${css.tab} ${tab.id === activeId ? css.tabActive : ''}`}
 						onClick={handleClick}
 						onFocus={handleFocus}

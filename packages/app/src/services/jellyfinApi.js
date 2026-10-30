@@ -704,6 +704,9 @@ export const api = {
 	saveCollectionOrder: (collectionId, itemIds) =>
 		request(`/Moonfin/Collections/${collectionId}/Order`, {method: 'POST', body: itemIds}),
 
+	// Every rating the viewer gave through the plugin, as {Items: [{ItemId, Rating}]}.
+	getMyUserRatings: () => request('/Moonfin/UserRatings/Mine'),
+
 	getMusicGenres: (params = {}) => {
 		const merged = {UserId: currentUser, SortBy: 'SortName', SortOrder: 'Ascending', Recursive: 'true'};
 		Object.keys(params).forEach(function (k) { merged[k] = String(params[k]); });
@@ -1277,6 +1280,8 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 
 		saveCollectionOrder: (collectionId, itemIds) =>
 			serverRequest(`/Moonfin/Collections/${collectionId}/Order`, {method: 'POST', body: itemIds}),
+
+		getMyUserRatings: () => serverRequest('/Moonfin/UserRatings/Mine'),
 
 		searchRemoteSubtitles: (itemId, language = 'eng', isPerfectMatch = null) => {
 			const query = isPerfectMatch === null ? '' : `?IsPerfectMatch=${isPerfectMatch}`;

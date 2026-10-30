@@ -31,6 +31,7 @@ export const DETAIL_SECTIONS = [
 	{id: 'logo', label: 'Logo', subtitle: 'Shows the title as text when off', group: 'header', styles: [CLASSIC, MODERN, SPOTLIGHT, NOUVEAU, MINIMALIST]},
 	{id: 'tagline', label: 'Tagline', group: 'header', styles: [CLASSIC, MODERN, SPOTLIGHT]},
 	{id: 'poster', label: 'Poster', group: 'header', styles: [CLASSIC]},
+	{id: 'versionBadge', label: 'Version badge', group: 'header', styles: [SPOTLIGHT]},
 	{id: 'upNext', label: 'Next Up', group: 'header', styles: [CLASSIC, MODERN]},
 	{id: 'cast', label: 'Cast', subtitle: 'Also on collection pages', group: 'sections', styles: [CLASSIC, MODERN, SPOTLIGHT, NOUVEAU]},
 	{id: 'crew', label: 'Directors & writers', group: 'sections', styles: [CLASSIC, MODERN, SPOTLIGHT, NOUVEAU]},

@@ -13,7 +13,9 @@ const clampBlur = (amount) => {
 	return Math.min(amount || 0, cap);
 };
 
-const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, inCorner}) => {
+const FADE_CLASS = {corner: css.cornerFadeDown, top: css.topFade};
+
+const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, placement}) => {
 	const blurredUrl = serverBlurredUrl(requestedUrl, blurAmount);
 	const targetUrl = blurredUrl || requestedUrl;
 	const layerARef = useRef(null);
@@ -87,8 +89,8 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 	return (
 		<div className={css.globalBackdrop}>
 			{/* The frames stay mounted either way, so the layers keep the picture they hold */}
-			<div className={inCorner ? css.cornerFadeLeft : css.fill}>
-				<div className={inCorner ? css.cornerFadeDown : css.fill}>
+			<div className={placement === 'corner' ? css.cornerFadeLeft : css.fill}>
+				<div className={FADE_CLASS[placement] || css.fill}>
 					<div
 						ref={layerARef}
 						className={css.globalBackdropImage}

@@ -1,5 +1,6 @@
 import {getAuthHeader, getServerUrl, api} from './jellyfinApi';
 import {mediaServerQueue} from '../utils/requestQueue';
+import {RATING_SETTING_KEYS, ratingKey} from '../utils/ratingSources';
 
 const cache = {};
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -51,10 +52,23 @@ export const getIconUrl = (baseUrl, source, rating) => {
 };
 
 /**
+ * The settings with a surface's own ratings settings in place of the plain ones, so the
+ * rest of the ratings code reads them under the usual names.
+ */
+export const ratingSettingsFor = (settings, surface) => {
+	if (!surface || !settings) return settings;
+	const own = {};
+	for (const key of RATING_SETTING_KEYS) own[key] = settings[ratingKey(surface, key)];
+	return {...settings, ...own};
+};
+
+/**
  * Whether MDBList ratings should be shown at all.
  */
-export const isMdblistEnabled = (settings) =>
-	!!settings?.useMoonfinPlugin && settings?.mdblistEnabled !== false;
+export const isMdblistEnabled = (settings, surface) => {
+	const own = ratingSettingsFor(settings, surface);
+	return !!own?.useMoonfinPlugin && own?.mdblistEnabled !== false;
+};
 
 /**
  * No stored list means the user hasn't narrowed the sources, so everything shows.

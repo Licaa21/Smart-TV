@@ -194,7 +194,6 @@
 .posterWrapper {
 	position: relative;
 	width: 100%;
-	height: 270px;
 	border-radius: 8px;
 	overflow: hidden;
 }
@@ -368,45 +367,6 @@
 	color: var(--theme-text-muted, rgba(255, 255, 255, 0.5));
 }
 
-.popupContent {
-	display: flex;
-	flex-direction: column;
-	padding: 30px 40px;
-	min-width: 350px;
-}
-
-// The sort and filter panel holds far more rows than fit a TV screen, so it
-// scrolls while the focused row is kept in view by spotlight.
-.popupScroll {
-	max-height: 70vh;
-	overflow-y: auto;
-	scrollbar-width: none;
-
-	// Older sets shrink flex children to fit the height rather than scrolling,
-	// which squeezes every row to a few pixels and piles the text on top of itself.
-	> * {
-		flex-shrink: 0;
-	}
-
-	&::-webkit-scrollbar {
-		display: none;
-		width: 0;
-	}
-}
-
-.popupOption {
-	width: 100%;
-	margin-top: 15px;
-}
-
-.modalTitle {
-	font-size: 32px;
-	font-weight: 600;
-	color: var(--theme-text-primary, #ffffff);
-	margin-bottom: 10px;
-	text-align: center;
-}
-
 :global(html[data-theme-id='neon_pulse']) {
 	.backdropOverlay {
 		background: linear-gradient(
@@ -418,8 +378,7 @@
 	}
 
 	.header .title,
-	.itemName,
-	.modalTitle {
+	.itemName {
 		color: var(--theme-accent, #ff2e92);
 		text-shadow: var(--theme-text-glow, 0 0 8px rgba(255, 46, 146, 0.35));
 		font-family: 'NeonPulseDisplay', sans-serif;

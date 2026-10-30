@@ -6,6 +6,7 @@ import {fetchSeasonalRow} from '../../services/externalRowsApi';
 import {resolveItemsByProviderIds} from '../../services/jellyfinApi';
 import {seasonalCountryParam} from '../../utils/seasonalRow';
 import {resolveDeviceCountry} from '../../utils/deviceCountry';
+import {settleSections} from './browseCache';
 
 // Home rows built from TMDB and IMDb charts, lists the viewer pasted a URL for, and the
 // Radarr and Sonarr calendars. Items arrive as provider ids, so every row is resolved against
@@ -40,7 +41,7 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 		let cancelled = false;
 		const presetConfigs = getExternalHomeRowConfigs();
 		const mergedCalendars = radarrEnabled && sonarrEnabled && settings.mergeRadarrSonarrCalendars;
-		setPending([
+		const pendingRows = [
 			...enabledPresets
 				.map((id) => presetConfigs.find((c) => c.id === id))
 				.filter(Boolean)
@@ -50,7 +51,8 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 			...(mergedCalendars ? [{id: 'radarr_calendar', title: $L('Upcoming Releases'), isCalendarMerged: true}] : []),
 			...(radarrEnabled && !mergedCalendars ? [{id: 'radarr_calendar', title: $L('Upcoming Movies')}] : []),
 			...(sonarrEnabled && !mergedCalendars ? [{id: 'sonarr_calendar', title: $L('Upcoming Episodes')}] : [])
-		]);
+		];
+		setPending(pendingRows);
 
 		(async () => {
 			try {
@@ -135,7 +137,9 @@ const useExternalRows = ({settings, homeRows, kidsMode}) => {
 				}
 
 				if (!cancelled) {
-					setExternalRows([...presetRows, ...builtCustomRows, seasonalRow, ...resolvedCalendarRows].filter(Boolean));
+					const built = [...presetRows, ...builtCustomRows, seasonalRow, ...resolvedCalendarRows].filter(Boolean);
+					settleSections(pendingRows.map((row) => row.id), built);
+					setExternalRows(built);
 				}
 			} catch (err) {
 				console.warn('[Browse] Failed to fetch and resolve external rows:', err);

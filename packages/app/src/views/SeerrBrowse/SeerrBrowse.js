@@ -1,15 +1,16 @@
 import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import {VirtualGridList} from '@enact/sandstone/VirtualList';
-import Popup from '@enact/sandstone/Popup';
-import Button from '@enact/sandstone/Button';
 import $L from '@enact/i18n/$L';
 import {useSeerr} from '../../context/SeerrContext';
 import {useSettings} from '../../context/SettingsContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import * as seerrApi from '../../services/seerrApi';
+import {POSTER_HEIGHTS, POSTER_SIZE_OPTIONS, seerrPosterSize} from '../../utils/gridChrome';
+import {CORE_ICON_PATHS} from '../Settings/settingsCoreIcons';
 import {buildSeerrDiscoverParams, getSeerrSortOptions, getSeerrTvStatusOptions, getSeerrMinRatingOptions, getSeerrMinVoteOptions, getSeerrRuntimeOptions, getSeerrReleaseOptions, hasSeerrDiscoverFilters} from '../../utils/seerrBrowseFilters';
 import {browseStateKey, readBrowseState, writeBrowseState} from './seerrBrowseState';
+import {BrowseDialog, CheckTile, ClearFiltersTile, DialogDivider, DialogSubtitle, DialogTitle, ExpanderTile, RadioTile, SectionHeader, SortArrow} from './SeerrBrowseDialogs';
 
 import css from './SeerrBrowse.module.less';
 
@@ -37,7 +38,13 @@ const MAX_PAGES = 25;
  */
 const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectItem, backHandlerRef}) => {
 	const {isEnabled} = useSeerr();
-	const {settings} = useSettings();
+	const {settings, updateSetting} = useSettings();
+	const posterSize = seerrPosterSize(settings);
+	const posterHeight = POSTER_HEIGHTS[posterSize];
+	// The card's margin and the title and year under the poster ride on top of the poster size.
+	const gridItemSize = useMemo(() => (
+		{minWidth: Math.round(posterHeight * 2 / 3) + 20, minHeight: posterHeight + 70}
+	), [posterHeight]);
 	const stateKey = useMemo(
 		() => browseStateKey(browseType, item, initialMediaType),
 		[browseType, item, initialMediaType]
@@ -58,6 +65,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const [initialLoadDone, setInitialLoadDone] = useState(false);
 	const [backdropUrl, setBackdropUrl] = useState('');
 	const [showFilterModal, setShowFilterModal] = useState(false);
+	const [showSettingsModal, setShowSettingsModal] = useState(false);
 	const [sortBy, setSortBy] = useState(saved?.sortBy || 'popularity.desc');
 	const [genreIds, setGenreIds] = useState(saved?.genreIds || []);
 	const [tvStatuses, setTvStatuses] = useState(saved?.tvStatuses || []);
@@ -68,6 +76,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 	const [released, setReleased] = useState(saved?.released || '');
 	const [filterGenres, setFilterGenres] = useState([]);
 	const [filterLanguages, setFilterLanguages] = useState([]);
+	const [genresExpanded, setGenresExpanded] = useState(false);
 	const [languagesExpanded, setLanguagesExpanded] = useState(false);
 	const filterOptionsRequestedRef = useRef(false);
 
@@ -247,8 +256,18 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 
 	const handleOpenFilterModal = useCallback(() => {
 		loadFilterOptions();
+		setGenresExpanded(false);
+		setLanguagesExpanded(false);
 		setShowFilterModal(true);
 	}, [loadFilterOptions]);
+
+	const handleOpenSettingsModal = useCallback(() => setShowSettingsModal(true), []);
+	const handleCloseSettingsModal = useCallback(() => setShowSettingsModal(false), []);
+
+	const handlePosterSizeSelect = useCallback((ev) => {
+		updateSetting('seerrPosterSize', ev.currentTarget.dataset.size);
+		setShowSettingsModal(false);
+	}, [updateSetting]);
 
 	useEffect(() => {
 		if (!backHandlerRef) return;
@@ -257,11 +276,15 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 				setShowFilterModal(false);
 				return true;
 			}
+			if (showSettingsModal) {
+				setShowSettingsModal(false);
+				return true;
+			}
 			return false;
 		};
 		backHandlerRef.current = handler;
 		return () => { if (backHandlerRef.current === handler) backHandlerRef.current = null; };
-	}, [backHandlerRef, showFilterModal]);
+	}, [backHandlerRef, showFilterModal, showSettingsModal]);
 
 	useEffect(() => {
 		return () => {
@@ -319,7 +342,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 				onFocus={updateBackdrop}
 				data-index={index}
 			>
-				<div className={css.posterWrapper}>
+				<div className={css.posterWrapper} style={{height: posterHeight}}>
 					{imageUrl ? (
 						<img
 							className={css.poster}
@@ -353,7 +376,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 				</div>
 			</SpottableDiv>
 		);
-	}, [handleItemClick, updateBackdrop, loadItems, mediaType]);
+	}, [handleItemClick, updateBackdrop, loadItems, mediaType, posterHeight]);
 
 	const currentFilter = getFilterOptions().find(o => o.key === mediaType);
 
@@ -382,6 +405,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		} else {
 			setSortBy(option.defaultValue);
 		}
+		setShowFilterModal(false);
 	}, [mediaType, sortBy]);
 
 	const handleGenreToggle = useCallback((ev) => {
@@ -416,6 +440,10 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		setReleased(ev.currentTarget?.dataset?.optionKey || '');
 	}, []);
 
+	const handleToggleGenres = useCallback(() => {
+		setGenresExpanded((prev) => !prev);
+	}, []);
+
 	const handleToggleLanguages = useCallback(() => {
 		setLanguagesExpanded((prev) => !prev);
 	}, []);
@@ -428,6 +456,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 		setMinVotes('');
 		setRuntime('');
 		setReleased('');
+		setShowFilterModal(false);
 	}, []);
 
 	const filterState = {genreIds, tvStatuses, language, minRating, minVotes, runtime, released};
@@ -486,6 +515,15 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 						</svg>
 						{$L('Sort & Filter')}
 					</SpottableButton>
+					<SpottableButton
+						className={css.filterButton}
+						onClick={handleOpenSettingsModal}
+						aria-label={$L('Seerr Settings')}
+					>
+						<svg viewBox="0 0 24 24">
+							<path d={CORE_ICON_PATHS.settings} />
+						</svg>
+					</SpottableButton>
 				</div>
 
 				<div className={css.gridContainer}>
@@ -502,7 +540,7 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 							cbScrollTo={getScrollTo}
 							dataSize={items.length}
 							itemRenderer={renderItem}
-							itemSize={{minWidth: 180, minHeight: 340}}
+							itemSize={gridItemSize}
 							spacing={20}
 							spotlightId="seerr-browse-grid"
 						/>
@@ -511,169 +549,168 @@ const SeerrBrowse = ({browseType, item, mediaType: initialMediaType, onSelectIte
 				</div>
 			</div>
 
-			<Popup
-				open={showFilterModal}
-				onClose={handleCloseModal}
-				position="center"
-				scrimType="translucent"
-				noAutoDismiss
-			>
-				<div className={`${css.popupContent} ${css.popupScroll}`}>
-					{showMediaTypeFilter && (
-						<>
-							<div className={css.modalTitle}>{$L('Media Type')}</div>
-							{getFilterOptions().map((option) => (
-								<Button
-									key={option.key}
-									className={css.popupOption}
-									selected={mediaType === option.key}
-									onClick={handleFilterSelect}
-									data-filter-key={option.key}
-								>
-									{option.label}
-								</Button>
-							))}
-						</>
-					)}
-					<div className={css.modalTitle}>{$L('Sort By')}</div>
-					{getSeerrSortOptions(mediaType).map((option) => {
-						const active = sortBy.startsWith(option.key + '.');
-						const direction = sortBy.endsWith('.asc') ? '↑' : '↓';
-						return (
-							<Button
+			<BrowseDialog open={showFilterModal} onClose={handleCloseModal} spotlightId="seerr-browse-sort">
+				<DialogTitle>{$L('Sort & Filter')}</DialogTitle>
+				<DialogDivider />
+				{getSeerrSortOptions(mediaType).map((option) => {
+					const active = sortBy.startsWith(option.key + '.');
+					return (
+						<RadioTile
+							key={option.key}
+							label={option.label}
+							selected={active}
+							trailing={active && <SortArrow ascending={sortBy.endsWith('.asc')} />}
+							onClick={handleSortSelect}
+							data-sort-key={option.key}
+						/>
+					);
+				})}
+				{showMediaTypeFilter && (
+					<>
+						<DialogDivider />
+						<SectionHeader>{$L('Media Type')}</SectionHeader>
+						{getFilterOptions().map((option) => (
+							<RadioTile
 								key={option.key}
-								className={css.popupOption}
-								selected={active}
-								onClick={handleSortSelect}
-								data-sort-key={option.key}
-							>
-								{active ? `${option.label} ${direction}` : option.label}
-							</Button>
-						);
-					})}
-					{filterGenres.length > 0 && (
-						<>
-							<div className={css.modalTitle}>{$L('Genres')}</div>
-							{filterGenres.map((genre) => (
-								<Button
-									key={genre.id}
-									className={css.popupOption}
-									selected={genreIds.includes(genre.id)}
-									onClick={handleGenreToggle}
-									data-genre-id={genre.id}
-								>
-									{genre.name}
-								</Button>
-							))}
-						</>
-					)}
-					{mediaType === 'tv' && (
-						<>
-							<div className={css.modalTitle}>{$L('Series Status')}</div>
-							{getSeerrTvStatusOptions().map((option) => (
-								<Button
-									key={option.key}
-									className={css.popupOption}
-									selected={tvStatuses.includes(option.key)}
-									onClick={handleTvStatusToggle}
-									data-status-key={option.key}
-								>
-									{option.label}
-								</Button>
-							))}
-						</>
-					)}
-					<div className={css.modalTitle}>{$L('Released')}</div>
-					{getSeerrReleaseOptions().map((option) => (
-						<Button
-							key={option.key || 'any'}
-							className={css.popupOption}
-							selected={released === option.key}
-							onClick={handleReleasedSelect}
-							data-option-key={option.key}
-						>
-							{option.label}
-						</Button>
-					))}
-					<div className={css.modalTitle}>{$L('Minimum Rating')}</div>
-					{getSeerrMinRatingOptions().map((option) => (
-						<Button
-							key={option.key || 'any'}
-							className={css.popupOption}
-							selected={minRating === option.key}
-							onClick={handleMinRatingSelect}
-							data-option-key={option.key}
-						>
-							{option.label}
-						</Button>
-					))}
-					<div className={css.modalTitle}>{$L('Minimum Votes')}</div>
-					{getSeerrMinVoteOptions().map((option) => (
-						<Button
-							key={option.key || 'any'}
-							className={css.popupOption}
-							selected={minVotes === option.key}
-							onClick={handleMinVotesSelect}
-							data-option-key={option.key}
-						>
-							{option.label}
-						</Button>
-					))}
-					<div className={css.modalTitle}>{$L('Runtime')}</div>
-					{getSeerrRuntimeOptions().map((option) => (
-						<Button
-							key={option.key || 'any'}
-							className={css.popupOption}
-							selected={runtime === option.key}
-							onClick={handleRuntimeSelect}
-							data-option-key={option.key}
-						>
-							{option.label}
-						</Button>
-					))}
-					{filterLanguages.length > 0 && (
-						<>
-							<Button
-								className={css.popupOption}
-								onClick={handleToggleLanguages}
-							>
-								{`${$L('Original Language')} ${languagesExpanded ? '▴' : '▾'}`}
-							</Button>
-							{languagesExpanded && (
-								<>
-									<Button
-										className={css.popupOption}
-										selected={language === ''}
+								label={option.label}
+								selected={mediaType === option.key}
+								onClick={handleFilterSelect}
+								data-filter-key={option.key}
+							/>
+						))}
+					</>
+				)}
+				{filterGenres.length > 0 && (
+					<>
+						<DialogDivider />
+						<ExpanderTile
+							label={$L('Genres')}
+							count={genreIds.length}
+							expanded={genresExpanded}
+							onClick={handleToggleGenres}
+						/>
+						{genresExpanded && filterGenres.map((genre) => (
+							<CheckTile
+								key={genre.id}
+								label={genre.name}
+								checked={genreIds.includes(genre.id)}
+								onClick={handleGenreToggle}
+								data-genre-id={genre.id}
+							/>
+						))}
+					</>
+				)}
+				{mediaType === 'tv' && (
+					<>
+						<DialogDivider />
+						<SectionHeader>{$L('Series Status')}</SectionHeader>
+						{getSeerrTvStatusOptions().map((option) => (
+							<CheckTile
+								key={option.key}
+								label={option.label}
+								checked={tvStatuses.includes(option.key)}
+								onClick={handleTvStatusToggle}
+								data-status-key={option.key}
+							/>
+						))}
+					</>
+				)}
+				<DialogDivider />
+				<SectionHeader>{$L('Released')}</SectionHeader>
+				{getSeerrReleaseOptions().map((option) => (
+					<RadioTile
+						key={option.key || 'any'}
+						label={option.label}
+						selected={released === option.key}
+						onClick={handleReleasedSelect}
+						data-option-key={option.key}
+					/>
+				))}
+				<DialogDivider />
+				<SectionHeader>{$L('Minimum Rating')}</SectionHeader>
+				{getSeerrMinRatingOptions().map((option) => (
+					<RadioTile
+						key={option.key || 'any'}
+						label={option.label}
+						selected={minRating === option.key}
+						onClick={handleMinRatingSelect}
+						data-option-key={option.key}
+					/>
+				))}
+				<DialogDivider />
+				<SectionHeader>{$L('Minimum Votes')}</SectionHeader>
+				{getSeerrMinVoteOptions().map((option) => (
+					<RadioTile
+						key={option.key || 'any'}
+						label={option.label}
+						selected={minVotes === option.key}
+						onClick={handleMinVotesSelect}
+						data-option-key={option.key}
+					/>
+				))}
+				<DialogDivider />
+				<SectionHeader>{$L('Runtime')}</SectionHeader>
+				{getSeerrRuntimeOptions().map((option) => (
+					<RadioTile
+						key={option.key || 'any'}
+						label={option.label}
+						selected={runtime === option.key}
+						onClick={handleRuntimeSelect}
+						data-option-key={option.key}
+					/>
+				))}
+				{filterLanguages.length > 0 && (
+					<>
+						<DialogDivider />
+						<ExpanderTile
+							label={$L('Original Language')}
+							count={language ? 1 : 0}
+							expanded={languagesExpanded}
+							onClick={handleToggleLanguages}
+						/>
+						{languagesExpanded && (
+							<>
+								<RadioTile
+									label={$L('All')}
+									selected={language === ''}
+									onClick={handleLanguageSelect}
+									data-language-code=""
+								/>
+								{filterLanguages.map((option) => (
+									<RadioTile
+										key={option.code}
+										label={option.name}
+										selected={language === option.code}
 										onClick={handleLanguageSelect}
-										data-language-code=""
-									>
-										{$L('Any')}
-									</Button>
-									{filterLanguages.map((option) => (
-										<Button
-											key={option.code}
-											className={css.popupOption}
-											selected={language === option.code}
-											onClick={handleLanguageSelect}
-											data-language-code={option.code}
-										>
-											{option.name}
-										</Button>
-									))}
-								</>
-							)}
-						</>
-					)}
-					{hasSeerrDiscoverFilters(filterState) && (
-						<Button
-							className={css.popupOption}
-							onClick={handleClearFilters}
-						>
-							{$L('Clear Filters')}
-						</Button>
-					)}
-				</div>
-			</Popup>
+										data-language-code={option.code}
+									/>
+								))}
+							</>
+						)}
+					</>
+				)}
+				{hasSeerrDiscoverFilters(filterState) && (
+					<>
+						<DialogDivider />
+						<ClearFiltersTile label={$L('Clear Filters')} onClick={handleClearFilters} />
+					</>
+				)}
+			</BrowseDialog>
+
+			<BrowseDialog open={showSettingsModal} onClose={handleCloseSettingsModal} spotlightId="seerr-browse-settings">
+				<DialogTitle>{$L('Seerr Settings')}</DialogTitle>
+				<DialogSubtitle>{$L('Poster Size')}</DialogSubtitle>
+				<DialogDivider />
+				{POSTER_SIZE_OPTIONS.map((option) => (
+					<RadioTile
+						key={option.key}
+						label={option.label()}
+						selected={posterSize === option.key}
+						onClick={handlePosterSizeSelect}
+						data-size={option.key}
+					/>
+				))}
+			</BrowseDialog>
 		</div>
 	);
 };

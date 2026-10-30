@@ -349,6 +349,17 @@ describe('loading placeholders', () => {
 		expect(rows.map((r) => [r.id, Boolean(r.isPlaceholder)])).toEqual([['collections', false]]);
 	});
 
+	test('a section known to come back empty holds no place while it loads', () => {
+		const rows = build({
+			homeRowsConfig: [...config, {id: 'imdb-top250-movies', enabled: true, order: 6}],
+			pendingSections: ['collections', 'sinceyouwatched1'],
+			pendingRows: [{id: 'imdb-top250-movies', title: 'IMDb Top 250 Movies'}],
+			emptySections: new Set(['sinceyouwatched1', 'imdb-top250-movies'])
+		});
+
+		expect(rows.map((r) => r.id)).toEqual(['collections']);
+	});
+
 	test('a plugin section is titled and gated by the plugin list', () => {
 		const rows = build({
 			pluginSectionsConfig: [{id: 'plugin:a', name: 'Plugin A', enabled: true, order: 0}, {id: 'plugin:b', name: 'Plugin B', enabled: false, order: 1}],

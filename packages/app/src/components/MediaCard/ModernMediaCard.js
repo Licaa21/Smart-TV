@@ -237,7 +237,8 @@ const ModernMediaCard = ({
 	detailsWidth,
 	isLibraryRow = false,
 	warmFocusArt = false,
-	menuOptions
+	menuOptions,
+	ratingsSurface
 }) => {
 	const {settings} = useSettings();
 	const focusTimeoutRef = useRef(null);
@@ -505,7 +506,8 @@ const ModernMediaCard = ({
 						serverUrl={itemServerUrl}
 						compact
 						singleLineWidth={extendedSectionWidth}
-						pluginEnabled={isMdblistEnabled(settings)}
+						surface={ratingsSurface}
+						pluginEnabled={isMdblistEnabled(settings, ratingsSurface)}
 					/>
 					{shouldShowOverview && <div className={css.overview}>{overviewText}</div>}
 				</div>

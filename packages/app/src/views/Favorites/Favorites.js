@@ -11,6 +11,7 @@ import * as connectionPool from '../../services/connectionPool';
 import {withoutBlockedItems} from '../../services/parentalControls';
 import BackdropLayer from '../../components/BackdropLayer';
 import DetailsTabBar from '../../components/DetailsTabBar';
+import IncompleteBadge from '../../components/IncompleteBadge';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import {getBackdropId, getImageUrl} from '../../utils/helpers';
 import {showsWatchedCheck} from '../../utils/playedState';
@@ -412,6 +413,7 @@ const Favorites = ({onSelectItem, onSelectPerson, onHome, backHandlerRef}) => {
 					{unifiedMode && item._serverName && (
 						<div className={css.serverBadge}>{item._serverName}</div>
 					)}
+					<IncompleteBadge itemId={item.Id} belowFavorite={unifiedMode && Boolean(item._serverName)} />
 					{showsWatchedCheck(item) && (
 						<div className={css.watchedBadge}>
 							<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>

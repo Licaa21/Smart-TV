@@ -644,6 +644,16 @@
 	opacity: 0.6;
 }
 
+// The runtime with the Incomplete badge beside it. With neither, it takes no room.
+.episodeMetaRow {
+	display: flex;
+	align-items: center;
+
+	&:empty {
+		display: none;
+	}
+}
+
 .episodeOverview {
 	font-size: 20px;
 	line-height: 1.4;
@@ -888,6 +898,7 @@
 .episodeList          { .flex-col-gap(16px); }
 .episodeRow           { .flex-row-gap(24px); }
 .episodeBody          { .flex-col-gap(8px); }
+.episodeMetaRow       { .flex-row-gap(10px); }
 .castCard             { .flex-col-gap(10px); }
 .chapterCard          { .flex-col-gap(8px); }
 .tracksContainer      { .flex-col-gap(16px); }

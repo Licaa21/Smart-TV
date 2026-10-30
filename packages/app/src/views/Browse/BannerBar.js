@@ -214,7 +214,8 @@ const BannerBar = memo(({
 						item={currentFeatured}
 						serverUrl={serverUrl}
 						compact
-						pluginEnabled={isMdblistEnabled(settings)}
+						surface='mediaBar'
+						pluginEnabled={isMdblistEnabled(settings, 'mediaBar')}
 					/>
 				</div>
 

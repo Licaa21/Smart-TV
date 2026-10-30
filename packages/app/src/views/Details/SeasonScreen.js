@@ -8,6 +8,7 @@ import {isMdblistEnabled} from '../../services/mdblistApi';
 import {SpottableDiv} from './detailsSpottables';
 import {PosterBadges, WatchedCheckIcon, FavoriteHeartIcon} from './DetailBadges';
 import {AnimeEpisodePills} from '../../components/AnimeMarkerPills';
+import IncompleteBadge from '../../components/IncompleteBadge';
 import useItemMenuHold, {itemWithIdAt} from '../../hooks/useItemMenuHold';
 
 import css from './Details.module.less';
@@ -106,6 +107,7 @@ const SeasonScreen = ({
 										</span>
 									)}
 									<AnimeEpisodePills episode={ep} serverUrl={serverUrl} compact />
+									<IncompleteBadge itemId={ep.Id} inline />
 								</span>
 							</div>
 							<span className={css.seasonEpTitle}>{ep.Name}</span>

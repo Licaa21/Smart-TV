@@ -20,7 +20,8 @@ import {withoutBlockedItems} from '../../services/parentalControls';
 import {activeSyncProfile} from '../../context/SettingsContext';
 import {
 	CACHE_TTL_LIBRARIES, CACHE_TTL_VOLATILE, VOLATILE_REFRESH_COOLDOWN_MS,
-	cancelPendingCacheSave, clearBrowseCache, clearMemoryCache, isCacheValid, loadBrowseCache, memoryCache, saveBrowseCache
+	cancelPendingCacheSave, clearBrowseCache, clearMemoryCache, isCacheValid, loadBrowseCache, memoryCache, resetEmptySections, saveBrowseCache,
+	seedEmptySections, settleSections
 } from './browseCache';
 
 const LOAD_FRESH_MS = 10000;
@@ -224,6 +225,7 @@ const useBrowseData = ({
 	useEffect(() => {
 		if (memoryCache.owner === owner) return;
 		clearMemoryCache();
+		resetEmptySections();
 		memoryCache.owner = owner;
 	}, [owner]);
 
@@ -279,7 +281,9 @@ const useBrowseData = ({
 		if (due.length === 0) return;
 		due.forEach((section) => deferred.sections.delete(section.id));
 		loadDeferredSections(deferred.ctx, due, (id) => {
-			if (deferredRef.current === deferred) dispatch({type: 'SECTIONS_DONE', sections: [id]});
+			if (deferredRef.current !== deferred) return;
+			settleSections([id], memoryCache.rowData);
+			dispatch({type: 'SECTIONS_DONE', sections: [id]});
 		});
 	}, []);
 
@@ -372,6 +376,7 @@ const useBrowseData = ({
 		const fetchAllData = async () => {
 			try {
 				let libs, resumeItems, nextUp, userConfig, recentlyPlayed;
+				const storedRows = memoryCache.emptySectionsSeeded || unifiedMode ? null : loadBrowseCache(cacheOwner.serverUrl, cacheOwner.userId);
 
 				if (unifiedMode) {
 					const [libsArray, resumeArray, nextUpArray] = await Promise.all([
@@ -580,6 +585,8 @@ const useBrowseData = ({
 					appendRows
 				});
 				const loaderSections = BROWSE_ROW_LOADERS.map(({sections}) => sections(loaderContext));
+				const stored = await storedRows;
+				if (storedRows && !cancelled) seedEmptySections([].concat(...loaderSections), stored);
 				if (!cancelled) {
 					loaderContextRef.current = loaderContext;
 					deferredRef.current = {ctx: loaderContext, sections: new Map(loaderContext.deferredPluginSections.map((section) => [section.id, section]))};
@@ -588,10 +595,12 @@ const useBrowseData = ({
 				dispatch({type: 'SET_LOADING', value: false});
 				if (!cancelled) {
 					BROWSE_ROW_LOADERS.forEach(({load}, index) => {
-						const done = () => {
-							if (!cancelled) dispatch({type: 'SECTIONS_DONE', sections: loaderSections[index]});
+						const done = (loaded) => {
+							if (cancelled) return;
+							if (loaded) settleSections(loaderSections[index], memoryCache.rowData);
+							dispatch({type: 'SECTIONS_DONE', sections: loaderSections[index]});
 						};
-						Promise.resolve(load(loaderContext)).then(done, done);
+						Promise.resolve(load(loaderContext)).then(() => done(true), () => done(false));
 					});
 				}
 
@@ -663,6 +672,7 @@ const useBrowseData = ({
 		allRowData: state.allRowData,
 		featuredItems: state.featuredItems,
 		pendingSections: state.pendingSections,
+		emptySections: memoryCache.emptySections,
 		setBrowseMode,
 		fetchFreshFeaturedItems,
 		refreshVolatileData,

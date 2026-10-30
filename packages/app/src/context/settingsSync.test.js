@@ -200,7 +200,7 @@ describe('localToProfile', () => {
 		const profile = localToProfile(defaultSettings);
 
 		expect(profile.classicHomeRowsPadding).toBe(30);
-		expect(profile.modernHomeRowsPadding).toBe(420);
+		expect(profile.modernHomeRowsPadding).toBe(360);
 	});
 
 	test('sends the card size under the names the other clients use', () => {
@@ -317,6 +317,70 @@ describe('SYNCABLE_KEYS', () => {
 	});
 });
 
+describe('the home rows and media bar ratings settings', () => {
+	const SERVER_KEYS = {
+		homeRowsMdblistEnabled: 'homeRowsMdblistEnabled',
+		homeRowsMdblistRatingSources: 'homeRowsMdblistRatingSources',
+		homeRowsTmdbEpisodeRatingsEnabled: 'homeRowsTmdbEpisodeRatingsEnabled',
+		homeRowsShowRatingLabels: 'homeRowsMdblistShowRatingNames',
+		homeRowsShowRatingBadges: 'homeRowsMdblistShowRatingBadges',
+		mediaBarMdblistEnabled: 'mediaBarMdblistEnabled',
+		mediaBarMdblistRatingSources: 'mediaBarMdblistRatingSources',
+		mediaBarShowRatingLabels: 'mediaBarMdblistShowRatingNames',
+		mediaBarShowRatingBadges: 'mediaBarMdblistShowRatingBadges'
+	};
+
+	test('default like the plain ones, except home rows start with labels off', () => {
+		for (const local of Object.keys(SERVER_KEYS)) {
+			const plain = local.replace(/^(homeRows|mediaBar)(.)/, (all, surface, first) => first.toLowerCase());
+			const expected = local === 'homeRowsShowRatingLabels' ? false : defaultSettings[plain];
+			expect({local, value: defaultSettings[local]}).toEqual({local, value: expected});
+		}
+	});
+
+	test('travel under the shared server names', () => {
+		const local = {
+			homeRowsMdblistEnabled: false,
+			homeRowsMdblistRatingSources: ['imdb', 'myanimelist'],
+			homeRowsTmdbEpisodeRatingsEnabled: false,
+			homeRowsShowRatingLabels: true,
+			homeRowsShowRatingBadges: false,
+			mediaBarMdblistEnabled: false,
+			mediaBarMdblistRatingSources: ['metacriticuser', 'stars'],
+			mediaBarShowRatingLabels: false,
+			mediaBarShowRatingBadges: false
+		};
+		const profile = localToProfile({...defaultSettings, ...local}, Object.keys(SERVER_KEYS));
+
+		expect(profile).toEqual({
+			homeRowsMdblistEnabled: false,
+			homeRowsMdblistRatingSources: ['imdb', 'myAnimeList'],
+			homeRowsTmdbEpisodeRatingsEnabled: false,
+			homeRowsMdblistShowRatingNames: true,
+			homeRowsMdblistShowRatingBadges: false,
+			mediaBarMdblistEnabled: false,
+			mediaBarMdblistRatingSources: ['metacriticUser', 'stars'],
+			mediaBarMdblistShowRatingNames: false,
+			mediaBarMdblistShowRatingBadges: false
+		});
+		expect(profileToLocal(profile)).toEqual(local);
+	});
+
+	test('an empty source list from the server keeps the one this device has', () => {
+		expect(profileToLocal({homeRowsMdblistRatingSources: [], mediaBarMdblistRatingSources: []})).toEqual({});
+
+		const resolved = resolveFromEnvelope({tv: {}, global: {}}, {homeRowsMdblistRatingSources: [], mediaBarMdblistRatingSources: ['imdb']});
+		expect(resolved).not.toHaveProperty('homeRowsMdblistRatingSources');
+		expect(resolved.mediaBarMdblistRatingSources).toEqual(['imdb']);
+	});
+
+	test('leave the plain ratings settings alone', () => {
+		const local = profileToLocal({homeRowsMdblistShowRatingNames: true, mediaBarMdblistRatingSources: ['imdb']});
+
+		expect(local).toEqual({homeRowsShowRatingLabels: true, mediaBarMdblistRatingSources: ['imdb']});
+	});
+});
+
 describe('the backdrop toggles', () => {
 	test('take and send the home and details backdrops under the server names', () => {
 		expect(profileToLocal({homeBackdropEnabled: false, detailsBackdropEnabled: false}))
@@ -349,6 +413,33 @@ describe('the library style', () => {
 
 	test('keeps the style it has when the profile names one this app has no way to draw', () => {
 		expect(profileToLocal({libraryStyle: 'grid'})).toEqual({});
+	});
+});
+
+describe('the library grid settings', () => {
+	test('poster sizes sync under their own names, one for libraries and one for playlists', () => {
+		['small', 'medium', 'large', 'extraLarge'].forEach((size) => {
+			expect(profileToLocal({libraryPosterSize: size, playlistPosterSize: size})).toEqual({libraryPosterSize: size, playlistPosterSize: size});
+			expect(localToProfile({...defaultSettings, libraryPosterSize: size}, ['libraryPosterSize'])).toEqual({libraryPosterSize: size});
+		});
+	});
+
+	test('an unpicked poster size stays off the profile', () => {
+		expect(defaultSettings.libraryPosterSize).toBeNull();
+		expect(localToProfile(defaultSettings, ['libraryPosterSize', 'playlistPosterSize'])).toEqual({});
+		expect(profileToLocal({libraryPosterSize: 'grandparents'})).toEqual({});
+	});
+
+	test('titles under posters is on until turned off and syncs as it is', () => {
+		expect(defaultSettings.libraryCardTitles).toBe(true);
+		expect(profileToLocal({libraryCardTitles: false})).toEqual({libraryCardTitles: false});
+		expect(localToProfile({...defaultSettings, libraryCardTitles: false}, ['libraryCardTitles'])).toEqual({libraryCardTitles: false});
+	});
+
+	test('neither folder view nor the alphabet syncs', () => {
+		expect(SYNCABLE_KEYS).not.toContain('folderViewMode');
+		expect(SYNCABLE_KEYS).not.toContain('showAlphabeticalFilters');
+		expect(profileToLocal({enableFolderView: true})).toEqual({});
 	});
 });
 

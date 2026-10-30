@@ -39,6 +39,8 @@ describe('detailSectionLayout', () => {
 		expect(isAvailableIn(byId('mediaInfo'), 'v1')).toBe(false);
 		expect(isAvailableIn(byId('mediaInfo'), 'v4')).toBe(true);
 		expect(isAvailableIn(byId('mediaInfo'), 'v3')).toBe(true);
+		expect(isAvailableIn(byId('versionBadge'), 'v3')).toBe(true);
+		expect(isAvailableIn(byId('versionBadge'), 'v1')).toBe(false);
 	});
 
 	it('lists for Minimalist whatever Spotlight draws for the pages it hands over', () => {
