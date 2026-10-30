@@ -1,4 +1,4 @@
-import {PERF_LEVELS, applyPerfTier, computePerfTier, getPerfLevelIndex, getPerfTier, perfClassesFor} from './perfTier';
+import {PERF_LEVELS, applyPerfTier, chromiumMajorOf, computePerfTier, getPerfLevelIndex, getPerfTier, perfClassesFor} from './perfTier';
 
 describe('computePerfTier', () => {
 	test('Tizen 2.4 WebKit (no Chrome token) is low', () => {
@@ -27,6 +27,21 @@ describe('computePerfTier', () => {
 
 	test('webOS 6.x Chromium 79 is mid', () => {
 		expect(computePerfTier('Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.79 Safari/537.36 WebAppManager')).toBe('mid');
+	});
+
+	// Samsung's browser names its engine without the word Chrome: the user's Q67A (2021, Tizen 6.0) read as the lowest level on Auto
+	test('Tizen 6.0 Chromium 76, named by the number after like Gecko, is mid', () => {
+		const q67a = 'Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) 76.0.3809.146/6.0 TV Safari/537.36';
+		expect(chromiumMajorOf(q67a)).toBe(76);
+		expect(computePerfTier(q67a)).toBe('mid');
+	});
+
+	test('Tizen 9.0 Chromium 120, named the same way, is high', () => {
+		expect(computePerfTier('Mozilla/5.0 (SMART-TV; LINUX; Tizen 9.0) AppleWebKit/537.36 (KHTML, like Gecko) 120.0.6099.5/9.0 TV Safari/537.36')).toBe('high');
+	});
+
+	test('the old WebKit version number is not an engine version', () => {
+		expect(chromiumMajorOf('Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/2.4 TV Safari/538.1')).toBeNull();
 	});
 
 	test('Tizen 6.5 Chromium 85 is high', () => {

@@ -1,7 +1,18 @@
+// The Chromium version a user agent names. Samsung's TV browser names its engine without the word Chrome, as the number
+// after "like Gecko" (Tizen 6.0: `(KHTML, like Gecko) 76.0.3809.146/6.0 TV Safari/537.36`), and reading it only by Chrome/
+// made every Samsung set of Tizen 5 and newer read as the lowest level. The old Tizen 2.4 and 3.0 WebKit says
+// `Version/2.4`, which is not four numbers, and stays unread.
+export const chromiumMajorOf = (ua) => {
+	const text = ua || '';
+	const chrome = text.match(/Chrome\/(\d+)/);
+	if (chrome) return parseInt(chrome[1], 10);
+	const samsung = text.match(/like Gecko\)\s+(\d+)\.\d+\.\d+\.\d+\//);
+	return samsung ? parseInt(samsung[1], 10) : null;
+};
+
 export const computePerfTier = (ua) => {
-	const match = (ua || '').match(/Chrome\/(\d+)/);
-	if (!match) return 'low';
-	const major = parseInt(match[1], 10);
+	const major = chromiumMajorOf(ua);
+	if (major === null) return 'low';
 	if (!(major >= 56)) return 'low';
 	if (major < 85) return 'mid';
 	return 'high';
@@ -29,8 +40,7 @@ export const getDetectedPerfTier = () => {
 
 export const getPerfTier = () => overrideTier || getDetectedPerfTier();
 
-// The level the viewer picked, or null for Auto. Auto on a Samsung set reads as the lowest level, since its user agent has no
-// Chrome token to read the engine from, so code that must not be held back by that asks whether a level was picked at all.
+// The level the viewer picked, or null for Auto, for code that must not be held back by what a user agent makes of Auto.
 export const getPerfLevelChoice = () => currentLevel;
 
 // Position in PERF_LEVELS, 0 being Ultra. Auto lands on the level that matches the engine.
