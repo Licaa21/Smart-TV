@@ -7,6 +7,8 @@ import {VirtualGridList} from '@enact/sandstone/VirtualList';
 import {useAuth} from '../../context/AuthContext';
 import {createApiForServer} from '../../services/jellyfinApi';
 import MusicBrowse from '../MusicBrowse';
+import MusicCategoryScreen from '../MusicBrowse/MusicCategoryScreen';
+import {musicScreenFor} from '../MusicBrowse/musicScreens';
 import BookBrowse from '../BookBrowse';
 import BackdropLayer from '../../components/BackdropLayer';
 import TileGrid from '../../components/TileGrid';
@@ -106,6 +108,10 @@ let returnTo = null;
 // The same for a book grid the item was opened from, so Back comes to the grid rather than the
 // book library.
 let bookGridReturn = null;
+// And for the music screen an item was opened or played from.
+let musicScreenReturn = null;
+// And for the book library screen.
+let bookScreenReturn = null;
 
 const PLAYED_FILTERS = [
 	{key: 'all', label: $L('All')},
@@ -241,7 +247,17 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const isMusicLibrary = library?.CollectionType?.toLowerCase() === 'music';
 	const isBookLibrary = isBookLibraryType(library?.CollectionType);
 	const [restoredBookGrid] = useState(() => (bookGridReturn?.libraryId === library?.Id ? bookGridReturn : null));
-	useEffect(() => { bookGridReturn = null; }, []);
+	// The music category screen that's open, from musicScreenFor.
+	const [musicScreen, setMusicScreen] = useState(() => (musicScreenReturn?.libraryId === library?.Id ? musicScreenReturn.screen : null));
+	// The book library screen that's open, from bookScreens, kept with its library so another one
+	// opens at its own root.
+	const [bookScreenOf, setBookScreenOf] = useState(() => (bookScreenReturn?.libraryId === library?.Id ? bookScreenReturn : null));
+	const bookScreen = bookScreenOf && bookScreenOf.libraryId === library?.Id ? bookScreenOf.screen : null;
+	useEffect(() => {
+		bookGridReturn = null;
+		musicScreenReturn = null;
+		bookScreenReturn = null;
+	}, []);
 	const isSeriesLibrary = library?.CollectionType?.toLowerCase() === 'tvshows';
 	const isPlaylistLibrary = library?.CollectionType?.toLowerCase() === 'playlists';
 	const isSquareDefault = isMusicLibrary || isPlaylistLibrary;
@@ -750,6 +766,34 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		initialFocusDoneRef.current = false;
 	}, []);
 
+	// The music categories and See All links open their own screens. A genre tile still opens the
+	// albums grid narrowed to it, and the Songs screen opens the full songs grid, which Back leaves
+	// for the screen.
+	const handleOpenMusicCategory = useCallback((target, genre) => {
+		const screen = genre ? null : musicScreenFor(target);
+		if (screen) setMusicScreen(screen);
+		else handleOpenMusicGrid(target, genre);
+	}, [handleOpenMusicGrid]);
+	const handleOpenSongsGrid = useCallback(() => handleOpenMusicGrid('songs'), [handleOpenMusicGrid]);
+	const handleCloseMusicScreen = useCallback(() => setMusicScreen(null), []);
+	const handleMusicScreenSelect = useCallback((item) => {
+		musicScreenReturn = {libraryId, screen: musicScreen};
+		onSelectItem?.(item);
+	}, [libraryId, musicScreen, onSelectItem]);
+	const handleMusicScreenPlay = useCallback((item, resume, options) => {
+		musicScreenReturn = {libraryId, screen: musicScreen};
+		onPlay?.(item, resume, options);
+	}, [libraryId, musicScreen, onPlay]);
+	const handleOpenBookScreen = useCallback((screen) => setBookScreenOf({libraryId, screen}), [libraryId]);
+	const handleBookScreenSelect = useCallback((item) => {
+		bookScreenReturn = {libraryId, screen: bookScreen};
+		onSelectItem?.(item);
+	}, [libraryId, bookScreen, onSelectItem]);
+	const handleBookScreenPlay = useCallback((item, resume, options) => {
+		bookScreenReturn = {libraryId, screen: bookScreen};
+		onPlay?.(item, resume, options);
+	}, [libraryId, bookScreen, onPlay]);
+
 	// The book library's See All and its series, genre and folder cards. A series with no folder of
 	// its own is looked for by name, and a folder series opens at its folder with Back going home.
 	const handleOpenBookGrid = useCallback((target) => {
@@ -787,10 +831,12 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 			} else {
 				returnTo = {libraryId, itemId: item.Id, index, folderStack};
 				bookGridReturn = bookGridView ? {libraryId, view: bookGridView, genreFilters, search: searchQuery} : null;
+				musicScreenReturn = musicScreen ? {libraryId, screen: musicScreen} : null;
+				bookScreenReturn = bookScreen ? {libraryId, screen: bookScreen} : null;
 				onSelectItem?.(item);
 			}
 		}
-	}, [isFolderView, onSelectItem, onViewPhoto, libraryId, bookGridView, folderStack, genreFilters, searchQuery, handleOpenBookGrid]);
+	}, [isFolderView, onSelectItem, onViewPhoto, libraryId, bookGridView, folderStack, genreFilters, searchQuery, handleOpenBookGrid, musicScreen, bookScreen]);
 
 	const {getScrollTo: getGridScrollTo, quickReturn, scrollTo: scrollGridTo} = useQuickReturnGrid('library-grid');
 
@@ -1457,9 +1503,29 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 				library={library}
 				api={effectiveApi}
 				serverUrl={effectiveServerUrl}
-				onSelectItem={onSelectItem}
+				screen={bookScreen}
+				onOpenScreen={handleOpenBookScreen}
+				onSelectItem={handleBookScreenSelect}
 				onOpenGrid={handleOpenBookGrid}
-				onPlay={onPlay}
+				onPlay={handleBookScreenPlay}
+				onSearch={onSearch}
+				backHandlerRef={backHandlerRef}
+			/>
+		);
+	}
+
+	if (isMusicBrowseHome && musicScreen) {
+		return (
+			<MusicCategoryScreen
+				screen={musicScreen}
+				library={library}
+				api={effectiveApi}
+				serverUrl={effectiveServerUrl}
+				onSelectItem={handleMusicScreenSelect}
+				onPlay={handleMusicScreenPlay}
+				onBack={handleCloseMusicScreen}
+				onOpenScreen={setMusicScreen}
+				onOpenSongsGrid={handleOpenSongsGrid}
 				onSearch={onSearch}
 				backHandlerRef={backHandlerRef}
 			/>
@@ -1473,7 +1539,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 				api={effectiveApi}
 				serverUrl={effectiveServerUrl}
 				onSelectItem={onSelectItem}
-				onOpenGrid={handleOpenMusicGrid}
+				onOpenGrid={handleOpenMusicCategory}
 				onPlay={onPlay}
 				onSearch={onSearch}
 				onHome={onHome}
