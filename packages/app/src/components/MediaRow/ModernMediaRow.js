@@ -1,4 +1,5 @@
 import {useCallback, useRef, useEffect, useState, memo} from 'react';
+import {flushSync} from 'react-dom';
 import {initialRowCount, grownRowCount, rememberedRowCount, rememberRowCount} from '../../utils/rowCap';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import Spotlight from '@enact/spotlight';
@@ -172,15 +173,22 @@ const ModernMediaRow = ({
 		setFocusedItemId(itemId || null);
 	}, []);
 
+	// The card in focus makes its row taller, and the row it moves to makes room the same way. Left to the blur that follows
+	// the move, the row closes a few frames after the list has been scrolled for it, and the list is put back by what it
+	// grew, which showed as a shake at the end of the move. So the screen is handed this, to close the row first.
 	const handleKeyDown = useCallback((e) => {
+		const closeRow = () => flushSync(() => {
+			setFocusedItemId(null);
+			setDetails(null);
+		});
 		if (e.keyCode === KEYS.UP && onNavigateUp) {
 			e.preventDefault();
 			e.stopPropagation();
-			onNavigateUp(rowIndex);
+			onNavigateUp(rowIndex, closeRow);
 		} else if (e.keyCode === KEYS.DOWN && onNavigateDown) {
 			e.preventDefault();
 			e.stopPropagation();
-			onNavigateDown(rowIndex);
+			onNavigateDown(rowIndex, closeRow);
 		}
 	}, [rowIndex, onNavigateUp, onNavigateDown]);
 

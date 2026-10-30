@@ -16,10 +16,11 @@ const HELD_GAP_MS = 200;
 // A move shorter than this is not worth drawing
 const MIN_DISTANCE = 6;
 // A short move is quick, and a long one, a row that scrolled several cards at once, takes longer so it can be followed
-export const SLIDE_MS = {x: 130, y: 180};
-const MAX_SLIDE_MS = {x: 260, y: 320};
-const MS_PER_PX = 0.1;
-export const slideMsFor = (axis, distance) => Math.round(Math.min(MAX_SLIDE_MS[axis], SLIDE_MS[axis] + Math.abs(distance) * MS_PER_PX));
+export const SLIDE_MS = {x: 130, y: 130};
+const MAX_SLIDE_MS = {x: 260, y: 200};
+// Up and down the moves are about a row and keep to about 150 ms, since a slide that lasts longer shows what the page does under it
+const MS_PER_PX = {x: 0.1, y: 0.04};
+export const slideMsFor = (axis, distance) => Math.round(Math.min(MAX_SLIDE_MS[axis], SLIDE_MS[axis] + Math.abs(distance) * MS_PER_PX[axis]));
 const EASE = 'cubic-bezier(0.2, 0.7, 0.2, 1)';
 // Up and down, a row is often scrolled twice in a row: by the focus, which lands where it likes, and then by the code that
 // puts the row back at its resting place on the frames behind it. Drawn as two slides the easing starts over and reads as

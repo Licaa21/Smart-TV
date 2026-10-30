@@ -15,6 +15,7 @@ jest.mock('react/jsx-dev-runtime', () => {
 		}
 	};
 });
+jest.mock('react-dom', () => ({flushSync: (fn) => fn()}));
 // Pointer mode keeps the row from reaching for layout that jsdom doesn't have.
 jest.mock('@enact/spotlight', () => ({focus: jest.fn(() => true), getPointerMode: () => true}));
 jest.mock('@enact/spotlight/SpotlightContainerDecorator', () => (config, type) => {
@@ -26,11 +27,12 @@ jest.mock('../../platform', () => ({getPlatform: () => 'webos'}));
 jest.mock('../Skeleton', () => ({SkeletonHomeRow: () => null, SkeletonRowTitle: () => null}));
 jest.mock('../MediaCard/ModernMediaCard', () => {
 	const React = require('react');
-	return ({item, spotlightId, onFocused, warmRank}) => React.createElement('div', {
+	return ({item, spotlightId, onFocused, warmRank, isFocused}) => React.createElement('div', {
 		className: 'spottable',
 		tabIndex: -1,
 		'data-spotlight-id': spotlightId,
 		'data-warm': warmRank >= 0 ? 'yes' : 'no',
+		'data-focused': isFocused ? 'yes' : 'no',
 		onFocus: () => onFocused?.(item.Id)
 	}, item.Name);
 });
@@ -64,6 +66,25 @@ describe('ModernMediaRow', () => {
 		draw({onFocus});
 		focusCard(0);
 		expect(onFocus).toHaveBeenCalledWith(2);
+	});
+
+	it('hands the screen a way to close the row before it moves up or down', () => {
+		const onNavigateDown = jest.fn();
+		const onNavigateUp = jest.fn();
+		draw({onNavigateDown, onNavigateUp});
+		const opened = () => document.querySelectorAll('[data-focused="yes"]').length;
+		focusCard(1);
+		expect(opened()).toBe(1);
+		fireEvent.keyDown(document.querySelectorAll('.spottable')[1], {keyCode: 40});
+		expect(onNavigateDown).toHaveBeenCalledWith(2, expect.any(Function));
+		// Nothing has closed it until the screen asks
+		expect(opened()).toBe(1);
+		act(() => { onNavigateDown.mock.calls[0][1](); });
+		expect(opened()).toBe(0);
+		focusCard(1);
+		fireEvent.keyDown(document.querySelectorAll('.spottable')[1], {keyCode: 38});
+		act(() => { onNavigateUp.mock.calls[0][1](); });
+		expect(opened()).toBe(0);
 	});
 
 	describe('fetching wide art ahead', () => {
