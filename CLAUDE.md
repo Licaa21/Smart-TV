@@ -106,7 +106,7 @@ ode_modules`.
   and the context) on the change, and run it more than once: fix what it finds, then review again, until a pass finds
   nothing real. Do this before reporting the work as done, before committing when the commit is what gets built, and before a build. It is part of the work, not an extra to offer afterwards: if it was not run, the work is not done. The order before every report: lint, tests, code review (two passes or more), `verification-before-completion`.
 - Every change ships with a test for what can be tested (rules, ranking, timing with fake timers, a hook with Spotlight mocked), added in the same commit. What needs a real TV (focus feel, timing on the set) is said so in the report instead.
-- Look at screens in a browser, not just in tests (see "Tools"). TV behaviour itself is only known from a real TV.
+- Look at screens in a browser, not just in tests, **on the user's own server, not the fake one** (see "Looking at screens in a browser"). TV behaviour itself is only known from a real TV.
 - Do not run the tests while the dev server is up: the server stalls rebuilding. Stop it first.
 
 ### Strings and languages
@@ -434,20 +434,22 @@ what the plugin now does. Say what was removed and what was kept. Each item is c
 
 ### Looking at screens in a browser
 
+**Use the user's own Jellyfin server and Seerr for every browser check, as the test user Claude. This is the default and the user has asked for it more than once.** Do not start the fake server (`fork-tools/browser-mock.js`) because it is quicker or because it is already at hand. The fake server is the fallback, only for what the real one cannot show (a library state it does not have, a failure to provoke, a server that cannot be reached), and the report says that it was used and why. The steps to sign in are in "Testing against the real server" below, and the logins are in `local/test-server.md`.
+
 1. From `packages/app`: `REACT_APP_PLATFORM=tizen npx enact serve --port 8123` (the repository script is
    `npm run dev:tizen`). It takes a minute to compile.
-2. In the Playwright tool, run `fork-tools/browser-mock.js` (it signs in a fake user). The first run shows a setup
-   wizard: click "Skip setup".
+2. In the Playwright tool, sign in to the real server (`node fork-tools/make-real-session.js`, then run the file it writes, see "Testing against the real server"). Only for the fallback cases above, run `fork-tools/browser-mock.js` instead (it signs in a fake user, and its first run shows a setup
+   wizard: click "Skip setup").
 3. Keys: arrows move, Enter selects, Escape is Back. The browser is a modern Chrome, so older-set behaviour (such as
    rows starting short on a Medium performance tier) needs the `performanceMode` setting set to `mid` in
    `localStorage` key `moonfin_settings`.
 4. Stop the server when done.
 
-For the user's own server and Seerr instead of the fake one, see "Testing against the real server" below.
+The real server is read only (see below), so a check that needs something it does not hold is the other case for the fake server.
 
 ### Testing against the real server
 
-- **Claude is authorised to launch the test browser (Playwright, see "Looking at screens in a browser") against the user's own Jellyfin server and Seerr**, signed in as the test user **Claude** by default (a normal user that cannot delete or download and sees every library) or as the administrator **Lica** for what only an administrator sees (both logins are in `local/test-server.md`), whenever that tests a change better than the fake server does (a real library, real posters, a real genre or studio, real Seerr titles, the Moonfin plugin's rows). Say in the report that the real server was used, and use the fake server (`fork-tools/browser-mock.js`) when it is enough.
+- **Claude is authorised, and expected, to launch the test browser (Playwright, see "Looking at screens in a browser") against the user's own Jellyfin server and Seerr for every browser check**, signed in as the test user **Claude** by default (a normal user that cannot delete or download and sees every library) or as the administrator **Lica** for what only an administrator sees (both logins are in `local/test-server.md`). The real library, real posters, real genres and studios, real Seerr titles and the Moonfin plugin's rows are what the user wants a change looked at on. Say in the report that the real server was used. The fake server (`fork-tools/browser-mock.js`) is only the fallback named in "Looking at screens in a browser", never the first choice; if it was used, say why.
 - **The login is never written in this file or in anything tracked.** This file is committed and the fork is public, so the address, the user and the password live only in `local/test-server.md` (ignored by git in every folder), and are read from there when needed. They never go in a commit, a branch, a pull request, a diagnostic report, a log or a screenshot that is kept outside `local/`.
 - **Two logins, both in that file.** Claude, a normal user, is the one for testing in general. Lica, the administrator, is only for testing what an administrator alone sees or can do in the app (admin only screens and settings, the server messages, the Moonfin plugin's admin parts), and for work on the test user itself. Whichever is used, the test is read only, since it is a real library: with Lica, take extra care, as an administrator can also delete, so nothing is deleted, edited or configured, and a setting is only read, never changed, unless the user asks for that change.
 - Seerr: Claude is imported in Seerr with no permissions (it can browse and cannot request), and the plugin's Seerr session for it is made by posting its Jellyfin login to `/Moonfin/Seerr/Login`, as the app's own Seerr sign in does.
