@@ -1,6 +1,6 @@
-import {act, render} from '@testing-library/react';
+import {act, fireEvent, render, screen} from '@testing-library/react';
 
-import {getFromStorage} from '../../services/storage';
+import {getFromStorage, saveToStorage} from '../../services/storage';
 import Library from './Library';
 
 const mockApi = {getItems: jest.fn(), getQueryFilters: jest.fn(), getLibraries: jest.fn()};
@@ -102,5 +102,87 @@ describe('the music library', () => {
 
 		act(() => mockScreens.music.onOpenGrid('allArtists'));
 		expect(mockScreens.musicCategory.screen).toEqual({id: 'artists', mode: 'artists'});
+	});
+});
+
+describe('the filters of a library', () => {
+	const movies = {Id: 'lib1', Name: 'Movies', CollectionType: 'movies'};
+	const stored = {};
+	// Storage answers a beat later, the way the TV's does, so the first render runs on defaults
+	const slowStorage = () => getFromStorage.mockImplementation((key) => new Promise((resolve) => setTimeout(() => resolve(key in stored ? stored[key] : null), 0)));
+
+	beforeEach(() => {
+		Object.keys(stored).forEach((key) => delete stored[key]);
+		mockApi.getItems.mockResolvedValue({Items: [{Id: 'm1', Name: 'Alien', Type: 'Movie'}], TotalRecordCount: 1});
+	});
+
+	it('wait for what this device saved before the first page, and the page is fetched with them', async () => {
+		stored.library_filters_lib1 = {favoritesOnly: true, tagFilters: ['4K']};
+		slowStorage();
+		render(<Library library={movies} backHandlerRef={{current: null}} onHome={jest.fn()} />);
+		expect(mockApi.getItems).not.toHaveBeenCalled();
+		await settle();
+		expect(mockApi.getItems).toHaveBeenCalled();
+		mockApi.getItems.mock.calls.forEach(([params]) => {
+			expect(JSON.stringify(params)).toContain('IsFavorite');
+			expect(JSON.stringify(params)).toContain('4K');
+		});
+	});
+
+	it('are saved for the library when one is picked in the popup, and a library with none saves nothing', async () => {
+		slowStorage();
+		render(<Library library={movies} backHandlerRef={{current: null}} onHome={jest.fn()} />);
+		await settle();
+		expect(saveToStorage.mock.calls.filter(([key]) => key === 'library_filters_lib1')).toHaveLength(0);
+
+		fireEvent.click(document.querySelector('[data-spotlight-id="library-sort-btn"]'));
+		fireEvent.click(document.querySelector('[data-spotlight-id="sort-panel-group-favorites"]'));
+		fireEvent.click(screen.getByText('Favorites Only'));
+		await settle();
+		expect(saveToStorage).toHaveBeenCalledWith('library_filters_lib1', expect.objectContaining({favoritesOnly: true}));
+	});
+
+	it('are not kept for a music library, which opens its grids with filters of their own', async () => {
+		slowStorage();
+		render(<Library library={{Id: 'music1', Name: 'Music', CollectionType: 'music'}} backHandlerRef={{current: null}} />);
+		await settle();
+		expect(saveToStorage.mock.calls.filter(([key]) => /^library_filters_/.test(key))).toHaveLength(0);
+	});
+});
+
+describe('the popup', () => {
+	it('carries Show Alphabet in its own group, with what is on in its summary', async () => {
+		getFromStorage.mockImplementation(() => Promise.resolve(null));
+		render(<Library library={{Id: 'lib1', Name: 'Movies', CollectionType: 'movies'}} backHandlerRef={{current: null}} />);
+		await settle();
+		fireEvent.click(document.querySelector('[data-spotlight-id="library-sort-btn"]'));
+		const group = document.querySelector('[data-spotlight-id="sort-panel-group-view"]');
+		expect(group).not.toBeNull();
+		expect(group.textContent).toContain('Show Alphabet');
+		fireEvent.click(group);
+		// The summary of the group says it too, so the option is the one in the options pane
+		fireEvent.click(screen.getAllByText('Show Alphabet').find((el) => /optionLabel/.test(el.className)));
+		await settle();
+		expect(saveToStorage.mock.calls.map(([key]) => key)).toContain('library_letterNav_lib1');
+		expect(saveToStorage).toHaveBeenCalledWith('library_letterNav_lib1', 'off');
+	});
+});
+
+describe('the Songs grid of a music library', () => {
+	it('has a Shuffle button that plays random songs from the library', async () => {
+		const onPlay = jest.fn();
+		getFromStorage.mockImplementation(() => Promise.resolve(null));
+		mockApi.getItems.mockResolvedValue({Items: [{Id: 't1', Name: 'Song', Type: 'Audio'}], TotalRecordCount: 1});
+		render(<Library library={{Id: 'music1', Name: 'Music', CollectionType: 'music'}} backHandlerRef={{current: null}} onPlay={onPlay} />);
+		await settle();
+		act(() => mockScreens.music.onOpenGrid('songs'));
+		act(() => mockScreens.musicCategory.onOpenSongsGrid());
+		await settle();
+		const shuffle = document.querySelector('[data-spotlight-id="library-shuffle-btn"]');
+		expect(shuffle).not.toBeNull();
+		fireEvent.click(shuffle);
+		await settle();
+		expect(mockApi.getItems).toHaveBeenCalledWith(expect.objectContaining({IncludeItemTypes: 'Audio', SortBy: 'Random', ParentId: 'music1'}));
+		expect(onPlay).toHaveBeenCalledWith(expect.objectContaining({Id: 't1'}), false, {audioPlaylist: [expect.objectContaining({Id: 't1'})]});
 	});
 });

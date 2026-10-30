@@ -12,6 +12,7 @@ import {musicScreenFor} from '../MusicBrowse/musicScreens';
 import BookBrowse from '../BookBrowse';
 import BackdropLayer from '../../components/BackdropLayer';
 import TileGrid from '../../components/TileGrid';
+import IncompleteBadge from '../../components/IncompleteBadge';
 import {getImageUrl, getPrimaryImageId, formatDuration} from '../../utils/helpers';
 import useQuickReturnGrid from '../../hooks/useQuickReturnGrid';
 import {useSettings} from '../../context/SettingsContext';
@@ -38,8 +39,8 @@ import useHeaderGridKeys from '../../hooks/useHeaderGridKeys';
 import useStartLetter from '../../hooks/useStartLetter';
 import {useUserDataList} from '../../hooks/useUserDataSync';
 import useItemMenuHold, {cardIndexOf} from '../../hooks/useItemMenuHold';
-import {GRID_DIRECTIONS, IMAGE_SIZES, IMAGE_TYPES, capitalize, createGridKeyDown, createRowsLeftKeyDown, createToolbarKeyDown, cycleValue, focusOverhang, horizontalCellPad, stopPropagation} from '../../utils/gridChrome';
-import {DOCK_WIDTH, HOME_ICON, Letters, LibraryDock, LibraryTitle, ModernBar, ModernLetters, SEARCH_ICON, SETTINGS_ICON, SORT_ICON, libraryStyleOf} from './LibraryHeaders';
+import {GRID_DIRECTIONS, IMAGE_SIZES, IMAGE_TYPES, capitalize, libraryPosterSize, createGridKeyDown, createRowsLeftKeyDown, createToolbarKeyDown, cycleValue, focusOverhang, horizontalCellPad, stopPropagation} from '../../utils/gridChrome';
+import {DOCK_WIDTH, HOME_ICON, Letters, LibraryDock, LibraryTitle, ModernBar, ModernLetters, SEARCH_ICON, SETTINGS_ICON, SHUFFLE_ICON, SORT_ICON, libraryStyleOf} from './LibraryHeaders';
 import LibrarySkeleton from './LibrarySkeleton';
 
 import css from './Library.module.less';
@@ -112,6 +113,22 @@ let bookGridReturn = null;
 let musicScreenReturn = null;
 // And for the book library screen.
 let bookScreenReturn = null;
+
+// What a library keeps of its filters, in one shape whatever was stored
+const NO_FILTERS = {
+	favoritesOnly: false, playedFilter: 'all', likedFilter: 'all', seriesFilter: 'all', featureFilters: [], qualityFilters: [],
+	videoSourceFilters: [], ratingFilters: [], tagFilters: [], yearFilters: [], audioLanguageFilters: [], subtitleLanguageFilters: []
+};
+const normalizeFilters = (saved) => {
+	const from = saved && typeof saved === 'object' ? saved : {};
+	const out = {};
+	Object.keys(NO_FILTERS).forEach((key) => {
+		const fallback = NO_FILTERS[key];
+		const value = from[key];
+		out[key] = Array.isArray(fallback) ? (Array.isArray(value) ? value : fallback) : (typeof value === typeof fallback ? value : fallback);
+	});
+	return out;
+};
 
 const PLAYED_FILTERS = [
 	{key: 'all', label: $L('All')},
@@ -317,7 +334,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const activeSortOptions = isMusicLibrary
 		? MUSIC_SORT_OPTIONS
 		: SORT_OPTIONS.filter(o => !o.seriesOnly || isSeriesLibrary || followedSeries);
-	const [imageSize, setImageSize, sizeLoaded] = useStorage(`library_imageSize_${layoutId}`, 'medium');
+	const [imageSize, setImageSize, sizeLoaded] = useStorage(`library_imageSize_${layoutId}`, libraryPosterSize(settings, isPlaylistLibrary));
 	const [imageType, setImageType, typeLoaded] = useStorage(`library_imageType_${layoutId}`, isSquareDefault ? 'square' : 'poster');
 	const [gridDirection, setGridDirection, directionLoaded] = useStorage(`library_gridDirection_${layoutId}`, 'vertical');
 	const [storedGroupBy, setGroupBy, groupLoaded] = useStorage(`library_groupBy_${layoutId}`, 'none');
@@ -325,21 +342,54 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	const [sortKey, setSortKey, sortKeyLoaded] = useStorage(`library_sortKey_${layoutId}`, 'SortName');
 	const [sortOrder, setSortOrder, sortOrderLoaded] = useStorage(`library_sortOrder_${layoutId}`, '');
 	const [searchQuery, setSearchQuery] = useState(() => restoredBookGrid?.search || '');
-	const [cardText, setCardText, cardTextLoaded] = useStorage(`library_cardText_${layoutId}`, 'on');
+	const [cardText, setCardText, cardTextLoaded] = useStorage(`library_cardText_${layoutId}`, settings.libraryCardTitles === false ? 'off' : 'on');
 	const [letterNav, setLetterNav, letterNavLoaded] = useStorage(`library_letterNav_${layoutId}`, 'on');
+	// The filters of a library are kept on this device, the way its sort is, and its first page waits for them
+	// rather than being fetched with none and again once they land. The music and book libraries and the genre and
+	// studio screens keep none: what they open sets their filters. The genres picked in the popup are not kept either,
+	// since the book and music tiles use that same list for the genre they open.
+	const persistsFilters = Boolean(library?.Id) && !genreFilter && !studioFilter && !isMusicLibrary && !isBookLibrary;
+	const [storedFilters, setStoredFilters, filtersLoaded] = useStorage(`library_filters_${libraryId}`, null);
+	const [filtersFor, setFiltersFor] = useState(null);
+	const filtersReady = !persistsFilters || filtersFor === libraryId;
+	useEffect(() => {
+		if (!persistsFilters || !filtersLoaded || filtersFor === libraryId) return;
+		const kept = normalizeFilters(storedFilters);
+		setFavoritesOnly(kept.favoritesOnly);
+		setPlayedFilter(kept.playedFilter);
+		setLikedFilter(kept.likedFilter);
+		setSeriesFilter(kept.seriesFilter);
+		setFeatureFilters(kept.featureFilters);
+		setQualityFilters(kept.qualityFilters);
+		setVideoSourceFilters(kept.videoSourceFilters);
+		setRatingFilters(kept.ratingFilters);
+		setTagFilters(kept.tagFilters);
+		setYearFilters(kept.yearFilters);
+		setAudioLanguageFilters(kept.audioLanguageFilters);
+		setSubtitleLanguageFilters(kept.subtitleLanguageFilters);
+		setFiltersFor(libraryId);
+	}, [persistsFilters, filtersLoaded, filtersFor, libraryId, storedFilters]);
+	const filtersJson = JSON.stringify(normalizeFilters({
+		favoritesOnly, playedFilter, likedFilter, seriesFilter, featureFilters, qualityFilters, videoSourceFilters,
+		ratingFilters, tagFilters, yearFilters, audioLanguageFilters, subtitleLanguageFilters
+	}));
+	useEffect(() => {
+		if (!persistsFilters || filtersFor !== libraryId) return;
+		if (filtersJson !== JSON.stringify(normalizeFilters(storedFilters))) setStoredFilters(JSON.parse(filtersJson));
+	}, [filtersJson, persistsFilters, filtersFor, libraryId]); // eslint-disable-line react-hooks/exhaustive-deps
 	// The grid waits for the library's settings, so it is not drawn at the defaults and then again.
-	const layoutPending = followsLibrary && (styleLibraries === null || !(sizeLoaded && typeLoaded && directionLoaded && groupLoaded && sortKeyLoaded && sortOrderLoaded && cardTextLoaded && letterNavLoaded));
+	const layoutPending = !filtersReady || followsLibrary && (styleLibraries === null || !(sizeLoaded && typeLoaded && directionLoaded && groupLoaded && sortKeyLoaded && sortOrderLoaded && cardTextLoaded && letterNavLoaded));
 	const showCardText = cardText !== 'off';
 	const showLetterNav = letterNav !== 'off';
 	const libraryStyle = libraryStyleOf(settings);
 	const isDocked = libraryStyle === 'docked';
 	const detailedSubtitles = settings.useDetailedSubHeadings !== false;
 	const isMixedContentLibrary = library != null && (!library.CollectionType || library.CollectionType.toLowerCase() === 'folders');
-	const folderViewMode = settings.folderViewMode || 'local';
+	// Folder view is a switch of each library. Upstream's global override of it (a synced setting that could force it on or off
+	// for every library) is gone, and an old value of it left on the device does nothing.
 	const isFolderView =
 	isMixedContentLibrary ||
-	folderViewMode === 'on' ||
-	(folderViewMode !== 'off' && folderView === 'on') ||
+	folderView === 'on' ||
 	Boolean(bookGridView?.folders);
 	const [folderStack, setFolderStack] = useState(() => (returnTo?.libraryId === libraryId && returnTo.folderStack) || []);
 	const currentFolderId = folderStack.length > 0 ? folderStack[folderStack.length - 1].id : library?.Id;
@@ -723,6 +773,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 			setIsLoading(false);
 			return;
 		}
+		if (!filtersReady) return;
 		if (library || genreFilter || studioFilter) {
 			setIsLoading(true);
 			setAllItems([]);
@@ -733,7 +784,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 			initialFocusDoneRef.current = false;
 			loadItemsRef.current(0, false);
 		}
-	}, [library, sortKey, sortOrder, favoritesOnly, playedFilter, likedFilter, seriesFilter, featureFilters, qualityFilters, videoSourceFilters, genreFilters, ratingFilters, tagFilters, yearFilters, audioLanguageFilters, subtitleLanguageFilters, musicContentType, bookGridView, isFolderView, currentFolderId, genreFilter, studioFilter, isBrowseHome, settings.groupItemsIntoCollections]);
+	}, [library, filtersReady, sortKey, sortOrder, favoritesOnly, playedFilter, likedFilter, seriesFilter, featureFilters, qualityFilters, videoSourceFilters, genreFilters, ratingFilters, tagFilters, yearFilters, audioLanguageFilters, subtitleLanguageFilters, musicContentType, bookGridView, isFolderView, currentFolderId, genreFilter, studioFilter, isBrowseHome, settings.groupItemsIntoCollections]);
 
 	// The values the library actually holds, read once per library so opening
 	// the filter panel does not wait on the network. A genre or studio has none: the server only lists
@@ -775,6 +826,18 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		else handleOpenMusicGrid(target, genre);
 	}, [handleOpenMusicGrid]);
 	const handleOpenSongsGrid = useCallback(() => handleOpenMusicGrid('songs'), [handleOpenMusicGrid]);
+	const handleShuffle = useCallback(async () => {
+		const res = await effectiveApi.getItems({
+			ParentId: library?.Id,
+			IncludeItemTypes: 'Audio',
+			Recursive: true,
+			SortBy: 'Random',
+			Limit: 300,
+			Fields: 'MediaSources,MediaStreams'
+		}).catch(() => null);
+		const tracks = res?.Items || [];
+		if (tracks.length > 0) onPlay?.(tracks[0], false, {audioPlaylist: tracks});
+	}, [effectiveApi, library, onPlay]);
 	const handleCloseMusicScreen = useCallback(() => setMusicScreen(null), []);
 	const handleMusicScreenSelect = useCallback((item) => {
 		musicScreenReturn = {libraryId, screen: musicScreen};
@@ -1126,10 +1189,9 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 	}, [playlistGroupingOn, updateSetting]);
 
 	const handleToggleFolderView = useCallback(() => {
-		if (folderViewMode !== 'local') return;
 		setFolderView(isFolderView ? 'off' : 'on');
 		setFolderStack([]);
-	}, [folderViewMode, isFolderView, setFolderView]);
+	}, [isFolderView, setFolderView]);
 
 	const handleToggleCardText = useCallback(() => {
 		setCardText(showCardText ? 'off' : 'on');
@@ -1247,6 +1309,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 						<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
 					</div>
 				)}
+				<IncompleteBadge itemId={item.Id} belowFavorite={item.UserData?.IsFavorite} />
 				{item.UserData?.Played && (
 					<div className={css.watchedBadge}>
 						<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
@@ -1330,6 +1393,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 
 	// What the Modern bar and the Docked panel share. Every value here holds still while
 	// focus moves through the grid, so neither redraws with the focused item.
+	const isSongs = isMusicLibrary && musicContentType === 'songs';
 	const controlProps = {
 		canGroup,
 		sortLabel,
@@ -1342,6 +1406,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 		onSort: handleToggleSortPanel,
 		onGroup: handleOpenGroupBy,
 		onShow: handleOpenPlayedFilter,
+		onShuffle: isSongs ? handleShuffle : null,
 		onSettings: handleToggleSettingsPanel
 	};
 	const displayLabel = $L(capitalize(imageSize));
@@ -1659,6 +1724,18 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 							</svg>
 						</SpottableButton>
 
+						{isSongs && (
+							<SpottableButton
+								className={css.toolbarBtn}
+								onClick={handleShuffle}
+								spotlightId="library-shuffle-btn"
+							>
+								<svg className={css.toolbarIcon} viewBox="0 0 24 24">
+									<path d={SHUFFLE_ICON} />
+								</svg>
+							</SpottableButton>
+						)}
+
 						<SpottableButton
 							className={css.toolbarBtn}
 							onClick={handleToggleSettingsPanel}
@@ -1771,6 +1848,10 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 								return renderRadioRow(option.key, `${$L(option.label)}${active ? arrow : ''}`, active, handleSortSelect, 'data-sort-key');
 							})
 						)),
+						renderSection('view', $L('Display'), [showLetterNav && $L('Show Alphabet'), isFolderView && $L('Folder View')].filter(Boolean).join(', ') || null, () => ([
+							<FilterOption key="alphabet" multi label={$L('Show Alphabet')} selected={showLetterNav} onClick={handleToggleLetterNav} />,
+							!isFilterMode && <FilterOption key="folders" multi label={$L('Folder View')} selected={isFolderView} onClick={handleToggleFolderView} />
+						])),
 						isMusicLibrary && renderSection('music', $L('Show'), chosenLabel(MUSIC_CONTENT_TYPES, musicContentType), () => (
 							MUSIC_CONTENT_TYPES.map((ct) => renderRadioRow(ct.key, $L(ct.label), musicContentType === ct.key, handleMusicContentSelect, 'data-content-key'))
 						)),
@@ -1883,7 +1964,7 @@ const Library = ({library, genreFilter, studioFilter, onSelectItem, onViewPhoto,
 							<div className={css.settingValue}>{showLetterNav ? $L('On') : $L('Off')}</div>
 						</SpottableButton>
 
-						{!isFilterMode && folderViewMode === 'local' && (
+						{!isFilterMode && (
 							<SpottableButton
 								className={css.settingRow}
 								onClick={handleToggleFolderView}

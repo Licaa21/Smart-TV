@@ -3,6 +3,7 @@ import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import Spotlight from '@enact/spotlight';
 import {KEYS} from '../../utils/keys';
+import {layoutRectOf} from '../../utils/slideScroll';
 import {useSettings} from '../../context/SettingsContext';
 import LogoTile from '../LogoTile';
 
@@ -118,7 +119,7 @@ const SeerrTileRow = ({
 				window.cancelAnimationFrame(scrollTimeoutRef.current);
 			}
 			scrollTimeoutRef.current = window.requestAnimationFrame(() => {
-				const cardRect = card.getBoundingClientRect();
+				const cardRect = layoutRectOf(card);
 				if (!scrollerRectRef.current) {
 					scrollerRectRef.current = scroller.getBoundingClientRect();
 				}
@@ -173,7 +174,7 @@ const SeerrTileRow = ({
 			onKeyDown={handleKeyDown}
 		>
 			<h2 className={css.title}>{title}</h2>
-			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus}>
+			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus} data-slide-scroll="x">
 				<div className={css.items}>
 					{items.map((item, index) => (
 						<TileCard

@@ -8,6 +8,7 @@ import LogoTile from '../../components/LogoTile';
 import {useAuth} from '../../context/AuthContext';
 import {useSeerr} from '../../context/SeerrContext';
 import {pointerHover} from '../../utils/focusScroll';
+import {layoutRectOf} from '../../utils/slideScroll';
 import {useSettings} from '../../context/SettingsContext';
 import seerrApi from '../../services/seerrApi';
 import {seerrGenreBackdrop} from '../../utils/seerrGenreArt';
@@ -288,7 +289,7 @@ const DiscoverRow = memo(function DiscoverRow({
 		const scroller = scrollerRef.current;
 		const hover = pointerHover();
 		if (card && scroller && !hover) {
-			const cardRect = card.getBoundingClientRect();
+			const cardRect = layoutRectOf(card);
 			const scrollerRect = scroller.getBoundingClientRect();
 			if (cardRect.left < scrollerRect.left) {
 				scroller.scrollLeft -= (scrollerRect.left - cardRect.left + 50);
@@ -366,7 +367,7 @@ const DiscoverRow = memo(function DiscoverRow({
 			style={typeof rowSpacing === 'number' ? {marginBottom: rowSpacing} : undefined}
 		>
 			<h2 className={css.rowTitle}>{config.title}</h2>
-			<div className={css.rowScroller} ref={scrollerRef}>
+			<div className={css.rowScroller} ref={scrollerRef} data-slide-scroll="x">
 				<RowContainer
 					className={css.rowItems}
 					spotlightId={spotlightId}
@@ -626,7 +627,7 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 			if (!container || !row) return;
 			const offset = showDetailSection && settings.navbarPosition !== 'left' ? 20 : 0;
 			// the first row sits under a margin of its own, which is not scrolled away
-			const top = rowIndex === 0 ? 0 : row.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - offset;
+			const top = rowIndex === 0 ? 0 : layoutRectOf(row).top - container.getBoundingClientRect().top + container.scrollTop - offset;
 			if (Math.abs(container.scrollTop - top) > 1) container.scrollTop = Math.max(0, top);
 		};
 		rest();
@@ -794,6 +795,8 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 					<div
 						className={`${css.rowsContainer} ${showDetailSection || settings.navbarPosition === 'left' ? '' : css.rowsBelowNav}`}
 						ref={rowsContainerRef}
+						data-slide-scroll="y"
+						data-slide-content="children"
 					>
 						{visibleRows.map((config, index) => (
 							<DiscoverRow

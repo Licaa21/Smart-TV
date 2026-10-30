@@ -6,6 +6,7 @@ import Spotlight from '@enact/spotlight';
 import {isPaused} from '@enact/spotlight/Pause';
 import {useAuth} from '../../context/AuthContext';
 import {keepFocusInView, pointerHover} from '../../utils/focusScroll';
+import {layoutRectOf} from '../../utils/slideScroll';
 import {isKidsMode} from '../../utils/kidsMode';
 import {withoutBlockedItems} from '../../services/parentalControls';
 import {useSettings} from '../../context/SettingsContext';
@@ -634,7 +635,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 			const row = document.querySelector(`[data-spotlight-id="${rowSpotlightId(rowIndex)}"]`);
 			if (!container || !row) return;
 			const view = container.getBoundingClientRect();
-			const rect = row.getBoundingClientRect();
+			const rect = layoutRectOf(row);
 			// Coming up from the row below leaves this row's title above the top edge.
 			const hidden = view.top + ROW_TOP_MARGIN - rect.top;
 			if (hidden > 0) {
@@ -694,7 +695,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 			});
 		}
 		window.requestAnimationFrame(() => {
-			const cardRect = card.getBoundingClientRect();
+			const cardRect = layoutRectOf(card);
 			const scrollerRect = scroller.getBoundingClientRect();
 			const leftEdge = scrollerRect.left + ROW_SCROLL_MARGIN;
 			const rightEdge = scrollerRect.right - ROW_SCROLL_MARGIN;
@@ -810,7 +811,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	return (
 		<div className={css.searchPage}>
 		<ScreenBackdrop item={backdropItem} serverUrl={serverUrl} />
-		<div ref={containerRef} className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : musicBar ? css.musicBarOffset : ''}`}>
+		<div ref={containerRef} className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : musicBar ? css.musicBarOffset : ''}`} data-slide-scroll="y" data-slide-content="children">
 			<div className={css.searchInputSection} onFocus={scrollToTop}>
 				<div
 					className={`${css.searchInputWrapper} ${searchInputFocused ? css.searchInputFocused : ''}`}

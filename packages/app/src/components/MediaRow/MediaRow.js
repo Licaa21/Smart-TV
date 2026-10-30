@@ -1,5 +1,6 @@
 import {useCallback, useState, useRef, useEffect, memo} from 'react';
 import {initialRowCount, grownRowCount, rememberedRowCount, rememberRowCount} from '../../utils/rowCap';
+import {layoutRectOf} from '../../utils/slideScroll';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import Spotlight from '@enact/spotlight';
 import Spottable from '@enact/spotlight/Spottable';
@@ -105,7 +106,7 @@ const MediaRow = ({
 				window.cancelAnimationFrame(scrollTimeoutRef.current);
 			}
 			scrollTimeoutRef.current = window.requestAnimationFrame(() => {
-				const cardRect = card.getBoundingClientRect();
+				const cardRect = layoutRectOf(card);
 				if (!scrollerRectRef.current) {
 					scrollerRectRef.current = scroller.getBoundingClientRect();
 				}
@@ -188,7 +189,7 @@ const MediaRow = ({
 		>
 			<h2 className={css.title}>{title}</h2>
 			{subtitle && <div className={css.subtitle}>{subtitle}</div>}
-			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus}>
+			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus} data-slide-scroll="x">
 				<div className={css.items}>
 						{onSeeAll && (
 							<SpottableDiv
