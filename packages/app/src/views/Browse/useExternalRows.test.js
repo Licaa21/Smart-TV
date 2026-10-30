@@ -20,6 +20,8 @@ jest.mock('../../utils/externalHomeRows', () => ({
 jest.mock('../../services/externalRowsApi', () => ({fetchSeasonalRow: jest.fn()}));
 jest.mock('../../services/jellyfinApi', () => ({resolveItemsByProviderIds: async (items) => items}));
 jest.mock('../../utils/deviceCountry', () => ({resolveDeviceCountry: async () => 'US'}));
+// The rows are asked for in the language the server is set to, which needs the server
+jest.mock('../../utils/metadataLanguage', () => ({currentMetadataLanguage: async () => null}));
 
 const settings = {useMoonfinPlugin: true};
 const homeRows = [{id: 'tmdb_popular_movies', enabled: true}];

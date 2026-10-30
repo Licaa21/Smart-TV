@@ -673,7 +673,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${musicCss.track}:focus`, `background: ${buttonFocused}; border-color: ${homeAccent.a(0.72)};`);
 	rule(`.${musicCss.track}:focus .${musicCss.trackTitle}`, `color: ${invertedStrong};`);
 	rule(`.${musicCss.track}:focus .${musicCss.trackNumber}, .${musicCss.track}:focus .${musicCss.trackSubtitle}, .${musicCss.track}:focus .${musicCss.trackLength}`, `color: ${invertedSoft};`);
-	rule(`.${musicCss.trackRank}`, `color: ${accent};`);
+	rule(`.${musicCss.trackRank}`, `color: ${homeAccent.css};`);
 
 	// The music category screens. The genre stations and the mix cards other than Everything keep
 	// their own palette with white text.
@@ -683,25 +683,25 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${ms.count}, .${ms.subMeta}`, `color: ${os(0.65)};`);
 	rule(`.${ms.meta}`, `color: ${os(0.75)};`);
 	rule(`.${ms.empty}, .${ms.loading}, .${ms.artPlaceholder}`, `color: ${os(0.5)};`);
-	rule(`.${ms.eyebrow}, .${ms.letter}`, `color: ${accent};`);
+	rule(`.${ms.eyebrow}, .${ms.letter}`, `color: ${homeAccent.css};`);
 	rule(`.${ms.pill}`, `background: ${os(0.08)}; color: ${onSurface};`);
-	rule(`.${ms.pillPrimary}`, `background: ${accent}; color: ${onAccent};`);
+	rule(`.${ms.pillPrimary}`, `background: ${homeAccent.css}; color: ${homeAccent.on};`);
 	rule(`.${ms.pill}:focus`, `background: ${buttonFocused}; border-color: ${focusColor}; color: ${buttonInk};`);
-	rule(`.${ms.pill} .${ms.accentIcon}`, `fill: ${accent};`);
+	rule(`.${ms.pill} .${ms.accentIcon}`, `fill: ${homeAccent.css};`);
 	rule(`.${ms.rail}`, `background: ${os(0.05)};`);
 	rule(`.${ms.railLetter}`, `color: ${os(0.7)};`);
-	rule(`.${ms.railLetter}.${ms.railCurrent}`, `color: ${accent};`);
+	rule(`.${ms.railLetter}.${ms.railCurrent}`, `color: ${homeAccent.css};`);
 	rule(`.${ms.railLetter}:focus, .${ms.mix}:focus, .${ms.station}:focus`, `box-shadow: 0 0 0 3px ${focusColor};`);
 	rule(`.${ms.albumPanel}, .${ms.shelfPlaceholder}, .${ms.playlistArt}, .${ms.detailArt}`, `background: ${os(0.06)};`);
 	rule(`.${ms.caret}`, `border-bottom-color: ${os(0.06)};`);
-	rule(`.${ms.mixAccent}`, `background: ${accent}; color: ${onAccent};`);
-	rule(`.${ms.playlistShown}`, `background: ${accentA(0.16)};`);
+	rule(`.${ms.mixAccent}`, `background: ${homeAccent.css}; color: ${homeAccent.on};`);
+	rule(`.${ms.playlistShown}`, `background: ${homeAccent.a(0.16)};`);
 	rule(`.${ms.playlistRow}:focus`, `background: ${os(0.12)}; box-shadow: inset 0 0 0 3px ${focusColor};`);
 	// Classic's chips over a category screen. The Classic overview's own chips are left as they are.
 	const chip = musicChipsCss.chip;
 	rule(`.${ms.screenChips} .${chip}`, `background: ${os(0.09)}; color: ${os(0.8)};`);
-	rule(`.${ms.screenChips} .${ms.chipCurrent}:not(:focus)`, `background: ${accentA(0.16)}; color: ${accent};`);
-	rule(`.${ms.screenChips} .${chip}:focus`, `background: ${accent}; border-color: ${accent}; color: ${onAccent}; box-shadow: 0 0 14px 1px ${accentA(0.45)};`);
+	rule(`.${ms.screenChips} .${ms.chipCurrent}:not(:focus)`, `background: ${homeAccent.a(0.16)}; color: ${homeAccent.css};`);
+	rule(`.${ms.screenChips} .${chip}:focus`, `background: ${homeAccent.css}; border-color: ${homeAccent.css}; color: ${homeAccent.on}; box-shadow: 0 0 14px 1px ${homeAccent.a(0.45)};`);
 
 	// The music Sort & Filter panel and the Albums genre list, which share its rows.
 	const mf = musicFilterCss;
@@ -711,9 +711,9 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${mf.option}`, `color: ${os(0.8)};`);
 	rule(`.${mf.option}:focus`, `background: ${os(0.1)}; border-color: ${focusColor}; color: ${onSurface};`);
 	rule(`.${mf.radio}, .${mf.check}`, `border-color: ${os(0.35)};`);
-	rule(`.${mf.optionActive} .${mf.radio}`, `border-color: ${accent};`);
-	rule(`.${mf.optionActive} .${mf.check}`, `border-color: ${accent}; background: ${accent};`);
-	rule(`.${mf.radioFill}`, `background: ${accent};`);
+	rule(`.${mf.optionActive} .${mf.radio}`, `border-color: ${homeAccent.css};`);
+	rule(`.${mf.optionActive} .${mf.check}`, `border-color: ${homeAccent.css}; background: ${homeAccent.css};`);
+	rule(`.${mf.radioFill}`, `background: ${homeAccent.css};`);
 
 	// The book library screens. They share the music screens' header, pills, panels and lists above,
 	// and only the genre stations keep their own palette with white text.
@@ -725,7 +725,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${bs.overviewText}, .${bs.detailOverview}`, `color: ${os(0.75)};`);
 	rule(`.${bs.progressLine}, .${bs.statLabel}, .${bs.panelCount}`, `color: ${os(0.65)};`);
 	rule(`.${bs.track}`, `background: ${os(0.18)};`);
-	rule(`.${bs.trackFill}`, `background: ${accent};`);
+	rule(`.${bs.trackFill}`, `background: ${homeAccent.css};`);
 	rule(`.${bs.panel}, .${bs.stat}, .${bs.collectionCard}, .${bs.boardPanel}, .${bs.hero}`, `background: ${os(0.06)};`);
 	rule(`.${bs.stripCover}, .${bs.heroCover}, .${bs.tag}`, `background: ${os(0.08)};`);
 	rule(`.${bs.tag}`, `color: ${os(0.8)};`);
@@ -735,16 +735,16 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${bs.search}:focus`, `border-color: ${focusColor};`);
 	rule(`.${bs.detailPanel}`, `background: ${surface};`);
 	rule(`.${bs.subjects} .${chip}`, `background: ${os(0.09)}; color: ${os(0.8)};`);
-	rule(`.${bs.subjects} .${ms.chipCurrent}:not(:focus)`, `background: ${accentA(0.16)}; color: ${accent};`);
-	rule(`.${bs.subjects} .${chip}:focus`, `background: ${accent}; border-color: ${accent}; color: ${onAccent}; box-shadow: 0 0 14px 1px ${accentA(0.45)};`);
+	rule(`.${bs.subjects} .${ms.chipCurrent}:not(:focus)`, `background: ${homeAccent.a(0.16)}; color: ${homeAccent.css};`);
+	rule(`.${bs.subjects} .${chip}:focus`, `background: ${homeAccent.css}; border-color: ${homeAccent.css}; color: ${homeAccent.on}; box-shadow: 0 0 14px 1px ${homeAccent.a(0.45)};`);
 	rule(`.${bc.cover}`, `background: ${os(0.08)}; border-radius: ${cardRadius};`);
 	rule(`.${bc.card}:focus .${bc.cover}`, `border-color: ${focusColor}; box-shadow: ${glowOr('none')};`);
 	rule(`.${bc.title}`, `color: ${os(0.9)};`);
 	rule(`.${bc.card}:focus .${bc.title}`, `color: ${onSurface};`);
 	rule(`.${bc.subtitle}`, `color: ${os(0.6)};`);
 	rule(`.${bc.placeholderIcon}`, `fill: ${os(0.35)};`);
-	rule(`.${bc.progress}`, `background: ${accent};`);
-	rule(`.${bc.numberBadge}`, `background: ${accent}; color: ${onAccent};`);
+	rule(`.${bc.progress}`, `background: ${homeAccent.css};`);
+	rule(`.${bc.numberBadge}`, `background: ${homeAccent.css}; color: ${homeAccent.on};`);
 	rule(`.${br.rail}`, `border-right-color: ${os(0.06)};`);
 	rule(`.${br.railTitle}, .${br.railRow}, .${br.continueTitle}`, `color: ${onSurface};`);
 	rule(`.${br.railSubtitle}`, `color: ${os(0.6)};`);
@@ -752,16 +752,16 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${br.railRow} svg`, `fill: ${os(0.8)};`);
 	rule(`.${br.railRow}:focus`, `box-shadow: 0 0 0 3px ${focusColor};`);
 	rule(`.${br.railCount}, .${br.continueSubtitle}`, `color: ${os(0.62)};`);
-	rule(`.${br.railSelected}`, `background: ${accentA(0.16)};`);
-	rule(`.${br.railSelected} svg`, `fill: ${accent};`);
-	rule(`.${br.railSelected} .${br.railCount}`, `color: ${accent};`);
+	rule(`.${br.railSelected}`, `background: ${homeAccent.a(0.16)};`);
+	rule(`.${br.railSelected} svg`, `fill: ${homeAccent.css};`);
+	rule(`.${br.railSelected} .${br.railCount}`, `color: ${homeAccent.css};`);
 	rule(`.${br.continueTile}`, `background: ${os(0.06)};`);
 	rule(`.${br.continueTile}:focus`, `box-shadow: 0 0 0 3px ${focusColor};`);
 	rule(`.${br.continueCover}, .${br.continueCoverAudio}`, `background: ${surfaceVariant};`);
 	rule(`.${br.continuePlaceholder}`, `fill: ${os(0.4)};`);
 	rule(`.${br.continueProgress}`, `background: ${os(0.14)};`);
-	rule(`.${br.continueProgress} div, .${br.continuePlay}`, `background: ${accent};`);
-	rule(`.${br.continuePlay} svg`, `fill: ${onAccent};`);
+	rule(`.${br.continueProgress} div, .${br.continuePlay}`, `background: ${homeAccent.css};`);
+	rule(`.${br.continuePlay} svg`, `fill: ${homeAccent.on};`);
 	rule(`.${br.continueMeta}`, `color: ${os(0.68)};`);
 
 	// Detail screens, nouveau layout

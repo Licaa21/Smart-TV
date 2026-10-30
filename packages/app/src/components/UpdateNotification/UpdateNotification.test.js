@@ -48,7 +48,7 @@ describe('UpdateNotification', () => {
 		expect(onDismiss).toHaveBeenCalled();
 	});
 
-	test('takes focus back when something behind it takes it later, as Home's media bar does', () => {
+	test('takes focus back when something behind it takes it later, as the media bar of Home does', () => {
 		Spotlight.focus.mockClear();
 		render(<div><button>behind</button><UpdateNotification updateInfo={updateInfo} formattedNotes="notes" onDismiss={() => {}} /></div>);
 		screen.getByText('behind').focus();

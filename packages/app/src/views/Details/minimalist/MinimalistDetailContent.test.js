@@ -18,6 +18,8 @@ jest.mock('react/jsx-dev-runtime', () => {
 	};
 });
 jest.mock('@enact/i18n/$L', () => ({__esModule: true, default: (str) => str}));
+// The fork's anime markers read the settings, which these tests do not provide
+jest.mock('../../../components/AnimeMarkerPills', () => ({AnimeItemPills: () => null}));
 jest.mock('@enact/spotlight', () => ({__esModule: true, default: {focus: jest.fn(() => true)}}));
 
 // Spottable and the spotlight containers need the framework's own React, so they become plain

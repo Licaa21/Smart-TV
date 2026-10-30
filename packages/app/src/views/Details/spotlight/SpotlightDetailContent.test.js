@@ -25,6 +25,7 @@ jest.mock('@enact/spotlight/SpotlightContainerDecorator', () => {
 // Only the hero title is under test, so everything drawn around it stays out of the way.
 jest.mock('../../../components/RatingsRow', () => () => null);
 jest.mock('../../../components/IncompleteBadge', () => ({IncompleteDetailLine: () => null}));
+jest.mock('../../../components/AnimeMarkerPills', () => ({AnimeItemPills: () => null}));
 jest.mock('../../../components/seerr/SeerrStatusBadge', () => ({SeerrStatusBadge: () => null, SeerrDownloadBars: () => null}));
 jest.mock('../../../components/seerr/SeerrSections', () => ({seerrChipCount: () => 0}));
 jest.mock('../../../context/SeerrContext', () => ({useSeerr: () => ({isEnabled: false})}));
