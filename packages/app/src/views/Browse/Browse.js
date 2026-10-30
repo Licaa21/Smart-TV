@@ -19,6 +19,7 @@ import {SkeletonShimmer, skeletonTitleWidths} from '../../components/Skeleton';
 import {getImageUrl, getBackdropId} from '../../utils/helpers';
 import {focusedCardIndex, rowEntryCardIndex, cardToRestore, focusedRowIndex} from '../../utils/rowFocusMemory';
 import {channelForProgram, isLiveTvProgram} from '../../utils/liveTvLibrary';
+import {slideLayoutChange} from '../../utils/slideScroll';
 import {radiusToCss, shadowToCss, toCssColor} from '../../theme/themeSpec';
 import DetailSection from './DetailSection';
 import FeaturedBanner from './FeaturedBanner';
@@ -491,7 +492,7 @@ const Browse = ({
 			}
 			return;
 		}
-		if (closeRow) closeRow();
+		if (closeRow) slideLayoutChange(contentRowsRef.current, closeRow);
 		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current));
 	}, [showFeaturedBar, featuredItems.length, settings.navbarPosition, scrollToRow, setBrowseMode, focusableRowFrom]);
 
@@ -523,7 +524,7 @@ const Browse = ({
 	const handleNavigateDown = useCallback((fromRowIndex, closeRow) => {
 		const targetIndex = focusableRowFrom(fromRowIndex + 1, 1);
 		if (targetIndex < 0) return;
-		if (closeRow) closeRow();
+		if (closeRow) slideLayoutChange(contentRowsRef.current, closeRow);
 		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current));
 	}, [scrollToRow, focusableRowFrom]);
 

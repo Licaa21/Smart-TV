@@ -1,4 +1,4 @@
-import {SLIDE_MS, installSlideScroll, slideMsFor, layoutRectOf, offsetOf, resetSlideScroll, shouldSlide, slideShiftOf, slidesAtLevel} from './slideScroll';
+import {SLIDE_MS, installSlideScroll, slideLayoutChange, slideMsFor, layoutRectOf, offsetOf, resetSlideScroll, shouldSlide, slideShiftOf, slidesAtLevel} from './slideScroll';
 
 let mockLevel = 3;
 // What the viewer picked, or null for Auto
@@ -169,6 +169,112 @@ describe('on the page', () => {
 		nextFrame();
 		expect(first.style.transform).toBe('');
 		expect(first.style.transition).toContain(`${slideMsFor('y', 200)}ms`);
+	});
+
+	describe('a change of layout the key press made', () => {
+		// A row closing pulls the children under it up, which is what the layout does before the scroll is set
+		const closing = (nodes, tops) => nodes.forEach((node, i) => Object.defineProperty(node, 'offsetTop', {configurable: true, value: tops[i]}));
+
+		it('starts each child from where it was, so the first frame does not jump by what the layout moved', () => {
+			const {container, first, second} = row('y', 'children');
+			closing([first, second], [0, 400]);
+			now += 1000;
+			arrow(40);
+			now += 20;
+			slideLayoutChange(container, () => closing([first, second], [0, 150]));
+			scrolled(container, 'scrollTop', 100);
+			// The first child did not move, the second was pulled up by 250 and the list scrolled by 100
+			expect(first.style.transform).toBe('translate3d(0, 100px, 0)');
+			expect(second.style.transform).toBe('translate3d(0, 350px, 0)');
+			nextFrame();
+			nextFrame();
+			expect(first.style.transform).toBe('');
+			expect(second.style.transform).toBe('');
+			expect(second.style.transition).toContain(`${slideMsFor('y', 100)}ms`);
+		});
+
+		it('is let go when the slide that follows is not the same key press', () => {
+			const {container, first, second} = row('y', 'children');
+			closing([first, second], [0, 400]);
+			now += 1000;
+			arrow(40);
+			now += 20;
+			slideLayoutChange(container, () => closing([first, second], [0, 150]));
+			// Another press comes before the list is scrolled
+			now += 400;
+			arrow(40);
+			now += 20;
+			scrolled(container, 'scrollTop', 100);
+			expect(second.style.transform).toBe('translate3d(0, 100px, 0)');
+		});
+
+		it('is let go by a scroll that is not slid, and does not reach the next one', () => {
+			const {container, first, second} = row('y', 'children');
+			closing([first, second], [0, 400]);
+			now += 1000;
+			arrow(40);
+			// A held key: the second press is closer than a held gap, so its scroll jumps
+			now += 100;
+			arrow(40);
+			slideLayoutChange(container, () => closing([first, second], [0, 150]));
+			scrolled(container, 'scrollTop', 100);
+			expect(second.style.transform).toBe('');
+			// A press of its own, with no change of layout, carries nothing over
+			now += 1000;
+			arrow(40);
+			now += 20;
+			scrolled(container, 'scrollTop', 300);
+			expect(second.style.transform).toBe('translate3d(0, 200px, 0)');
+		});
+
+		it('keeps the shift through the scrolls that follow in the same press', () => {
+			const {container, first, second} = row('y', 'children');
+			closing([first, second], [0, 400]);
+			now += 1000;
+			arrow(40);
+			now += 20;
+			slideLayoutChange(container, () => closing([first, second], [0, 150]));
+			scrolled(container, 'scrollTop', 300);
+			nextFrame();
+			// The row is put back on the frame behind it
+			scrolled(container, 'scrollTop', 200);
+			expect(first.style.transform).toBe('translate3d(0, 200px, 0)');
+			expect(second.style.transform).toBe('translate3d(0, 450px, 0)');
+		});
+
+		it('carries on from where each child is drawn when the press before is still easing', () => {
+			const {container, first, second} = row('y', 'children');
+			// The second child has 40px left of the slide before
+			window.getComputedStyle.mockImplementation((node) => ({transform: node === second ? 'matrix(1, 0, 0, 1, 0, 40)' : 'matrix(1, 0, 0, 1, 0, 0)', scrollBehavior: 'auto'}));
+			now += 1000;
+			arrow(40);
+			now += 20;
+			scrolled(container, 'scrollTop', 100);
+			expect(first.style.transform).toBe('translate3d(0, 100px, 0)');
+			expect(second.style.transform).toBe('translate3d(0, 140px, 0)');
+		});
+
+		it('adds its shift to a slide of the press before that is still waiting', () => {
+			const {container, first, second} = row('y', 'children');
+			closing([first, second], [0, 400]);
+			now += 1000;
+			arrow(40);
+			now += 20;
+			scrolled(container, 'scrollTop', 100);
+			// The frames stalled, and the next press is past a held gap with the slide still waiting
+			now += 250;
+			arrow(40);
+			slideLayoutChange(container, () => closing([first, second], [0, 150]));
+			scrolled(container, 'scrollTop', 200);
+			expect(first.style.transform).toBe('translate3d(0, 200px, 0)');
+			expect(second.style.transform).toBe('translate3d(0, 450px, 0)');
+		});
+
+		it('only runs the change when there is nothing to slide', () => {
+			const change = jest.fn();
+			slideLayoutChange(null, change);
+			expect(change).toHaveBeenCalledTimes(1);
+		});
 	});
 
 	it('takes a few pixels of correction into the slide that waits, and does not cancel it', () => {
