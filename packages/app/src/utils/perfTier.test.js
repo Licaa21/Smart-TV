@@ -40,6 +40,10 @@ describe('computePerfTier', () => {
 		expect(computePerfTier('Mozilla/5.0 (SMART-TV; LINUX; Tizen 9.0) AppleWebKit/537.36 (KHTML, like Gecko) 120.0.6099.5/9.0 TV Safari/537.36')).toBe('high');
 	});
 
+	test('a version with five numbers, as some Tizen 5 sets write it, is read too', () => {
+		expect(chromiumMajorOf('Mozilla/5.0 (SMART-TV; LINUX; Tizen 5.5) AppleWebKit/537.36 (KHTML, like Gecko) 69.0.3497.106.1/5.5 TV Safari/537.36')).toBe(69);
+	});
+
 	test('the old WebKit version number is not an engine version', () => {
 		expect(chromiumMajorOf('Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/2.4 TV Safari/538.1')).toBeNull();
 	});

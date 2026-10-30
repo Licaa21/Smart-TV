@@ -1,12 +1,12 @@
 // The Chromium version a user agent names. Samsung's TV browser names its engine without the word Chrome, as the number
-// after "like Gecko" (Tizen 6.0: `(KHTML, like Gecko) 76.0.3809.146/6.0 TV Safari/537.36`), and reading it only by Chrome/
+// after "like Gecko" (Tizen 6.0: `(KHTML, like Gecko) 76.0.3809.146/6.0 TV Safari/537.36`, with a fifth number on some older sets), and reading it only by Chrome/
 // made every Samsung set of Tizen 5 and newer read as the lowest level. The old Tizen 2.4 and 3.0 WebKit says
 // `Version/2.4`, which is not four numbers, and stays unread.
 export const chromiumMajorOf = (ua) => {
 	const text = ua || '';
 	const chrome = text.match(/Chrome\/(\d+)/);
 	if (chrome) return parseInt(chrome[1], 10);
-	const samsung = text.match(/like Gecko\)\s+(\d+)\.\d+\.\d+\.\d+\//);
+	const samsung = text.match(/like Gecko\)\s+(\d+)(?:\.\d+)+\//);
 	return samsung ? parseInt(samsung[1], 10) : null;
 };
 
