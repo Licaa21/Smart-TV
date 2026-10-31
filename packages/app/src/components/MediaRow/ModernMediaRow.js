@@ -1,5 +1,6 @@
 import {useCallback, useRef, useEffect, useState, memo} from 'react';
 import {flushSync} from 'react-dom';
+import {keepInPlace} from '../../utils/slideScroll';
 import {initialRowCount, grownRowCount, rememberedRowCount, rememberRowCount} from '../../utils/rowCap';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import Spotlight from '@enact/spotlight';
@@ -13,6 +14,28 @@ import PlaceholderRow from './PlaceholderRow';
 import {useWarmRow, cardPosition} from './warmWindow';
 
 import css from './ModernMediaRow.module.less';
+
+// A focus or a blur this soon after Up or Down is the move to another row
+const MOVE_BY_KEY_MS = 300;
+// The card moved to opens in the later part of the slide of the list, and is there at once, not before it starts and not
+// while it is still beginning
+const GROW_AFTER_MS = 100;
+// The row left stays open while the list slides away. It closes once it is out of screen, checked from the slide's end, or at
+// the latest when the slide is over, whether it is out of screen or not
+const OFF_SCREEN_CHECK_FROM_MS = 150;
+const OFF_SCREEN_CHECK_MS = 50;
+const HOLD_OPEN_MS = 450;
+let verticalMoveAt = 0;
+
+const isOffScreen = (rowNode) => {
+	const list = rowNode && rowNode.closest ? rowNode.closest('[data-slide-scroll="y"]') : null;
+	if (!list) return false;
+	const row = rowNode.getBoundingClientRect();
+	const view = list.getBoundingClientRect();
+	// The row next to it overlaps its bottom edge by a few pixels, so a sliver left in sight is out of screen
+	const inSight = Math.min(row.bottom, view.bottom) - Math.max(row.top, view.top);
+	return inSight <= (row.bottom - row.top) * 0.1;
+};
 
 const RowContainer = SpotlightContainerDecorator({
 	enterTo: 'last-focused'
@@ -57,6 +80,12 @@ const ModernMediaRow = ({
 	}, [shownCount, rowId]);
 	const [focusedItemId, setFocusedItemId] = useState(null);
 	const [details, setDetails] = useState(null);
+	const closeTimer = useRef(0);
+	const growTimer = useRef(0);
+	useEffect(() => () => {
+		clearTimeout(closeTimer.current);
+		clearTimeout(growTimer.current);
+	}, []);
 	const platform = useRef(getPlatform()).current;
 	const {noteFocus, noteBlur, rankOf} = useWarmRow(rowIndex, settings.rememberRowCard);
 
@@ -99,6 +128,8 @@ const ModernMediaRow = ({
 	}, [onSelectItem]);
 
 	const handleFocus = useCallback((e) => {
+		// Back in the row before it closed
+		clearTimeout(closeTimer.current);
 		onFocus?.(rowIndex);
 		// The next cards are drawn as focus nears the end of those that are.
 		const grownCard = e.target.closest('.spottable');
@@ -166,29 +197,47 @@ const ModernMediaRow = ({
 		const rowNode = document.querySelector(`[data-row-index="${rowIndex}"]`) || rowElementRef.current;
 		if (rowNode && nextTarget && typeof rowNode.contains === 'function' && rowNode.contains(nextTarget)) return;
 		noteBlur();
+		clearTimeout(growTimer.current);
+		// Left by Up or Down, the card stays open while the list slides away, and the row closes once it is out of screen,
+		// with the list scrolled back by what that moves. Closing it with the key press made the move wait for it.
+		const list = rowNode && rowNode.closest ? rowNode.closest('[data-slide-scroll="y"]') : null;
+		// Focus that left the list (to the media bar, the search tabs) has no slide to wait for
+		const staysInList = !list || Boolean(nextTarget && list.contains(nextTarget));
+		if (staysInList && Date.now() - verticalMoveAt < MOVE_BY_KEY_MS) {
+			clearTimeout(closeTimer.current);
+			const since = Date.now();
+			const close = () => keepInPlace(rowNode, () => flushSync(() => setFocusedItemId(null)));
+			const check = () => {
+				if (isOffScreen(rowNode) || Date.now() - since >= HOLD_OPEN_MS) close();
+				else closeTimer.current = setTimeout(check, OFF_SCREEN_CHECK_MS);
+			};
+			closeTimer.current = setTimeout(check, OFF_SCREEN_CHECK_FROM_MS);
+			return;
+		}
 		setFocusedItemId(null);
 	}, [rowIndex, noteBlur]);
 
 	const handleFocusedChange = useCallback((itemId) => {
+		clearTimeout(growTimer.current);
+		// Moved to by Up or Down the card opens a little way into the slide of the list, so the move does not wait for it
+		if (itemId && Date.now() - verticalMoveAt < MOVE_BY_KEY_MS) {
+			growTimer.current = setTimeout(() => setFocusedItemId(itemId), GROW_AFTER_MS);
+			return;
+		}
 		setFocusedItemId(itemId || null);
 	}, []);
 
-	// The card in focus makes its row taller, and the row it moves to makes room the same way. Left to the blur that follows
-	// the move, the row closes a few frames after the list has been scrolled for it, and the list is put back by what it
-	// grew, which showed as a shake at the end of the move. So the screen is handed this, to close the row first.
 	const handleKeyDown = useCallback((e) => {
-		const closeRow = () => flushSync(() => {
-			setFocusedItemId(null);
-			setDetails(null);
-		});
 		if (e.keyCode === KEYS.UP && onNavigateUp) {
 			e.preventDefault();
 			e.stopPropagation();
-			onNavigateUp(rowIndex, closeRow);
+			verticalMoveAt = Date.now();
+			onNavigateUp(rowIndex);
 		} else if (e.keyCode === KEYS.DOWN && onNavigateDown) {
 			e.preventDefault();
 			e.stopPropagation();
-			onNavigateDown(rowIndex, closeRow);
+			verticalMoveAt = Date.now();
+			onNavigateDown(rowIndex);
 		}
 	}, [rowIndex, onNavigateUp, onNavigateDown]);
 

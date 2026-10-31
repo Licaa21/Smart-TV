@@ -1,4 +1,4 @@
-import {SLIDE_MS, installSlideScroll, slideLayoutChange, slideMsFor, layoutRectOf, offsetOf, resetSlideScroll, shouldSlide, slideShiftOf, slidesAtLevel} from './slideScroll';
+import {SLIDE_MS, installSlideScroll, keepInPlace, slideMsFor, layoutRectOf, offsetOf, resetSlideScroll, shouldSlide, slideShiftOf, slidesAtLevel} from './slideScroll';
 
 let mockLevel = 3;
 // What the viewer picked, or null for Auto
@@ -171,77 +171,62 @@ describe('on the page', () => {
 		expect(first.style.transition).toContain(`${slideMsFor('y', 200)}ms`);
 	});
 
-	describe('a change of layout the key press made', () => {
-		// A row closing pulls the children under it up, which is what the layout does before the scroll is set
-		const closing = (nodes, tops) => nodes.forEach((node, i) => Object.defineProperty(node, 'offsetTop', {configurable: true, value: tops[i]}));
+	describe('a change above the row in focus', () => {
+		const tops = (nodes, values) => nodes.forEach((node, i) => Object.defineProperty(node, 'offsetTop', {configurable: true, value: values[i]}));
 
-		it('starts each child from where it was, so the first frame does not jump by what the layout moved', () => {
+		// Where a node is drawn: its place in the list less how far the list is scrolled
+		const drawn = (container, node) => jest.spyOn(node, 'getBoundingClientRect').mockImplementation(() => ({top: node.offsetTop - container.scrollTop}));
+
+		it('scrolls the list back by what it moved, without sliding it', () => {
 			const {container, first, second} = row('y', 'children');
-			closing([first, second], [0, 400]);
+			second.setAttribute('tabindex', '-1');
+			document.body.appendChild(container);
+			tops([first, second], [0, 400]);
+			drawn(container, second);
+			second.focus();
+			container.scrollTop = 400;
 			now += 1000;
 			arrow(40);
 			now += 20;
-			slideLayoutChange(container, () => closing([first, second], [0, 150]));
-			scrolled(container, 'scrollTop', 100);
-			// The first child did not move, the second was pulled up by 250 and the list scrolled by 100
-			expect(first.style.transform).toBe('translate3d(0, 100px, 0)');
-			expect(second.style.transform).toBe('translate3d(0, 350px, 0)');
-			nextFrame();
-			nextFrame();
+			keepInPlace(first, () => tops([first, second], [0, 150]));
+			// The row in focus moved up by 250, so the list goes up with it
+			expect(container.scrollTop).toBe(150);
+			expect(second.style.transform).toBe('');
 			expect(first.style.transform).toBe('');
-			expect(second.style.transform).toBe('');
-			expect(second.style.transition).toContain(`${slideMsFor('y', 100)}ms`);
 		});
 
-		it('is let go when the slide that follows is not the same key press', () => {
+		it('leaves the list alone when the browser already scrolled it back, which it does at the end of the list', () => {
 			const {container, first, second} = row('y', 'children');
-			closing([first, second], [0, 400]);
-			now += 1000;
-			arrow(40);
-			now += 20;
-			slideLayoutChange(container, () => closing([first, second], [0, 150]));
-			// Another press comes before the list is scrolled
-			now += 400;
-			arrow(40);
-			now += 20;
-			scrolled(container, 'scrollTop', 100);
-			expect(second.style.transform).toBe('translate3d(0, 100px, 0)');
+			second.setAttribute('tabindex', '-1');
+			document.body.appendChild(container);
+			tops([first, second], [0, 400]);
+			drawn(container, second);
+			second.focus();
+			container.scrollTop = 400;
+			// The browser's own scroll is not seen by the setter, which the list is then told of
+			let value = 400;
+			const sets = [];
+			Object.defineProperty(container, 'scrollTop', {configurable: true, get: () => value, set: (next) => { sets.push(next); value = next; }});
+			keepInPlace(first, () => {
+				tops([first, second], [0, 150]);
+				value = 150;
+			});
+			expect(value).toBe(150);
+			expect(sets).toEqual([150]);
 		});
 
-		it('is let go by a scroll that is not slid, and does not reach the next one', () => {
-			const {container, first, second} = row('y', 'children');
-			closing([first, second], [0, 400]);
-			now += 1000;
-			arrow(40);
-			// A held key: the second press is closer than a held gap, so its scroll jumps
-			now += 100;
-			arrow(40);
-			slideLayoutChange(container, () => closing([first, second], [0, 150]));
-			scrolled(container, 'scrollTop', 100);
-			expect(second.style.transform).toBe('');
-			// A press of its own, with no change of layout, carries nothing over
-			now += 1000;
-			arrow(40);
-			now += 20;
-			scrolled(container, 'scrollTop', 300);
-			expect(second.style.transform).toBe('translate3d(0, 200px, 0)');
+		it('only runs the change when nothing in the list has focus', () => {
+			const {first} = row('y', 'children');
+			const change = jest.fn();
+			keepInPlace(first, change);
+			expect(change).toHaveBeenCalledTimes(1);
+			const outside = jest.fn();
+			keepInPlace(null, outside);
+			expect(outside).toHaveBeenCalledTimes(1);
 		});
+	});
 
-		it('keeps the shift through the scrolls that follow in the same press', () => {
-			const {container, first, second} = row('y', 'children');
-			closing([first, second], [0, 400]);
-			now += 1000;
-			arrow(40);
-			now += 20;
-			slideLayoutChange(container, () => closing([first, second], [0, 150]));
-			scrolled(container, 'scrollTop', 300);
-			nextFrame();
-			// The row is put back on the frame behind it
-			scrolled(container, 'scrollTop', 200);
-			expect(first.style.transform).toBe('translate3d(0, 200px, 0)');
-			expect(second.style.transform).toBe('translate3d(0, 450px, 0)');
-		});
-
+	describe('children easing from an earlier press', () => {
 		it('carries on from where each child is drawn when the press before is still easing', () => {
 			const {container, first, second} = row('y', 'children');
 			// The second child has 40px left of the slide before
@@ -252,28 +237,6 @@ describe('on the page', () => {
 			scrolled(container, 'scrollTop', 100);
 			expect(first.style.transform).toBe('translate3d(0, 100px, 0)');
 			expect(second.style.transform).toBe('translate3d(0, 140px, 0)');
-		});
-
-		it('adds its shift to a slide of the press before that is still waiting', () => {
-			const {container, first, second} = row('y', 'children');
-			closing([first, second], [0, 400]);
-			now += 1000;
-			arrow(40);
-			now += 20;
-			scrolled(container, 'scrollTop', 100);
-			// The frames stalled, and the next press is past a held gap with the slide still waiting
-			now += 250;
-			arrow(40);
-			slideLayoutChange(container, () => closing([first, second], [0, 150]));
-			scrolled(container, 'scrollTop', 200);
-			expect(first.style.transform).toBe('translate3d(0, 200px, 0)');
-			expect(second.style.transform).toBe('translate3d(0, 450px, 0)');
-		});
-
-		it('only runs the change when there is nothing to slide', () => {
-			const change = jest.fn();
-			slideLayoutChange(null, change);
-			expect(change).toHaveBeenCalledTimes(1);
 		});
 	});
 

@@ -19,7 +19,6 @@ import {SkeletonShimmer, skeletonTitleWidths} from '../../components/Skeleton';
 import {getImageUrl, getBackdropId} from '../../utils/helpers';
 import {focusedCardIndex, rowEntryCardIndex, cardToRestore, focusedRowIndex} from '../../utils/rowFocusMemory';
 import {channelForProgram, isLiveTvProgram} from '../../utils/liveTvLibrary';
-import {slideLayoutChange} from '../../utils/slideScroll';
 import {radiusToCss, shadowToCss, toCssColor} from '../../theme/themeSpec';
 import DetailSection from './DetailSection';
 import FeaturedBanner from './FeaturedBanner';
@@ -479,9 +478,7 @@ const Browse = ({
 		return -1;
 	}, []);
 
-	// closeRow, from a row that grows with the card in focus, closes it before the list is scrolled, so the list is scrolled
-	// once, to where it ends up, and not for a row that is about to shrink
-	const handleNavigateUp = useCallback((fromRowIndex, closeRow) => {
+	const handleNavigateUp = useCallback((fromRowIndex) => {
 		const targetIndex = focusableRowFrom(fromRowIndex - 1, -1);
 		if (targetIndex < 0) {
 			if (showFeaturedBar !== false && featuredItems.length > 0) {
@@ -492,7 +489,6 @@ const Browse = ({
 			}
 			return;
 		}
-		if (closeRow) slideLayoutChange(contentRowsRef.current, closeRow);
 		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current));
 	}, [showFeaturedBar, featuredItems.length, settings.navbarPosition, scrollToRow, setBrowseMode, focusableRowFrom]);
 
@@ -521,10 +517,9 @@ const Browse = ({
 		};
 	}, [isLoading]);
 
-	const handleNavigateDown = useCallback((fromRowIndex, closeRow) => {
+	const handleNavigateDown = useCallback((fromRowIndex) => {
 		const targetIndex = focusableRowFrom(fromRowIndex + 1, 1);
 		if (targetIndex < 0) return;
-		if (closeRow) slideLayoutChange(contentRowsRef.current, closeRow);
 		scrollToRow(targetIndex, true, rowEntryCardIndex(settingsRef.current));
 	}, [scrollToRow, focusableRowFrom]);
 
