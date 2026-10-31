@@ -26,6 +26,9 @@ const OFF_SCREEN_CHECK_FROM_MS = 150;
 const OFF_SCREEN_CHECK_MS = 50;
 const HOLD_OPEN_MS = 450;
 let verticalMoveAt = 0;
+// Down leaves the row above the screen, where it can stay open and close out of sight. Up leaves it below the row moved to, still
+// in sight, and it closes at once
+let verticalMoveDown = false;
 
 const isOffScreen = (rowNode) => {
 	const list = rowNode && rowNode.closest ? rowNode.closest('[data-slide-scroll="y"]') : null;
@@ -203,7 +206,7 @@ const ModernMediaRow = ({
 		const list = rowNode && rowNode.closest ? rowNode.closest('[data-slide-scroll="y"]') : null;
 		// Focus that left the list (to the media bar, the search tabs) has no slide to wait for
 		const staysInList = !list || Boolean(nextTarget && list.contains(nextTarget));
-		if (staysInList && Date.now() - verticalMoveAt < MOVE_BY_KEY_MS) {
+		if (staysInList && verticalMoveDown && Date.now() - verticalMoveAt < MOVE_BY_KEY_MS) {
 			clearTimeout(closeTimer.current);
 			const since = Date.now();
 			const close = () => keepInPlace(rowNode, () => flushSync(() => setFocusedItemId(null)));
@@ -232,11 +235,13 @@ const ModernMediaRow = ({
 			e.preventDefault();
 			e.stopPropagation();
 			verticalMoveAt = Date.now();
+			verticalMoveDown = false;
 			onNavigateUp(rowIndex);
 		} else if (e.keyCode === KEYS.DOWN && onNavigateDown) {
 			e.preventDefault();
 			e.stopPropagation();
 			verticalMoveAt = Date.now();
+			verticalMoveDown = true;
 			onNavigateDown(rowIndex);
 		}
 	}, [rowIndex, onNavigateUp, onNavigateDown]);
