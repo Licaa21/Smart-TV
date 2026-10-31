@@ -3059,5 +3059,10 @@
     "Works with Jellyfin and Emby. A Plex address opens the Plex sign-in.": "Funcționează cu Jellyfin și Emby. O adresă Plex deschide autentificarea Plex.",
     "Works with Jellyfin, Emby and Plex.": "Funcționează cu Jellyfin, Emby și Plex.",
     "Works with Jellyfin and Emby.": "Funcționează cu Jellyfin și Emby.",
-    "Play a short clip or the trailer of the focused card after a moment.": "Redă un clip scurt sau trailerul cardului selectat după un moment."
+    "Play a short clip or the trailer of the focused card after a moment.": "Redă un clip scurt sau trailerul cardului selectat după un moment.",
+    "Live preview": "Previzualizare live",
+    "Shows on the {screen} preview": "Se vede în previzualizarea {screen}",
+    "Not shown in the preview": "Nu apare în previzualizare",
+    "Saved": "Salvat",
+    "Skip Intro": "Sari peste intro"
 }

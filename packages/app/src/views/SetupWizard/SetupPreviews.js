@@ -12,6 +12,7 @@ import {useSettings} from '../../context/SettingsContext';
 import {useAuth} from '../../context/AuthContext';
 import {toCssColor, toRgbTriplet, radiusToCss} from '../../theme/themeSpec';
 import {resolveOverlayColor} from '../../theme/overlayColors';
+import {formatClockTime} from '../../utils/clock';
 import {genreGlowRgb} from '../Browse/galleryGlow';
 import {materialIconPath} from '../Settings/materialIconMap';
 import {getPreviewItems, subscribePreviewItems} from './setupPreviewData';
@@ -34,6 +35,7 @@ const TEXT_SHADOW = '0px 0px 4px rgba(0, 0, 0, 0.54)';
 const LOCAL_ICON_PATHS = {
 	search: 'M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z',
 	chevron_left: 'M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z',
+	pause: 'M560-200v-560h160v560H560Zm-320 0v-560h160v560H240Z',
 	chevron_right: 'M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z',
 	keyboard_arrow_down: 'M480-344 240-584l43-43 197 197 197-197 43 43-240 240Z',
 	translate: 'm475-80 185-480h79L924-80h-65l-45-117H584L539-80h-64ZM162-201l-42-42 201-201q-51-53-85.5-107.5T183-660h65q16 43 43.5 85t72.5 88q46-48 85-117.5T505-740H40v-60h290v-80h60v80h290v60H567q-17 78-61.5 159.5T406-443l102 104-24 63-121-125-201 200Zm443-51h188l-94-248-94 248Z',
@@ -443,9 +445,14 @@ const HomeRow = ({title, items, t, modern, thumbs = false, offset = 0, withFocus
 	);
 };
 
+// Card Size as a scale of Default, the size the rows are drawn at otherwise.
+const POSTER_SIZE_SCALE = {small: 0.8, default: 1, large: 1.2, xlarge: 1.4, grandparents: 2};
+
 const HomeRowsColumn = ({items, t, modern, focusFirst = false, rowGapOverride}) => {
-	const posterHeight = (modern ? 240 : 150) * ROW_SCALE;
-	const thumbHeight = 110 * ROW_SCALE;
+	const {settings} = useSettings();
+	const sizeScale = POSTER_SIZE_SCALE[settings.homeRowsPosterSize] || 1;
+	const posterHeight = (modern ? 240 : 150) * ROW_SCALE * sizeScale;
+	const thumbHeight = 110 * ROW_SCALE * sizeScale;
 	const rowGap = rowGapOverride != null ? rowGapOverride : (modern ? 60 : 18);
 	const first = items[0];
 	return (
@@ -875,19 +882,38 @@ const NavAvatar = ({name}) => {
 	);
 };
 
-const NavbarRows = ({items, t, topInset = 12}) => (
+const NAV_LABELS = {
+	home: () => $L('Home'),
+	search: () => $L('Search'),
+	shuffle: () => $L('Shuffle'),
+	favorite: () => $L('Favorites'),
+	video_library: () => $L('Libraries'),
+	settings: () => $L('Settings')
+};
+
+// The buttons the navbar shows with the shuffle and favorites switches applied.
+const useNavButtons = () => {
+	const {settings} = useSettings();
+	return NAV_ICONS.filter((name) => (
+		(name !== 'shuffle' || settings.showShuffleButton !== false) &&
+		(name !== 'favorite' || settings.showFavoritesButton !== false)
+	));
+};
+
+const NavbarRows = ({items, t, topInset = 12, modern = true}) => (
 	<div style={{flex: '1 1 auto', overflow: 'hidden', paddingTop: topInset}}>
-		<HomeRowsColumn items={items} t={t} modern rowGapOverride={24} />
+		<HomeRowsColumn items={items} t={t} modern={modern} rowGapOverride={24} />
 	</div>
 );
 
 // The toolbar draws no band of its own. An avatar sits on the left, the
 // buttons live in one translucent pill in the middle, and the clock keeps the
 // right, all floating straight over the content.
-const TopNavbarPreview = ({items, t, userName}) => {
-	const now = new Date();
-	const pad = (value) => (value < 10 ? `0${value}` : String(value));
-	const clock = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+const TopNavbarPreview = ({items, t, userName, modern}) => {
+	const {settings} = useSettings();
+	const buttons = useNavButtons();
+	const expanded = !!settings.navbarAlwaysExpanded;
+	const clock = settings.showClock === false ? null : formatClockTime(new Date(), settings.clockDisplay);
 	return (
 		<div style={{width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden'}}>
 			<div style={{height: 95, flexShrink: 0, padding: '27px 48px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
@@ -895,35 +921,45 @@ const TopNavbarPreview = ({items, t, userName}) => {
 					<NavAvatar name={userName} />
 				</div>
 				<div style={{backgroundColor: t.navbarSurface, borderRadius: 36, display: 'flex'}}>
-					{NAV_ICONS.map((name, i) => (
-						<div key={name} style={{width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+					{buttons.map((name, i) => (
+						<div key={name} style={{minWidth: 44, height: 44, padding: expanded ? '0 12px' : 0, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
 							<MIcon name={name} size={24} color={navIconColor(t, i)} />
+							{expanded && (
+								<span style={{marginLeft: 8, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', color: t.onSurfaceA(0.8)}}>
+									{NAV_LABELS[name]()}
+								</span>
+							)}
 						</div>
 					))}
 				</div>
-				<div style={{position: 'absolute', right: 48, top: '50%', transform: 'translateY(-50%)', fontSize: 14, fontWeight: 600, color: t.onSurfaceA(0.8)}}>
-					{clock}
-				</div>
+				{clock && (
+					<div style={{position: 'absolute', right: 48, top: '50%', transform: 'translateY(-50%)', fontSize: 14, fontWeight: 600, color: t.onSurfaceA(0.8)}}>
+						{clock}
+					</div>
+				)}
 			</div>
-			<NavbarRows items={items} t={t} />
+			<NavbarRows items={items} t={t} modern={modern} />
 		</div>
 	);
 };
 
 // The collapsed rail is a bare gutter of icons with no backdrop, so the
 // preview keeps it transparent too and just moves the rows over.
-const LeftNavbarPreview = ({items, t}) => (
-	<div style={{width: '100%', height: '100%', display: 'flex', overflow: 'hidden'}}>
-		<div style={{width: 72, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-			{NAV_ICONS.map((name, i) => (
-				<div key={name} style={{height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-					<MIcon name={name} size={24} color={navIconColor(t, i)} />
-				</div>
-			))}
+const LeftNavbarPreview = ({items, t, modern}) => {
+	const buttons = useNavButtons();
+	return (
+		<div style={{width: '100%', height: '100%', display: 'flex', overflow: 'hidden'}}>
+			<div style={{width: 72, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+				{buttons.map((name, i) => (
+					<div key={name} style={{height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+						<MIcon name={name} size={24} color={navIconColor(t, i)} />
+					</div>
+				))}
+			</div>
+			<NavbarRows items={items} t={t} topInset={24} modern={modern} />
 		</div>
-		<NavbarRows items={items} t={t} topInset={24} />
-	</div>
-);
+	);
+};
 
 // ---------------------------------------------------------------------------
 // Detail screen styles
@@ -1583,14 +1619,228 @@ export const HomeRowsPreview = ({modern}) => {
 
 export const DetailStylePreview = ({variant}) => {
 	const t = usePreviewPalette();
-	const render = useCallback((items) => {
+	const {settings} = useSettings();
+	const hideDescription = !!settings.hideDetailsMediaDescription;
+	const render = useCallback((shown) => {
+		const items = hideDescription ? shown.map((item) => ({...item, overview: ''})) : shown;
 		if (variant === 'v1') return <ClassicDetail items={items} t={t} />;
 		if (variant === 'v3') return <SpotlightDetail items={items} t={t} />;
 		if (variant === 'v4') return <NouveauDetail items={items} t={t} />;
 		if (variant === 'v5') return <MinimalistDetail items={items} t={t} />;
 		return <ModernDetail items={items} t={t} />;
-	}, [variant, t]);
+	}, [variant, t, hideDescription]);
 	return <LivePreview render={render} fallback={<FallbackDetail variant={variant} t={t} />} />;
+};
+
+// Home as the settings live preview draws it: the navbar where it's set, with its
+// buttons, labels and clock, over the rows in their set style and card size.
+export const SettingsHomePreview = () => {
+	const t = usePreviewPalette();
+	const {user} = useAuth();
+	const {settings} = useSettings();
+	const position = settings.navbarPosition === 'left' ? 'left' : 'top';
+	const modern = settings.homeRowsStyle !== 'v1';
+	const render = useCallback((items) => (
+		position === 'left'
+			? <LeftNavbarPreview items={items} t={t} modern={modern} />
+			: <TopNavbarPreview items={items} t={t} userName={user?.Name} modern={modern} />
+	), [position, modern, t, user?.Name]);
+	return <LivePreview render={render} fallback={<FallbackNavbar position={position} t={t} />} />;
+};
+
+const SUBTITLE_LINES = {
+	jpn: '待って、今の聞こえた？',
+	spa: 'Espera, ¿oíste eso?',
+	fre: 'Attends, tu as entendu ça ?',
+	fra: 'Attends, tu as entendu ça ?',
+	ger: 'Warte, hast du das gehört?',
+	deu: 'Warte, hast du das gehört?'
+};
+
+const SHADOWED = {color: '#FFFFFF', textShadow: '0px 0px 6px #000000'};
+
+const PlayerCircle = ({filled, children}) => (
+	<div
+		style={{
+			width: 46,
+			height: 46,
+			borderRadius: '50%',
+			boxSizing: 'border-box',
+			display: 'flex',
+			alignItems: 'center',
+			justifyContent: 'center',
+			margin: '0 10px',
+			backgroundColor: filled ? '#FFFFFF' : 'rgba(255, 255, 255, 0.08)',
+			border: filled ? 'none' : '2px solid rgba(255, 255, 255, 0.6)'
+		}}
+	>
+		{children}
+	</div>
+);
+
+// The player with its controls up: the zoom mode, subtitles, skip lengths and paused
+// description in the middle of a title, the intro prompt at its start and Next Up at its
+// end. [moment] picks which of the three to show.
+export const PlayerPreview = ({moment = 'middle'}) => {
+	const t = usePreviewPalette();
+	const {settings} = useSettings();
+	const items = usePreviewItems();
+	const item = items[0];
+	const next = items[1] || item;
+	const zoom = settings.playerZoomMode || 'fit';
+	const paused = moment === 'middle' && !!settings.showDescriptionOnPause;
+	const subtitles = !paused && settings.subtitleMode !== 'none';
+	const back = Math.round((settings.skipBackLength || 10000) / 1000);
+	const forward = Math.round((settings.skipForwardLength || 30000) / 1000);
+	const intro = settings.introAction || 'ask';
+	const nextUp = settings.nextUpBehavior || 'extended';
+	let time = '4:12';
+	let progress = 0.42;
+	if (moment === 'intro') {
+		time = intro === 'auto' ? '1:30' : '0:42';
+		progress = intro === 'auto' ? 0.15 : 0.07;
+	} else if (moment === 'end') {
+		time = '9:58';
+		progress = 0.99;
+	}
+	// The picture is drawn as a 2.39:1 film, so each zoom mode shows plainly.
+	let frame = {position: 'absolute', left: 0, right: 0, top: 69, height: 402};
+	let frameInner = null;
+	if (zoom === 'autoCrop') frame = {position: 'absolute', top: 0, bottom: 0, left: -165, right: -165};
+	if (zoom === 'stretch') {
+		frame = {position: 'absolute', left: 0, right: 0, top: 0, height: 402};
+		frameInner = {transform: 'scaleY(1.3433)', transformOrigin: 'top left'};
+	}
+	return (
+		<PreviewScreen>
+			<div style={{...ABS_FILL, backgroundColor: '#000000', overflow: 'hidden'}}>
+				<div style={{...frame, overflow: zoom === 'stretch' ? 'visible' : 'hidden', ...frameInner}}>
+					<Artwork url={item && item.backdropUrl} t={t} />
+				</div>
+				{paused && (
+					<div style={{...ABS_FILL, background: 'linear-gradient(to right, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.3))'}}>
+						<div style={{position: 'absolute', left: 48, top: 110, width: 460}}>
+							<div style={{...SHADOWED, fontSize: 13, fontWeight: 700, textTransform: 'uppercase'}}>{$L('Paused')}</div>
+							<div style={{...SHADOWED, marginTop: 8, fontSize: 32, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{item ? item.title : ''}</div>
+							<div style={{...SHADOWED, marginTop: 8, fontSize: 15, lineHeight: 1.4, ...clampLines(4)}}>{item ? item.overview : ''}</div>
+						</div>
+					</div>
+				)}
+				{subtitles && (
+					<div style={{...SHADOWED, position: 'absolute', left: 0, right: 0, bottom: 132, textAlign: 'center', fontSize: 24, fontWeight: 500}}>
+						{SUBTITLE_LINES[settings.subtitleLanguage] || 'Wait, did you hear that?'}
+					</div>
+				)}
+				{moment === 'intro' && intro === 'ask' && (
+					<div style={{position: 'absolute', right: 36, bottom: 126, padding: '10px 20px', borderRadius: 999, backgroundColor: '#FFFFFF', color: '#000000', fontSize: 15, fontWeight: 700}}>
+						{$L('Skip Intro')}
+					</div>
+				)}
+				{moment === 'end' && nextUp === 'extended' && (
+					<div style={{position: 'absolute', right: 32, top: 28, width: 270, borderRadius: 12, overflow: 'hidden', backgroundColor: 'rgba(0, 0, 0, 0.85)'}}>
+						<div style={{position: 'relative', height: 140}}>
+							<Artwork url={next && next.backdropUrl} t={t} />
+						</div>
+						<div style={{padding: 12}}>
+							<div style={{fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: t.accent}}>{$L('Up Next')}</div>
+							<div style={{...SHADOWED, marginTop: 4, fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{next ? next.title : ''}</div>
+						</div>
+					</div>
+				)}
+				{moment === 'end' && nextUp === 'minimal' && (
+					<div style={{...SHADOWED, position: 'absolute', right: 32, top: 28, padding: '9px 16px', borderRadius: 999, backgroundColor: 'rgba(0, 0, 0, 0.8)', fontSize: 14, fontWeight: 600}}>
+						{`${$L('Up Next')}: ${next ? next.title : ''}`}
+					</div>
+				)}
+				<div style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: 118, padding: '0 32px 16px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.85))'}}>
+					<div style={{display: 'flex', alignItems: 'center'}}>
+						<span style={{...SHADOWED, fontSize: 13}}>{time}</span>
+						<div style={{flex: '1 1 auto', height: 5, margin: '0 12px', borderRadius: 3, overflow: 'hidden', backgroundColor: 'rgba(255, 255, 255, 0.25)'}}>
+							<div style={{width: `${progress * 100}%`, height: '100%', backgroundColor: t.accent}} />
+						</div>
+						<span style={{...SHADOWED, fontSize: 13}}>10:04</span>
+					</div>
+					<div style={{display: 'flex', justifyContent: 'center', marginTop: 12}}>
+						<PlayerCircle><span style={{...SHADOWED, fontSize: 14, fontWeight: 700}}>{`-${back}`}</span></PlayerCircle>
+						<PlayerCircle filled><MIcon name={paused ? 'play_arrow' : 'pause'} size={28} color='#000000' /></PlayerCircle>
+						<PlayerCircle><span style={{...SHADOWED, fontSize: 14, fontWeight: 700}}>{`+${forward}`}</span></PlayerCircle>
+					</div>
+				</div>
+			</div>
+		</PreviewScreen>
+	);
+};
+
+const KEY_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+const TYPED = 'Spri';
+const GRID_ROWS = ['abcdef', 'ghijkl', 'mnopqr', 'stuvwx', 'yz1234', '567890'];
+
+// How each keyboard style sits and draws its keys, at the size the TV lays it out.
+const KEYBOARD_LOOKS = {
+	native: {box: {left: 0, right: 0, bottom: 0, padding: '18px 80px 22px', backgroundColor: '#E8EAED'}, key: {width: 56, height: 42, backgroundColor: '#FFFFFF', color: '#202124', borderRadius: 6}, focus: {backgroundColor: '#1A73E8', color: '#FFFFFF'}},
+	classic: {box: {left: 48, top: 92, padding: 10, borderRadius: 12, backgroundColor: 'rgba(20, 20, 20, 0.85)'}, key: {width: 38, height: 38, backgroundColor: '#2A2A2A', color: '#FFFFFF', borderRadius: 6}, focus: {backgroundColor: '#FFFFFF', color: '#000000'}, grid: true},
+	glass: {box: {left: 120, right: 120, bottom: 24, padding: 14, borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.12)', border: '1px solid rgba(255, 255, 255, 0.28)'}, key: {width: 52, height: 46, backgroundColor: 'rgba(255, 255, 255, 0.16)', color: '#FFFFFF', borderRadius: 12}, focus: {backgroundColor: '#FFFFFF', color: '#000000'}},
+	docked: {box: {left: 0, right: 0, bottom: 0, padding: '14px 60px 18px', backgroundColor: 'rgba(18, 18, 18, 0.97)', borderTop: '1px solid rgba(255, 255, 255, 0.12)'}, key: {width: 62, height: 44, backgroundColor: '#2A2A2A', color: '#FFFFFF', borderRadius: 8}, focus: {backgroundColor: '#FFFFFF', color: '#000000'}, typed: true}
+};
+
+// Search with its keyboard open, drawn the way the chosen keyboard style sits on screen.
+export const KeyboardPreview = () => {
+	const t = usePreviewPalette();
+	const {settings} = useSettings();
+	const items = usePreviewItems();
+	const look = KEYBOARD_LOOKS[settings.keyboardStyle] || KEYBOARD_LOOKS.docked;
+	const rows = look.grid ? GRID_ROWS : KEY_ROWS;
+	return (
+		<PreviewScreen>
+			<div style={{...ABS_FILL, backgroundColor: t.background, overflow: 'hidden'}}>
+				{!look.typed && (
+					<div style={{position: 'absolute', top: 28, left: look.grid ? 48 : 270, width: look.grid ? 280 : 420, height: 44, borderRadius: 22, padding: '0 16px', boxSizing: 'border-box', display: 'flex', alignItems: 'center', backgroundColor: t.onSurfaceA(0.1)}}>
+						<MIcon name='search' size={22} color={t.onSurfaceA(0.7)} />
+						<span style={{marginLeft: 10, fontSize: 17, color: t.onSurface}}>{TYPED}</span>
+						<span style={{width: 2, height: 20, backgroundColor: t.accent}} />
+					</div>
+				)}
+				<div style={{position: 'absolute', top: look.typed ? 28 : 92, left: look.grid ? 360 : 48, display: 'flex'}}>
+					{items.slice(0, 4).map((entry) => (
+						<div key={entry.id || entry.title} style={{width: 92, marginRight: 14}}>
+							<div style={{position: 'relative', width: 92, height: 138, borderRadius: t.cardRadius, overflow: 'hidden'}}>
+								<Artwork url={entry.posterUrl} t={t} />
+							</div>
+							<div style={{marginTop: 6, fontSize: 12, fontWeight: 600, color: t.onSurface, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{entry.title}</div>
+						</div>
+					))}
+				</div>
+				<div style={{position: 'absolute', boxSizing: 'border-box', ...look.box}}>
+					{look.typed && (
+						<div style={{fontSize: 24, fontWeight: 500, color: '#FFFFFF', padding: '0 4px 12px'}}>
+							{TYPED}<span style={{color: t.accent}}>|</span>
+						</div>
+					)}
+					{rows.map((row) => (
+						<div key={row} style={{display: 'flex', justifyContent: 'center', marginBottom: 6}}>
+							{row.split('').map((key) => (
+								<div
+									key={key}
+									style={{
+										...look.key,
+										...(key === 'n' ? look.focus : null),
+										margin: '0 3px',
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+										fontSize: 17,
+										textTransform: 'uppercase'
+									}}
+								>
+									{key}
+								</div>
+							))}
+						</div>
+					))}
+				</div>
+			</div>
+		</PreviewScreen>
+	);
 };
 
 export {MIcon as SetupIcon};
