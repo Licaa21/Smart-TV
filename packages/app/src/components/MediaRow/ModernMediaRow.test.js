@@ -129,11 +129,19 @@ describe('ModernMediaRow', () => {
 			expect(opened()).toBe(0);
 		});
 
+		it('closes the row left at once on Up, where it stays in sight', () => {
+			draw({onNavigateUp: jest.fn()});
+			focusCard(1);
+			press(38);
+			leave();
+			expect(opened()).toBe(0);
+		});
+
 		it('closes the row left once it is out of screen', () => {
 			const list = document.createElement('div');
 			list.setAttribute('data-slide-scroll', 'y');
 			document.body.appendChild(list);
-			render(<ModernMediaRow rowId="trending" title="Trending" items={items} rowIndex={2} onNavigateUp={jest.fn()} />, {container: list});
+			render(<ModernMediaRow rowId="trending" title="Trending" items={items} rowIndex={2} onNavigateDown={jest.fn()} />, {container: list});
 			let rowRect = {top: 100, bottom: 400};
 			jest.spyOn(list, 'getBoundingClientRect').mockReturnValue({top: 0, bottom: 1000});
 			jest.spyOn(find('[data-row-index="2"]'), 'getBoundingClientRect').mockImplementation(() => rowRect);
@@ -141,7 +149,7 @@ describe('ModernMediaRow', () => {
 			const next = document.createElement('div');
 			list.appendChild(next);
 			focusCard(1);
-			press(38);
+			press(40);
 			fireEvent.blur(cards()[1], {relatedTarget: next});
 			act(() => { jest.advanceTimersByTime(200); });
 			expect(opened()).toBe(1);
@@ -154,17 +162,17 @@ describe('ModernMediaRow', () => {
 			const list = document.createElement('div');
 			list.setAttribute('data-slide-scroll', 'y');
 			document.body.appendChild(list);
-			render(<ModernMediaRow rowId="trending" title="Trending" items={items} rowIndex={2} onNavigateUp={jest.fn()} />, {container: list});
+			render(<ModernMediaRow rowId="trending" title="Trending" items={items} rowIndex={2} onNavigateDown={jest.fn()} />, {container: list});
 			focusCard(1);
-			press(38);
+			press(40);
 			leave();
 			expect(opened()).toBe(0);
 		});
 
 		it('stays open when focus comes back before it closes', () => {
-			draw({onNavigateUp: jest.fn()});
+			draw({onNavigateDown: jest.fn()});
 			focusCard(1);
-			press(38);
+			press(40);
 			leave();
 			act(() => { jest.advanceTimersByTime(60); });
 			fireEvent.focus(cards()[1]);
