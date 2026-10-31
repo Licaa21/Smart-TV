@@ -1,4 +1,4 @@
-import {Fragment, useCallback, useState, useEffect, useMemo, useRef} from 'react';
+import {Fragment, useCallback, useState, useEffect, useLayoutEffect, useMemo, useRef} from 'react';
 import {
 	hashPin, isPinShaped, pinMatches, lockoutRemaining, registerFailedAttempt, clearedLockout, tooManyAttempts, KIDS_PIN
 } from '../../utils/pinLockout';
@@ -113,7 +113,11 @@ const FIRST_ROW_VIEWS = {
 	ratingSources: 'rating-sources-view'
 };
 
-const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, panelMode, initialView, hasLiveTv }) => {
+// With [liveCategory] set, the stack starts at that category's page instead of the category
+// list, [onRootBack] takes Back at that root, and [onPreviewTry] hears which option a picker
+// has in focus. [liveSearchQuery] comes from the search field beside the pill, and
+// [onLiveSearchClear] empties that field. The live preview layout drives all of them.
+const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, panelMode, initialView, hasLiveTv, liveCategory, onRootBack, onPreviewTry, liveSearchQuery, onLiveSearchClear }) => {
 	const { api, serverUrl, servers, accessToken, hasMultipleServers, logoutAll, activeServerInfo, user, serverType } = useAuth();
 	const {
 		settings, updateSetting, updateSettings, resetSettings, restoreSyncedDefaults, applyServerProfile, selectSyncProfile,
@@ -125,6 +129,8 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	const romm = useRommAccount({serverUrl, accessToken});
 	const isSeerr = seerr.isMoonfin && seerr.variant === 'seerr';
 	const bootLocaleRef = useRef(settings.uiLanguage);
+	const onLiveSearchClearRef = useRef(onLiveSearchClear);
+	onLiveSearchClearRef.current = onLiveSearchClear;
 	useEffect(() => {
 		if (settings.uiLanguage !== bootLocaleRef.current &&
 			typeof window !== 'undefined' && window.location) {
@@ -154,7 +160,10 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 
 	// Opened on a screen of its own when the shell asked for one, with the categories under it
 	// so BACK still walks out the usual way.
-	const [navStack, setNavStack] = useState(() => (initialView ? [{view: 'categories'}, {view: initialView}] : [{view: 'categories'}]));
+	const [navStack, setNavStack] = useState(() => {
+		if (liveCategory) return [{view: 'category', id: liveCategory}];
+		return initialView ? [{view: 'categories'}, {view: initialView}] : [{view: 'categories'}];
+	});
 	const currentView = navStack[navStack.length - 1];
 	const pendingFocusRef = useRef(null);
 	const navStackRef = useRef(navStack);
@@ -177,14 +186,14 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		}
 		setNavStack((prev) => {
 			if (prev.length <= 1) {
-				onBack?.();
+				(onRootBack || onBack)?.();
 				return prev;
 			}
 			const popped = prev[prev.length - 1];
 			pendingFocusRef.current = popped.returnFocusTo || null;
 			return prev.slice(0, -1);
 		});
-	}, [onBack]);
+	}, [onBack, onRootBack]);
 
 	const [serverVersion, setServerVersion] = useState(null);
 	const [clearDataDialogOpen, setClearDataDialogOpen] = useState(false);
@@ -227,6 +236,10 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 
 	const focusViewDefault = useCallback((cv) => {
 			if (cv.view === 'categories') {
+				if (cv.searchOnly && !searchQueryRef.current) {
+					Spotlight.focus('settings-search-input');
+					return;
+				}
 				// With a query up the categories are not mounted, so the first result is
 				// the only thing there is to land on.
 				const results = searchResultsRef.current;
@@ -301,6 +314,9 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	}, [categories, settings, availableThemes, activeThemeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	useEffect(() => {
+		// A category's own page under the live preview leaves focus where the pill put it,
+		// unless Back is returning to the row that opened a screen.
+		if (liveCategory && navStack.length === 1 && !pendingFocusRef.current) return undefined;
 		let retry = null;
 		const timer = setTimeout(() => {
 			const cv = navStack[navStack.length - 1];
@@ -346,6 +362,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			if (navStackRef.current.length === 1 && searchQueryRef.current) {
 				setSearchQuery('');
 				setDebouncedQuery('');
+				if (onLiveSearchClearRef.current) onLiveSearchClearRef.current();
 				Spotlight.focus('settings-search-input');
 				return;
 			}
@@ -1148,7 +1165,8 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		openExternalCustomRows, openSeerrHomeRows, openScreen, onRunSetupWizard, canProbeDevice
 	]);
 
-	const openCategory = useCallback((id) => {
+	// The page a category opens on.
+	const rootViewFor = useCallback((id) => {
 		// A category holding a single screen opens it directly, unless it always lists its screens
 		const category = SETTINGS_SCHEMA.find((c) => c.id === id);
 		const visible = (category?.subcategories || [])
@@ -1156,24 +1174,50 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		if (visible.length === 1 && !category.alwaysMenu) {
 			// A subcategory that is really a screen of its own opens that screen, the same way it
 			// would if it had been reached through the subcategory list.
-			pushView(visible[0].opensView
-				? {
-					view: visible[0].opensView,
-					label: resolve(visible[0].label, settingsCtx),
-					returnFocusTo: `cat-${id}`
-				}
-				: {
-					view: 'subcategory',
-					categoryId: id,
-					subcategoryId: visible[0].id,
-					label: resolve(visible[0].label, settingsCtx),
-					returnFocusTo: `cat-${id}`
-				});
-			return;
+			const only = visible[0];
+			const label = resolve(only.label, settingsCtx);
+			return only.opensView
+				? {view: only.opensView, label}
+				: {view: 'subcategory', categoryId: id, subcategoryId: only.id, label};
 		}
-		pushView({view: 'category', id, returnFocusTo: `cat-${id}`});
-	}, [pushView, settingsCtx]);
+		return {view: 'category', id};
+	}, [settingsCtx]);
 
+	const openCategory = useCallback((id) => {
+		pushView({...rootViewFor(id), returnFocusTo: `cat-${id}`});
+	}, [pushView, rootViewFor]);
+
+
+	const rootViewForRef = useRef(rootViewFor);
+	rootViewForRef.current = rootViewFor;
+
+	// A query in the field beside the pill swaps the page for the results, and clearing it
+	// brings the category back.
+	const liveSearching = !!(liveCategory && liveSearchQuery && liveSearchQuery.trim());
+	useLayoutEffect(() => {
+		if (!liveCategory) return;
+		navActionRef.current = 'none';
+		setNavStack([liveSearching ? {view: 'categories', searchOnly: true} : rootViewForRef.current(liveCategory)]);
+	}, [liveCategory, liveSearching]);
+
+	useEffect(() => {
+		if (liveCategory) setSearchQuery(liveSearchQuery || '');
+	}, [liveCategory, liveSearchQuery]);
+
+	// Tells the live preview which option the picker has in focus, and that it closed.
+	const handleOptionFocus = useCallback((ev) => {
+		if (!onPreviewTry || !currentView.settingKey || !currentView.options) return;
+		const host = ev.target.closest ? ev.target.closest('[data-spotlight-id]') : null;
+		const match = /^opt-(\d+)$/.exec(host ? host.getAttribute('data-spotlight-id') : '');
+		if (!match) return;
+		const index = Number(match[1]);
+		const option = currentView.options[index];
+		if (option) onPreviewTry(currentView.settingKey, option.value, index);
+	}, [onPreviewTry, currentView]);
+
+	useEffect(() => {
+		if (onPreviewTry && currentView.view !== 'options') onPreviewTry(null);
+	}, [onPreviewTry, currentView]);
 
 	const openSubcategory = useCallback((sub) => {
 		// An entry that is a screen in its own right rather than a list of settings rows opens
@@ -1377,12 +1421,12 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			<Fragment key={viewKey}>
 			{viewName === 'categories' && (
 				<CategoriesView
-					categories={categories}
+					categories={baseView.searchOnly ? [] : categories}
 					searchQuery={searchQuery}
 					onSearchChange={handleSearchChange}
 					onSearchKeyDown={handleSearchKeyDown}
 					showSearchResults={showSearchResults}
-					hideSearch={settings.kidsModeEnabled}
+					hideSearch={settings.kidsModeEnabled || !!liveCategory}
 					searchResults={searchResults}
 					onOpenResult={openSearchResult}
 					onResultKeyDown={handleResultKeyDown}
@@ -1785,12 +1829,14 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			</SettingsEnterContext.Provider>
 			</SettingsTitleContext.Provider>
 			{optionsOpen && (
-				<OptionsDialog
-					title={currentView.title}
-					options={currentView.options}
-					currentValue={currentView.settingKey === '__themeSelection' ? activeThemeId : currentView.value}
-					onSelect={selectOptionValue}
-				/>
+				<div onFocus={handleOptionFocus}>
+					<OptionsDialog
+						title={currentView.title}
+						options={currentView.options}
+						currentValue={currentView.settingKey === '__themeSelection' ? activeThemeId : currentView.value}
+						onSelect={selectOptionValue}
+					/>
+				</div>
 			)}
 			<ClearDataDialog
 				open={clearDataDialogOpen}
