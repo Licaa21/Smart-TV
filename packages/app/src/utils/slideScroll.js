@@ -67,8 +67,6 @@ let held = false;
 const positions = typeof WeakMap === 'function' ? new WeakMap() : null;
 // The slides waiting for their scrolling to be over, by container
 const waiting = positions ? new WeakMap() : null;
-// How far a change of layout moved each child of a container, for the slide the same key press makes
-const layoutShifts = positions ? new WeakMap() : null;
 let installed = false;
 
 const onKeyDown = (e) => {
@@ -104,29 +102,33 @@ const release = (nodes, axis, distance) => {
 	});
 };
 
-// Runs a change that moves the content of a container by itself (a row closing, which pulls the rows under it up) and
-// has the slide of the key press that made it start from where each child was, so the first frame looks as it did and the
-// content eases to its place, and does not jump by what the layout moved before the slide begins. For a list that slides up and down: the
-// children are measured by offsetTop, which a slide does not move.
-export const slideLayoutChange = (container, change) => {
-	if (!layoutShifts || !container) {
+// Runs a change that makes a row above the one in focus shorter or taller (a row left open while the list slid away,
+// closing), and scrolls the list back by what that moved, so what is on screen stays where it is and nothing is slid for it.
+// node is anything inside the list.
+let adjusting = false;
+export const keepInPlace = (node, change) => {
+	const container = node && node.closest ? node.closest('[data-slide-scroll="y"]') : null;
+	// The element in focus itself: the rows of a list are not always its direct children
+	const anchor = document.activeElement;
+	if (!container || !anchor || !container.contains(anchor)) {
 		change();
 		return;
 	}
-	const before = contentOf(container).map((node) => [node, node.offsetTop]);
+	// Where it is drawn, and not its offset: a list at its end is scrolled back by the browser when it gets shorter, and that
+	// has the row in focus where it was already
+	const before = anchor.getBoundingClientRect().top;
 	change();
-	const extra = new Map();
-	before.forEach(([node, top]) => {
-		if (top !== node.offsetTop) extra.set(node, top - node.offsetTop);
-	});
-	layoutShifts.set(container, {extra, keyAt: lastKeyAt});
+	const drift = anchor.getBoundingClientRect().top - before;
+	// Set even when there is no drift: a scroll the browser made by itself is not seen by the setter, and its event would
+	// come later as a move to slide
+	adjusting = true;
+	container.scrollTop += drift;
+	adjusting = false;
 };
 
 const slide = (container, axis, distance) => {
+	if (adjusting) return;
 	let pending = waiting.get(container);
-	// Taken once, by the slide of the same key press, or let go
-	const shift = layoutShifts.get(container);
-	layoutShifts.delete(container);
 	// A scroll that comes while the slide waits is part of it, however small: the code that puts the row back at its resting
 	// place moves it a few pixels, which is a correction and not a move of its own. It has to be the key's, and the same
 	// press: a key pressed since is a held key or a flurry, which jump as fast as they can.
@@ -153,20 +155,15 @@ const slide = (container, axis, distance) => {
 	if (!nodes.length) return;
 
 	const quiet = QUIET_FRAMES[axis];
-	const own = Boolean(shift) && shift.keyAt === lastKeyAt;
 	if (!pending) {
 		// The content shows where it was, before the page is drawn
 		const base = offsetOf(window.getComputedStyle(nodes[0]).transform, axis);
-		pending = {nodes, offset: base, frame: 0, quiet: 0, keyAt: lastKeyAt, extra: new Map(own ? shift.extra : [])};
+		pending = {nodes, offset: base, frame: 0, quiet: 0, keyAt: lastKeyAt, extra: new Map()};
 		// A child still easing from an earlier press is not where the first one is, and is carried on from where it is drawn
 		nodes.forEach((node) => {
 			const apart = offsetOf(window.getComputedStyle(node).transform, axis) - base;
 			if (apart) pending.extra.set(node, (pending.extra.get(node) || 0) + apart);
 		});
-	} else if (own && pending.keyAt !== lastKeyAt) {
-		// A slide of the press before is still waiting: this press's shift goes on top of what it holds
-		shift.extra.forEach((value, node) => pending.extra.set(node, (pending.extra.get(node) || 0) + value));
-		pending.keyAt = lastKeyAt;
 	}
 	// A row mounted while the slide waits is held with the others and let go with them, and one that has gone from the
 	// list is put where it stands

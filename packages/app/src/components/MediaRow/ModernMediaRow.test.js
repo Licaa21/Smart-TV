@@ -68,23 +68,109 @@ describe('ModernMediaRow', () => {
 		expect(onFocus).toHaveBeenCalledWith(2);
 	});
 
-	it('hands the screen a way to close the row before it moves up or down', () => {
-		const onNavigateDown = jest.fn();
-		const onNavigateUp = jest.fn();
-		draw({onNavigateDown, onNavigateUp});
+	describe('moving between rows with Up and Down', () => {
 		const opened = () => document.querySelectorAll('[data-focused="yes"]').length;
-		focusCard(1);
-		expect(opened()).toBe(1);
-		fireEvent.keyDown(document.querySelectorAll('.spottable')[1], {keyCode: 40});
-		expect(onNavigateDown).toHaveBeenCalledWith(2, expect.any(Function));
-		// Nothing has closed it until the screen asks
-		expect(opened()).toBe(1);
-		act(() => { onNavigateDown.mock.calls[0][1](); });
-		expect(opened()).toBe(0);
-		focusCard(1);
-		fireEvent.keyDown(document.querySelectorAll('.spottable')[1], {keyCode: 38});
-		act(() => { onNavigateUp.mock.calls[0][1](); });
-		expect(opened()).toBe(0);
+		const cards = () => document.querySelectorAll('.spottable');
+		const leave = () => fireEvent.blur(cards()[1], {relatedTarget: document.body});
+		const press = (keyCode) => fireEvent.keyDown(cards()[1], {keyCode});
+		let clock = 0;
+
+		beforeEach(() => {
+			jest.useFakeTimers();
+			// Each test starts well after the key of the one before
+			clock += 100000;
+			jest.setSystemTime(clock);
+		});
+		afterEach(() => jest.useRealTimers());
+
+		it('closes at once when focus leaves any other way', () => {
+			draw();
+			focusCard(1);
+			expect(opened()).toBe(1);
+			leave();
+			expect(opened()).toBe(0);
+		});
+
+		it('opens the card at once when focus comes any other way', () => {
+			draw();
+			focusCard(1);
+			expect(opened()).toBe(1);
+		});
+
+		it('opens the card moved to a little way into the slide, not before it', () => {
+			draw({onNavigateDown: jest.fn()});
+			press(40);
+			focusCard(1);
+			expect(opened()).toBe(0);
+			act(() => { jest.advanceTimersByTime(99); });
+			expect(opened()).toBe(0);
+			act(() => { jest.advanceTimersByTime(2); });
+			expect(opened()).toBe(1);
+		});
+
+		it('does not open a card that focus has left again', () => {
+			draw({onNavigateDown: jest.fn()});
+			press(40);
+			focusCard(1);
+			leave();
+			act(() => { jest.advanceTimersByTime(500); });
+			expect(opened()).toBe(0);
+		});
+
+		it('keeps the row left open until the slide is over when it stays in sight, and then closes it', () => {
+			draw({onNavigateDown: jest.fn()});
+			focusCard(1);
+			press(40);
+			leave();
+			expect(opened()).toBe(1);
+			act(() => { jest.advanceTimersByTime(400); });
+			expect(opened()).toBe(1);
+			act(() => { jest.advanceTimersByTime(100); });
+			expect(opened()).toBe(0);
+		});
+
+		it('closes the row left once it is out of screen', () => {
+			const list = document.createElement('div');
+			list.setAttribute('data-slide-scroll', 'y');
+			document.body.appendChild(list);
+			render(<ModernMediaRow rowId="trending" title="Trending" items={items} rowIndex={2} onNavigateUp={jest.fn()} />, {container: list});
+			let rowRect = {top: 100, bottom: 400};
+			jest.spyOn(list, 'getBoundingClientRect').mockReturnValue({top: 0, bottom: 1000});
+			jest.spyOn(find('[data-row-index="2"]'), 'getBoundingClientRect').mockImplementation(() => rowRect);
+			// Focus moves to another row of the list
+			const next = document.createElement('div');
+			list.appendChild(next);
+			focusCard(1);
+			press(38);
+			fireEvent.blur(cards()[1], {relatedTarget: next});
+			act(() => { jest.advanceTimersByTime(200); });
+			expect(opened()).toBe(1);
+			rowRect = {top: -500, bottom: -100};
+			act(() => { jest.advanceTimersByTime(50); });
+			expect(opened()).toBe(0);
+		});
+
+		it('closes at once when focus leaves the list, to the media bar or the tabs above it', () => {
+			const list = document.createElement('div');
+			list.setAttribute('data-slide-scroll', 'y');
+			document.body.appendChild(list);
+			render(<ModernMediaRow rowId="trending" title="Trending" items={items} rowIndex={2} onNavigateUp={jest.fn()} />, {container: list});
+			focusCard(1);
+			press(38);
+			leave();
+			expect(opened()).toBe(0);
+		});
+
+		it('stays open when focus comes back before it closes', () => {
+			draw({onNavigateUp: jest.fn()});
+			focusCard(1);
+			press(38);
+			leave();
+			act(() => { jest.advanceTimersByTime(60); });
+			fireEvent.focus(cards()[1]);
+			act(() => { jest.advanceTimersByTime(1000); });
+			expect(opened()).toBe(1);
+		});
 	});
 
 	describe('fetching wide art ahead', () => {
