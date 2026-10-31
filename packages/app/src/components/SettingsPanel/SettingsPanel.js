@@ -11,6 +11,8 @@ import {SCENE_BY_KEY, describeRow} from '../../views/Settings/LivePreview/previe
 import {SETTINGS_SCHEMA, resolve} from '../../views/Settings/settingsSchema';
 import {usePreviewPalette} from '../../views/SetupWizard/SetupPreviews';
 import {useSettings} from '../../context/SettingsContext';
+import {effectiveAccent, themeAccentHex} from '../../theme/accentSurfaces';
+import {readableInk, toCssColor} from '../../theme/themeSpec';
 import {useAuth} from '../../context/AuthContext';
 import {ensurePreviewItemsLoaded} from '../../views/SetupWizard/setupPreviewData';
 import {isTvKeyboardVisible} from '../TVKeyboard/keyboardBus';
@@ -48,9 +50,11 @@ const hasRowAbove = (column, active) => {
 // category's screens in a column on the left, and a preview of the screen the focused
 // setting changes on the right.
 const LiveSettingsLayout = ({closing, onClose, onLibrariesChanged, onRunSetupWizard, onSelectItem, hasLiveTv}) => {
-	const {settings} = useSettings();
+	const {settings, activeTheme} = useSettings();
 	const {api} = useAuth();
 	const t = usePreviewPalette();
+	// The accent for Settings, as a hex, with ink that reads on it: a white pick would otherwise carry white text
+	const accent = effectiveAccent(settings, 'settings') || themeAccentHex(activeTheme);
 	const categories = useMemo(() => SETTINGS_SCHEMA
 		.filter((entry) => !entry.when || entry.when({settings}))
 		.map((entry) => ({id: entry.id, label: resolve(entry.label)})), [settings]);
@@ -59,6 +63,8 @@ const LiveSettingsLayout = ({closing, onClose, onLibrariesChanged, onRunSetupWiz
 	const [trying, setTrying] = useState(null);
 	const [scene, setScene] = useState('home');
 	const [query, setQuery] = useState('');
+	// The pill in focus is white with black text, whatever the accent, so the ink picked for the accent is only for a pill at rest
+	const [pillFocused, setPillFocused] = useState(false);
 	const listRef = useRef(null);
 	const pillRef = useRef(null);
 	const topRef = useRef(null);
@@ -141,6 +147,11 @@ const LiveSettingsLayout = ({closing, onClose, onLibrariesChanged, onRunSetupWiz
 
 	const row = useMemo(() => describeRow(rowId, settings), [rowId, settings]);
 
+	const handlePillFocus = useCallback(() => setPillFocused(true), []);
+	const handlePillBlur = useCallback((ev) => {
+		if (!ev.currentTarget.contains(ev.relatedTarget)) setPillFocused(false);
+	}, []);
+
 	const handleQueryChange = useCallback((ev) => setQuery(ev.target.value), []);
 	const clearQuery = useCallback(() => setQuery(''), []);
 
@@ -150,14 +161,14 @@ const LiveSettingsLayout = ({closing, onClose, onLibrariesChanged, onRunSetupWiz
 				<div className={css.liveTop} ref={topRef}>
 					<div className={css.liveTitle}>{$L('Settings')}</div>
 					<div className={css.pillWrap} ref={pillRef}>
-						<PillContainer className={css.pill} spotlightId={PILL_ID}>
+						<PillContainer className={css.pill} spotlightId={PILL_ID} onFocus={handlePillFocus} onBlur={handlePillBlur}>
 							{categories.map((c) => (
 								<PillItem
 									key={c.id}
 									spotlightId={`pill-${c.id}`}
 									data-selected={c.id === category}
 									className={c.id === category ? `${css.pillItem} ${css.pillItemSelected}` : css.pillItem}
-									style={c.id === category ? {backgroundColor: t.accent} : null}
+									style={c.id === category ? (accent ? {backgroundColor: toCssColor(accent), color: pillFocused ? undefined : readableInk(accent)} : {backgroundColor: t.accent}) : null}
 									onFocus={() => setCategory(c.id)}
 									onClick={() => setCategory(c.id)}
 								>
