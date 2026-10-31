@@ -14,7 +14,6 @@ jest.mock('react/jsx-dev-runtime', () => {
 			: React.createElement(type, config);
 	}};
 });
-jest.mock('react-dom', () => ({flushSync: (fn) => fn()}));
 jest.mock('@enact/i18n/$L', () => (text) => text);
 jest.mock('@enact/spotlight', () => ({focus: jest.fn(() => true)}));
 jest.mock('@enact/spotlight/Pause', () => ({isPaused: () => false}));

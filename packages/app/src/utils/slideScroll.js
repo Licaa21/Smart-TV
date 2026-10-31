@@ -16,11 +16,10 @@ const HELD_GAP_MS = 200;
 // A move shorter than this is not worth drawing
 const MIN_DISTANCE = 6;
 // A short move is quick, and a long one, a row that scrolled several cards at once, takes longer so it can be followed
-export const SLIDE_MS = {x: 130, y: 130};
-const MAX_SLIDE_MS = {x: 260, y: 200};
-// Up and down the moves are about a row and keep to about 150 ms, since a slide that lasts longer shows what the page does under it
-const MS_PER_PX = {x: 0.1, y: 0.04};
-export const slideMsFor = (axis, distance) => Math.round(Math.min(MAX_SLIDE_MS[axis], SLIDE_MS[axis] + Math.abs(distance) * MS_PER_PX[axis]));
+export const SLIDE_MS = {x: 130, y: 180};
+const MAX_SLIDE_MS = {x: 260, y: 320};
+const MS_PER_PX = 0.1;
+export const slideMsFor = (axis, distance) => Math.round(Math.min(MAX_SLIDE_MS[axis], SLIDE_MS[axis] + Math.abs(distance) * MS_PER_PX));
 const EASE = 'cubic-bezier(0.2, 0.7, 0.2, 1)';
 // Up and down, a row is often scrolled twice in a row: by the focus, which lands where it likes, and then by the code that
 // puts the row back at its resting place on the frames behind it. Drawn as two slides the easing starts over and reads as
@@ -102,32 +101,7 @@ const release = (nodes, axis, distance) => {
 	});
 };
 
-// Runs a change that makes a row above the one in focus shorter or taller (a row left open while the list slid away,
-// closing), and scrolls the list back by what that moved, so what is on screen stays where it is and nothing is slid for it.
-// node is anything inside the list.
-let adjusting = false;
-export const keepInPlace = (node, change) => {
-	const container = node && node.closest ? node.closest('[data-slide-scroll="y"]') : null;
-	// The element in focus itself: the rows of a list are not always its direct children
-	const anchor = document.activeElement;
-	if (!container || !anchor || !container.contains(anchor)) {
-		change();
-		return;
-	}
-	// Where it is drawn, and not its offset: a list at its end is scrolled back by the browser when it gets shorter, and that
-	// has the row in focus where it was already
-	const before = anchor.getBoundingClientRect().top;
-	change();
-	const drift = anchor.getBoundingClientRect().top - before;
-	// Set even when there is no drift: a scroll the browser made by itself is not seen by the setter, and its event would
-	// come later as a move to slide
-	adjusting = true;
-	container.scrollTop += drift;
-	adjusting = false;
-};
-
 const slide = (container, axis, distance) => {
-	if (adjusting) return;
 	let pending = waiting.get(container);
 	// A scroll that comes while the slide waits is part of it, however small: the code that puts the row back at its resting
 	// place moves it a few pixels, which is a correction and not a move of its own. It has to be the key's, and the same
@@ -157,13 +131,7 @@ const slide = (container, axis, distance) => {
 	const quiet = QUIET_FRAMES[axis];
 	if (!pending) {
 		// The content shows where it was, before the page is drawn
-		const base = offsetOf(window.getComputedStyle(nodes[0]).transform, axis);
-		pending = {nodes, offset: base, frame: 0, quiet: 0, keyAt: lastKeyAt, extra: new Map()};
-		// A child still easing from an earlier press is not where the first one is, and is carried on from where it is drawn
-		nodes.forEach((node) => {
-			const apart = offsetOf(window.getComputedStyle(node).transform, axis) - base;
-			if (apart) pending.extra.set(node, (pending.extra.get(node) || 0) + apart);
-		});
+		pending = {nodes, offset: offsetOf(window.getComputedStyle(nodes[0]).transform, axis), frame: 0, quiet: 0, keyAt: lastKeyAt};
 	}
 	// A row mounted while the slide waits is held with the others and let go with them, and one that has gone from the
 	// list is put where it stands
@@ -177,7 +145,7 @@ const slide = (container, axis, distance) => {
 	nodes.forEach((node) => { node.style.transition = 'none'; });
 	pending.offset += distance;
 	pending.quiet = 0;
-	nodes.forEach((node) => { node.style.transform = translate(axis, pending.offset + (pending.extra.get(node) || 0)); });
+	nodes.forEach((node) => { node.style.transform = translate(axis, pending.offset); });
 
 	if (!quiet) {
 		waiting.delete(container);

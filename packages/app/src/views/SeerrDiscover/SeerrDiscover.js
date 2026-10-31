@@ -795,8 +795,6 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 					<div
 						className={`${css.rowsContainer} ${showDetailSection || settings.navbarPosition === 'left' ? '' : css.rowsBelowNav}`}
 						ref={rowsContainerRef}
-						data-slide-scroll="y"
-						data-slide-content="children"
 					>
 						{visibleRows.map((config, index) => (
 							<DiscoverRow

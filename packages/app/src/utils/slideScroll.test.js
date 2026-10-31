@@ -1,4 +1,4 @@
-import {SLIDE_MS, installSlideScroll, keepInPlace, slideMsFor, layoutRectOf, offsetOf, resetSlideScroll, shouldSlide, slideShiftOf, slidesAtLevel} from './slideScroll';
+import {SLIDE_MS, installSlideScroll, slideMsFor, layoutRectOf, offsetOf, resetSlideScroll, shouldSlide, slideShiftOf, slidesAtLevel} from './slideScroll';
 
 let mockLevel = 3;
 // What the viewer picked, or null for Auto
@@ -48,7 +48,7 @@ describe('how long a slide takes', () => {
 		expect(slideMsFor('x', 20)).toBeCloseTo(SLIDE_MS.x + 2, 0);
 		expect(slideMsFor('x', 288)).toBeGreaterThan(slideMsFor('x', 20));
 		expect(slideMsFor('x', 5000)).toBe(260);
-		expect(slideMsFor('y', 5000)).toBe(200);
+		expect(slideMsFor('y', 5000)).toBe(320);
 		expect(slideMsFor('y', -400)).toBe(slideMsFor('y', 400));
 	});
 });
@@ -169,75 +169,6 @@ describe('on the page', () => {
 		nextFrame();
 		expect(first.style.transform).toBe('');
 		expect(first.style.transition).toContain(`${slideMsFor('y', 200)}ms`);
-	});
-
-	describe('a change above the row in focus', () => {
-		const tops = (nodes, values) => nodes.forEach((node, i) => Object.defineProperty(node, 'offsetTop', {configurable: true, value: values[i]}));
-
-		// Where a node is drawn: its place in the list less how far the list is scrolled
-		const drawn = (container, node) => jest.spyOn(node, 'getBoundingClientRect').mockImplementation(() => ({top: node.offsetTop - container.scrollTop}));
-
-		it('scrolls the list back by what it moved, without sliding it', () => {
-			const {container, first, second} = row('y', 'children');
-			second.setAttribute('tabindex', '-1');
-			document.body.appendChild(container);
-			tops([first, second], [0, 400]);
-			drawn(container, second);
-			second.focus();
-			container.scrollTop = 400;
-			now += 1000;
-			arrow(40);
-			now += 20;
-			keepInPlace(first, () => tops([first, second], [0, 150]));
-			// The row in focus moved up by 250, so the list goes up with it
-			expect(container.scrollTop).toBe(150);
-			expect(second.style.transform).toBe('');
-			expect(first.style.transform).toBe('');
-		});
-
-		it('leaves the list alone when the browser already scrolled it back, which it does at the end of the list', () => {
-			const {container, first, second} = row('y', 'children');
-			second.setAttribute('tabindex', '-1');
-			document.body.appendChild(container);
-			tops([first, second], [0, 400]);
-			drawn(container, second);
-			second.focus();
-			container.scrollTop = 400;
-			// The browser's own scroll is not seen by the setter, which the list is then told of
-			let value = 400;
-			const sets = [];
-			Object.defineProperty(container, 'scrollTop', {configurable: true, get: () => value, set: (next) => { sets.push(next); value = next; }});
-			keepInPlace(first, () => {
-				tops([first, second], [0, 150]);
-				value = 150;
-			});
-			expect(value).toBe(150);
-			expect(sets).toEqual([150]);
-		});
-
-		it('only runs the change when nothing in the list has focus', () => {
-			const {first} = row('y', 'children');
-			const change = jest.fn();
-			keepInPlace(first, change);
-			expect(change).toHaveBeenCalledTimes(1);
-			const outside = jest.fn();
-			keepInPlace(null, outside);
-			expect(outside).toHaveBeenCalledTimes(1);
-		});
-	});
-
-	describe('children easing from an earlier press', () => {
-		it('carries on from where each child is drawn when the press before is still easing', () => {
-			const {container, first, second} = row('y', 'children');
-			// The second child has 40px left of the slide before
-			window.getComputedStyle.mockImplementation((node) => ({transform: node === second ? 'matrix(1, 0, 0, 1, 0, 40)' : 'matrix(1, 0, 0, 1, 0, 0)', scrollBehavior: 'auto'}));
-			now += 1000;
-			arrow(40);
-			now += 20;
-			scrolled(container, 'scrollTop', 100);
-			expect(first.style.transform).toBe('translate3d(0, 100px, 0)');
-			expect(second.style.transform).toBe('translate3d(0, 140px, 0)');
-		});
 	});
 
 	it('takes a few pixels of correction into the slide that waits, and does not cancel it', () => {
