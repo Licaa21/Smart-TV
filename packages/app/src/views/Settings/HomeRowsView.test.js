@@ -32,6 +32,7 @@ jest.mock('@enact/spotlight/SpotlightContainerDecorator', () => (config, type) =
 	return ({spotlightId, ...props}) => React.createElement(type, {...props, 'data-spotlight-id': spotlightId});
 });
 jest.mock('../../components/LoadingSpinner', () => () => null);
+jest.mock('../../context/SettingsContext', () => ({useSettings: () => ({settings: {}})}));
 
 const ROWS = [
 	{id: 'resume', name: 'Continue Watching', enabled: true, order: 0},

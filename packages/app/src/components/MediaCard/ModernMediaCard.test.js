@@ -309,7 +309,6 @@ describe('ModernMediaCard description', () => {
 
 	it('shows under the focused card unless the row hides it', () => {
 		const {rerender} = render(<ModernMediaCard item={film} serverUrl="http://server" isFocused />);
-		passArtWait();
 		expect(screen.getByText('A story.')).toBeTruthy();
 		rerender(<ModernMediaCard item={film} serverUrl="http://server" isFocused hideOverview />);
 		expect(screen.queryByText('A story.')).toBeNull();

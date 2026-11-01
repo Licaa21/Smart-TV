@@ -3,30 +3,30 @@
 // Every declaration that reads the accent, grouped by the surface it belongs to. {accent} and
 // {rgb} stand for the surface color, and `.{name}` for a CSS module class.
 
-import m0 from '../components/AccountModal/AccountModal.module.less';
-import m1 from '../components/AddToCollectionModal/AddToCollectionModal.module.less';
-import m2 from '../components/AddToPlaylistModal/AddToPlaylistModal.module.less';
-import m3 from '../components/AnimeMarkerPills/AnimeMarkerPills.module.less';
-import m4 from '../components/ChangeArtworkModal/ChangeArtworkModal.module.less';
-import m5 from '../components/ClearDataDialog/ClearDataDialog.module.less';
-import m6 from '../components/ComicViewer/ComicViewer.module.less';
-import m7 from '../components/CoreDialog/CoreDialog.module.less';
-import m8 from '../components/EpubReader/EpubReader.module.less';
-import m9 from '../components/ExitDialog/ExitDialog.module.less';
-import m10 from '../components/FilterPopup/FilterPopup.module.less';
-import m11 from '../components/GameCard/GameCard.module.less';
-import m12 from '../components/GameSystemCard/GameSystemCard.module.less';
-import m13 from '../components/IdentifyModal/IdentifyModal.module.less';
-import m14 from '../components/LibraryButtonRow/LibraryButtonRow.module.less';
-import m15 from '../components/MediaCard/MediaCard.module.less';
-import m16 from '../components/MediaCard/ModernMediaCard.module.less';
-import m17 from '../components/MediaRow/MediaRow.module.less';
-import m18 from '../components/NavBar/NavBar.module.less';
-import m19 from '../components/NoConnection/NoConnection.module.less';
-import m20 from '../components/PersonDetailShell/PersonDetailShell.module.less';
-import m21 from '../components/PersonalRatingDialog/PersonalRatingDialog.module.less';
-import m22 from '../components/PhotoViewer/PhotoViewer.module.less';
-import m23 from '../components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less';
+import m0 from '../components/AddToCollectionModal/AddToCollectionModal.module.less';
+import m1 from '../components/AddToPlaylistModal/AddToPlaylistModal.module.less';
+import m2 from '../components/AnimeMarkerPills/AnimeMarkerPills.module.less';
+import m3 from '../components/ChangeArtworkModal/ChangeArtworkModal.module.less';
+import m4 from '../components/ClearDataDialog/ClearDataDialog.module.less';
+import m5 from '../components/ComicViewer/ComicViewer.module.less';
+import m6 from '../components/CoreDialog/CoreDialog.module.less';
+import m7 from '../components/EpubReader/EpubReader.module.less';
+import m8 from '../components/ExitDialog/ExitDialog.module.less';
+import m9 from '../components/FilterPopup/FilterPopup.module.less';
+import m10 from '../components/GameCard/GameCard.module.less';
+import m11 from '../components/GameSystemCard/GameSystemCard.module.less';
+import m12 from '../components/IdentifyModal/IdentifyModal.module.less';
+import m13 from '../components/LibraryButtonRow/LibraryButtonRow.module.less';
+import m14 from '../components/MediaCard/MediaCard.module.less';
+import m15 from '../components/MediaCard/ModernMediaCard.module.less';
+import m16 from '../components/MediaRow/MediaRow.module.less';
+import m17 from '../components/NavBar/NavBar.module.less';
+import m18 from '../components/NoConnection/NoConnection.module.less';
+import m19 from '../components/PersonDetailShell/PersonDetailShell.module.less';
+import m20 from '../components/PersonalRatingDialog/PersonalRatingDialog.module.less';
+import m21 from '../components/PhotoViewer/PhotoViewer.module.less';
+import m22 from '../components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less';
+import m23 from '../components/ProfileCarousel/ProfileCarousel.module.less';
 import m24 from '../components/RatingsRow/RatingsRow.module.less';
 import m25 from '../components/RecordPrompt/RecordPrompt.module.less';
 import m26 from '../components/SeerrIssueThread/SeerrIssueThread.module.less';
@@ -99,30 +99,30 @@ import m92 from '../views/Settings/achievements/Achievements.module.less';
 import m93 from '../views/Settings/friends/Friends.module.less';
 
 export const MODULES = {
-	'components/AccountModal/AccountModal.module.less': m0,
-	'components/AddToCollectionModal/AddToCollectionModal.module.less': m1,
-	'components/AddToPlaylistModal/AddToPlaylistModal.module.less': m2,
-	'components/AnimeMarkerPills/AnimeMarkerPills.module.less': m3,
-	'components/ChangeArtworkModal/ChangeArtworkModal.module.less': m4,
-	'components/ClearDataDialog/ClearDataDialog.module.less': m5,
-	'components/ComicViewer/ComicViewer.module.less': m6,
-	'components/CoreDialog/CoreDialog.module.less': m7,
-	'components/EpubReader/EpubReader.module.less': m8,
-	'components/ExitDialog/ExitDialog.module.less': m9,
-	'components/FilterPopup/FilterPopup.module.less': m10,
-	'components/GameCard/GameCard.module.less': m11,
-	'components/GameSystemCard/GameSystemCard.module.less': m12,
-	'components/IdentifyModal/IdentifyModal.module.less': m13,
-	'components/LibraryButtonRow/LibraryButtonRow.module.less': m14,
-	'components/MediaCard/MediaCard.module.less': m15,
-	'components/MediaCard/ModernMediaCard.module.less': m16,
-	'components/MediaRow/MediaRow.module.less': m17,
-	'components/NavBar/NavBar.module.less': m18,
-	'components/NoConnection/NoConnection.module.less': m19,
-	'components/PersonDetailShell/PersonDetailShell.module.less': m20,
-	'components/PersonalRatingDialog/PersonalRatingDialog.module.less': m21,
-	'components/PhotoViewer/PhotoViewer.module.less': m22,
-	'components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less': m23,
+	'components/AddToCollectionModal/AddToCollectionModal.module.less': m0,
+	'components/AddToPlaylistModal/AddToPlaylistModal.module.less': m1,
+	'components/AnimeMarkerPills/AnimeMarkerPills.module.less': m2,
+	'components/ChangeArtworkModal/ChangeArtworkModal.module.less': m3,
+	'components/ClearDataDialog/ClearDataDialog.module.less': m4,
+	'components/ComicViewer/ComicViewer.module.less': m5,
+	'components/CoreDialog/CoreDialog.module.less': m6,
+	'components/EpubReader/EpubReader.module.less': m7,
+	'components/ExitDialog/ExitDialog.module.less': m8,
+	'components/FilterPopup/FilterPopup.module.less': m9,
+	'components/GameCard/GameCard.module.less': m10,
+	'components/GameSystemCard/GameSystemCard.module.less': m11,
+	'components/IdentifyModal/IdentifyModal.module.less': m12,
+	'components/LibraryButtonRow/LibraryButtonRow.module.less': m13,
+	'components/MediaCard/MediaCard.module.less': m14,
+	'components/MediaCard/ModernMediaCard.module.less': m15,
+	'components/MediaRow/MediaRow.module.less': m16,
+	'components/NavBar/NavBar.module.less': m17,
+	'components/NoConnection/NoConnection.module.less': m18,
+	'components/PersonDetailShell/PersonDetailShell.module.less': m19,
+	'components/PersonalRatingDialog/PersonalRatingDialog.module.less': m20,
+	'components/PhotoViewer/PhotoViewer.module.less': m21,
+	'components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less': m22,
+	'components/ProfileCarousel/ProfileCarousel.module.less': m23,
 	'components/RatingsRow/RatingsRow.module.less': m24,
 	'components/RecordPrompt/RecordPrompt.module.less': m25,
 	'components/SeerrIssueThread/SeerrIssueThread.module.less': m26,
@@ -418,14 +418,6 @@ export const ACCENT_RULES = {
 		["components/Sidebar/Sidebar.module.less","","html[data-theme-id='neon_pulse'] .{clock}","text-shadow","0 0 8px rgba({rgb}, 0.35)"]
 	],
 	other: [
-		["components/AccountModal/AccountModal.module.less","",".{card}:focus .{avatar}","border-color","rgb({rgb})"],
-		["components/AccountModal/AccountModal.module.less","",".{active}","color","rgb({rgb})"],
-		["components/AccountModal/AccountModal.module.less","",".{addCard}:focus .{avatar}","background","rgba({rgb}, 0.14)"],
-		["components/AccountModal/AccountModal.module.less","",".{addCard}:focus .{addIcon}","color","rgb({rgb})"],
-		["components/AccountModal/AccountModal.module.less","",".{actionBtn}:focus","border-color","rgb({rgb})"],
-		["components/AccountModal/AccountModal.module.less","",".{actionBtn}:focus","background","rgba({rgb}, 0.16)"],
-		["components/AccountModal/AccountModal.module.less","",".{actionBtn}:focus","box-shadow","inset 0 0 0 1.66957px rgb({rgb}), 0 0 0 5.00871px rgba({rgb}, 0.35)"],
-		["components/AccountModal/AccountModal.module.less","",".{actionBtn}:focus","color","rgb({rgb})"],
 		["components/AddToCollectionModal/AddToCollectionModal.module.less","",".{collectionRow}:focus","background","rgba({rgb}, 0.25)"],
 		["components/AddToCollectionModal/AddToCollectionModal.module.less","",".{collectionRow}:focus","box-shadow","inset 0 0 0 2px {accent}"],
 		["components/AddToCollectionModal/AddToCollectionModal.module.less","",".{input}:focus","border-color","{accent}"],
@@ -495,6 +487,12 @@ export const ACCENT_RULES = {
 		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{pill}:focus .{badge}, .{pill}.{spottable-focus} .{badge}","color","{accent}"],
 		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{clearFiltersBtn}:focus, .{clearFiltersBtn}.{spottable-focus}","background","{accent}"],
 		["components/PlaylistSortFilterBar/PlaylistSortFilterBar.module.less","",".{clearFiltersBtn}:focus, .{clearFiltersBtn}.{spottable-focus}","border-color","{accent}"],
+		["components/ProfileCarousel/ProfileCarousel.module.less","",".{carousel}:focus .{slot0} .{avatar}","box-shadow","0 0 0 6.67828px rgba(0, 0, 0, 0.45), 0 0 0 13.35656px {accent}"],
+		["components/ProfileCarousel/ProfileCarousel.module.less","",".{badgeActive}","background-color","{accent}"],
+		["components/ProfileCarousel/ProfileCarousel.module.less","",".{lineAccent}","color","{accent}"],
+		["components/ProfileCarousel/ProfileCarousel.module.less","",".{dotOn}","background","{accent}"],
+		["components/ProfileCarousel/ProfileCarousel.module.less","",".{pill}:focus","border-color","{accent}"],
+		["components/ProfileCarousel/ProfileCarousel.module.less","",".{pill}:focus","color","{accent}"],
 		["components/RecordPrompt/RecordPrompt.module.less","",".{button}","color","{accent}"],
 		["components/RecordPrompt/RecordPrompt.module.less","",".{button}:focus","background","rgba({rgb}, 0.25)"],
 		["components/RecordPrompt/RecordPrompt.module.less","",".{spinner}","border-top-color","{accent}"],
@@ -587,8 +585,6 @@ export const ACCENT_RULES = {
 		["views/Login/Login.module.less","",".{outlineButton}:focus","border-color","{accent}"],
 		["views/Login/Login.module.less","",".{outlineButton}:focus","box-shadow","inset 0 0 0 1.66957px {accent}"],
 		["views/Login/Login.module.less","",".{outlineButton}:focus","color","{accent}"],
-		["views/Login/Login.module.less","",".{userCard}:focus .{userAvatar}, .{userCard}:focus .{userAvatarPlaceholder}","border","5.00871px solid {accent}"],
-		["views/Login/Login.module.less","",".{userCard}:focus .{userName}","color","{accent}"],
 		["views/Login/Login.module.less","",".{toggleButton}:focus","border-color","{accent}"],
 		["views/Login/Login.module.less","",".{toggleButton}:focus","box-shadow","inset 0 0 0 1.66957px {accent}"],
 		["views/Login/Login.module.less","",".{toggleButton}:focus","color","{accent}"],
