@@ -238,7 +238,8 @@
 	box-sizing: border-box;
 	width: (18 * @dp);
 	height: (18 * @dp);
-	border: (2 * @dp) solid rgba(255, 255, 255, 0.7);
+	// Drawn in the label's color, so it shows on a button filled with a light accent too.
+	border: (2 * @dp) solid currentColor;
 	border-top-color: transparent;
 	border-radius: 50%;
 	-webkit-animation: seerrButtonSpin 1s linear infinite;
