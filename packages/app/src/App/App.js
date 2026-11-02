@@ -292,6 +292,8 @@ const AppContent = (props) => {
 	}, [backgroundMusic, user?.Id, panelIndex]);
 	const [trailerPreviewActive, setTrailerPreviewActive] = useState(false);
 	const [trailerHidesChrome, setTrailerHidesChrome] = useState(false);
+	// Stage hides the toolbar along the top once its page scrolls down.
+	const [detailsHidesNavbar, setDetailsHidesNavbar] = useState(false);
 	const [panelHistory, setPanelHistory] = useState([]);
 	// Where the details screen sits in the history when a guest star was opened from one of its episode dialogs
 	const episodeReturnRef = useRef(null);
@@ -426,6 +428,12 @@ const AppContent = (props) => {
 		};
 		window.addEventListener('moonfin:trailerPreview', handleTrailerPreview);
 		return () => window.removeEventListener('moonfin:trailerPreview', handleTrailerPreview);
+	}, []);
+
+	useEffect(() => {
+		const handleDetailsChrome = (e) => setDetailsHidesNavbar(!!e.detail?.hidden);
+		window.addEventListener('moonfin:detailsChrome', handleDetailsChrome);
+		return () => window.removeEventListener('moonfin:detailsChrome', handleDetailsChrome);
 	}, []);
 
 	// The logging switches used to reach the logger only from the settings toggle, so
@@ -2050,7 +2058,7 @@ const AppContent = (props) => {
 					onFriends={handleOpenFriends}
 					music={navMusic}
 					onOpenMusic={handleOpenMusic}
-					hideForTrailer={trailerHidesChrome}
+					hideForTrailer={trailerHidesChrome || detailsHidesNavbar}
 				/>
 			) : null}
 			<ItemMenuProvider onPlay={handlePlayFromMenu} onOpenItem={handleSelectItem} backRef={itemMenuBackRef}>

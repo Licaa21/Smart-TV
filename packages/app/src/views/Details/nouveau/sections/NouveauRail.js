@@ -26,10 +26,15 @@ const NEAR_END_CARDS = 8;
 // Left and right belong to the rail, and only its two edges need deciding. The gap comes from the
 // caller because it isn't the same on every rail. A rail given `itemMenu`, true or the menu's
 // options, opens a card's long press menu when OK is held on it. A rail given `wrap` false stops at its ends
-// instead of carrying on round to the other.
+// instead of carrying on round to the other. `onLeftEdge` is for a rail with something of its own to the
+// left, which then takes Left off the first card.
+//
+// Cards that grow on focus need room on every side, since the track clips whatever spills out of
+// it. `clearance` is the room above and below, and `bleed` widens the track into the page margin
+// on both sides without moving the cards. `bleedRight` sets the right side on its own.
 const NouveauRail = ({
-	title, items = [], spotlightId, renderItem, gap = 32, wrap = true,
-	navbarPosition, onNavigateUp, onNavigateDown, onNearEnd, itemMenu
+	title, items = [], spotlightId, renderItem, gap = 32, wrap = true, clearance = FOCUS_CLEARANCE, bleed = 0, bleedRight = bleed,
+	navbarPosition, onNavigateUp, onNavigateDown, onNearEnd, onLeftEdge, itemMenu
 }) => {
 	const trackRef = useRef(null);
 	const rectRef = useRef(null);
@@ -123,6 +128,11 @@ const NouveauRail = ({
 		ev.preventDefault();
 		ev.stopPropagation();
 
+		if (atLeft && onLeftEdge) {
+			onLeftEdge();
+			return;
+		}
+
 		// A docked sidebar is reached sideways rather than upwards, so the left edge is the way out
 		// to it. With the bar along the top there is nothing out here, so the rail keeps the press
 		// and wraps rather than letting focus fall off the end.
@@ -135,17 +145,23 @@ const NouveauRail = ({
 
 		const target = atLeft ? cells[cells.length - 1] : cells[0];
 		if (target) Spotlight.focus(target);
-	}, [wrap, navbarPosition, onNavigateUp, onNavigateDown, spotlightId]);
+	}, [wrap, navbarPosition, onNavigateUp, onNavigateDown, onLeftEdge, spotlightId]);
 
 	if (!items.length) return null;
 
 	return (
 		<RowContainer className={css.rail} spotlightId={spotlightId} onKeyDown={handleKeyDown}>
 			{title && <h2 className={css.railTitle}>{title}</h2>}
-			<div className={css.track} ref={trackRef} onFocus={handleFocus} {...(itemMenu ? menuHold : null)}>
+			<div
+				className={css.track}
+				ref={trackRef}
+				onFocus={handleFocus}
+				style={bleed || bleedRight ? {marginLeft: -bleed, marginRight: -bleedRight} : undefined}
+				{...(itemMenu ? menuHold : null)}
+			>
 				<div
 					className={css.trackInner}
-					style={{paddingTop: FOCUS_CLEARANCE, paddingBottom: FOCUS_CLEARANCE}}
+					style={{paddingTop: clearance, paddingBottom: clearance, paddingLeft: bleed || undefined, paddingRight: bleedRight || undefined}}
 				>
 					{items.slice(0, visibleCount).map((item, index) => (
 						<div
