@@ -49,6 +49,11 @@ const submit = async () => {
 const write = (text) => fireEvent.change(screen.getByPlaceholderText("What's wrong?"), {target: {value: text}});
 
 describe('ReportIssuePopup', () => {
+	test('tints the frame of the sheet with the accent', () => {
+		render(<ReportIssuePopup open isTv={false} seasons={[]} onSubmit={() => {}} onClose={() => {}} />);
+		expect(screen.getByText('Report Issue').parentElement.className).toContain('frame');
+	});
+
 	test('sends nothing until something is written', async () => {
 		const onSubmit = jest.fn();
 		render(<ReportIssuePopup open isTv={false} seasons={[]} onSubmit={onSubmit} onClose={() => {}} />);

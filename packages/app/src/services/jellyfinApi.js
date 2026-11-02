@@ -10,7 +10,7 @@ import * as userDataSync from './userDataSync';
 import {SUPPORTED_COMMANDS} from './remoteControl';
 import {createPlexApi, withEveryMethod} from './plexApi';
 import {isPlexServer, registerPlexServer} from '../utils/plexUrls';
-const APP_VERSION = packageJson.version;
+import {clientIdentity} from '../utils/clientIdentity';
 
 const PLATFORM_IDENTITY = {
 	tizen: {appName: 'Moonfin for Tizen', deviceName: 'Samsung Smart TV', tag: 'tizen'},
@@ -18,7 +18,9 @@ const PLATFORM_IDENTITY = {
 	webos: {appName: 'Moonfin for webOS', deviceName: 'LG Smart TV', tag: 'webos'},
 	xbox: {appName: 'Moonfin for Xbox', deviceName: 'Xbox', tag: 'xbox'}
 };
-const {appName: APP_NAME, deviceName: DEVICE_NAME, tag: platformTag} = PLATFORM_IDENTITY[getPlatform()] || PLATFORM_IDENTITY.webos;
+const {appName: PLATFORM_APP_NAME, deviceName: DEVICE_NAME, tag: platformTag} = PLATFORM_IDENTITY[getPlatform()] || PLATFORM_IDENTITY.webos;
+// Jellyfin's devices page lists these two, so a package the fork built shows as the fork and its own version
+const {appName: APP_NAME, appVersion: APP_VERSION} = clientIdentity(PLATFORM_APP_NAME, packageJson.version, process.env.REACT_APP_FORK_VERSION);
 
 let deviceId = null;
 let currentServer = null;

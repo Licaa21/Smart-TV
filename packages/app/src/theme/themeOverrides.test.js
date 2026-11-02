@@ -214,7 +214,7 @@ describe('per-surface accents', () => {
 			}
 			expect(lines.some((line) => line.includes('.buttonAccent *') && line.includes('color: rgba(0, 0, 0, 0.92)'))).toBe(true);
 			// The frame and the selector rows follow the pick as well, in place of CoreDialog's fixed pale blue.
-			for (const name of ['.frame {', '.selector {']) {
+			for (const name of ['.frame {', '.selector {', '.messageField {']) {
 				expect(lines.some((line) => line.includes(name) && line.includes('rgba(255, 255, 255, 0.33)'))).toBe(true);
 			}
 		});

@@ -5,7 +5,7 @@ import CoreDialog, {CoreDialogRow} from '../CoreDialog';
 import SpottableInput from '../SpottableInput/SpottableInput';
 import {ISSUE_TYPE, getIssueTypeLabel} from '../../utils/seerrStatus';
 import {seasonNumbersOf} from '../../utils/seerrRequestRules';
-import {SeerrButtonRow, SeerrDialogButton, SeerrDivider, SeerrFocusRow, SeerrSelectorRow} from './SeerrDialogControls';
+import {SEERR_DIALOG_FRAME, SeerrButtonRow, SeerrDialogButton, SeerrDivider, SeerrFocusRow, SeerrSelectorRow} from './SeerrDialogControls';
 import {MaterialIcon} from '../icons/materialIcons';
 
 import css from './ReportIssuePopup.module.less';
@@ -92,6 +92,7 @@ const ReportIssueForm = ({isTv, seasons, numberOfSeasons, initialSeason, initial
 				onClose={onClose}
 				title={$L('Report Issue')}
 				spotlightId="report-issue"
+				className={SEERR_DIALOG_FRAME}
 				bodyClassName={css.body}
 			>
 				<div className={css.form}>

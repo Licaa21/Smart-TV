@@ -545,6 +545,7 @@ export const ACCENT_RULES = {
 		["components/TrickplayPreview/TrickplaySettingsPreview.module.less","",".{barFill}","background","{accent}"],
 		["components/TrickplayPreview/TrickplaySettingsPreview.module.less","",".{barThumb}","background","{accent}"],
 		["components/seerr/ReportIssuePopup.module.less","",".{radioOn}","color","rgb({rgb})"],
+		["components/seerr/ReportIssuePopup.module.less","",".{messageField}","border","1.66957px solid rgba({rgb}, 0.33)"],
 		["components/seerr/ReportIssuePopup.module.less","",".{messageField}:focus, .{messageField}[data-focused]","border-color","rgb({rgb})"],
 		["components/seerr/SeerrDialogControls.module.less","",".{frame}","border-color","rgba({rgb}, 0.33)"],
 		["components/seerr/SeerrDialogControls.module.less","",".{rowFocusable}:focus","border-color","rgb({rgb})"],
