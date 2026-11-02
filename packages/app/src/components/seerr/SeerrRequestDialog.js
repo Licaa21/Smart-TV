@@ -162,7 +162,7 @@ const SeerrRequestDialog = ({
 				<SeerrDialogButton
 					label={$L('Submit Request')}
 					primary
-					primaryColor="#6366f1"
+					accent
 					onClick={quotaBlocked ? null : handleSubmit}
 				/>
 			</SeerrButtonRow>

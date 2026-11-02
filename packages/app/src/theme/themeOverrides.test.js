@@ -206,6 +206,15 @@ describe('per-surface accents', () => {
 			expect(lines.some((line) => line.includes('.btn:focus *') && line.includes('color: rgba(0, 0, 0, 0.92)'))).toBe(true);
 		});
 
+		it('writes dark ink on the picked season pill and the submit button of the request sheet when the surface was given white', () => {
+			const lines = buildThemeOverrideCss(moonfin, {accents: {other: '#ffffff'}}).split('\n');
+			for (const name of ['.chipSelected {', '.buttonAccent {']) {
+				const fill = lines.find((line) => line.includes(name) && line.includes('background: rgb(255, 255, 255)'));
+				expect(fill).toContain('color: rgba(0, 0, 0, 0.92)');
+			}
+			expect(lines.some((line) => line.includes('.buttonAccent *') && line.includes('color: rgba(0, 0, 0, 0.92)'))).toBe(true);
+		});
+
 		it('keeps the stylesheet\'s own text on a fill that white text still reads on', () => {
 			const css = buildThemeOverrideCss(moonfin, {accents: {other: '#0a3d91'}});
 			expect(css).not.toContain('.btn:focus *');

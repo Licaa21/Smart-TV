@@ -71,6 +71,13 @@ describe('SeerrRequestDialog', () => {
 		expect(onSubmit).toHaveBeenCalledWith({is4k: false, seasons: [2], serverId: null, profileId: null, rootFolder: null});
 	});
 
+	test('fills the submit button with the accent and not a color of its own', () => {
+		setup();
+		const button = screen.getByText('Submit Request').parentElement;
+		expect(button.className).toContain('buttonAccent');
+		expect(button.style.backgroundColor).toBe('');
+	});
+
 	test('names the track in the title when there is no switch', () => {
 		setup({is4k: true});
 		expect(screen.getByText('Request 4K Series')).toBeTruthy();

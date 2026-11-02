@@ -47,14 +47,14 @@ export const SeerrSelectorRow = ({label, value, className, ...rest}) => (
 );
 
 // A dialog action. It stays focusable while disabled, which is when onClick is null.
-export const SeerrDialogButton = ({label, icon, primary, primaryColor, foreground, busy, busyLabel, onClick, className, ...rest}) => {
+export const SeerrDialogButton = ({label, icon, primary, primaryColor, accent, foreground, busy, busyLabel, onClick, className, ...rest}) => {
 	const enabled = Boolean(onClick);
 	const style = {};
 	if (enabled && primary && primaryColor) style.backgroundColor = primaryColor;
 	if (enabled && foreground) style.color = foreground;
 
 	let primaryClass = '';
-	if (primary) primaryClass = enabled ? css.buttonPrimary : css.buttonPrimaryDisabled;
+	if (primary) primaryClass = enabled ? `${css.buttonPrimary} ${accent ? css.buttonAccent : ''}` : css.buttonPrimaryDisabled;
 
 	return (
 		<SpottableDiv

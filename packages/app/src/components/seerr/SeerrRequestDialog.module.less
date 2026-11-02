@@ -79,9 +79,16 @@
 	}
 }
 
+// The fill is written with the accent itself, not its rgb triplet, so a light pick is given dark ink.
 .chipSelected {
-	background: rgb(@accent-rgb);
+	background: var(--theme-accent, #00a4dc);
 	color: #fff;
+
+	// A ring of the accent would vanish into the fill, so a dark line inside it marks focus. It is
+	// !important because the accent replay writes the ring again under the theme's prefix.
+	&:focus {
+		box-shadow: inset 0 0 0 (3 * @dp) rgba(0, 0, 0, 0.45) !important;
+	}
 }
 
 .chipDisabled {
@@ -91,7 +98,7 @@
 }
 
 .chipSelected.chipDisabled {
-	background: rgb(@accent-rgb);
+	background: var(--theme-accent, #00a4dc);
 }
 
 .chipCheck {
