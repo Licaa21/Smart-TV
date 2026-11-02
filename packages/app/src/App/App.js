@@ -26,6 +26,8 @@ import * as remoteControl from '../services/remoteControl';
 import * as serverSocket from '../services/serverSocket';
 import {isBackKey, isChannelMenuKey, KEYS} from '../utils/keys';
 import {toggleNavigationFocus} from '../utils/navFocusTargets';
+import {drawsStage} from '../views/Details/stage/stageRules';
+import {QUICK_LOOK_ID} from '../views/Details/quickLook/quickLookRules';
 import {applyPerfTier} from '../utils/perfTier';
 import {isLiveTvChannel, isLiveTvLibrary} from '../utils/liveTvLibrary';
 import {OLED_TUNING} from '../utils/oledMode';
@@ -151,6 +153,9 @@ const PanelLoader = () => (
 // rules its panel gave it.
 const HomeLayer = SpotlightContainerDecorator({enterTo: 'last-focused', continue5WayHold: true}, 'div');
 const hiddenStyle = {display: 'none'};
+
+// Whether `node` comes before Quick Look's layer in the page, which puts it on the panel under the drawer.
+const underDrawer = (layer, node) => Boolean(layer && node && (layer.compareDocumentPosition(node) & document.DOCUMENT_POSITION_PRECEDING));
 
 const PANELS = {
 	LOGIN: 0,
@@ -338,6 +343,16 @@ const AppContent = (props) => {
 	const detailsItemStackRef = useRef([]);
 	// Play from a card's menu opens the item's screen, which starts it once it knows what to play.
 	const [detailsAutoPlay, setDetailsAutoPlay] = useState(false);
+	// The title Quick Look shows in a drawer over the panel it opened on: {item, autoPlay, panel,
+	// previous}, where previous is a drawer it opened over. The ref is read where a press has to see
+	// a change made earlier in the same press.
+	const [quickLook, setQuickLook] = useState(null);
+	const quickLookRef = useRef(null);
+	quickLookRef.current = quickLook;
+	const quickLookBackRef = useRef(null);
+	const quickLookLayerRef = useRef(null);
+	// Where focus goes back to when the drawer closes.
+	const quickLookReturnRef = useRef(null);
 	// A Smart Hub tile that opened the app, held until there's someone signed in to open it for.
 	const [deepLink, setDeepLink] = useState(null);
 	const [seerrCollection, setSeerrCollection] = useState(null);
@@ -899,10 +914,13 @@ const AppContent = (props) => {
 	}, [settings, kidsBlockedPanels]);
 
 	const navigateTo = useCallback((panel, addToHistory = true) => {
+		// A Quick Look drawer open over this panel comes back with it, without starting play again.
+		const drawer = quickLookRef.current;
 		if (addToHistory && panelIndex !== PANELS.LOGIN) {
 			const left = shownRef.current;
+			const entry = drawer ? {panel: panelIndex, quickLook: {...drawer, autoPlay: false}} : panelIndex;
 			setPanelHistory(prev => {
-				const newHistory = [...prev, panelIndex];
+				const newHistory = [...prev, entry];
 				const states = [...navStateRef.current.slice(0, prev.length), left];
 				if (newHistory.length > MAX_HISTORY_LENGTH) {
 					navStateRef.current = states.slice(-MAX_HISTORY_LENGTH);
@@ -912,6 +930,8 @@ const AppContent = (props) => {
 				return newHistory;
 			});
 		}
+		quickLookRef.current = null;
+		setQuickLook(null);
 		showPanel(panel);
 	}, [panelIndex, showPanel]);
 
@@ -942,11 +962,13 @@ const AppContent = (props) => {
 		if (panelHistory.length > 0) {
 			const prevPanel = panelHistory[panelHistory.length - 1];
 			setPanelHistory(prev => prev.slice(0, -1));
+			const backPanel = prevPanel.quickLook ? prevPanel.panel : prevPanel;
+			setQuickLook(prevPanel.quickLook || null);
 			// Leaving the player keeps the item as it stands, since an episode played on from inside it moves that
 			if (panelIndex !== PANELS.PLAYER) restoreShown(panelHistory.length - 1);
 			// Back to the details screen an episode dialog was opened from, which brings the dialog up again
 			if (episodeReturnRef.current && panelHistory.length - 1 <= episodeReturnRef.current.depth) episodeReturnRef.current = null;
-			if (prevPanel === PANELS.PLAYER) {
+			if (backPanel === PANELS.PLAYER) {
 				// back to the player a person was opened from, where it left off
 				const back = playerReturnRef.current;
 				playerReturnRef.current = null;
@@ -958,7 +980,7 @@ const AppContent = (props) => {
 				setPlaybackOptions(back.options);
 				setIsResume(back.isResume);
 			}
-			setPanelIndex(prevPanel);
+			setPanelIndex(backPanel);
 		} else if (panelIndex > PANELS.BROWSE) {
 			setPanelIndex(PANELS.BROWSE);
 		}
@@ -992,6 +1014,51 @@ const AppContent = (props) => {
 		setPanelIndex(PANELS.DETAILS);
 		return true;
 	}, [panelHistory, restoreShown]);
+
+	const quickLookShown = Boolean(quickLook) && quickLook.panel === panelIndex;
+
+	// A drawer belongs to the panel it opened over, so any other way off that panel closes it.
+	useEffect(() => {
+		if (quickLook && quickLook.panel !== panelIndex) setQuickLook(null);
+	}, [quickLook, panelIndex]);
+
+	// Back closes the drawer, back to one it was opened over or to the card that opened it.
+	const closeQuickLook = useCallback(() => {
+		const next = quickLookRef.current?.previous || null;
+		quickLookRef.current = next;
+		setQuickLook(next);
+		const target = quickLookReturnRef.current;
+		if (next || !target) return;
+		window.requestAnimationFrame(() => {
+			if (document.body.contains(target)) Spotlight.focus(target);
+		});
+	}, []);
+
+	// Notes where focus came from as it enters the drawer from the panel underneath: the card it was
+	// opened from, or the one the panel put focus back on after a page opened over the drawer closed.
+	// A dialog the drawer opened comes after it in the page and doesn't count.
+	const handleQuickLookFocus = useCallback((ev) => {
+		if (underDrawer(ev.currentTarget, ev.relatedTarget)) quickLookReturnRef.current = ev.relatedTarget;
+	}, []);
+
+	// A panel that comes back under the drawer, after a page opened over it closes, puts its own
+	// focus back once it has loaded. That's where Back should land, and the drawer keeps the focus.
+	useEffect(() => {
+		if (!quickLookShown) return undefined;
+		const keep = (ev) => {
+			if (!underDrawer(quickLookLayerRef.current, ev.target)) return;
+			quickLookReturnRef.current = ev.target;
+			window.requestAnimationFrame(() => {
+				if (quickLookRef.current && underDrawer(quickLookLayerRef.current, document.activeElement)) Spotlight.focus(QUICK_LOOK_ID);
+			});
+		};
+		document.addEventListener('focusin', keep, true);
+		return () => document.removeEventListener('focusin', keep, true);
+	}, [quickLookShown]);
+
+	const handleQuickLookAutoPlayed = useCallback(() => {
+		setQuickLook((open) => (open ? {...open, autoPlay: false} : open));
+	}, []);
 
 	useEffect(() => {
 		const handleKeyDown = (e) => {
@@ -1032,6 +1099,20 @@ const AppContent = (props) => {
 					e.stopPropagation();
 					return;
 				}
+			}
+			// The panel under Quick Look's drawer doesn't take the remote. A press that finds focus there,
+			// because the drawer was still loading or the panel put its own focus back, brings it into
+			// the drawer instead. Anything after the drawer in the page, a dialog, is left alone.
+			const layer = quickLookLayerRef.current;
+			const active = document.activeElement;
+			if (
+				quickLookShown && layer && [KEYS.UP, KEYS.DOWN, KEYS.LEFT, KEYS.RIGHT, KEYS.ENTER].indexOf(e.keyCode) >= 0 &&
+				(!active || active === document.body || underDrawer(layer, active))
+			) {
+				e.preventDefault();
+				e.stopPropagation();
+				Spotlight.focus(QUICK_LOOK_ID);
+				return;
 			}
 			if (isBackKey(e)) {
 				e.preventDefault();
@@ -1080,6 +1161,11 @@ const AppContent = (props) => {
 
 				if (itemMenuBackRef.current?.()) return;
 
+				if (quickLookShown) {
+					if (!quickLookBackRef.current?.()) closeQuickLook();
+					return;
+				}
+
 				if (panelIndex === PANELS.BROWSE || panelIndex === PANELS.LOGIN) {
 					// Sign-in walks its own screens, and home returns a scrolled row
 					// list to the top, before back means exit
@@ -1109,7 +1195,7 @@ const AppContent = (props) => {
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [panelIndex, handleBack, handleReturnToPlayer, handleReturnToEpisode, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, photoViewerItem, isPinGateActive, isPinChecking, timesUp, setupWizardActive, updateInfo, handleCloseUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition, reading, unreadableBook]);
+	}, [panelIndex, handleBack, handleReturnToPlayer, handleReturnToEpisode, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, photoViewerItem, isPinGateActive, isPinChecking, timesUp, setupWizardActive, updateInfo, handleCloseUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition, reading, unreadableBook, quickLookShown, closeQuickLook]);
 
 	// The account stays saved, so it can be chosen again from the picker once its hours are back.
 	const handleTimesUpSwitchUser = useCallback(() => {
@@ -1152,6 +1238,26 @@ const AppContent = (props) => {
 		navigateTo(PANELS.PLAYER);
 	}, [navigateTo]);
 
+	const openFullPage = useCallback((item) => {
+		if (panelIndex === PANELS.DETAILS && selectedItem) {
+			// One episode to the next takes its place, so Back leaves the run of episodes in one press.
+			if (selectedItem.Type !== 'Episode' || item.Type !== 'Episode') detailsItemStackRef.current.push(selectedItem);
+			setSelectedItem(item);
+		} else {
+			detailsItemStackRef.current = [];
+			setSelectedItem(item);
+			navigateTo(PANELS.DETAILS);
+		}
+	}, [navigateTo, panelIndex, selectedItem]);
+
+	// Open full page swaps the drawer for the title's page, and a season's page opens over the drawer,
+	// which comes back with Back.
+	const handleQuickLookFullPage = useCallback((item, replace) => {
+		if (replace) quickLookRef.current = quickLookRef.current?.previous || null;
+		setDetailsAutoPlay(false);
+		openFullPage(item);
+	}, [openFullPage]);
+
 	const handleSelectItem = useCallback((picked, autoPlay = false) => {
 		// a Seerr card reaches here from rows that open library items too, such as the related row
 		const item = seerrCardTarget(picked);
@@ -1177,16 +1283,18 @@ const AppContent = (props) => {
 			navigateTo(PANELS.PLAYER);
 			return;
 		}
-		if (panelIndex === PANELS.DETAILS && selectedItem) {
-			// One episode to the next takes its place, so Back leaves the run of episodes in one press.
-			if (selectedItem.Type !== 'Episode' || item.Type !== 'Episode') detailsItemStackRef.current.push(selectedItem);
-			setSelectedItem(item);
-		} else {
-			detailsItemStackRef.current = [];
-			setSelectedItem(item);
-			navigateTo(PANELS.DETAILS);
+		// Quick Look opens a title it draws in a drawer over the panel it was picked on, or over the
+		// drawer it was picked in. One picked on a title's own page or in the player gets its full page.
+		if (
+			settings.detailScreenStyle === 'v8' && !isKidsMode(settings) && panelIndex !== PANELS.DETAILS &&
+			panelIndex !== PANELS.PLAYER && (!item.Type || drawsStage(item.Type))
+		) {
+			setDetailsAutoPlay(false);
+			setQuickLook((open) => ({item, autoPlay: Boolean(autoPlay), panel: panelIndex, previous: open}));
+			return;
 		}
-	}, [navigateTo, panelIndex, selectedItem, handlePlayChannel]);
+		openFullPage(item);
+	}, [navigateTo, panelIndex, handlePlayChannel, openFullPage, settings]);
 
 	// A song or a channel plays as soon as it's picked, so only the rest wait for their screen to start them.
 	const handlePlayFromMenu = useCallback((item) => {
@@ -2332,6 +2440,31 @@ const AppContent = (props) => {
 						/>
 					</HomeLayer>
 				)}
+				{/* After the panels and Home and before the dialogs, which is how a press tells which side of
+				it focus is on. */}
+				<div ref={quickLookLayerRef} onFocus={handleQuickLookFocus}>
+					{quickLookShown && (
+						<Suspense fallback={null}>
+							<Details
+								key={quickLook.item.Id}
+								quickLook
+								itemId={quickLook.item.Id}
+								initialItem={quickLook.item}
+								onPlay={handlePlay}
+								onSelectItem={handleSelectItem}
+								onSelectPerson={handleSelectPerson}
+								onSelectStudio={handleSelectStudio}
+								onItemDeleted={closeQuickLook}
+								autoPlay={quickLook.autoPlay}
+								onAutoPlayed={handleQuickLookAutoPlayed}
+								seerrNav={seerrNav}
+								backHandlerRef={quickLookBackRef}
+								onOpenFullPage={handleQuickLookFullPage}
+								onClose={closeQuickLook}
+							/>
+						</Suspense>
+					)}
+				</div>
 			</ItemMenuProvider>
 			<AccountModal
 				open={showAccountModal}
