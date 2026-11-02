@@ -78,6 +78,11 @@ describe('SeerrRequestDialog', () => {
 		expect(button.style.backgroundColor).toBe('');
 	});
 
+	test('tints the frame of the sheet with the accent', () => {
+		setup();
+		expect(screen.getByText('Request Series').parentElement.className).toContain('frame');
+	});
+
 	test('names the track in the title when there is no switch', () => {
 		setup({is4k: true});
 		expect(screen.getByText('Request 4K Series')).toBeTruthy();

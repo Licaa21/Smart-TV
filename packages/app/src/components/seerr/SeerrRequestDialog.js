@@ -7,7 +7,7 @@ import {MaterialIcon} from '../icons/materialIcons';
 import {MEDIA_STATUS, isUnlimitedQuota} from '../../utils/seerrStatus';
 import {isAvailableStatus, seasonNumbersOf, unavailableOrRequestedSeasons} from '../../utils/seerrRequestRules';
 import {SeerrAdvancedRequestOptions, useSeerrAdvancedRequest} from './SeerrAdvancedRequestOptions';
-import {SeerrButtonRow, SeerrDialogButton, SeerrDivider, SeerrQuotaRow, SeerrToggleRow} from './SeerrDialogControls';
+import {SEERR_DIALOG_FRAME, SeerrButtonRow, SeerrDialogButton, SeerrDivider, SeerrQuotaRow, SeerrToggleRow} from './SeerrDialogControls';
 
 import css from './SeerrRequestDialog.module.less';
 
@@ -120,7 +120,7 @@ const SeerrRequestDialog = ({
 	const title = (startIs4k && !qualityToggle ? $L('Request 4K {type}') : $L('Request {type}')).replace('{type}', type);
 
 	return (
-		<CoreDialog open title={title} onClose={onClose} spotlightId="seerr-request-dialog" bodyClassName={css.body}>
+		<CoreDialog open title={title} onClose={onClose} spotlightId="seerr-request-dialog" className={SEERR_DIALOG_FRAME} bodyClassName={css.body}>
 			{isTv && isContinuing && status === MEDIA_STATUS.AVAILABLE && (
 				<div className={css.continuing}>
 					<MaterialIcon name="autorenew" className={css.continuingIcon} />

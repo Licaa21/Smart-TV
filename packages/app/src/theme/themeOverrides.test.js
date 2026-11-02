@@ -213,6 +213,10 @@ describe('per-surface accents', () => {
 				expect(fill).toContain('color: rgba(0, 0, 0, 0.92)');
 			}
 			expect(lines.some((line) => line.includes('.buttonAccent *') && line.includes('color: rgba(0, 0, 0, 0.92)'))).toBe(true);
+			// The frame and the selector rows follow the pick as well, in place of CoreDialog's fixed pale blue.
+			for (const name of ['.frame {', '.selector {']) {
+				expect(lines.some((line) => line.includes(name) && line.includes('rgba(255, 255, 255, 0.33)'))).toBe(true);
+			}
 		});
 
 		it('keeps the stylesheet\'s own text on a fill that white text still reads on', () => {

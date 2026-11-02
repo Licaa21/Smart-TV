@@ -7,6 +7,8 @@ import css from './SeerrDialogControls.module.less';
 
 // The remote-friendly controls the Seerr request and issue dialogs are built from.
 
+export const SEERR_DIALOG_FRAME = css.frame;
+
 const SpottableDiv = Spottable('div');
 
 // A row that fills solid when focused and turns its content dark to read on the fill. Without

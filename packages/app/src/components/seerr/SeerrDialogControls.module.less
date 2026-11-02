@@ -9,6 +9,12 @@
 	white-space: nowrap;
 }
 
+// The frame of a request dialog. CoreDialog's own is a fixed pale blue, so these two dialogs, which
+// take the accent everywhere else, tint theirs with it. It is passed as the dialog's className.
+.frame {
+	border-color: rgba(@accent-rgb, 0.33);
+}
+
 // Focus the way these rows take it: a solid fill in the theme's text color, a hairline in its
 // focus color and every glyph and word inside going dark. The hairline is there unfocused too,
 // clear, so the content doesn't move when focus lands.
@@ -89,7 +95,7 @@
 	position: relative;
 	box-sizing: border-box;
 	padding: (14 * @dp) (12 * @dp);
-	border: (1 * @dp) solid rgba(142, 200, 240, 0.33);
+	border: (1 * @dp) solid rgba(@accent-rgb, 0.33);
 	border-radius: (8 * @dp);
 	font-size: (14 * @dp);
 	cursor: pointer;

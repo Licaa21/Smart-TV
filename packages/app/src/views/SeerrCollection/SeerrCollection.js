@@ -9,7 +9,7 @@ import $L from '@enact/i18n/$L';
 import seerrApi from '../../services/seerrApi';
 import CoreDialog from '../../components/CoreDialog';
 import SeerrNotificationToast from '../../components/SeerrNotificationToast';
-import {SeerrButtonRow, SeerrDialogButton, SeerrDivider, SeerrQuotaRow, SeerrToggleRow} from '../../components/seerr/SeerrDialogControls';
+import {SEERR_DIALOG_FRAME, SeerrButtonRow, SeerrDialogButton, SeerrDivider, SeerrQuotaRow, SeerrToggleRow} from '../../components/seerr/SeerrDialogControls';
 import {SeerrAdvancedRequestOptions, useSeerrAdvancedRequest} from '../../components/seerr/SeerrAdvancedRequestOptions';
 import {MEDIA_STATUS, isUnlimitedQuota} from '../../utils/seerrStatus';
 import {KEYS} from '../../utils/keys';
@@ -135,6 +135,7 @@ export const RequestCollectionSheet = ({parts, canUse4k, quota, servers, onConfi
 			onClose={onClose}
 			title={$L('Request Collection')}
 			spotlightId="collection-request"
+			className={SEERR_DIALOG_FRAME}
 			bodyClassName={css.sheetBody}
 		>
 			<div className={css.sheet}>
@@ -201,7 +202,7 @@ export const RequestCollectionSheet = ({parts, canUse4k, quota, servers, onConfi
 					<SeerrDialogButton
 						label={$L('Request {count} movies').replace('{count}', selected.size)}
 						primary
-						primaryColor="#6366f1"
+						accent
 						busy={submitting && progress !== null}
 						busyLabel={progress && $L('Requesting {current} of {total}...')
 							.replace('{current}', progress.current)
