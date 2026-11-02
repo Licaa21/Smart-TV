@@ -21,6 +21,12 @@ const COMMON_PORTS = [8096, 8920];
 // Plex answers on its own port, over plain http on a LAN, since its certificate names a plex.direct host and not the address.
 const PLEX_PORT = 32400;
 const PLEX_ADDRESS = new RegExp(`:${PLEX_PORT}$`);
+// The fork's own server answers on a port of its own, which a TV cannot learn from a broadcast the way the phone apps do, so a subnet
+// walk asks it too. Plain http only, since a server on a port of its own at home has no certificate.
+const EXTRA_PORTS = [2364];
+// Where the walk goes when the TV could not tell its own subnet (a TV that hides its address from WebRTC): the two a home router
+// hands out most.
+export const FALLBACK_PREFIXES = ['192.168.1', '192.168.0'];
 const WEBRTC_GATHER_TIMEOUT = 2200;
 const WEBRTC_POLL_INTERVAL = 120;
 
@@ -373,7 +379,10 @@ export const buildPrivateSubnetCandidates = ({prefixes, currentHostByPrefix, ori
 					}
 				}
 			}
-			if (schemes.indexOf('http') >= 0) candidates.push('http://' + host + ':' + PLEX_PORT);
+			if (schemes.indexOf('http') >= 0) {
+				candidates.push('http://' + host + ':' + PLEX_PORT);
+				EXTRA_PORTS.forEach((port) => candidates.push('http://' + host + ':' + port));
+			}
 		}
 	}
 
@@ -410,6 +419,8 @@ const discoverPrivateSubnet = async (state) => {
 	const deviceOctets = parseIpv4(deviceIp);
 	if (deviceOctets && isPrivateIpv4(deviceOctets)) remember(deviceOctets);
 	webRtcIps.forEach(remember);
+
+	if (Object.keys(prefixes).length === 0) FALLBACK_PREFIXES.forEach((prefix) => { prefixes[prefix] = true; });
 
 	const candidates = buildPrivateSubnetCandidates({
 		prefixes,

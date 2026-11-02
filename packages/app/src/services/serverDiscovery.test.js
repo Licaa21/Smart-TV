@@ -1,6 +1,7 @@
 import {
 	buildPrivateSubnetCandidates,
 	extractPrivateIpv4FromSdp,
+	FALLBACK_PREFIXES,
 	isPrivateIpv4,
 	parseIpv4
 } from './serverDiscovery';
@@ -55,17 +56,19 @@ describe('extractPrivateIpv4FromSdp', () => {
 });
 
 describe('buildPrivateSubnetCandidates', () => {
-	test('walks the subnet on both schemes and both ports, plus Plex over http, skipping our own address', () => {
+	test('walks the subnet on both schemes and both ports, plus Plex and the extra server port over http, skipping our own address', () => {
 		const candidates = buildPrivateSubnetCandidates({
 			prefixes: {'192.168.50': true},
 			currentHostByPrefix: {'192.168.50': 42},
 			originScheme: 'http'
 		});
 
-		expect(candidates).toHaveLength(253 * 5);
+		expect(candidates).toHaveLength(253 * 6);
 		expect(candidates).toContain('http://192.168.50.1:8096');
 		expect(candidates).toContain('https://192.168.50.1:8920');
 		expect(candidates).toContain('http://192.168.50.1:32400');
+		expect(candidates).toContain('http://192.168.50.1:2364');
+		expect(candidates).not.toContain('https://192.168.50.1:2364');
 		expect(candidates.some((url) => url.indexOf('192.168.50.42:') >= 0)).toBe(false);
 	});
 
@@ -78,6 +81,7 @@ describe('buildPrivateSubnetCandidates', () => {
 
 		expect(candidates).toHaveLength(254 * 2);
 		expect(candidates.every((url) => url.indexOf('https://') === 0)).toBe(true);
+		expect(candidates.some((url) => url.indexOf(':2364') >= 0)).toBe(false);
 	});
 
 	test('nothing to walk without a prefix', () => {
@@ -86,5 +90,18 @@ describe('buildPrivateSubnetCandidates', () => {
 			currentHostByPrefix: {},
 			originScheme: 'http'
 		})).toEqual([]);
+	});
+});
+
+describe('FALLBACK_PREFIXES', () => {
+	test('are the two subnets a home router hands out, each walkable', () => {
+		expect(FALLBACK_PREFIXES).toEqual(['192.168.1', '192.168.0']);
+		const candidates = buildPrivateSubnetCandidates({
+			prefixes: {[FALLBACK_PREFIXES[0]]: true, [FALLBACK_PREFIXES[1]]: true},
+			currentHostByPrefix: {},
+			originScheme: 'file'
+		});
+		expect(candidates).toContain('http://192.168.1.142:2364');
+		expect(candidates).toContain('http://192.168.0.5:8096');
 	});
 });
