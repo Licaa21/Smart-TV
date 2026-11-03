@@ -29,7 +29,7 @@ jest.mock('@enact/spotlight/Spottable', () => (type) => {
 		return React.createElement(type, rest);
 	};
 });
-const mockSettings = {};
+let mockSettings = {};
 jest.mock('../../context/SettingsContext', () => ({useSettings: () => ({settings: mockSettings})}));
 jest.mock('../../utils/backdropWarm', () => ({warmBackdrop: jest.fn()}));
 jest.mock('../../services/jellyfinApi', () => ({
@@ -75,6 +75,7 @@ const draw = (item, isFocused) => {
 };
 
 beforeEach(() => {
+	mockSettings = {};
 	jest.useFakeTimers();
 	setTmdbThumbsAvailable(true);
 });
@@ -490,5 +491,35 @@ describe('ModernMediaCard loading its backdrop ahead', () => {
 		drawn({warmRank: 2});
 		rest();
 		expect(warmBackdrop).not.toHaveBeenCalled();
+	});
+});
+
+describe('ModernMediaCard Seerr status', () => {
+	const dot = () => document.querySelector('[class~="seerrBadge"]');
+	const banner = () => document.querySelector('[class~="banner"]');
+	const drawCard = (item) => render(<ModernMediaCard item={item} serverUrl="http://server" />);
+
+	it('keeps the corner dot in badge mode', () => {
+		drawCard(seerrShow({mediaInfo: {status: 3}}));
+		expect(dot().className).toContain('seerr3');
+		expect(banner()).toBeNull();
+	});
+
+	it('draws nothing when the badges are off', () => {
+		mockSettings = {showSeerrAvailabilityBadges: false};
+		drawCard(seerrShow({mediaInfo: {status: 3}}));
+		expect(dot()).toBeNull();
+		expect(banner()).toBeNull();
+	});
+
+	it('runs a banner across the top in banner mode', () => {
+		mockSettings = {seerrBadgeStyle: 'banner'};
+		const {rerender} = drawCard(seerrShow({mediaInfo: {status: 3}}));
+		expect(banner().textContent).toBe('REQUESTED');
+		expect(dot()).toBeNull();
+		expect(document.querySelector('[data-card-art]').className).toContain('underSeerrBanner');
+
+		rerender(<ModernMediaCard item={seerrShow()} serverUrl="http://server" />);
+		expect(banner()).toBeNull();
 	});
 });

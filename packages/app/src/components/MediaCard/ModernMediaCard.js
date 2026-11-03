@@ -10,6 +10,7 @@ import {isStaticLibraryCard, modernCardMetrics, getEpisodeLabels, getCardDisplay
 import SeerrIcon from '../icons/SeerrIcon';
 import {requestedArtwork, episodeArtwork} from './MediaCard';
 import {externalArtwork} from '../../utils/externalArtwork';
+import SeerrStatusBanner, {seerrBadgeStyle, seerrTitleStatus} from '../seerr/SeerrStatusBanner';
 import {showsWatchedCheck} from '../../utils/playedState';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
@@ -343,6 +344,8 @@ const ModernMediaCard = ({
 	const showIndicators = watchedBehavior === 'always' || watchedBehavior === 'hideCount' || (watchedBehavior === 'episodesOnly' && item?.Type === 'Episode');
 	const unplayedCount = item?.UserData?.UnplayedItemCount;
 	const showUnplayedCount = showIndicators && watchedBehavior !== 'hideCount' && !item?.UserData?.Played && unplayedCount > 0;
+	const seerrStyle = seerrBadgeStyle(settings);
+	const bannerStatus = seerrStyle === 'banner' ? seerrTitleStatus(item) : null;
 
 	const displayTitle = useMemo(() => getCardDisplayTitle(item), [item]);
 
@@ -523,7 +526,7 @@ const ModernMediaCard = ({
 			onSpotlightLeft={onSpotlightLeft}
 			onSpotlightRight={onSpotlightRight}
 		>
-			<div className={previewPhase !== 'idle' ? `${css.imageContainer} ${css.previewHost}` : css.imageContainer} data-card-art>
+			<div className={`${css.imageContainer}${previewPhase !== 'idle' ? ' ' + css.previewHost : ''}${bannerStatus ? ' ' + css.underSeerrBanner : ''}`} data-card-art>
 				{imageUrl ? (
 					<>
 						<img
@@ -590,9 +593,10 @@ const ModernMediaCard = ({
 					<div className={`${css.seerrBadge} ${css.seerrMissing}`}>
 						<SeerrIcon />
 					</div>
-				) : item?._seerr && [2, 3, 4, 5].includes(item?.mediaInfo?.status) ? (
+				) : seerrStyle === 'badge' && item?._seerr && [2, 3, 4, 5].includes(item?.mediaInfo?.status) ? (
 					<div className={`${css.seerrBadge} ${css[`seerr${item.mediaInfo.status}`]}`} />
 				) : null}
+				{bannerStatus && <SeerrStatusBanner status={bannerStatus} className={css.seerrBanner} />}
 
 				{showIndicators && showsWatchedCheck(item) && (
 					<div className={css.watchedBadge}>
@@ -610,7 +614,7 @@ const ModernMediaCard = ({
 					</div>
 				)}
 
-				<IncompleteBadge itemId={item.Id} belowFavorite={item.UserData?.IsFavorite} />
+				<IncompleteBadge itemId={item.Id} belowFavorite={item.UserData?.IsFavorite} belowBanner={Boolean(bannerStatus)} />
 				<AnimeCardPill item={item} serverUrl={itemServerUrl} hasProgressBar={showIndicators && progress > 0} />
 			</div>
 

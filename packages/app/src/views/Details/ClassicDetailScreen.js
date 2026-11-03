@@ -10,6 +10,7 @@ import {splitAdditionalParts} from './extraCategories';
 import {isMdblistEnabled} from '../../services/mdblistApi';
 import {formatTime} from '../Player/PlayerConstants';
 import {SeerrStatusBadge, SeerrDownloadBars, SeerrSeasonDot} from '../../components/seerr/SeerrStatusBadge';
+import SeerrStatusBanner, {hasSeerrDot, seerrBadgeStyle} from '../../components/seerr/SeerrStatusBanner';
 import {SeerrChips, SeerrFacts, SeerrStreaming, SeerrCollectionBanner} from '../../components/seerr/SeerrSections';
 import {SpottableDiv, RowContainer, CurrentRowContainer, ShortRowContainer} from './detailsSpottables';
 import ExpandableOverview from './ExpandableOverview';
@@ -336,10 +337,13 @@ const ClassicDetailScreen = ({
 								: null;
 							const isWatched = showsWatchedCheck(season);
 							const unplayed = season.UserData?.UnplayedItemCount;
+							const seerrStyle = seerrBadgeStyle(settings);
+							const seerrStatus = seerr.seasonMarkers.get(season.IndexNumber);
+							const banner = seerrStyle === 'banner' && hasSeerrDot(seerrStatus);
 
 							return (
 								<SpottableDiv key={season.Id} className={css.seasonCard} data-season-id={season.Id} onClick={onSeasonSelect}>
-									<div className={css.seasonPosterWrapper}>
+									<div className={`${css.seasonPosterWrapper}${banner ? ' ' + css.underSeerrBanner : ''}`}>
 										{seasonPosterUrl ? (
 											<img src={seasonPosterUrl} alt="" />
 										) : (
@@ -347,7 +351,9 @@ const ClassicDetailScreen = ({
 												<span>{season.Name}</span>
 											</div>
 										)}
-										<SeerrSeasonDot status={settings.showSeerrAvailabilityBadges !== false ? seerr.seasonMarkers.get(season.IndexNumber) : null} />
+										{banner
+											? <SeerrStatusBanner status={seerrStatus} />
+											: <SeerrSeasonDot status={seerrStyle === 'badge' ? seerrStatus : null} />}
 										{isWatched && (
 											<div className={css.watchedIndicator}>
 												<WatchedCheckIcon />

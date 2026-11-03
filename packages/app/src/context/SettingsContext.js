@@ -103,11 +103,11 @@ const normalizeHomeRowsStyle = (value) => {
 
 // Core and the plugin's admin page store the detail style by name. Builds of this app before
 // Stage pushed their own v1 to v5 unconverted, so those still read back.
-const DETAIL_STYLE_NAMES = {v1: 'classic', v2: 'modern', v3: 'spotlight', v4: 'nouveau', v5: 'minimalist', v6: 'stage', v7: 'premiere', v8: 'quickLook'};
+const DETAIL_STYLE_NAMES = {v1: 'classic', v2: 'modern', v3: 'spotlight', v4: 'nouveau', v5: 'minimalist', v6: 'stage', v7: 'premiere', v8: 'quickLook', v9: 'frost'};
 const detailStyleFromServer = (value) => (Object.prototype.hasOwnProperty.call(DETAIL_STYLE_NAMES, value)
 	? value
 	: Object.keys(DETAIL_STYLE_NAMES).find((key) => DETAIL_STYLE_NAMES[key] === value));
-const normalizeDetailScreenStyle = (value) => detailStyleFromServer(value) || 'v2';
+const normalizeDetailScreenStyle = (value) => detailStyleFromServer(value) || defaultSettings.detailScreenStyle;
 
 const normalizeGuid = (id) => {
 	if (!id || typeof id !== 'string') return id;
@@ -221,6 +221,7 @@ const VALUE_CONVERSIONS = {
 	bookLibraryStyle: oneOf(['classic', 'readingRoom', 'bookstore']),
 	musicLibraryStyle: oneOf(['classic', 'quickAccess', 'immersive']),
 	keyboardStyle: oneOf(['native', 'classic', 'glass', 'docked']),
+	seerrBadgeStyle: oneOf(['badge', 'banner']),
 	seasonalRowCountry: {fromServer: normalizeSeasonalRowCountry},
 	seasonalRowHiddenHolidays: {fromServer: normalizeSeasonalHiddenHolidays},
 	screensaverContentType: {
@@ -354,7 +355,7 @@ export const SYNCABLE_KEYS = [
 	'mergeRadarrSonarrCalendars',
 	'radarrCalendarShowCinema', 'radarrCalendarShowDigital', 'radarrCalendarShowPhysical',
 	'radarrCalendarShowDate', 'sonarrCalendarShowDate', 'sonarrCalendarShowEpisodeInfo',
-	'showSeerrButton', 'seerrShowMissingCollectionItems', 'showSeerrAvailabilityBadges',
+	'showSeerrButton', 'seerrShowMissingCollectionItems', 'showSeerrAvailabilityBadges', 'seerrBadgeStyle',
 	'showServerMessagesButton',
 	'screensaverMode', 'screensaverClockMode',
 	'screensaverBackdrop', 'screensaverComponent', 'screensaverMovement',
