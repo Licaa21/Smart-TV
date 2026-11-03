@@ -810,7 +810,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	// hairlines and the light fills take the page's text color, the glass and placeholders the
 	// surface, the dim and fades over the art the background, and focus the focused button color.
 	const fr = frostCss;
-	const ink = (a) => `rgba(${toRgbTriplet(c.onBackground)}, ${a})`;
+	const frostInk = (a) => `rgba(${toRgbTriplet(c.onBackground)}, ${a})`;
 	const ground = (a) => `rgba(${toRgbTriplet(c.background)}, ${a})`;
 	const focusFill = (a) => `rgba(${toRgbTriplet(c.buttonFocused)}, ${a})`;
 	rule(`.${fr.frost}, .${fr.readMore}`, `color: ${onBackground};`);
@@ -820,34 +820,34 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${fr.toolbarPane}, .${fr.tabPane}`, `background: ${surfaceA(0.9)};`);
 	rule(`.${fr.readMore}`, `background: ${surfaceA(0.97)};`);
 	rule(`.${fr.still}, .${fr.seasonPoster}, .${fr.avatar}, .${fr.wideThumb}, .${fr.posterThumb}`, `background: ${surfaceA(1)};`);
-	rule(`.${fr.window}::after, .${fr.toolbarPane}::after, .${fr.tabPane}::after`, `border-color: ${ink(0.08)}; border-top-color: ${ink(0.24)};`);
-	rule(`.${fr.strip}`, `border-color: ${ink(0.14)};`);
-	rule(`.${ratingsCss.ratingColumn} + .${ratingsCss.ratingColumn}`, `border-left-color: ${ink(0.14)};`);
-	rule(`.${ratingsCss.columnName}`, `color: ${ink(0.62)};`);
-	rule(`.${ratingsCss.columnValue}`, `color: ${ink(0.94)};`);
-	rule(`.${fr.infoRow} + .${fr.infoRow}`, `border-top-color: ${ink(0.08)};`);
+	rule(`.${fr.window}::after, .${fr.toolbarPane}::after, .${fr.tabPane}::after`, `border-color: ${frostInk(0.08)}; border-top-color: ${frostInk(0.24)};`);
+	rule(`.${fr.strip}`, `border-color: ${frostInk(0.14)};`);
+	rule(`.${ratingsCss.ratingColumn} + .${ratingsCss.ratingColumn}`, `border-left-color: ${frostInk(0.14)};`);
+	rule(`.${ratingsCss.columnName}`, `color: ${frostInk(0.62)};`);
+	rule(`.${ratingsCss.columnValue}`, `color: ${frostInk(0.94)};`);
+	rule(`.${fr.infoRow} + .${fr.infoRow}`, `border-top-color: ${frostInk(0.08)};`);
 	rule(['headingCaps', 'creditLabel', 'trackChevron', 'watchHeading', 'caps', 'playedIcon', 'avatarIcon', 'groupTitle', 'infoLabel']
-		.map((name) => `.${fr[name]}`).join(', '), `color: ${ink(0.62)};`);
-	rule(`.${fr.metaLine}`, `color: ${ink(0.78)};`);
-	rule(`.${fr.metaRating}, .${fr.techChip}`, `border-color: ${ink(0.55)}; color: ${ink(0.85)};`);
-	rule(`.${fr.statusUpcoming}`, `background: ${accent};`);
-	rule(`.${fr.status}`, `color: ${ink(0.8)};`);
-	rule(`.${fr.textBody}, .${fr.posterTitle}`, `color: ${ink(0.9)};`);
-	rule(`.${fr.credits}, .${fr.readMoreText}`, `color: ${ink(0.92)};`);
-	rule(`.${fr.infoValue}`, `color: ${ink(0.94)};`);
-	rule(`.${fr.trackValue}, .${fr.rowSide}`, `color: ${ink(0.72)};`);
-	rule(`.${fr.watchOthers}, .${fr.pill}`, `color: ${ink(0.68)};`);
-	rule(`.${fr.rowOverview}, .${fr.castRole}, .${fr.readMoreMeta}`, `color: ${ink(0.65)};`);
+		.map((name) => `.${fr[name]}`).join(', '), `color: ${frostInk(0.62)};`);
+	rule(`.${fr.metaLine}`, `color: ${frostInk(0.78)};`);
+	rule(`.${fr.metaRating}, .${fr.techChip}`, `border-color: ${frostInk(0.55)}; color: ${frostInk(0.85)};`);
+	rule(`.${fr.statusUpcoming}`, `background: ${detailsAccent.css};`);
+	rule(`.${fr.status}`, `color: ${frostInk(0.8)};`);
+	rule(`.${fr.textBody}, .${fr.posterTitle}`, `color: ${frostInk(0.9)};`);
+	rule(`.${fr.credits}, .${fr.readMoreText}`, `color: ${frostInk(0.92)};`);
+	rule(`.${fr.infoValue}`, `color: ${frostInk(0.94)};`);
+	rule(`.${fr.trackValue}, .${fr.rowSide}`, `color: ${frostInk(0.72)};`);
+	rule(`.${fr.watchOthers}, .${fr.pill}`, `color: ${frostInk(0.68)};`);
+	rule(`.${fr.rowOverview}, .${fr.castRole}, .${fr.readMoreMeta}`, `color: ${frostInk(0.65)};`);
 	rule(`.${fr.statusTrack}, .${fr.rowBar}`, `background: ${rangeTrack};`);
 	rule(`.${fr.barFill}`, `background: ${rangeProgress};`);
-	rule(`.${fr.card}`, `background: ${ink(0.06)};`);
-	rule(`.${fr.pills}, .${fr.statusPill}`, `background: ${ink(0.08)};`);
-	rule(`.${fr.track}, .${fr.watchCard}`, `background: ${ink(0.1)};`);
-	rule(`.${fr.watchLogo}`, `background: ${ink(0.12)};`);
+	rule(`.${fr.card}`, `background: ${frostInk(0.06)};`);
+	rule(`.${fr.pills}, .${fr.statusPill}`, `background: ${frostInk(0.08)};`);
+	rule(`.${fr.track}, .${fr.watchCard}`, `background: ${frostInk(0.1)};`);
+	rule(`.${fr.watchLogo}`, `background: ${frostInk(0.12)};`);
 	rule(`.${fr.details}:focus .${fr.card}`, `background: ${focusFill(0.12)};`);
 	rule(`.${fr.text}:focus, .${fr.row}:focus, .${fr.castTile}:focus, .${fr.extraTile}:focus, .${fr.posterTile}:focus`, `background: ${focusFill(0.14)};`);
-	rule(`.${fr.tabSelected}`, `background: ${ink(0.16)};`);
-	rule(`.${fr.pillSelected}`, `background: ${ink(0.18)}; color: ${onBackground};`);
+	rule(`.${fr.tabSelected}`, `background: ${frostInk(0.16)};`);
+	rule(`.${fr.pillSelected}`, `background: ${frostInk(0.18)}; color: ${onBackground};`);
 	rule(`.${fr.track}:focus`, `background: ${focusFill(0.32)};`);
 	rule(`.${fr.pill}:focus, .${fr.tab}:focus`, `background: ${focusFill(0.38)}; color: ${onBackground};`);
 	// Frost's toolbar: Play is an accent pill that fills like Modern's labeled Play when focused, and
@@ -857,11 +857,11 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	const favorite = `.${modernDetailCss.actionActive}[data-spotlight-id='details-favorite-btn']`;
 	rule(`${frosted} .${actionBtn}`, `color: ${onButtonNormal};`);
 	rule(`${frosted} .${actionBtn}:focus`, `background: transparent; border-color: transparent; color: ${onButtonNormal};`);
-	rule(`${frosted} .${modernDetailCss.actionActive}, ${frosted} .${modernDetailCss.actionActive}:focus`, `color: ${accent};`);
+	rule(`${frosted} .${modernDetailCss.actionActive}, ${frosted} .${modernDetailCss.actionActive}:focus`, `color: ${detailsAccent.css};`);
 	rule(`${frosted} ${favorite}, ${frosted} ${favorite}:focus`, 'color: #ff375f;');
 	rule(`${frosted} .${actionBtn}:not(:first-child):focus .${modernDetailCss.actionIcon}`, `background: ${focusFill(0.32)};`);
 	rule(`${frosted} .${actionBtn}:not(:first-child) .${modernDetailCss.actionText}`, `background: ${surfaceA(0.97)}; color: ${onSurface};`);
-	rule(`${frosted} .${actionBtn}:first-child`, `background: ${accentA(0.86)}; background-clip: padding-box; color: ${onAccent};`);
+	rule(`${frosted} .${actionBtn}:first-child`, `background: ${detailsAccent.a(0.86)}; background-clip: padding-box; color: ${detailsAccent.on};`);
 	rule(`${frosted} .${actionBtn}:first-child:focus`, `background: ${buttonFocused}; background-clip: padding-box; border-color: ${focusFill(0.3)}; color: ${onButtonFocused};`);
 
 	// Home screen chrome
