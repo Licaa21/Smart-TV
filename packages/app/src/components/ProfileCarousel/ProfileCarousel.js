@@ -1,6 +1,7 @@
 import {useCallback, useState} from 'react';
 import Spottable from '@enact/spotlight/Spottable';
 import {MaterialIcon} from '../icons/materialIcons';
+import AvatarImage from '../AvatarImage';
 import {clampIndex, initialOf, initialsColor, slotOf} from '../../utils/profileCarousel';
 
 import css from './ProfileCarousel.module.less';
@@ -24,7 +25,7 @@ const Avatar = ({item}) => {
 	const initial = initialOf(item.name);
 
 	if (item.imageUrl && !failed) {
-		return <img src={item.imageUrl} alt="" className={css.image} onError={handleError} />;
+		return <AvatarImage src={item.imageUrl} alt="" className={css.image} onError={handleError} />;
 	}
 	if (!initial) {
 		return (

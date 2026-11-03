@@ -3,6 +3,7 @@ import Spottable from '@enact/spotlight/Spottable';
 
 import {useSettings} from '../../context/SettingsContext';
 import useUserAvatar from '../../hooks/useUserAvatar';
+import AvatarImage from '../AvatarImage';
 
 import css from './NavBar.module.less';
 
@@ -20,7 +21,7 @@ const NavUserButton = ({onClick}) => {
 	return (
 		<SpottableButton className={`${css.navBtn} ${css.navBtnIcon}`} onClick={onClick}>
 			{avatarUrl ? (
-				<img
+				<AvatarImage
 					className={css.userAvatarImg}
 					src={avatarUrl}
 					alt={user?.Name}

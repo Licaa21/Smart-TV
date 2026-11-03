@@ -2,6 +2,7 @@ import $L from '@enact/i18n/$L';
 import Spottable from '@enact/spotlight/Spottable';
 
 import useUserAvatar from '../../hooks/useUserAvatar';
+import AvatarImage from '../AvatarImage';
 
 import css from './Sidebar.module.less';
 
@@ -13,7 +14,7 @@ const SidebarUserButton = ({onClick}) => {
 	return (
 		<SpottableButton className={`${css.sidebarItem} ${css.userBtn}`} onClick={onClick}>
 			{avatarUrl ? (
-				<img className={css.userAvatarImg} src={avatarUrl} alt={user?.Name} onError={onError} />
+				<AvatarImage className={css.userAvatarImg} src={avatarUrl} alt={user?.Name} onError={onError} />
 			) : (
 				<div className={css.userAvatar}>{initial}</div>
 			)}

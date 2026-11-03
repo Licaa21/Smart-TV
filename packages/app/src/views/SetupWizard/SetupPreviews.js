@@ -42,6 +42,7 @@ import {splitNouveauActions} from '../Details/nouveau/nouveauActionSplit';
 import {personalRatingIconPath, personalRatingLabel} from '../Details/personalRatingAction';
 import {materialIconPath} from '../Settings/materialIconMap';
 import {ScrubThumbnails} from '../../components/TrickplayPreview/TrickplaySettingsPreview';
+import AvatarImage from '../../components/AvatarImage';
 import {getPreviewItems, subscribePreviewItems} from './setupPreviewData';
 import {previewNavButtons} from './previewNavButtons';
 import css from './SetupPreviews.module.less';
@@ -951,7 +952,7 @@ const NavButtonIcon = ({button, color, size = 24}) => {
 const NavAvatar = ({name, size = 40}) => {
 	const {avatarUrl, onError} = useUserAvatar();
 	if (avatarUrl) {
-		return <img src={avatarUrl} alt='' onError={onError} style={{width: size, height: size, borderRadius: '50%', objectFit: 'cover', opacity: 0.85, display: 'block'}} />;
+		return <AvatarImage src={avatarUrl} alt='' onError={onError} style={{width: size, height: size, borderRadius: '50%', objectFit: 'cover', opacity: 0.85, display: 'block'}} />;
 	}
 	const initial = name ? name.charAt(0).toUpperCase() : '?';
 	return (
