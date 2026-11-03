@@ -55,6 +55,11 @@ const PEOPLE_FETCH_LIMIT = 24;
 // The People row fills in when the answer lands.
 const PEOPLE_GRACE_MS = 1000;
 const SEERR_CAP = 24;
+// A query of this many words goes to the plugin's smart search as well, which waits this long after the last key.
+const SMART_SEARCH_MIN_WORDS = 2;
+const SMART_SEARCH_DEBOUNCE_MS = 600;
+const SMART_SEARCH_LIMIT = 20;
+const NO_SMART_RESULTS = {items: [], seerr: []};
 const RECENT_SEARCHES_KEY = 'search_recentQueries';
 const RECENT_SEARCHES_MAX = 10;
 const ROW_SCROLL_MARGIN = 50;
@@ -118,7 +123,9 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	const {api, serverUrl, hasMultipleServers} = useAuth();
 	const {settings} = useSettings();
 	const unifiedMode = settings.unifiedLibraryMode && hasMultipleServers;
-	const {isEnabled: seerrEnabled, api: seerrApi, displayName: seerrName} = useSeerr();
+	const {isEnabled: seerrEnabled, api: seerrApi, displayName: seerrName, pluginInfo} = useSeerr();
+	// The plugin offers it only when its admin turned it on, and the viewer's own Moonfin plugin switch has to be on too.
+	const smartSearchOn = !!settings.useMoonfinPlugin && pluginInfo?.smartSearchEnabled === true;
 
 	// Results are drawn with the rows and cards Home uses, so they follow the Home settings for
 	// style and artwork. The space between rows is Search's own, since Home's is sized for a
@@ -131,6 +138,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	const [groups, setGroups] = useState([]);
 	const [seerrResults, setSeerrResults] = useState([]);
 	const [gameResults, setGameResults] = useState([]);
+	const [smartResults, setSmartResults] = useState(NO_SMART_RESULTS);
 	const [activeTab, setActiveTab] = useState('all');
 	const activeTabRef = useRef('all');
 	activeTabRef.current = activeTab;
@@ -158,6 +166,8 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 
 	const debounceRef = useRef(null);
 	const requestIdRef = useRef(0);
+	const smartDebounceRef = useRef(null);
+	const smartRequestIdRef = useRef(0);
 	const remoteSearchRef = useRef(remoteSearch);
 	remoteSearchRef.current = remoteSearch;
 	const lastResultNamesRef = useRef([]);
@@ -347,13 +357,40 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		}
 	}, [api, seerrEnabled, seerrApi, unifiedMode, focusAllTab, rememberSearch, openOnSeerr, settings]);
 
+	// One word is a title or a name, which the usual search handles, so only a query of two words or more goes to the plugin. Its rows
+	// come in beside the usual ones, and a failure or an index still being built adds nothing.
+	const runSmartSearch = useCallback((text) => {
+		const requestId = ++smartRequestIdRef.current;
+		const q = (text || '').trim();
+		if (!smartSearchOn || q.split(/\s+/).length < SMART_SEARCH_MIN_WORDS || q.toLowerCase().startsWith('studio:')) {
+			setSmartResults(NO_SMART_RESULTS);
+			return;
+		}
+		api.smartSearch(q, SMART_SEARCH_LIMIT).then((res) => {
+			if (requestId !== smartRequestIdRef.current) return;
+			if (res?.Ready !== true) {
+				setSmartResults(NO_SMART_RESULTS);
+				return;
+			}
+			setSmartResults({
+				items: withoutBlockedItems(res.Items || []),
+				seerr: seerrEnabled && !isKidsMode(settings) ? (res.Seerr || []).filter((r) => r.mediaType !== 'person').slice(0, SEERR_CAP) : []
+			});
+		}).catch(() => {
+			if (requestId === smartRequestIdRef.current) setSmartResults(NO_SMART_RESULTS);
+		});
+	}, [api, smartSearchOn, seerrEnabled, settings]);
+
 	const applyQuery = useCallback((value) => {
 		// Even a clear or a query waiting for debounce supersedes older results.
 		requestIdRef.current++;
+		smartRequestIdRef.current++;
 		setQuery(value);
 		if (debounceRef.current) clearTimeout(debounceRef.current);
 		debounceRef.current = setTimeout(() => doSearch(value), SEARCH_DEBOUNCE_MS);
-	}, [doSearch]);
+		if (smartDebounceRef.current) clearTimeout(smartDebounceRef.current);
+		smartDebounceRef.current = setTimeout(() => runSmartSearch(value), SMART_SEARCH_DEBOUNCE_MS);
+	}, [doSearch, runSmartSearch]);
 	const handleInputChange = useCallback((e) => {
 		remoteSearch?.close();
 		let value = e.target.value;
@@ -390,16 +427,18 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	const handleClearSearch = useCallback(() => {
 		remoteSearch?.close();
 		if (debounceRef.current) clearTimeout(debounceRef.current);
+		if (smartDebounceRef.current) clearTimeout(smartDebounceRef.current);
 		requestIdRef.current++;
 		setIsLoading(false);
 		setQuery('');
 		setGroups([]);
 		setSeerrResults([]);
 		setGameResults([]);
+		runSmartSearch('');
 		setActiveRowId(null);
 		setVisibleCardCounts({});
 		Spotlight.focus('search-input');
-	}, [remoteSearch]);
+	}, [remoteSearch, runSmartSearch]);
 
 	// Picking a past query runs it straight away. The debounce only exists to
 	// throttle typing, and there is nothing left to wait for here.
@@ -408,9 +447,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		const term = e.currentTarget.dataset.term;
 		if (!term) return;
 		if (debounceRef.current) clearTimeout(debounceRef.current);
+		if (smartDebounceRef.current) clearTimeout(smartDebounceRef.current);
 		setQuery(term);
 		doSearch(term);
-	}, [doSearch, remoteSearch]);
+		runSmartSearch(term);
+	}, [doSearch, runSmartSearch, remoteSearch]);
 
 	const handleClearRecent = useCallback(() => {
 		recentSearchesRef.current = [];
@@ -419,8 +460,9 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	}, [saveRecentSearches]);
 
 	const totalCount = useMemo(() => (
-		groups.reduce((sum, g) => sum + g.items.length, 0) + seerrResults.length + gameResults.length
-	), [groups, seerrResults, gameResults]);
+		groups.reduce((sum, g) => sum + g.items.length, 0) + seerrResults.length + gameResults.length +
+		smartResults.items.length + smartResults.seerr.length
+	), [groups, seerrResults, gameResults, smartResults]);
 
 	const tabs = useMemo(() => {
 		const list = [];
@@ -456,13 +498,30 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		return {items, raw};
 	}, [seerrResults]);
 
-	// Rows shown in the All tab: groups first, then Seerr, then Games.
+	const smartSeerrCards = useMemo(() => {
+		const raw = new Map();
+		const items = smartResults.seerr.map((result) => {
+			const item = normalizeSeerrItem(result);
+			raw.set(item.Id, result);
+			return item;
+		});
+		return {items, raw};
+	}, [smartResults.seerr]);
+
+	// Rows shown in the All tab: Smart Search first, then groups, then Seerr, then Games.
 	const allRows = useMemo(() => {
-		const list = groups.map((g) => ({id: g.key, title: g.title, items: g.items, kind: 'jellyfin', cardType: cardTypeFor(g.items[0]?.Type)}));
+		const list = [];
+		if (smartResults.items.length > 0) {
+			list.push({id: 'smart', title: $L('Smart Search'), items: smartResults.items, kind: 'jellyfin', cardType: cardTypeFor(smartResults.items[0]?.Type)});
+		}
+		if (smartSeerrCards.items.length > 0) {
+			list.push({id: 'smartSeerr', title: $L('Smart Search on {name}').replace('{name}', seerrLabel), items: smartSeerrCards.items, kind: 'seerr', cardType: 'portrait'});
+		}
+		groups.forEach((g) => list.push({id: g.key, title: g.title, items: g.items, kind: 'jellyfin', cardType: cardTypeFor(g.items[0]?.Type)}));
 		if (seerrCards.items.length > 0) list.push({id: 'seerr', title: seerrLabel, items: seerrCards.items, kind: 'seerr', cardType: 'portrait'});
 		if (gameResults.length > 0) list.push({id: 'games', title: $L('Games'), items: gameResults, kind: 'game'});
 		return list;
-	}, [groups, seerrCards, gameResults, seerrLabel]);
+	}, [groups, seerrCards, gameResults, seerrLabel, smartResults.items, smartSeerrCards]);
 
 	// Every tab but Games is a stack of Home rows, like All. A row scrolls sideways, so a focused card
 	// growing to show its details cannot push the last card of a wrapped line onto a line of its own,
@@ -495,7 +554,9 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// Keeps people that answer after the screen closed from landing on it.
 	useEffect(() => () => {
 		if (debounceRef.current) clearTimeout(debounceRef.current);
+		if (smartDebounceRef.current) clearTimeout(smartDebounceRef.current);
 		requestIdRef.current++;
+		smartRequestIdRef.current++;
 	}, []);
 
 	const showRecent = !hasResults &&
@@ -522,12 +583,13 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// once the press reaches the top, and from the pill just focused that lands on another tab
 	// and switches to it.
 	const handleInputKeyDown = useCallback((e) => {
+		if (e.keyCode === KEYS.ENTER) runSmartSearch(query);
 		if (e.keyCode !== KEYS.DOWN) return;
 		if (focusBelowInput()) {
 			e.preventDefault();
 			e.stopPropagation();
 		}
-	}, [focusBelowInput]);
+	}, [focusBelowInput, runSmartSearch, query]);
 
 	// Each TV keyboard carries the remote's microphone, and what it hears lands
 	// in the field like typed text. The field is handed over on the key down,
@@ -719,8 +781,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 
 	const seerrCardsRef = useRef(seerrCards);
 	seerrCardsRef.current = seerrCards;
+	const smartSeerrCardsRef = useRef(smartSeerrCards);
+	smartSeerrCardsRef.current = smartSeerrCards;
 	const handleSelectSeerr = useCallback((item) => {
-		const raw = seerrCardsRef.current.raw.get(item._seerrSourceId || item.Id);
+		const id = item._seerrSourceId || item.Id;
+		const raw = seerrCardsRef.current.raw.get(id) || smartSeerrCardsRef.current.raw.get(id);
 		if (raw) onSelectSeerrItem?.(raw);
 	}, [onSelectSeerrItem]);
 
