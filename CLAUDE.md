@@ -316,12 +316,12 @@ did, what the fork keeps instead, and what to do on a merge.
 - **On a merge:** keep `AvatarImage` where upstream draws a user's picture with an `<img>` (`NavUserButton`, `SidebarUserButton`, `ProfileCarousel`, `SetupPreviews`) and any new place that shows `getUserImageUrl`.
 - **Files:** `components/AvatarImage/`, `utils/avatarOrientation.js` (and its test), `NavBar/NavUserButton.js`, `Sidebar/SidebarUserButton.js`, `ProfileCarousel/ProfileCarousel.js`, `views/SetupWizard/SetupPreviews.js`.
 
-### 26. The Search screen, and Smart Search not ported
+### 26. The Search screen, with Smart Search added to it
 
-- **Upstream:** the Search screen's own layout (rows of cards under a search field), with Smart Search added on 2026-11-03 (f3026fc6): for a query of two words or more, two extra rows ("Smart Search" and "Smart Search on <Seerr>") from the Moonbase plugin's `/Moonfin/SmartSearch`, only when the plugin reports `smartSearchEnabled`.
-- **The fork keeps:** its own `views/Search/Search.js` (Home's cards and rows, the Seerr and Games rows, a default tab), whole. Smart Search is **not ported yet**: the 2026-11-03 merge took the fork's file and dropped upstream's `Search.smart.test.js`, which tests upstream's structure. `api.smartSearch` and the two strings (with Romanian) are in the tree for the port. Whether to port it, and how its two rows should look in the fork's Search, is the user's to decide.
-- **On a merge:** keep the fork's Search whole, and tell the user what upstream changed in it.
-- **Files:** `views/Search/Search.js`, `services/jellyfinApi.js` (`smartSearch`).
+- **Upstream:** the Search screen's own layout (rows of cards under a search field), with Smart Search added on 2026-11-03 (f3026fc6): for a query of two words or more, two extra rows ("Smart Search" and "Smart Search on <Seerr>") from the Moonbase plugin's `GET /Moonfin/SmartSearch?query=&limit=20`, which answers `{Ready, Items, Seerr}` (`Ready` false while the plugin's index is still being built), and only when `/Moonfin/Ping` reports `smartSearchEnabled` (an admin toggle of the plugin, off by default) and the viewer's Moonfin plugin switch is on.
+- **The fork keeps:** its own `views/Search/Search.js` (Home's cards and rows, the Seerr and Games rows, a default tab), whole, with Smart Search added to it by hand (2026-11-03, the user asked for it in the fork's own layout): `runSmartSearch` (a second debounce of 600 ms, an answer for an older query dropped, Enter and a picked recent search ask at once, a failure or an index still building adds nothing), two rows ahead of the usual ones in the All tab only (`smart` of library items, `smartSeerr` of Seerr cards that open like the other Seerr results through `smartSeerrCards`), and their counts in the All tab's total. Upstream's own `Search.smart.test.js` tests upstream's layout, so the fork's `Search.smart.test.js` is its own. The plugin has to be the fork's release that carries the route (the plugin chat's work, 3.0.0.1 or later); on 2.5.0.1 the route answers 404, `smartSearchEnabled` is absent and nothing changes on screen.
+- **On a merge:** keep the fork's Search whole, take upstream's Smart Search changes into `runSmartSearch` and the two rows, and tell the user what upstream changed in it.
+- **Files:** `views/Search/Search.js` and `Search.smart.test.js`, `services/jellyfinApi.js` (`smartSearch`).
 
 ## The plugin fork, and the TMDB text
 
