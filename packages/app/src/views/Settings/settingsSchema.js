@@ -43,6 +43,7 @@ import {
 	getContinueWatchingDefaultActionOptions,
 	getNextUpMaxDaysOptions,
 	getOledModeOptions,
+	getSeerrBadgeStyleOptions,
 	getOverlayColorOptions,
 	getPassthroughModeOptions,
 	getPerformanceModeOptions,
@@ -656,7 +657,7 @@ export const SETTINGS_SCHEMA = [
 				description: () => $L('Layout, buttons, sections, ratings, and theme music'),
 				rows: [
 					{kind: KIND.SECTION, id: 'detailsDisplay', label: () => $L('Display')},
-					{kind: KIND.OPTION, key: 'detailScreenStyle', label: () => $L('Details Screen Style'), desc: () => $L('Classic is the original centered moonfin layout. Modern is a responsive cinematic layout. Spotlight is a hero-first layout with pop-up content cards. Nouveau is a full-screen layout with sections stacked down the page. Minimalist is artwork, one play button and the episodes. Stage leads with the poster, with play under it and the details beside it. Premiere centers the title over a backdrop that fills the screen, with every section down the page under it. Quick Look opens a drawer over the screen you were on, with the full page a press away.'), options: getDetailScreenStyleOptions, fallback: () => $L('Modern'), icon: 'movie_outlined'},
+					{kind: KIND.OPTION, key: 'detailScreenStyle', label: () => $L('Details Screen Style'), desc: () => $L('Classic is the original centered moonfin layout. Modern is a responsive cinematic layout. Spotlight is a hero-first layout with pop-up content cards. Nouveau is a full-screen layout with sections stacked down the page. Minimalist is artwork, one play button and the episodes. Stage leads with the poster, with play under it and the details beside it. Premiere centers the title over a backdrop that fills the screen, with every section down the page under it. Quick Look opens a drawer over the screen you were on, with the full page a press away. Frost floats the title in a glass window over a blurred copy of its art, with its parts in tabs under the buttons.'), options: getDetailScreenStyleOptions, fallback: () => $L('Modern'), icon: 'movie_outlined'},
 					{kind: KIND.OPTION, key: 'personalRatingStyle', label: () => $L('Personal Rating Style'), options: getPersonalRatingStyleOptions, fallback: () => $L('Like / dislike'), icon: 'rate_review'},
 					{kind: KIND.TOGGLE, key: 'detailsBackdropEnabled', label: () => $L('Details Screen Backdrop'), icon: 'photo'},
 					{
@@ -1087,9 +1088,19 @@ export const SETTINGS_SCHEMA = [
 						kind: KIND.TOGGLE,
 						key: 'showSeerrAvailabilityBadges',
 						label: () => $L('Show Seerr Availability Badges'),
-						desc: () => $L('Show season availability badges on media details pages'),
+						desc: () => $L('Show the Seerr status on posters and seasons across the app'),
 						icon: 'check_circle_outline',
 						when: whenSeerr
+					},
+					{
+						kind: KIND.OPTION,
+						key: 'seerrBadgeStyle',
+						label: () => $L('Badge Style'),
+						desc: () => $L("Badge puts Seerr's dot in a corner. Banner runs the status across the top of the poster."),
+						options: getSeerrBadgeStyleOptions,
+						fallback: () => $L('Badge'),
+						icon: 'label_outline',
+						when: (ctx) => whenSeerr(ctx) && ctx.settings.showSeerrAvailabilityBadges !== false
 					},
 					{kind: KIND.INFO, id: 'seerrVariant', label: () => $L('Detected Variant'), value: (ctx) => $L('{seerrLabel} (Seerr v3+)').replace('{seerrLabel}', ctx.seerrLabel), when: (ctx) => ctx.isSeerr, icon: 'info_outline'}
 				]
