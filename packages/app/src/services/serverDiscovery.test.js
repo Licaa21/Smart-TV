@@ -84,6 +84,30 @@ describe('buildPrivateSubnetCandidates', () => {
 		expect(candidates.some((url) => url.indexOf(':2364') >= 0)).toBe(false);
 	});
 
+	test('asks the likely ports on every address before the rare ones, so a server high in the subnet shows up soon', () => {
+		const candidates = buildPrivateSubnetCandidates({
+			prefixes: {'192.168.1': true},
+			currentHostByPrefix: {},
+			originScheme: 'file'
+		});
+
+		const likely = (url) => /^http:\/\/[^/]+:(8096|2364)$/.test(url);
+		expect(candidates.slice(0, 254 * 2).every(likely)).toBe(true);
+		expect(candidates.slice(254 * 2).some(likely)).toBe(false);
+		expect(candidates.indexOf('http://192.168.1.142:2364')).toBeLessThan(254 * 2);
+		expect(candidates.indexOf('https://192.168.1.1:8096')).toBeGreaterThanOrEqual(254 * 2);
+	});
+
+	test('an https page asks https on the default port first', () => {
+		const candidates = buildPrivateSubnetCandidates({
+			prefixes: {'10.0.0': true},
+			currentHostByPrefix: {},
+			originScheme: 'https'
+		});
+
+		expect(candidates.slice(0, 254).every((url) => /^https:\/\/[^/]+:8096$/.test(url))).toBe(true);
+	});
+
 	test('nothing to walk without a prefix', () => {
 		expect(buildPrivateSubnetCandidates({
 			prefixes: {},
