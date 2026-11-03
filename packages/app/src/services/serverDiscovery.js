@@ -16,7 +16,9 @@ import {loadShellBridge} from './shellBridge';
 import {plexVersion} from './plexMapper';
 
 const REQUEST_TIMEOUT = 1200;
-const MAX_IN_FLIGHT = 16;
+// A dead address makes a request wait out its whole timeout, so a walk of a subnet is mostly waiting, and more of it at once is what
+// shortens it.
+const MAX_IN_FLIGHT = 32;
 const COMMON_PORTS = [8096, 8920];
 // Plex answers on its own port, over plain http on a LAN, since its certificate names a plex.direct host and not the address.
 const PLEX_PORT = 32400;
@@ -386,7 +388,10 @@ export const buildPrivateSubnetCandidates = ({prefixes, currentHostByPrefix, ori
 		}
 	}
 
-	return candidates;
+	// The ports a server is likely on go first, on every address, so one high in the subnet is reached after a few hundred requests
+	// and not after the whole walk.
+	const likely = schemes.indexOf('http') >= 0 ? /^http:\/\/[^/]+:(8096|2364)$/ : /^https:\/\/[^/]+:8096$/;
+	return candidates.filter((url) => likely.test(url)).concat(candidates.filter((url) => !likely.test(url)));
 };
 
 // A platform may know the device's own address where the page cant find it,
