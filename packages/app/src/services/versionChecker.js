@@ -155,7 +155,7 @@ const releaseHasPlatformAsset = (release) => {
 
 /**
  * Fetch the latest release that contains a platform-specific asset.
- * Walks recent releases (up to 10) to find one with an .ipk or .wgt file.
+ * Walks recent releases (up to 10) and takes the highest version that has an .ipk or .wgt file.
  * @returns {Promise<Object|null>}
  */
 const fetchLatestRelease = async () => {
@@ -174,15 +174,18 @@ const fetchLatestRelease = async () => {
 		const releases = await response.json();
 		if (!Array.isArray(releases)) return null;
 
-		// Find the first non-draft, non-prerelease release with a matching asset
+		// The highest version of the non-draft, non-prerelease releases with a matching asset. The first of the list is not
+		// it: GitHub listed fork-v1.9.9 above fork-v1.10.0, whatever their dates, so a set on 1.9.9 was told it was current.
+		let newest = null;
 		for (const release of releases) {
-			if (release.draft || release.prerelease) continue;
-			if (releaseHasPlatformAsset(release)) {
-				return release;
+			if (release.draft || release.prerelease || !release.tag_name) continue;
+			if (!releaseHasPlatformAsset(release)) continue;
+			if (!newest || compareVersions(newest.tag_name.replace(/^(fork-)?v/, ''), release.tag_name.replace(/^(fork-)?v/, '')) < 0) {
+				newest = release;
 			}
 		}
 
-		return null;
+		return newest;
 	} catch (e) {
 		console.warn('[VERSION] Failed to fetch release info:', e);
 		return null;

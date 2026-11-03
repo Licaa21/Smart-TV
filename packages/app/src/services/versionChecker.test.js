@@ -36,6 +36,24 @@ describe('versionChecker for the fork', () => {
 		expect((await load('1.1.2').checkForUpdatesDetailed()).status).toBe('current');
 	});
 
+	// GitHub listed fork-v1.9.9 above fork-v1.10.0 (2026-11-03), whatever the dates say, so the first release of the list is not the newest.
+	test('the newest version wins whatever order GitHub lists the releases in', async () => {
+		global.fetch = jest.fn(async () => ({ok: true, json: async () => [release('fork-v1.9.9'), release('fork-v1.10.0'), release('fork-v1.9.8')]}));
+		expect(await load('1.9.8').checkForUpdatesDetailed()).toEqual({status: 'update', currentVersion: '1.9.8', latestVersion: '1.10.0'});
+		expect(await load('1.9.9').checkForUpdatesDetailed()).toEqual({status: 'update', currentVersion: '1.9.9', latestVersion: '1.10.0'});
+		expect((await load('1.10.0').checkForUpdatesDetailed()).status).toBe('current');
+	});
+
+	test('a draft, a prerelease and a release without a package are never the newest', async () => {
+		global.fetch = jest.fn(async () => ({ok: true, json: async () => [
+			release('fork-v1.11.0', {draft: true}),
+			release('fork-v1.10.5', {prerelease: true}),
+			release('fork-v1.10.4', {assets: []}),
+			release('fork-v1.10.0')
+		]}));
+		expect(await load('1.9.9').checkForUpdatesDetailed()).toEqual({status: 'update', currentVersion: '1.9.9', latestVersion: '1.10.0'});
+	});
+
 	test('a check the viewer asked for shows an update whose notice was dismissed, the launch check does not', async () => {
 		const {getFromStorage} = require('./storage');
 		getFromStorage.mockImplementation(async (key) => (key === 'version_dismissed' ? '1.1.3' : null));
