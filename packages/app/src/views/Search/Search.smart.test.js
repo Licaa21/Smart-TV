@@ -84,7 +84,7 @@ afterEach(() => jest.useRealTimers());
 test('a query of two words or more adds the smart rows above the usual ones', async () => {
 	render(<Search />);
 	await typeQuery('jim carey mask');
-	expect(mockApi.smartSearch).toHaveBeenCalledWith('jim carey mask', 20);
+	expect(mockApi.smartSearch).toHaveBeenCalledWith('jim carey mask', 20, true);
 	expect(screen.getByText('Smart Search (1)')).toBeTruthy();
 	expect(screen.getByText('Smart Search on Seerr (1)')).toBeTruthy();
 	expect(shown('The Mask')).toBe(true);
@@ -175,4 +175,47 @@ test('clearing the search before the smart search has started stops it from comi
 	await act(async () => { jest.advanceTimersByTime(1000); });
 	expect(mockApi.smartSearch).not.toHaveBeenCalled();
 	expect(shown('The Mask')).toBe(false);
+});
+
+// The plugin's answer with the tuning flag on, as the installed plugin sends it.
+const scored = {
+	Ready: true,
+	Items: [
+		{Card: {Id: 'd1', Type: 'Movie', Name: 'Dog Days'}, Score: 0.83, Similarity: 0.584},
+		{Card: {Id: 'd2', Type: 'Movie', Name: 'Dog Days Two'}, Score: 0.73, Similarity: 0.506},
+		{Card: {Id: 'x1', Type: 'Movie', Name: 'Oppenheimer'}, Score: 0.6, Similarity: 0.322},
+		{Card: {Id: 'x2', Type: 'Movie', Name: 'Drive'}, Score: 0.55, Similarity: 0.372}
+	],
+	Seerr: [
+		{id: 1, mediaType: 'movie', title: 'Hachi', score: 0.85, similarity: 0.641},
+		{id: 2, mediaType: 'movie', title: 'Splice', score: 0.7, similarity: 0.35}
+	]
+};
+
+test('what is not close to the best of its row is left out, library and Seerr each on its own', async () => {
+	mockApi.smartSearch.mockResolvedValue(scored);
+	render(<Search />);
+	await typeQuery('movie about a dog');
+	expect(shown('Dog Days')).toBe(true);
+	expect(shown('Dog Days Two')).toBe(true);
+	expect(shown('Oppenheimer')).toBe(false);
+	expect(shown('Drive')).toBe(false);
+	expect(shown('Hachi')).toBe(true);
+	expect(shown('Splice')).toBe(false);
+	expect(screen.getByText('Smart Search (2)')).toBeTruthy();
+	expect(screen.getByText('Smart Search on Seerr (1)')).toBeTruthy();
+});
+
+test('a row whose results are all weak is not shown at all', async () => {
+	mockApi.smartSearch.mockResolvedValue({Ready: true, Items: scored.Items.map((item) => ({...item, Similarity: 0.3})), Seerr: []});
+	render(<Search />);
+	await typeQuery('movie about a dog');
+	expect(screen.queryByText(/Smart Search \(/)).toBeNull();
+});
+
+test('a plugin that sends no score gets everything shown, as before', async () => {
+	render(<Search />);
+	await typeQuery('jim carey mask');
+	expect(shown('The Mask')).toBe(true);
+	expect(shown('Jumanji')).toBe(true);
 });

@@ -55,6 +55,19 @@ describe('search', () => {
 	});
 });
 
+describe('smart search', () => {
+	test('asks for the closeness of each result only when told to', async () => {
+		setServerType('jellyfin');
+		platformFetch.mockClear();
+		await api.smartSearch('jim carey mask', 20);
+		await api.smartSearch('jim carey mask', 20, true);
+		const [plain, scored] = platformFetch.mock.calls;
+		expect(urlOf(plain)).toContain('/Moonfin/SmartSearch?query=jim%20carey%20mask&limit=20');
+		expect(urlOf(plain)).not.toContain('debug');
+		expect(urlOf(scored)).toContain('&limit=20&debug=true');
+	});
+});
+
 describe('libraries', () => {
 	const answer = (byUrl) => platformFetch.mockImplementation((url) => {
 		const body = /Views(\?|$)/.test(url) ? byUrl.views : byUrl.user;

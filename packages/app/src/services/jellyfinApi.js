@@ -707,8 +707,9 @@ export const api = {
 		return request(`/Moonfin/Items/${itemId}/Similar?limit=${limit}${userQuery}`);
 	},
 
-	smartSearch: (query, limit = 20) =>
-		request(`/Moonfin/SmartSearch?query=${encodeURIComponent(query)}&limit=${limit}`),
+	// `scores` asks the plugin for how close each result is (its tuning flag), which the Search screen cuts on.
+	smartSearch: (query, limit = 20, scores = false) =>
+		request(`/Moonfin/SmartSearch?query=${encodeURIComponent(query)}&limit=${limit}${scores ? '&debug=true' : ''}`),
 
 	getGenres: (libraryId, includeItemTypes = 'Movie,Series', sortBy = 'SortName', sortOrder = 'Ascending') => {
 		const params = libraryId ? `&ParentId=${libraryId}` : '';

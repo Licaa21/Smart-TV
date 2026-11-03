@@ -22,6 +22,7 @@ import {normalizeMediaItem as normalizeSeerrItem} from '../../utils/seerrHomeRow
 import {isGameLibrary, resolveGameLibraryId} from '../../utils/gameLibrary';
 import {groupSearchResults, aspectClassForType, isCircleType, filterByName, fetchAllGames, filterGames, rankMostRelevant} from '../../utils/searchGroups';
 import {foldForSearch} from '../../utils/accentFolding';
+import {relevantSmartResults} from '../../utils/smartSearchRelevance';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
 import {closeTvKeyboard} from '../../components/TVKeyboard/keyboardBus';
 import useStorage from '../../hooks/useStorage';
@@ -366,15 +367,17 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 			setSmartResults(NO_SMART_RESULTS);
 			return;
 		}
-		api.smartSearch(q, SMART_SEARCH_LIMIT).then((res) => {
+		api.smartSearch(q, SMART_SEARCH_LIMIT, true).then((res) => {
 			if (requestId !== smartRequestIdRef.current) return;
 			if (res?.Ready !== true) {
 				setSmartResults(NO_SMART_RESULTS);
 				return;
 			}
+			// What is not close to the best of its row is left out, as long as the plugin said how close each one is.
+			const found = relevantSmartResults(res);
 			setSmartResults({
-				items: withoutBlockedItems(res.Items || []),
-				seerr: seerrEnabled && !isKidsMode(settings) ? (res.Seerr || []).filter((r) => r.mediaType !== 'person').slice(0, SEERR_CAP) : []
+				items: withoutBlockedItems(found.items),
+				seerr: seerrEnabled && !isKidsMode(settings) ? found.seerr.filter((r) => r.mediaType !== 'person').slice(0, SEERR_CAP) : []
 			});
 		}).catch(() => {
 			if (requestId === smartRequestIdRef.current) setSmartResults(NO_SMART_RESULTS);
