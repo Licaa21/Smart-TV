@@ -86,14 +86,6 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 			settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo,
 			settings.imdbRowsSortBy, settings.imdbRowsSortOrder, settings.tmdbRowsSortBy, settings.tmdbRowsSortOrder
 		]);
-		const reusing = reuseRef.current && memoryCache.externalRows?.key === key && memoryCache.externalRows.owner === owner;
-		reuseRef.current = false;
-		if (reusing) {
-			setExternalRows(memoryCache.externalRows.rows);
-			setPending([]);
-			return undefined;
-		}
-
 		let cancelled = false;
 		let refreshTimer = null;
 		// Watching Now comes in on its own, so the kept rows are given it when it arrives.
@@ -105,6 +97,35 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 				memoryCache.externalRows = {...kept, rows: row ? withRow(kept.rows, row) : kept.rows.filter((r) => r.id !== 'mdblist_watching_now')};
 			}
 		};
+		const startWatchingRefresh = () => {
+			refreshTimer = setInterval(async () => {
+				// The player takes Home down with it, so only a hidden app is left to skip.
+				if (document.hidden) return;
+				try {
+					const row = await loadWatchingNowRow(true);
+					if (!row || cancelled) return;
+					keepWatchingRow(row);
+					setExternalRows((prevRows) => withRow(prevRows, row));
+				} catch (err) {
+					console.warn('[Browse] Failed to refresh Watching Now:', err);
+				}
+			}, 5 * 60 * 1000);
+		};
+		const stopWork = () => {
+			cancelled = true;
+			if (refreshTimer) clearInterval(refreshTimer);
+		};
+
+		const reusing = reuseRef.current && memoryCache.externalRows?.key === key && memoryCache.externalRows.owner === owner;
+		reuseRef.current = false;
+		if (reusing) {
+			setExternalRows(memoryCache.externalRows.rows);
+			setPending([]);
+			// The kept row is brought up to date every few minutes as before the return.
+			if (watchingNowEnabled) startWatchingRefresh();
+			return stopWork;
+		}
+
 		const presetConfigs = getExternalHomeRowConfigs();
 		const pendingRows = [
 			...enabledPresets
@@ -232,7 +253,10 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 
 		if (watchingNowEnabled) {
 			// Loaded apart so a slow MDBList answer doesn't hold back the other rows.
-			loadWatchingNowRow().then((row) => {
+			loadWatchingNowRow().catch((err) => {
+				console.warn('[Browse] Failed to load Watching Now:', err);
+				return null;
+			}).then((row) => {
 				if (cancelled) return;
 				keepWatchingRow(row);
 				settleSections(['mdblist_watching_now'], row ? [row] : []);
@@ -240,20 +264,10 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 				setPending((prevPending) => prevPending.filter((r) => r.id !== 'mdblist_watching_now'));
 			});
 
-			refreshTimer = setInterval(async () => {
-				// The player takes Home down with it, so only a hidden app is left to skip.
-				if (document.hidden) return;
-				const row = await loadWatchingNowRow(true);
-				if (!row || cancelled) return;
-				keepWatchingRow(row);
-				setExternalRows((prevRows) => withRow(prevRows, row));
-			}, 5 * 60 * 1000);
+			startWatchingRefresh();
 		}
 
-		return () => {
-			cancelled = true;
-			if (refreshTimer) clearInterval(refreshTimer);
-		};
+		return stopWork;
 	}, [settings.useMoonfinPlugin, homeRows, kidsMode, settings.homeRows, settings.customHomeRows,
 		settings.uiLanguage, settings.mdblistWatchingNowEnabled,
 		settings.seasonalRowEnabled, settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays,

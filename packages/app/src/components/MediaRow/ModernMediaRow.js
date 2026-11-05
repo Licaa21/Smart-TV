@@ -63,6 +63,8 @@ const ModernMediaRow = ({
 	// How many of the cards are drawn. Everything, except on the older sets, where the row starts short.
 	const [shownCount, setShownCount] = useState(() => (rowId ? rememberedRowCount(rowId) : null));
 	const limit = items ? Math.min(items.length, shownCount === null ? initialRowCount(items.length) : shownCount) : 0;
+	// The See All card ends the lane, so it waits until the cards before it have all been drawn.
+	const seeAllShown = Boolean(onCalendarSeeAll) && limit === (items ? items.length : 0);
 	useEffect(() => {
 		if (rowId && shownCount !== null) rememberRowCount(rowId, shownCount);
 	}, [shownCount, rowId]);
@@ -206,9 +208,9 @@ const ModernMediaRow = ({
 				Spotlight.move('left');
 			}
 		} else {
-			Spotlight.focus(onCalendarSeeAll ? `media-${keyPrefix}-calendar-see-all` : `media-${keyPrefix}-${items[limit - 1].Id}`);
+			Spotlight.focus(seeAllShown ? `media-${keyPrefix}-calendar-see-all` : `media-${keyPrefix}-${items[limit - 1].Id}`);
 		}
-	}, [items, limit, keyPrefix, settings.navbarPosition, onCalendarSeeAll]);
+	}, [items, limit, keyPrefix, settings.navbarPosition, seeAllShown]);
 
 	const handleWrapRight = useCallback((e) => {
 		e.preventDefault();
@@ -274,7 +276,7 @@ const ModernMediaRow = ({
 					{items.slice(0, limit).map((item, index) => {
 						const spotlightId = `media-${keyPrefix}-${item.Id}`;
 						const isFirst = index === 0;
-						const isLast = index === limit - 1 && !onCalendarSeeAll;
+						const isLast = index === limit - 1 && !seeAllShown;
 						return (
 							<ModernMediaCard
 								key={`${keyPrefix}-${item.Id}-${index}`}
@@ -301,7 +303,7 @@ const ModernMediaRow = ({
 							/>
 						);
 					})}
-					{onCalendarSeeAll && (
+					{seeAllShown && (
 						<CalendarSeeAllCard
 							{...seeAllSize(settings.homeRowsPosterSize)}
 							spotlightId={`media-${keyPrefix}-calendar-see-all`}

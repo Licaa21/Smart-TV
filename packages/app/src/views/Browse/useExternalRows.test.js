@@ -2,7 +2,7 @@ import {renderHook, waitFor} from '@testing-library/react';
 
 import useExternalRows from './useExternalRows';
 import {memoryCache, resetEmptySections} from './browseCache';
-import {fetchExternalPresetRow, normalizeWatchingNowItem} from '../../utils/externalHomeRows';
+import {fetchExternalPresetRow, formatWatchingNowSubtitle, normalizeWatchingNowItem} from '../../utils/externalHomeRows';
 import {fetchWatchingNow} from '../../services/mdblistApi';
 import {resolveItemsByProviderIds} from '../../services/jellyfinApi';
 
@@ -90,6 +90,31 @@ describe('empty external rows', () => {
 		await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
 		expect(fetchWatchingNow).toHaveBeenCalledTimes(2);
 		expect(fetchWatchingNow).toHaveBeenLastCalledWith(null, {forceRefresh: true});
+	});
+
+	test('watching now keeps refreshing after the rows are taken back from memory', async () => {
+		jest.useFakeTimers();
+		fetchWatchingNow.mockResolvedValue({items: [{title: 'Valid Movie', imdb_id: 'tt123456'}]});
+		const first = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false}));
+		await jest.advanceTimersByTimeAsync(50);
+		first.unmount();
+		fetchWatchingNow.mockClear();
+		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false, reuse: true}));
+		// The kept rows come back at once, with no new fetch
+		expect(result.current.rows.map((row) => row.id)).toEqual(['mdblist_watching_now']);
+		expect(fetchWatchingNow).not.toHaveBeenCalled();
+		await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+		expect(fetchWatchingNow).toHaveBeenCalledWith(null, {forceRefresh: true});
+	});
+
+	test('a watching now feed that cannot be read leaves no placeholder behind', async () => {
+		fetchWatchingNow.mockResolvedValue({items: [{title: 'Valid Movie', imdb_id: 'tt123456'}]});
+		formatWatchingNowSubtitle.mockImplementationOnce(() => {
+			throw new Error('bad payload');
+		});
+		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false}));
+		await waitFor(() => expect(result.current.pending).toEqual([]));
+		expect(result.current.rows).toEqual([]);
 	});
 
 	test("a slow watching now feed doesn't hold back the other rows", async () => {

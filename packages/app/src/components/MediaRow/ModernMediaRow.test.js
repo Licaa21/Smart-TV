@@ -2,6 +2,7 @@ import {act, fireEvent, render} from '@testing-library/react';
 
 import ModernMediaRow from './ModernMediaRow';
 import {announceFocusedRow, isNearFocusedRow as isNear} from './warmWindow';
+import {forgetRowCountsExcept, rememberRowCount} from '../../utils/rowCap';
 
 // The CLI ships a second copy of React, so the components' JSX goes through the copy under test.
 jest.mock('react/jsx-dev-runtime', () => {
@@ -85,6 +86,17 @@ describe('ModernMediaRow', () => {
 		expect(ids()).not.toContain('media-trending-calendar-see-all');
 		rerender(<ModernMediaRow rowId="trending" title="Trending" items={items} rowIndex={2} onCalendarSeeAll={() => {}} />);
 		expect(ids()[ids().length - 1]).toBe('media-trending-calendar-see-all');
+	});
+
+	it('holds the See all card back while the row has cards it has not drawn yet', () => {
+		rememberRowCount('trending', 3);
+		try {
+			draw({onCalendarSeeAll: () => {}});
+			expect(document.querySelectorAll('.spottable')).toHaveLength(3);
+			expect(find('[data-spotlight-id="media-trending-calendar-see-all"]')).toBeNull();
+		} finally {
+			forgetRowCountsExcept(null);
+		}
 	});
 
 	it('still tells the screen which row took focus', () => {
