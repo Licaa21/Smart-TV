@@ -392,7 +392,7 @@ const useBrowseData = ({
 		// detail.featured marks refreshes that change what the bar may hold, like hiding a library.
 		// detail.libraries marks a change to the libraries themselves, like their order, which has
 		// to show straight away, so the stored rows go too and the rows are asked for again. detail.reload is a refresh
-		// the viewer asked for, which does the same. detail.newMediaBar is Home pressed while Home is showing.
+		// the viewer asked for, which does the same. detail.newMediaBar is upstream's Home pressed while Home is showing, which the fork does not send: its Home refreshes everything (reload and featured).
 		const handleBrowseRefresh = (e) => {
 			if (e?.detail?.newMediaBar) {
 				drawNewMediaBarRef.current();

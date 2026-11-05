@@ -95,9 +95,9 @@ describe('empty external rows', () => {
 	test('watching now keeps refreshing after the rows are taken back from memory', async () => {
 		jest.useFakeTimers();
 		fetchWatchingNow.mockResolvedValue({items: [{title: 'Valid Movie', imdb_id: 'tt123456'}]});
-		const first = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false}));
+		const view = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false}));
 		await jest.advanceTimersByTimeAsync(50);
-		first.unmount();
+		view.unmount();
 		fetchWatchingNow.mockClear();
 		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false, reuse: true}));
 		// The kept rows come back at once, with no new fetch

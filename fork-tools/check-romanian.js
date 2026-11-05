@@ -11,7 +11,8 @@ const english = JSON.parse(fs.readFileSync(path.join(app, 'resources', 'strings.
 const romanian = JSON.parse(fs.readFileSync(path.join(app, 'resources', 'ro', 'strings.json'), 'utf8'));
 
 const literal = /\$L\(\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")/g;
-const unescape = (text) => text.replace(/\\(['"\\])/g, '$1');
+// The source text is read, not run, so a \u00b7 in a string is turned into the character the key holds.
+const unescape = (text) => text.replace(/\\(u[0-9a-fA-F]{4}|['"\\])/g, (_, esc) => (esc[0] === 'u' ? String.fromCharCode(parseInt(esc.slice(1), 16)) : esc));
 
 const sources = [];
 const walk = (dir) => {
