@@ -13,8 +13,11 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import FilterPopup, {FilterOption} from '../../components/FilterPopup';
 import {getImageUrl, getBackdropId, getPrimaryImageId} from '../../utils/helpers';
 import {serverBlurredUrl} from '../../utils/serverBlur';
+import {registerThemeSheet} from '../../theme/themeOverrides';
 
 import css from './GenreBrowse.module.less';
+
+registerThemeSheet('genreBrowse', css);
 
 const SpottableDiv = Spottable('div');
 const SpottableButton = Spottable('button');
