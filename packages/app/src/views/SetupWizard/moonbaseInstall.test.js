@@ -1,6 +1,6 @@
 jest.mock('@enact/i18n/$L', () => ({__esModule: true, default: (str) => str}));
 
-import {MOONBASE_MANIFEST_URL, installMoonbase, moonbaseFeatures, moonbaseGuideUrl} from './moonbaseInstall';
+import {MOONBASE_MANIFEST_URL, installMoonbase, moonbaseFeatures, moonbaseGuideUrl, shouldOfferMoonbase} from './moonbaseInstall';
 
 const OTHER = {Name: 'Other', Url: 'https://example.com/m.json', Enabled: true};
 
@@ -45,8 +45,37 @@ describe('moonbaseFeatures', () => {
 		expect(silo).not.toContain("A calendar of what's coming up");
 	});
 
-	test('each server links its own install steps', () => {
-		expect(moonbaseGuideUrl('silo')).toBe('https://github.com/Moonfin-Client/Plugin/wiki/Installation#silo');
+	test("the install steps are the fork's plugin page", () => {
+		expect(moonbaseGuideUrl('jellyfin')).toBe('https://github.com/Licaa21/Plugin');
+	});
+
+	test("installs from the fork's catalog, never upstream's", () => {
+		expect(MOONBASE_MANIFEST_URL).toBe('https://raw.githubusercontent.com/Licaa21/Plugin/refs/heads/main/manifest.json');
+	});
+});
+
+describe('shouldOfferMoonbase', () => {
+	test('offers it on a Jellyfin server that has no Moonbase', () => {
+		expect(shouldOfferMoonbase('jellyfin', {installed: false})).toBe(true);
+		expect(shouldOfferMoonbase('jellyfin', null, {status: 404})).toBe(true);
+	});
+
+	test('does not offer it where Moonbase is installed, with its settings sync on or off', () => {
+		expect(shouldOfferMoonbase('jellyfin', {installed: true, settingsSyncEnabled: true})).toBe(false);
+		expect(shouldOfferMoonbase('jellyfin', {installed: true, settingsSyncEnabled: false})).toBe(false);
+	});
+
+	test('does not take a failed ping for a missing plugin', () => {
+		expect(shouldOfferMoonbase('jellyfin', null, {status: 401})).toBe(false);
+		expect(shouldOfferMoonbase('jellyfin', null, {message: 'Network error'})).toBe(false);
+		expect(shouldOfferMoonbase('jellyfin', null, {status: 500})).toBe(false);
+	});
+
+	test("does not offer the fork's Jellyfin plugin to any other kind of server", () => {
+		['emby', 'plex', 'silo'].forEach((type) => {
+			expect(shouldOfferMoonbase(type, {installed: false})).toBe(false);
+			expect(shouldOfferMoonbase(type, null, {status: 404})).toBe(false);
+		});
 	});
 });
 

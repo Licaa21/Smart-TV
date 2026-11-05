@@ -25,6 +25,7 @@ import {ensurePreviewItemsLoaded} from './setupPreviewData';
 import {MediaBarPreview, NavbarPreview, HomeRowsPreview, DetailStylePreview, SetupIcon, usePreviewPalette} from './SetupPreviews';
 import {STEP_INFO, LANGUAGE_PATH, tourDescription} from './setupSteps';
 import MoonbaseDialog from './MoonbaseDialog';
+import {shouldOfferMoonbase} from './moonbaseInstall';
 import css from './SetupWizard.module.less';
 
 const SpottableDiv = Spottable('div');
@@ -513,8 +514,8 @@ const SetupWizard = ({onDone, backHandlerRef}) => {
 			if (cancelled) return;
 			// Not waited on, since only the last step needs it.
 			moonfinPing(serverUrl, accessToken).then(
-				(ping) => ping?.installed === false || ping?.settingsSyncEnabled === false,
-				() => true
+				(ping) => shouldOfferMoonbase(serverType, ping),
+				(failure) => shouldOfferMoonbase(serverType, null, failure || {})
 			).then((missing) => {
 				if (!cancelled) setOfferMoonbase(missing);
 			});
