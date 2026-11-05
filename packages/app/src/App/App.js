@@ -13,7 +13,7 @@ import $L from '@enact/i18n/$L';
 
 import ilib from 'ilib';
 
-import {AuthProvider, useAuth} from '../context/AuthContext';
+import {AuthProvider, takeHouseholdPick, useAuth} from '../context/AuthContext';
 import {useSettings} from '../context/SettingsContext';
 import * as connectionPool from '../services/connectionPool';
 import * as jellyfinApi from '../services/jellyfinApi';
@@ -59,6 +59,10 @@ import Screensaver from '../components/Screensaver';
 import SeasonalTheme from '../components/SeasonalTheme';
 import NoConnection from '../components/NoConnection/NoConnection';
 import SyncPlayDialog from '../components/SyncPlayDialog';
+import WatchPartyDialog from '../components/WatchPartyDialog';
+import useWatchParty from '../hooks/useWatchParty';
+import {watchParty, isRoomPlaying} from '../services/siloWatchParty';
+import {extendServerShuffle} from '../services/serverShuffle';
 import AdminMessageDialog from '../components/AdminMessageDialog';
 import {bookReader, isBookItem, supportsNewerBookFormats} from '../utils/books';
 import ShuffleOverlay from '../components/ShuffleOverlay';
@@ -71,7 +75,7 @@ import {useThemeMusic} from '../hooks/useThemeMusic';
 import {useAccessSchedule} from '../hooks/useAccessSchedule';
 import {shiftedNow} from '../utils/clock';
 import TimesUp from '../components/TimesUp/TimesUp';
-import {buildThemeCssVars, ensureVisible, isValidHexColor, toRgbTriplet} from '../theme/themeSpec';
+import {buildThemeCssVars, ensureVisible, isValidHexColor, resolveFocusBorderColor, toRgbTriplet} from '../theme/themeSpec';
 import {applyThemeOverrides} from '../theme/themeOverrides';
 import {accentSignature, pickedAccents} from '../theme/accentSurfaces';
 import {resolveOverlayColor} from '../theme/overlayColors';
@@ -109,6 +113,8 @@ const GameSystem = lazy(() => import('../views/GameSystem'));
 const GameDetails = lazy(() => import('../views/GameDetails'));
 const GamePlayer = lazy(() => import('../views/GamePlayer'));
 const SetupWizard = lazy(() => import('../views/SetupWizard'));
+const Calendar = lazy(() => import('../views/Calendar'));
+const CalendarMonth = lazy(() => import('../views/Calendar/CalendarMonth'));
 
 import '../styles/perf-overrides.less';
 import css from './App.module.less';
@@ -181,11 +187,13 @@ const PANELS = {
 	GAME_DETAILS: 20,
 	GAME_PLAYER: 21,
 	SEERR_COLLECTION: 22,
-	GAME_SYSTEM: 23
+	GAME_SYSTEM: 23,
+	CALENDAR: 24,
+	CALENDAR_MONTH: 25
 };
 
 const AppContent = (props) => {
-	const {isAuthenticated, isLoading, logout, serverUrl, serverName, api, user, hasMultipleServers, accessToken, connectionState, revalidateSession, leaveSession, serverType} = useAuth();
+	const {isAuthenticated, isLoading, serverUrl, serverName, api, user, hasMultipleServers, accessToken, connectionState, revalidateSession, leaveSession, serverType} = useAuth();
 	const {settings, activeTheme, syncOnLogin, updateSettings, loaded: settingsLoaded} = useSettings();
 	const {streamNotification, dismissStreamNotification, pluginInfo} = useSeerr();
 	const {pendingPopups, markPopupsRead} = useServerMessages();
@@ -312,9 +320,16 @@ const AppContent = (props) => {
 	const [authChecked, setAuthChecked] = useState(false);
 	const [libraries, setLibraries] = useState([]);
 	const [showAccountModal, setShowAccountModal] = useState(false);
+	// Home stays hidden behind the who's watching pick, or its first focus lands under the picker.
+	const [pickingHousehold, setPickingHousehold] = useState(false);
 	const [showServerMessages, setShowServerMessages] = useState(false);
 	const serverMessagesBackRef = useRef(null);
 	const [showExitDialog, setShowExitDialog] = useState(false);
+	// Silo's Watch Party, in SyncPlay's place on Silo.
+	const [watchPartyOpen, setWatchPartyOpen] = useState(false);
+	const {room: watchPartyRoom} = useWatchParty();
+	const openWatchParty = useCallback(() => setWatchPartyOpen(true), []);
+	const closeWatchParty = useCallback(() => setWatchPartyOpen(false), []);
 	const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 	// The screen the settings panel opens on when something other than the gear opened it.
 	const [settingsInitialView, setSettingsInitialView] = useState(null);
@@ -651,13 +666,12 @@ const AppContent = (props) => {
 
 	useEffect(() => {
 		const root = document.documentElement;
-		if (settings.focusBorderColor) {
-			// A pick that would vanish into the screen is nudged until it shows, same as the injected rules.
-			const outline = isValidHexColor(settings.focusBorderColor)
-				? ensureVisible(settings.focusBorderColor, [activeTheme?.colors?.background, activeTheme?.colors?.surface])
-				: settings.focusBorderColor;
-			root.style.setProperty('--theme-focus-border-color', outline);
-		}
+		// A pick that would vanish into the screen is nudged until it shows, same as the injected rules. With none (or a name
+		// that is not a color) the theme's own focus color goes back on, so clearing the choice does not leave the last one.
+		const picked = settings.focusBorderColor;
+		root.style.setProperty('--theme-focus-border-color', isValidHexColor(picked)
+			? ensureVisible(picked, [activeTheme?.colors?.background, activeTheme?.colors?.surface])
+			: resolveFocusBorderColor(activeTheme, picked));
 		root.style.setProperty('--theme-navbar-color-rgb', toRgbTriplet(resolveOverlayColor(settings.navbarColor)));
 	}, [activeTheme, settings.focusBorderColor, settings.navbarColor]);
 
@@ -1139,6 +1153,10 @@ const AppContent = (props) => {
 					closeSyncPlay();
 					return;
 				}
+				if (watchPartyOpen) {
+					closeWatchParty();
+					return;
+				}
 
 				if (updateInfo) {
 					handleCloseUpdate();
@@ -1147,6 +1165,7 @@ const AppContent = (props) => {
 
 				if (showAccountModal) {
 					setShowAccountModal(false);
+					setPickingHousehold(false);
 					return;
 				}
 
@@ -1195,7 +1214,7 @@ const AppContent = (props) => {
 
 		window.addEventListener('keydown', handleKeyDown, true);
 		return () => window.removeEventListener('keydown', handleKeyDown, true);
-	}, [panelIndex, handleBack, handleReturnToPlayer, handleReturnToEpisode, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, photoViewerItem, isPinGateActive, isPinChecking, timesUp, setupWizardActive, updateInfo, handleCloseUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition, reading, unreadableBook, quickLookShown, closeQuickLook]);
+	}, [panelIndex, handleBack, handleReturnToPlayer, handleReturnToEpisode, performAppCleanup, settings.exitConfirmation, showAccountModal, showServerMessages, showExitDialog, showSettingsPanel, showShuffleOverlay, photoViewerItem, isPinGateActive, isPinChecking, timesUp, setupWizardActive, updateInfo, handleCloseUpdate, syncPlayDialogOpen, closeSyncPlay, showScreensaver, settings.navbarPosition, reading, unreadableBook, quickLookShown, closeQuickLook, watchPartyOpen, closeWatchParty]);
 
 	// The account stays saved, so it can be chosen again from the picker once its hours are back.
 	const handleTimesUpSwitchUser = useCallback(() => {
@@ -1416,8 +1435,8 @@ const AppContent = (props) => {
 		}
 		// Music left playing behind the screens reports its stop before the new item opens.
 		if (backgroundMusic) await remoteControl.releasePlayer();
-		// Plex has no SyncPlay, so a Plex item neither joins a group nor opens it.
-		const itemOnPlex = (item._serverType || serverType) === 'plex';
+		// Plex and Silo have no SyncPlay, so their items neither join a group nor open it.
+		const itemOnPlex = ['plex', 'silo'].includes(item._serverType || serverType);
 		if (isSyncPlayInGroup && !itemOnPlex) {
 			syncPlaySetNewQueue([item.Id]);
 		} else if (!itemOnPlex && settings.syncplayEnabled !== false && settings.syncplayAutoOpen) {
@@ -1429,14 +1448,14 @@ const AppContent = (props) => {
 		navigateTo(PANELS.PLAYER);
 	}, [navigateTo, isSyncPlayInGroup, openSyncPlay, serverType, settings.syncplayAutoOpen, settings.syncplayEnabled, syncPlaySetNewQueue, backgroundMusic, openBook]);
 
-	const playSyncPlayItem = useCallback((item) => {
+	const playSyncPlayItem = useCallback((item, options = null) => {
 		if (panelIndex === PANELS.PLAYER && playingItem?.Id === item.Id) return;
 		// Opened where the group is: a set started at the beginning is only
 		// seeked there by the server afterwards, which on a transcode means
 		// starting the stream twice while everyone waits.
 		const startPositionTicks = getSyncPlayPositionTicks();
 		setPlayingItem(item);
-		setPlaybackOptions(startPositionTicks > 0 ? {startPositionTicks} : null);
+		setPlaybackOptions(startPositionTicks > 0 || options ? {...options, ...(startPositionTicks > 0 ? {startPositionTicks} : null)} : null);
 		setIsResume(false);
 		navigateTo(PANELS.PLAYER);
 	}, [panelIndex, playingItem, navigateTo, getSyncPlayPositionTicks]);
@@ -1449,7 +1468,7 @@ const AppContent = (props) => {
 		if (!update || update === handledSyncPlayQueueRef.current) return;
 		handledSyncPlayQueueRef.current = update;
 		if (!update.startsPlayback && playingItem?.Id === update.item.Id) return;
-		playSyncPlayItem(update.item);
+		playSyncPlayItem(update.item, update.options);
 	}, [syncPlayQueueUpdate, playingItem, playSyncPlayItem]);
 
 	// The SyncPlay dialog sits above every panel and holds the remote focus, so
@@ -1460,11 +1479,40 @@ const AppContent = (props) => {
 		if (syncPlayDialogOpen && isSyncPlayInGroup && panelIndex === PANELS.PLAYER) closeSyncPlay();
 	}, [syncPlayDialogOpen, isSyncPlayInGroup, panelIndex, closeSyncPlay]);
 
+	// The same for a Watch Party that starts playing. One that stops (the host went back to the lobby, the item
+	// finished, the party ended) brings its members back to the room instead of leaving them on a closed player.
+	const watchPartyPlaying = isRoomPlaying(watchPartyRoom);
+	const watchPartyWasPlayingRef = useRef(false);
+	useEffect(() => {
+		if (watchPartyOpen && watchPartyPlaying && panelIndex === PANELS.PLAYER) closeWatchParty();
+	}, [watchPartyOpen, watchPartyPlaying, panelIndex, closeWatchParty]);
+	useEffect(() => {
+		if (watchPartyWasPlayingRef.current && !watchPartyPlaying) openWatchParty();
+		watchPartyWasPlayingRef.current = watchPartyPlaying;
+	}, [watchPartyPlaying, openWatchParty]);
+	// A room belongs to the login and profile that opened it.
+	useEffect(() => {
+		watchParty.onSessionChanged();
+	}, [isAuthenticated, serverUrl, user?.Id, accessToken]);
+	const openWatchTogether = serverType === 'silo' ? openWatchParty : openSyncPlay;
+
 	// Moving on to another item from inside the player. The next episode starts at the top, and
 	// one the viewer picked by hand from the episode browser passes `resume` so an episode they
 	// were part way through carries on from where it stopped.
 	const handlePlayNext = useCallback((item, options) => {
 		setPlayingItem(item);
+		// A server's shuffle (Silo's) hands out one item ahead: the one starting now was it, so the server picks the next.
+		extendServerShuffle(item).then((more) => {
+			if (!more?.length) return;
+			const fromServer = Object.fromEntries(Object.entries(item).filter(([key]) => key.startsWith('_server')));
+			const added = more.map((next) => ({...next, ...fromServer}));
+			// Once Silo starts repeating, a title comes round again. The queue keeps only its latest place, since the
+			// player finds what's next from the first one.
+			const repeats = new Set([item.Id, ...added.map((next) => next.Id)]);
+			setPlaybackOptions((prev) => (prev?.videoQueue?.some((e) => e.Id === item.Id)
+				? {...prev, videoQueue: [...prev.videoQueue.filter((e) => !repeats.has(e.Id)), item, ...added]}
+				: prev));
+		}).catch((err) => console.warn('[App] Moving the server shuffle on failed:', err));
 		setPlaybackOptions(prev => {
 			if (prev?.audioPlaylist?.some(t => t.Id === item.Id)) {
 				return {audioPlaylist: prev.audioPlaylist};
@@ -1498,9 +1546,14 @@ const AppContent = (props) => {
 		setIsResume(false);
 		setMusicInBackground(false);
 		// Music stopped from the mini player ends wherever the viewer already is.
-		if (panelIndex === PANELS.PLAYER) handleBack();
+		if (panelIndex === PANELS.PLAYER) {
+			handleBack();
+			// A viewer in a Watch Party or a SyncPlay group goes back to its dialog, where they can rejoin, rather than to the item's page.
+			if (watchPartyRoom) openWatchParty();
+			else if (isSyncPlayInGroup) openSyncPlay();
+		}
 		window.dispatchEvent(new CustomEvent('moonfin:browseRefresh'));
-	}, [handleBack, panelHistory, selectedItem, playingItem, panelIndex]);
+	}, [handleBack, panelHistory, selectedItem, playingItem, panelIndex, watchPartyRoom, openWatchParty, isSyncPlayInGroup, openSyncPlay]);
 
 	const handlePlayerBackground = useCallback(() => {
 		setMusicInBackground(true);
@@ -1556,12 +1609,21 @@ const AppContent = (props) => {
 		handleSelectItem(item);
 	}, [handleSelectItem]);
 
+	// A Silo sign-in with several household profiles asks who's watching, once the setup and any PIN are out of the way.
+	useEffect(() => {
+		if (isAuthenticated && !setupWizardActive && !isPinGateActive && takeHouseholdPick()) {
+			setPickingHousehold(true);
+			setShowAccountModal(true);
+		}
+	}, [isAuthenticated, setupWizardActive, isPinGateActive]);
+
 	const handleOpenAccountModal = useCallback(() => {
 		setShowAccountModal(true);
 	}, []);
 
 	const handleCloseAccountModal = useCallback(() => {
 		setShowAccountModal(false);
+		setPickingHousehold(false);
 	}, []);
 
 	const handleOpenServerMessages = useCallback(() => {
@@ -1708,6 +1770,16 @@ const AppContent = (props) => {
 		navigateTo(PANELS.SEERR_DISCOVER);
 	}, [navigateTo]);
 
+	const [calendarMonthDay, setCalendarMonthDay] = useState(null);
+	const handleOpenCalendar = useCallback(() => {
+		if (panelIndex !== PANELS.CALENDAR) navigateTo(PANELS.CALENDAR);
+	}, [navigateTo, panelIndex]);
+	// The month grid opens at the day given, today when there's none.
+	const handleOpenCalendarMonth = useCallback((day) => {
+		setCalendarMonthDay(day instanceof Date ? day : null);
+		navigateTo(PANELS.CALENDAR_MONTH);
+	}, [navigateTo]);
+
 	const handleHome = useCallback(() => {
 		setPanelHistory([]);
 		setSelectedItem(null);
@@ -1828,7 +1900,7 @@ const AppContent = (props) => {
 				navigateTo(PANELS.SEERR_BROWSE);
 				break;
 			case 'series':
-				setSeerrBrowse({browseType: 'all', item: {name: $L('TV Shows')}, mediaType: 'tv'});
+				setSeerrBrowse({browseType: 'all', item: {name: $L('Series')}, mediaType: 'tv'});
 				navigateTo(PANELS.SEERR_BROWSE);
 				break;
 			case 'requests':
@@ -1842,11 +1914,11 @@ const AppContent = (props) => {
 		}
 	}, [navigateTo]);
 
-	const handleSwitchUser = useCallback(async () => {
-		await logout();
+	// The account dialog has already signed out, so this only goes back to sign-in.
+	const handleSignedOut = useCallback(() => {
 		setPanelHistory([]);
 		setPanelIndex(PANELS.LOGIN);
-	}, [logout]);
+	}, []);
 
 	const handleAddServer = useCallback(() => {
 		setPanelHistory([]);
@@ -2090,6 +2162,9 @@ const AppContent = (props) => {
 			case PANELS.SEERR_BROWSE:
 			case PANELS.SEERR_PERSON:
 				return 'discover';
+			case PANELS.CALENDAR:
+			case PANELS.CALENDAR_MONTH:
+				return 'calendar';
 			case PANELS.LIBRARY: return selectedLibrary?.Id || '';
 			default: return '';
 		}
@@ -2136,7 +2211,8 @@ const AppContent = (props) => {
 					onFavorites={handleOpenFavorites}
 					onLiveTv={handleOpenLiveTv}
 					onDiscover={handleOpenSeerr}
-					onSyncPlay={settings.syncplayEnabled !== false ? openSyncPlay : undefined}
+					onCalendar={handleOpenCalendar}
+					onSyncPlay={settings.syncplayEnabled !== false ? openWatchTogether : undefined}
 					onSettings={handleOpenSettings}
 					onSelectLibrary={handleSelectLibrary}
 					onUserMenu={handleOpenAccountModal}
@@ -2158,7 +2234,8 @@ const AppContent = (props) => {
 					onFavorites={handleOpenFavorites}
 					onLiveTv={handleOpenLiveTv}
 					onDiscover={handleOpenSeerr}
-					onSyncPlay={settings.syncplayEnabled !== false ? openSyncPlay : undefined}
+					onCalendar={handleOpenCalendar}
+					onSyncPlay={settings.syncplayEnabled !== false ? openWatchTogether : undefined}
 					onSettings={handleOpenSettings}
 					onSelectLibrary={handleSelectLibrary}
 					onUserMenu={handleOpenAccountModal}
@@ -2187,6 +2264,7 @@ const AppContent = (props) => {
 									onSelectPerson={handleSelectPerson}
 									onSelectStudio={handleSelectStudio}
 									onItemDeleted={handleBack}
+									onOpenWatchParty={openWatchParty}
 									autoPlay={detailsAutoPlay}
 									onAutoPlayed={handleAutoPlayed}
 									seerrNav={seerrNav}
@@ -2231,7 +2309,7 @@ const AppContent = (props) => {
 						<Panel />
 						<Panel>
 							{panelIndex === PANELS.FAVORITES && (
-								<Favorites onSelectItem={handleSelectItem} onSelectPerson={handleSelectPerson} onHome={handleHome} backHandlerRef={backHandlerRef} />
+								<Favorites onSelectItem={handleSelectItem} onSelectPerson={handleSelectPerson} onSelectSeerrItem={handleSelectSeerrItem} onHome={handleHome} backHandlerRef={backHandlerRef} />
 							)}
 						</Panel>
 						<Panel>
@@ -2258,6 +2336,7 @@ const AppContent = (props) => {
 									onSelectStudio={handleSelectSeerrStudio}
 									onSelectNetwork={handleSelectSeerrNetwork}
 									onOpenRequests={handleOpenSeerrRequests}
+									onOpenSearch={handleOpenSearch}
 									onOpenShortcut={handleOpenSeerrShortcut}
 								/>
 							)}
@@ -2385,6 +2464,24 @@ const AppContent = (props) => {
 								/>
 							)}
 						</Panel>
+						<Panel>
+							{panelIndex === PANELS.CALENDAR && (
+								<Calendar
+									onSelectItem={handleSelectItem}
+									onSelectSeerrItem={handleSelectSeerrItem}
+									onOpenMonth={handleOpenCalendarMonth}
+								/>
+							)}
+						</Panel>
+						<Panel>
+							{panelIndex === PANELS.CALENDAR_MONTH && (
+								<CalendarMonth
+									initialDay={calendarMonthDay}
+									onSelectItem={handleSelectItem}
+									onSelectSeerrItem={handleSelectSeerrItem}
+								/>
+							)}
+						</Panel>
 					</Panels>
 				</Suspense>
 				{/* Its own boundary, so a screen loading for the first time can't swap out music playing behind it. */}
@@ -2429,7 +2526,8 @@ const AppContent = (props) => {
 							onSelectSeerrStudio={handleSelectSeerrStudio}
 							onSelectSeerrNetwork={handleSelectSeerrNetwork}
 							onOpenSeerrShortcut={handleOpenSeerrShortcut}
-							isVisible={panelIndex === PANELS.BROWSE && !showSettingsPanel}
+							onOpenCalendarMonth={handleOpenCalendarMonth}
+							isVisible={panelIndex === PANELS.BROWSE && !showSettingsPanel && !pickingHousehold}
 							backHandlerRef={backHandlerRef}
 							onFocusItemThemeMusic={backgroundMusic ? undefined : themeMusic.playThemeMusicDelayed}
 							onBlurItemThemeMusic={themeMusic.cancelDelayed}
@@ -2461,6 +2559,7 @@ const AppContent = (props) => {
 								backHandlerRef={quickLookBackRef}
 								onOpenFullPage={handleQuickLookFullPage}
 								onClose={closeQuickLook}
+								onOpenWatchParty={openWatchParty}
 							/>
 						</Suspense>
 					)}
@@ -2469,7 +2568,7 @@ const AppContent = (props) => {
 			<AccountModal
 				open={showAccountModal}
 				onClose={handleCloseAccountModal}
-				onLogout={handleSwitchUser}
+				onLogout={handleSignedOut}
 				onAddServer={handleAddServer}
 				onAddUser={handleAddUser}
 			/>
@@ -2483,6 +2582,11 @@ const AppContent = (props) => {
 				onClose={closeSyncPlay}
 				playingItemId={panelIndex === PANELS.PLAYER ? playingItem?.Id : null}
 				onWatch={playSyncPlayItem}
+			/>
+			<WatchPartyDialog
+				open={watchPartyOpen}
+				onClose={closeWatchParty}
+				playingItemId={panelIndex === PANELS.PLAYER ? playingItem?.Id : null}
 			/>
 			<ShuffleOverlay
 				open={showShuffleOverlay}

@@ -22,7 +22,7 @@ const FADE_CLASS = {corner: css.cornerFadeDown, top: css.topFade};
 
 // settleMs is how long focus rests before the picture is asked for. fadeWhileMovingMs, when set, fades the picture on screen
 // out once focus has kept moving that long without resting, so a picture is not left behind a card it does not belong to.
-const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, placement, scrimWhenEmpty = true, settleMs = BACKDROP_DEBOUNCE_MS, fadeWhileMovingMs = 0}) => {
+const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity, placement, scrimWhenEmpty = true, settleMs = BACKDROP_DEBOUNCE_MS, fadeWhileMovingMs = 0, fadeMs}) => {
 	const blurredUrl = serverBlurredUrl(requestedUrl, blurAmount);
 	const targetUrl = blurredUrl || requestedUrl;
 	// A picture the server cannot blur is made soft by the screen, at any performance level
@@ -119,7 +119,10 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 					Object.assign(incoming.style, layerLook(how));
 
 					incoming.offsetHeight; // eslint-disable-line @babel/no-unused-expressions
-					incoming.style.transition = '';
+					// A screen can ask for its own fade, and the stylesheet's stands otherwise.
+					const fade = fadeMs ? `opacity ${fadeMs}ms ease` : '';
+					incoming.style.transition = fade;
+					outgoing.style.transition = fade;
 					incoming.style.opacity = '1';
 					outgoing.style.opacity = '0';
 
@@ -140,7 +143,7 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 				show(targetUrl, 'plain');
 			}
 		}, settleMs);
-	}, [targetUrl, drawKey, soften, blurAmount, layerLook, settleMs, fadeWhileMovingMs, stopMoving]);
+	}, [targetUrl, drawKey, soften, blurAmount, layerLook, settleMs, fadeWhileMovingMs, fadeMs, stopMoving]);
 
 	// The layers start with the look of the first picture. Each picture then sets its own as it is drawn, so a layer on
 	// screen is not restyled before the next one comes.

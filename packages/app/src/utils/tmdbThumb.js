@@ -4,6 +4,7 @@
 import {useSyncExternalStore} from 'react';
 import {getApiKey, getServerUrl, getTokenParam} from '../services/jellyfinApi';
 import {isLegacyTizen, isWebOS} from '../platform';
+import {knownSiloMoonbase, moonbaseAssetUrl} from '../services/moonbaseEndpoint';
 
 // Whether the plugin can hand thumbs out. App keeps it in step with the plugin ping, so a
 // card can ask without reading the Seerr context.
@@ -59,7 +60,9 @@ export const seerrThumbUrl = (item, size = null) => {
 	// A card asks for a smaller picture than the 1280 px one a banner takes. A plugin without the size parameter leaves
 	// it out of the question and answers as before.
 	const sized = size ? `&size=${size}` : '';
-	return `${server}/Moonfin/Tmdb/Thumb?type=${item._seerrMediaType}&${id}${sized}${scheme}&${getTokenParam()}=${encodeURIComponent(token)}`;
+	const path = `/Moonfin/Tmdb/Thumb?type=${item._seerrMediaType}&${id}${sized}${scheme}`;
+	if (knownSiloMoonbase(server)) return moonbaseAssetUrl(server, path, token);
+	return `${server}${path}&${getTokenParam()}=${encodeURIComponent(token)}`;
 };
 
 // The wide picture such a title shows, the plugin thumb first and the plain backdrop when

@@ -14,6 +14,7 @@ import {resolvePlatformModule} from './platformModule';
 import {isVega} from '../platform';
 import {loadShellBridge} from './shellBridge';
 import {plexVersion} from './plexMapper';
+import {isSiloSystemInfo} from './siloMapper';
 
 const REQUEST_TIMEOUT = 1200;
 // A dead address makes a request wait out its whole timeout, so a walk of a subnet is mostly waiting, and more of it at once is what
@@ -29,6 +30,10 @@ const EXTRA_PORTS = [2364];
 // Where the walk goes when the TV could not tell its own subnet (a TV that hides its address from WebRTC): the two a home router
 // hands out most.
 export const FALLBACK_PREFIXES = ['192.168.1', '192.168.0'];
+// Silo's own API: its default port, and the one its Docker setup publishes. It advertises itself over mDNS, which a
+// packaged TV app can't hear, so it's asked like the rest. Plain http on a LAN, as Moonfin-Core's LAN discovery.
+const SILO_PORTS = [8080, 8090];
+const SILO_ADDRESS = new RegExp(`^http://.*:(${SILO_PORTS.join('|')})$`);
 const WEBRTC_GATHER_TIMEOUT = 2200;
 const WEBRTC_POLL_INTERVAL = 120;
 
@@ -186,9 +191,32 @@ const probePlex = async (base, state) => {
 	};
 };
 
+// A Silo answers its public system info with its API version, and its identity and branding with its id and name. Null
+// when something else answered, undefined when nothing did.
+const probeSilo = async (base, state) => {
+	const read = (path) => (isVega() ? requestJsonInShell(base + path) : requestJson(base + path, state.live));
+	const info = await read('/api/v2/system/info');
+	// Nothing listening: there's nothing else to ask either.
+	if (!info.answered) return undefined;
+	if (!info.ok || !isSiloSystemInfo(info.data)) return null;
+	const [identity, branding] = await Promise.all([read('/api/v2/system/identity'), read('/api/v2/theme/branding')]);
+	return {
+		id: (identity.ok && readString(identity.data, ['server_id'])) || `silo-${base}`,
+		name: (branding.ok && readString(branding.data, ['server_name'])) || 'Silo',
+		address: base,
+		serverType: 'silo',
+		version: info.data.server_version
+	};
+};
+
 const probeServer = async (baseUrl, state) => {
 	const base = baseUrl.charAt(baseUrl.length - 1) === '/' ? baseUrl.slice(0, -1) : baseUrl;
 	if (PLEX_ADDRESS.test(base)) return probePlex(base, state);
+	// Those ports are common enough that a Jellyfin or Emby there is still asked for as one.
+	if (SILO_ADDRESS.test(base)) {
+		const silo = await probeSilo(base, state);
+		if (silo !== null || state.canceled) return silo || null;
+	}
 
 	for (let i = 0; i < PUBLIC_INFO_PATHS.length; i++) {
 		if (state.canceled) return null;
@@ -263,6 +291,7 @@ const discoverSameOriginAndCommonHosts = async (state) => {
 				add(schemes[s] + '://' + hostForUrl + ':' + COMMON_PORTS[p]);
 			}
 		}
+		if (loc.protocol !== 'https:') SILO_PORTS.forEach((port) => add('http://' + hostForUrl + ':' + port));
 	}
 
 	await probeCandidates(candidates, state);
@@ -384,6 +413,7 @@ export const buildPrivateSubnetCandidates = ({prefixes, currentHostByPrefix, ori
 			if (schemes.indexOf('http') >= 0) {
 				candidates.push('http://' + host + ':' + PLEX_PORT);
 				EXTRA_PORTS.forEach((port) => candidates.push('http://' + host + ':' + port));
+				SILO_PORTS.forEach((port) => candidates.push('http://' + host + ':' + port));
 			}
 		}
 	}

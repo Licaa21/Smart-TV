@@ -4,7 +4,7 @@ import $L from '@enact/i18n/$L';
 import * as playback from '../../services/playback';
 import serverLogger from '../../services/serverLogger';
 import {fetchTmdbSeasonRatings, resolveSeriesTmdbId, isRatingSourceAllowed} from '../../services/mdblistApi';
-import {getItemAudioPref, getSeriesAudioPref} from '../../services/subtitlePrefs';
+import {getItemAudioPref, getSeriesAudioPref, syncSeriesTrackChoices} from '../../services/subtitlePrefs';
 import {fromServerAudio, selectPreferredAudioStream} from '../../utils/audioTrackSelection';
 import {fromServerStream, matchSeriesTrackIndex} from '../../utils/seriesTrackPrefs';
 import {detailsSubtitlePosition} from '../Player/initialSubtitle';
@@ -243,8 +243,11 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 
 			setItem(tagWithServerInfo(data));
 			setSelectedVersionIndex(0);
+			// A series' track choice made on another device comes in before this page reads it.
+			const tracksSynced = syncSeriesTrackChoices(tagWithServerInfo(data));
 			const ms = data.MediaSources?.[0];
 			if (ms) {
+				await tracksSynced;
 				const initAudioStreams = ms.MediaStreams?.filter(s => s.Type === 'Audio') || [];
 				// The track playback will start on, picked the way the player picks it: a track remembered for the
 				// title or its series, then the audio language and codec order from Settings, and only when

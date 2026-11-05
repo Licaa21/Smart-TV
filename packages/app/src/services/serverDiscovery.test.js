@@ -56,15 +56,17 @@ describe('extractPrivateIpv4FromSdp', () => {
 });
 
 describe('buildPrivateSubnetCandidates', () => {
-	test('walks the subnet on both schemes and both ports, plus Plex and the extra server port over http, skipping our own address', () => {
+	test('walks the subnet on both schemes and both ports, plus Plex, the extra server port and Silo over http, skipping our own address', () => {
 		const candidates = buildPrivateSubnetCandidates({
 			prefixes: {'192.168.50': true},
 			currentHostByPrefix: {'192.168.50': 42},
 			originScheme: 'http'
 		});
 
-		expect(candidates).toHaveLength(253 * 6);
+		expect(candidates).toHaveLength(253 * 8);
 		expect(candidates).toContain('http://192.168.50.1:8096');
+		expect(candidates).toContain('http://192.168.50.1:8080');
+		expect(candidates).toContain('http://192.168.50.1:8090');
 		expect(candidates).toContain('https://192.168.50.1:8920');
 		expect(candidates).toContain('http://192.168.50.1:32400');
 		expect(candidates).toContain('http://192.168.50.1:2364');

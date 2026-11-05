@@ -20,7 +20,7 @@ import GameCard from '../../components/GameCard';
 import {KEYS} from '../../utils/keys';
 import {normalizeMediaItem as normalizeSeerrItem} from '../../utils/seerrHomeRows';
 import {isGameLibrary, resolveGameLibraryId} from '../../utils/gameLibrary';
-import {groupSearchResults, aspectClassForType, isCircleType, filterByName, fetchAllGames, filterGames, rankMostRelevant} from '../../utils/searchGroups';
+import {groupSearchResults, aspectClassForType, isCircleType, filterByName, fetchAllGames, filterGames, rankMostRelevant, searchLibrary} from '../../utils/searchGroups';
 import {foldForSearch} from '../../utils/accentFolding';
 import {relevantSmartResults} from '../../utils/smartSearchRelevance';
 import SpottableInput from '../../components/SpottableInput/SpottableInput';
@@ -121,7 +121,7 @@ const seerrSections = (items, query) => {
 };
 
 const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, onPlayChannel, remoteSearch, musicBar}) => {
-	const {api, serverUrl, hasMultipleServers} = useAuth();
+	const {api, serverUrl, serverType, hasMultipleServers} = useAuth();
 	const {settings} = useSettings();
 	const unifiedMode = settings.unifiedLibraryMode && hasMultipleServers;
 	const {isEnabled: seerrEnabled, api: seerrApi, displayName: seerrName, pluginInfo} = useSeerr();
@@ -284,7 +284,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 			const [libraryResult, channels] = await Promise.all([
 				unifiedMode
 					? connectionPool.searchAllServers(q, GLOBAL_FETCH_LIMIT).then((serverItems) => ({Items: serverItems}))
-					: api.search(q, GLOBAL_FETCH_LIMIT),
+					: searchLibrary(api, q, GLOBAL_FETCH_LIMIT, serverType),
 				hasLiveTvRef.current && !isStudioQuery
 					? api.getLiveTvChannels(0, 500).then((r) => r?.Items || []).catch(() => [])
 					: Promise.resolve([])
@@ -356,7 +356,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 			setGameResults([]);
 			setIsLoading(false);
 		}
-	}, [api, seerrEnabled, seerrApi, unifiedMode, focusAllTab, rememberSearch, openOnSeerr, settings]);
+	}, [api, serverType, seerrEnabled, seerrApi, unifiedMode, focusAllTab, rememberSearch, openOnSeerr, settings]);
 
 	// One word is a title or a name, which the usual search handles, so only a query of two words or more goes to the plugin. Its rows
 	// come in beside the usual ones, and a failure or an index still being built adds nothing.

@@ -1,15 +1,48 @@
 import {isTizen} from '../../platform';
 import * as playback from '../../services/playback';
+import {getDeviceProfile} from '../../services/deviceProfile';
 import {getFromStorage} from '../../services/storage';
 
 // Some servers list the reasons on the source. Jellyfin leaves them off and only writes them into
 // the url it would transcode from.
-const transcodeReasonsOf = (source) => {
-	const listed = source.TranscodeReasons || source.TranscodingReasons;
+const transcodeReasonsOf = (source, result) => {
+	const listed = source.TranscodeReasons || source.TranscodingReasons || result?.TranscodeReasons;
 	if (Array.isArray(listed) && listed.length) return listed;
 	if (typeof listed === 'string' && listed) return listed.split(',');
 	const match = /[?&]TranscodeReasons=([^&]+)/.exec(source.TranscodingUrl || '');
 	return match ? decodeURIComponent(match[1]).split(',') : [];
+};
+
+// Silo opens a playback session on getPlaybackInfo, so it is asked through its own preview call with the profile and the
+// cap playback would use (the viewer's own bitrate only, as in playback), not through the dry run below.
+const fetchPreviewPlaybackInfo = async (api, {itemId, serverType, mediaSourceId, audioStreamIndex, subtitleStreamIndex, maxBitrate}) => {
+	const deviceProfile = await getDeviceProfile(serverType, {}, api).catch(() => null);
+	const maxStreamingBitrate = maxBitrate > 0 ? maxBitrate : serverType === 'silo' ? null : deviceProfile?.MaxStreamingBitrate;
+
+	const body = {
+		EnableDirectPlay: true,
+		EnableDirectStream: true,
+		EnableTranscoding: true
+	};
+	if (deviceProfile) body.DeviceProfile = deviceProfile;
+	if (maxStreamingBitrate) body.MaxStreamingBitrate = maxStreamingBitrate;
+	if (mediaSourceId) body.MediaSourceId = mediaSourceId;
+	if (audioStreamIndex != null) body.AudioStreamIndex = audioStreamIndex;
+	if (subtitleStreamIndex != null) body.SubtitleStreamIndex = subtitleStreamIndex;
+
+	const result = await api.previewPlaybackInfo(itemId, body);
+	const sources = result?.MediaSources || [];
+	const source = (mediaSourceId && sources.find((s) => s.Id === mediaSourceId)) || sources[0];
+	if (!source) return null;
+
+	return {
+		supportsDirectPlay: source.SupportsDirectPlay === true,
+		supportsDirectStream: source.SupportsDirectStream === true,
+		transcodeReasons: transcodeReasonsOf(source, result),
+		source,
+		deviceProfile,
+		maxStreamingBitrate
+	};
 };
 
 // What a press of Play would do with the tracks the screen has selected, found by running the start
@@ -29,6 +62,9 @@ export const fetchDetailPlaybackInfo = async (api, {
 	maxBitrate
 } = {}) => {
 	if (!api?.getPlaybackInfo || !itemId) return null;
+	if (api.previewPlaybackInfo) {
+		return fetchPreviewPlaybackInfo(api, {itemId, serverType, mediaSourceId, audioStreamIndex, subtitleStreamIndex, maxBitrate});
+	}
 
 	const settings = (await getFromStorage('settings')) || {};
 	// The Samsung player opens a file on its first audio track, and queues a switch to the pick.
@@ -51,6 +87,7 @@ export const fetchDetailPlaybackInfo = async (api, {
 		dryRun: true
 	});
 	if (!preview?.mediaSource) return null;
+
 
 	const {mediaSource: source, playMethod} = preview;
 	return {

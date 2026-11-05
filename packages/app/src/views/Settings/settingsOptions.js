@@ -22,6 +22,22 @@ export const getContentTypeOptions = () => [
 	{ value: 'tv', label: $L('TV Shows Only') }
 ];
 
+export const getMediaBarSourceOptions = () => [
+	{ value: 'library', label: $L('Random') },
+	{ value: 'collection', label: $L('Collections') },
+	{ value: 'recentlyAdded', label: $L('Recently Added') },
+	{ value: 'recentlyReleased', label: $L('Recently Released') },
+	{ value: 'newReleases', label: $L('New Seasons & Episodes') }
+];
+
+export const getNewReleaseDaysOptions = () => [
+	{ value: 7, label: $L('7 days') },
+	{ value: 14, label: $L('14 days') },
+	{ value: 30, label: $L('30 days') },
+	{ value: 60, label: $L('60 days') },
+	{ value: 90, label: $L('90 days') }
+];
+
 export const getFeaturedBarStyleOptions = () => [
 	{ value: 'moonfin', label: $L('Moonfin') },
 	{ value: 'makd', label: $L('MakD') },
@@ -769,6 +785,7 @@ export const getAccentColorOptions = (defaultColor, defaultLabel = $L('Theme Def
 	{ value: '', label: defaultLabel, swatch: defaultColor },
 	{ value: '#00a4dc', label: $L('Moonfin Cyan'), swatch: '#00a4dc' },
 	{ value: '#ff2e92', label: $L('Neon Magenta'), swatch: '#ff2e92' },
+	{ value: '#ffcd75', label: $L('8-bit Gold'), swatch: '#ffcd75' },
 	{ value: '#0a84ff', label: $L('Blue'), swatch: '#0a84ff' },
 	{ value: '#30d158', label: $L('Green'), swatch: '#30d158' },
 	{ value: '#ffd60a', label: $L('Yellow'), swatch: '#ffd60a' },
@@ -838,4 +855,35 @@ export const getRecentlyReleasedSeriesTypeOptions = () => [
 	{ value: 'series', label: $L('Series') },
 	{ value: 'season', label: $L('Season') },
 	{ value: 'episode', label: $L('Episode') }
+];
+
+export const getCalendarStyleOptions = () => [
+	{ value: 'agenda', label: $L('Agenda') },
+	{ value: 'countdown', label: $L('Countdown') }
+];
+
+export const getCalendarWeekStartOptions = () => [
+	{ value: 'locale', label: $L('Auto') },
+	{ value: 'sunday', label: $L('Sunday') },
+	{ value: 'monday', label: $L('Monday') }
+];
+
+export const getCalendarScopeOptions = () => [
+	{ value: 'everything', label: $L('Everything') },
+	{ value: 'myShows', label: $L('My shows') }
+];
+
+export const getCalendarColorByOptions = () => [
+	{ value: 'type', label: $L('Type') },
+	{ value: 'status', label: $L('Status') }
+];
+
+export const getCalendarImageTypeOptions = () => [
+	{ value: 'poster', label: $L('Poster') },
+	{ value: 'thumb', label: $L('Thumbnail') }
+];
+
+export const getCalendarSelectActionOptions = () => [
+	{ value: 'details', label: $L('Open details') },
+	{ value: 'play', label: $L('Play when in library') }
 ];
