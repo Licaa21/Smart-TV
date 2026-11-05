@@ -37,7 +37,9 @@ export const isUnownedSeerrTitle = (item) => Boolean(item?._seerr) &&
 	(!item._seerrType || item._seerrType === 'item') &&
 	(item._seerrMediaType === 'movie' || item._seerrMediaType === 'tv');
 
-// The size a card asks the plugin for: a card is about 520 px wide, so the 780 px picture and not the 1280 px one.
+// The size a card asks the plugin for: the 780 px picture and not the 1280 px one. The plugin takes only w300, w780 and
+// w1280 and answers any other size with w1280, so a card (about 360 px wide at Core's size, more with a larger Poster
+// Size) cannot ask for w500.
 export const CARD_THUMB_SIZE = 'w780';
 
 // Image tags can't send auth headers, so the token rides in the query. An IMDb id only
