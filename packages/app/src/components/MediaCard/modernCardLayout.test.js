@@ -27,19 +27,20 @@ describe('isStaticLibraryCard', () => {
 
 describe('modernCardMetrics', () => {
 	test('scales the image with the size preset and falls back to the default', () => {
-		expect(metrics({posterSize: 'small'}).imageHeight).toBe(160);
-		expect(metrics().imageHeight).toBe(200);
-		expect(metrics({posterSize: 'xlarge'}).imageHeight).toBe(280);
-		expect(metrics({posterSize: 'nonsense'}).imageHeight).toBe(200);
+		expect(metrics({posterSize: 'small'}).imageHeight).toBe(240);
+		expect(metrics().imageHeight).toBe(360);
+		expect(metrics({posterSize: 'large'}).imageHeight).toBe(440);
+		expect(metrics({posterSize: 'xlarge'}).imageHeight).toBe(520);
+		expect(metrics({posterSize: 'nonsense'}).imageHeight).toBe(360);
 	});
 
 	test('keeps Grandparents at the Extra Large height', () => {
-		expect(metrics({posterSize: 'grandparents'}).imageHeight).toBe(280);
+		expect(metrics({posterSize: 'grandparents'}).imageHeight).toBe(520);
 	});
 
 	test('a poster is two thirds of its height and a sleeve is square', () => {
-		expect(metrics().cardWidth).toBe(134);
-		expect(metrics({isSquareItem: true}).cardWidth).toBe(200);
+		expect(metrics().cardWidth).toBe(240);
+		expect(metrics({isSquareItem: true}).cardWidth).toBe(360);
 	});
 
 	test('a static My Media tile is as wide as a focused card, so the rows line up', () => {
@@ -55,8 +56,8 @@ describe('modernCardMetrics', () => {
 	});
 
 	test('a focused card opens to 16:9 on every platform, as Core draws it', () => {
-		expect(metrics().expandedWidth).toBe(356);
-		expect(metrics({posterSize: 'small'}).expandedWidth).toBe(285);
+		expect(metrics().expandedWidth).toBe(640);
+		expect(metrics({posterSize: 'small'}).expandedWidth).toBe(427);
 	});
 });
 

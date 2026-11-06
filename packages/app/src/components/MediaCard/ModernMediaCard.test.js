@@ -554,16 +554,18 @@ describe('ModernMediaCard asking the server for the size it draws', () => {
 	};
 
 	it('asks for a poster as tall as the card at the default Poster Size', () => {
-		expect(sources()[0]).toContain('maxHeight=200');
-		expect(sources()[0]).not.toContain('maxHeight=360');
+		expect(sources()[0]).toContain('maxHeight=360');
+		expect(sources()[0]).not.toContain('maxHeight=200');
 	});
 
 	it('follows the Poster Size setting', () => {
 		mockSettings.homeRowsPosterSize = 'xlarge';
-		expect(sources()[0]).toContain('maxHeight=280');
+		expect(sources()[0]).toContain('maxHeight=520');
 	});
 
-	it('asks for no picture at the old card size, whatever the kind of title', () => {
+	it('asks for no picture at a size fixed in the code, whatever the kind of title', () => {
+		// Small is neither of the heights that used to be written in the card (360 and 600 wide)
+		mockSettings.homeRowsPosterSize = 'small';
 		const kinds = [
 			{Id: 'e1', Name: 'Ep', Type: 'Episode', SeriesId: 's1', SeriesPrimaryImageTag: 'sp', ParentThumbItemId: 's1', ParentThumbImageTag: 'st', ImageTags: {Primary: 'p'}},
 			{Id: 'a1', Name: 'Album', Type: 'MusicAlbum', ImageTags: {Primary: 'p'}},
@@ -585,6 +587,6 @@ describe('ModernMediaCard asking the server for the size it draws', () => {
 
 	it('asks for wide art as wide as the card grows', () => {
 		const wide = sources({isFocused: true}).find((src) => src.includes('/Thumb'));
-		expect(wide).toContain('maxWidth=356');
+		expect(wide).toContain('maxWidth=640');
 	});
 });

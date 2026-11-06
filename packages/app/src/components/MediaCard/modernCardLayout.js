@@ -1,8 +1,10 @@
 // The widths a modern home row card is laid out from.
 
-// Grandparents stops at the Extra Large height here, since a modern row any
-// taller no longer fits on the screen.
-const POSTER_SIZE_MULTIPLIERS = {small: 0.8, default: 1, large: 1.2, xlarge: 1.4, grandparents: 1.4};
+// The poster heights the choices give, on the 1080 screen: 240, 360, 440 and 520 (the user's choice, 2026-11-06). Upstream's
+// Core size (200 at Default, and 160 to 280 across the choices) was too small for the viewers the larger choices are for.
+// Default is the 360 the card had before it, and the range is wider than it was (288 to 504). Grandparents stops at the Extra Large height here, since a modern row any taller
+// no longer fits on the screen.
+const POSTER_SIZE_MULTIPLIERS = {small: 240 / 360, default: 1, large: 440 / 360, xlarge: 520 / 360, grandparents: 520 / 360};
 
 // Only the My Media row answers to the setting. Live TV draws its Guide and
 // Recordings tiles as collection folders too, and going by the item would
@@ -12,8 +14,9 @@ export const isStaticLibraryCard = (isLibraryRow, settings) =>
 
 export const posterSizeScale = (posterSize) => POSTER_SIZE_MULTIPLIERS[posterSize] || 1;
 
-// Core's Medium poster on TV, 120 points tall on its 1150 wide canvas, drawn at 1920.
-const BASE_IMAGE_HEIGHT = 120 * 1920 / 1150;
+// The Default poster height. Core's is 200 (120 points on its 1150 wide canvas, drawn at 1920); the fork's is the 360
+// this card had before upstream's Core size.
+const BASE_IMAGE_HEIGHT = 360;
 
 // Worked out together because a tile held static sits at the width a card grows
 // to on focus, which is what lines the row up with the ones around it.

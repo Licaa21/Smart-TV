@@ -533,7 +533,7 @@ const HomeRow = ({title, items, t, modern, thumbs = false, offset = 0, withFocus
 };
 
 // Card Size as a scale of Default, the size the rows are drawn at otherwise.
-const POSTER_SIZE_SCALE = {small: 0.8, default: 1, large: 1.2, xlarge: 1.4, grandparents: 2};
+const POSTER_SIZE_SCALE = {small: 240 / 360, default: 1, large: 440 / 360, xlarge: 520 / 360, grandparents: 520 / 360};
 
 const HomeRowsColumn = ({items, t, modern, focusFirst = false, rowGapOverride}) => {
 	const {settings} = useSettings();
