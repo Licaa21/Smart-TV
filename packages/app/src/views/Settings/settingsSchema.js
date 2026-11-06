@@ -686,7 +686,7 @@ export const SETTINGS_SCHEMA = [
 				description: () => $L('Layout, buttons, sections, ratings, and theme music'),
 				rows: [
 					{kind: KIND.SECTION, id: 'detailsDisplay', label: () => $L('Display')},
-					{kind: KIND.OPTION, key: 'detailScreenStyle', label: () => $L('Details Screen Style'), desc: () => $L('Classic is the original centered moonfin layout. Modern is a responsive cinematic layout. Spotlight is a hero-first layout with pop-up content cards. Nouveau is a full-screen layout with sections stacked down the page. Minimalist is artwork, one play button and the episodes. Stage leads with the poster, with play under it and the details beside it. Premiere centers the title over a backdrop that fills the screen, with every section down the page under it. Quick Look opens a drawer over the screen you were on, with the full page a press away. Frost floats the title in a glass window over a blurred copy of its art, with its parts in tabs under the buttons.'), options: getDetailScreenStyleOptions, fallback: () => $L('Modern'), icon: 'movie_outlined'},
+					{kind: KIND.OPTION, key: 'detailScreenStyle', label: () => $L('Details Screen Style'), desc: () => $L('How a movie or show looks when you open it.'), options: getDetailScreenStyleOptions, fallback: () => $L('Modern'), icon: 'movie_outlined'},
 					{kind: KIND.OPTION, key: 'personalRatingStyle', label: () => $L('Personal Rating Style'), options: getPersonalRatingStyleOptions, fallback: () => $L('Like / dislike'), icon: 'rate_review'},
 					{kind: KIND.TOGGLE, key: 'detailsBackdropEnabled', label: () => $L('Details Screen Backdrop'), icon: 'photo'},
 					{
@@ -973,7 +973,8 @@ export const SETTINGS_SCHEMA = [
 					{kind: KIND.SECTION, id: 'subtitleRendering', label: () => $L('Subtitle Rendering'), when: whenSubtitlesOn},
 					{kind: KIND.TOGGLE, key: 'enablePgsRendering', label: () => $L('PGS Direct Play'), desc: () => $L('Direct play PGS subtitles'), icon: 'image', when: whenSubtitlesOn},
 					{kind: KIND.TOGGLE, key: 'assDirectPlay', label: () => $L('ASS/SSA Direct Play'), desc: () => $L('Direct play ASS/SSA subtitles'), icon: 'text_snippet', when: whenSubtitlesOn},
-					{kind: KIND.TOGGLE, key: 'waitForAssSubtitles', label: () => $L('Wait for ASS/SSA subtitles'), desc: () => $L('Hold the video until styled subtitles are ready so the first lines show'), icon: 'timer', when: (ctx) => whenSubtitlesOn(ctx) && ctx.isWebOS && ctx.settings.assDirectPlay !== false}
+					{kind: KIND.TOGGLE, key: 'waitForAssSubtitles', label: () => $L('Wait for ASS/SSA subtitles'), desc: () => $L('Hold the video until styled subtitles are ready so the first lines show'), icon: 'timer', when: (ctx) => whenSubtitlesOn(ctx) && ctx.isWebOS && ctx.settings.assDirectPlay !== false},
+					{kind: KIND.TOGGLE, key: 'webosEmbeddedTextSubtitles', label: () => $L('Read embedded text subtitles from the file'), desc: () => $L('Show SRT subtitles from inside the file instead of waiting for the server to extract them'), icon: 'subtitles', when: (ctx) => whenSubtitlesOn(ctx) && ctx.isWebOS}
 				]
 			},
 			{
