@@ -20,6 +20,7 @@ import {withPlexToken} from '../utils/plexUrls';
 import {parseSubtitleText} from '../utils/subtitleText';
 import {corsFreeFetch} from './secureFetch';
 import {isTizen} from '../platform';
+import {mediaServerQueue} from '../utils/requestQueue';
 
 export const PlayMethod = {
 	DirectPlay: 'DirectPlay',
@@ -70,6 +71,30 @@ const isAudioOnlyRemuxTranscode = (mediaSource) => {
 
 let currentSession = null;
 let progressInterval = null;
+
+// What the progress reports have been doing, so a report from the TV can say whether they stopped (a long standby once left
+// a session whose position the server never heard again) and the player can notice and start them again.
+const reporting = {startedAt: 0, sentAt: 0, okAt: 0, failures: 0, lastError: null};
+
+const resetReporting = () => {
+	reporting.startedAt = Date.now();
+	reporting.sentAt = 0;
+	reporting.okAt = 0;
+	reporting.failures = 0;
+	reporting.lastError = null;
+};
+
+export const getReportingState = () => ({
+	hasSession: Boolean(currentSession),
+	progressActive: Boolean(progressInterval),
+	sinceSentMs: reporting.sentAt ? Date.now() - reporting.sentAt : null,
+	// From the last report the server took, or from the start of the session when none has been
+	sinceOkMs: reporting.okAt || reporting.startedAt ? Date.now() - (reporting.okAt || reporting.startedAt) : null,
+	failures: reporting.failures,
+	lastError: reporting.lastError,
+	queueInFlight: mediaServerQueue.inFlight(),
+	queuePending: mediaServerQueue.pending()
+});
 let healthMonitor = null;
 
 const apiForSession = (session) => (session.serverCredentials
@@ -111,6 +136,7 @@ const endReplacedPlexSession = (previous, next) => {
 const replaceSession = (session) => {
 	const previous = currentSession;
 	currentSession = session;
+	resetReporting();
 	if (previous && previous !== session) {
 		closeLiveStreamOnce(previous);
 		endReplacedPlexSession(previous, session);
@@ -1668,10 +1694,10 @@ const volumeReport = () => {
 // without any help from the API client. It names the live stream too, since no
 // other request follows it and the server only lets a tuner go when the stop
 // says which stream it held.
-const stopRequest = (positionTicks) => {
-	if (!currentSession) return null;
+const stopRequest = (positionTicks, session = currentSession) => {
+	if (!session) return null;
 
-	const creds = currentSession.serverCredentials;
+	const creds = session.serverCredentials;
 	let serverUrl = creds?.serverUrl || jellyfinApi.getServerUrl();
 	const token = creds?.accessToken || jellyfinApi.getApiKey();
 	if (!serverUrl || !token) return null;
@@ -1685,26 +1711,26 @@ const stopRequest = (positionTicks) => {
 
 	// Plex takes its stop as a timeline report, all of it in the address.
 	if (isPlexCreds(creds)) {
-		const endpoint = apiForSession(currentSession).stoppedTimelineUrl({
-			ItemId: currentSession.itemId,
-			PlaySessionId: currentSession.playSessionId,
+		const endpoint = apiForSession(session).stoppedTimelineUrl({
+			ItemId: session.itemId,
+			PlaySessionId: session.playSessionId,
 			PositionTicks: positionTicks || 0
 		});
 		return endpoint ? {endpoint, json: ''} : null;
 	}
 
-	const liveStreamId = currentSession.liveStreamClosed ? null : currentSession.liveStreamId;
+	const liveStreamId = session.liveStreamClosed ? null : session.liveStreamId;
 	return {
 		endpoint: `${serverUrl}/Sessions/Playing/Stopped?${jellyfinApi.getTokenParam(creds?.serverType)}=${encodeURIComponent(token)}`,
 		json: JSON.stringify({
-			ItemId: currentSession.itemId,
-			PlaySessionId: currentSession.playSessionId,
-			MediaSourceId: currentSession.mediaSourceId,
+			ItemId: session.itemId,
+			PlaySessionId: session.playSessionId,
+			MediaSourceId: session.mediaSourceId,
 			...(liveStreamId && {LiveStreamId: liveStreamId}),
 			PositionTicks: positionTicks || 0,
-			PlayMethod: currentSession.reportedPlayMethod || currentSession.playMethod,
-			AudioStreamIndex: currentSession.audioStreamIndex,
-			SubtitleStreamIndex: currentSession.subtitleStreamIndex
+			PlayMethod: session.reportedPlayMethod || session.playMethod,
+			AudioStreamIndex: session.audioStreamIndex,
+			SubtitleStreamIndex: session.subtitleStreamIndex
 		})
 	};
 };
@@ -1728,6 +1754,7 @@ const shareStopWithShell = (positionTicks) => {
 
 export const reportStart = async (positionTicks = 0) => {
 	if (!currentSession) return;
+	resetReporting();
 	// Once playback starts again, a stop at the same position is a new one.
 	delete currentSession.lastStopBeaconKey;
 
@@ -1750,6 +1777,7 @@ export const reportStart = async (positionTicks = 0) => {
 
 export const reportProgress = async (positionTicks, options = {}) => {
 	if (!currentSession) return;
+	const session = currentSession;
 
 	try {
 		const api = apiForSession(currentSession);
@@ -1772,11 +1800,26 @@ export const reportProgress = async (positionTicks, options = {}) => {
 		}
 
 		shareStopWithShell(positionTicks);
+		reporting.sentAt = Date.now();
 		await api.reportPlaybackProgress(info);
-	} catch (e) { void e; }
+		// An answer that comes after the session was let go of belongs to a session that is gone
+		if (session !== currentSession) return;
+		reporting.okAt = Date.now();
+		reporting.failures = 0;
+	} catch (e) {
+		if (session !== currentSession) return;
+		// Nothing waits on a progress report, so a failure was swallowed whole. It is counted now, and the first one
+		// and then every sixth in a row reach the report.
+		reporting.failures++;
+		reporting.lastError = (e && e.message) || String(e);
+		if (reporting.failures % 6 === 1) {
+			// Not an error entry: those are sent to the server, which is the one that is not answering
+			serverLogger.playback('Playback: progress reports are failing', {failures: reporting.failures, error: reporting.lastError});
+		}
+	}
 };
 
-const sendStopRequest = ({endpoint, json}) => {
+const sendStopRequest = ({endpoint, json}, {allowBlocking = true} = {}) => {
 	if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
 		try {
 			return navigator.sendBeacon(endpoint, new Blob([json], {type: 'application/json'}));
@@ -1784,6 +1827,8 @@ const sendStopRequest = ({endpoint, json}) => {
 			void e;
 		}
 	}
+	// A blocking request is for the exit, where nothing else gets through. A stop that merely failed must not freeze Back.
+	if (!allowBlocking) return false;
 
 	// webOS 3 has no sendBeacon, and an async request dies with the suspended
 	// process, so a blocking one is the only transport that gets through.
@@ -1852,6 +1897,9 @@ export const reportBackgroundStop = (positionTicks) => {
 	backgroundStopFired = true;
 };
 
+// True from a background stop until the resume path has taken it, while the session is deliberately ended on the server.
+export const isBackgroundStopPending = () => backgroundStopFired;
+
 // Returns true at most once per background stop, so the resume path knows it must
 // re-report start instead of assuming the session is still live on the server.
 export const consumeBackgroundStopFired = () => {
@@ -1889,7 +1937,19 @@ export const reportStop = async (positionTicks) => {
 				PositionTicks: positionTicks
 			});
 		} catch (e) {
-			console.warn('[playback] Failed to report stop:', e.message);
+			console.warn('[playback] Failed to report stop:', e && e.message);
+			// The stop is what the server keeps the resume position from, so one that failed is tried again the way an exit
+			// sends it, which does not wait on the request queue, and the report says so.
+			// Only a failure of the network kind is worth it (a 401 or a 404 would fail again), and not for Plex, whose stop is
+			// a timeline address a beacon cannot be trusted with. Silo has no beacon stop at all.
+			const networkFailure = !e || !e.status || e.status >= 500;
+			const request = networkFailure && !isPlexCreds(session.serverCredentials) ? stopRequest(positionTicks, session) : null;
+			const resent = request ? sendStopRequest(request, {allowBlocking: false}) : false;
+			if (resent) {
+				// The stop that went out named the live stream, as reportStopBeacon notes, so it is not closed a second time.
+				session.liveStreamClosed = true;
+			}
+			serverLogger.playbackError('Playback: the stop report failed', {error: (e && e.message) || String(e), status: e && e.status, resentAsBeacon: resent, positionTicks});
 		}
 	}
 

@@ -31,6 +31,7 @@ import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTi
 import {describeHlsManifest} from '../../utils/hlsManifestProbe';
 import {canvasLiftFor, canvasRestingPercent, getPgsBackgroundStyle, getPgsPictureStyle, getSubtitleCanvasStyle, resolveSubtitleStyleSettings} from '../../utils/subtitleConstants';
 import SubtitleTextOverlay from './SubtitleTextOverlay';
+import {watchReporting, PENDING_BACKGROUND_STOP_LOOKS} from './reportingWatch';
 import useSecondarySubtitle from './useSecondarySubtitle';
 import useSubtitleFetch from './useSubtitleFetch';
 import useCinemaSkip from './useCinemaSkip';
@@ -142,6 +143,8 @@ const RELOAD_RETRY_MAX_DELAY_MS = 30000;
 const RELOAD_STILL_RUNNING_MS = 45000;
 // How soon a retry that found a reload still running looks again.
 const RELOAD_RECHECK_MS = 3000;
+// How often the reporting watch looks (what it does is in reportingWatch.js).
+const REPORTING_CHECK_MS = 15000;
 const reloadRetryDelay = (attempt) => RELOAD_RETRY_DELAYS[attempt] ?? RELOAD_RETRY_MAX_DELAY_MS;
 const LIVE_RANGE_READ_MS = 2000;
 
@@ -444,11 +447,21 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const reloadRetryTimeoutRef = useRef(null);
 	const isUnmountedRef = useRef(false);
 	const reloadInFlightRef = useRef(false);
+	// Reloads running right now, whoever started them (recoverByReload, or the error path calling the reload itself)
+	const reloadActiveRef = useRef(0);
 	const reloadRunningSinceRef = useRef(0);
 	// Which reload is the latest, so one that a newer attempt has replaced can stop before it reaches AVPlay.
 	const reloadRunRef = useRef(0);
 	// A reload that follows a pause puts the pause back once the stream is up
 	const repauseAfterReloadRef = useRef(false);
+	// When the stream was last reopened by a reload, and when the reporting check last wrote a line to the report
+	const reloadedAtRef = useRef(0);
+	const reloadedItemRef = useRef(null);
+	const reportingLoggedAtRef = useRef(0);
+	const reportingFaultLoggedAtRef = useRef(0);
+	const pendingStopLooksRef = useRef(0);
+	const reportingHealedAtRef = useRef(0);
+	const noSessionChecksRef = useRef(0);
 	// index of a subtitle the server is currently burning into the stream
 	const burnInSubtitleRef = useRef(null);
 
@@ -1656,6 +1669,69 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		healthMonitorRef.current = playback.getHealthMonitor();
 	};
 
+	// Watches that the server is still being told where the picture is. A set that came back from a long standby once
+	// played for half an hour with nothing reaching the server, so Back and the next start used a position from before.
+	// Playing with the progress reports not running is put right at once, and the state is written to the report: a
+	// session that is gone, or reports that keep failing, and a line a minute for a quarter of an hour after a reload.
+	useEffect(() => {
+		if (isLiveTV) return undefined;
+		const timer = setInterval(() => { try {
+			// A look that cannot judge starts the count of looks without a session again. A background stop ended the session
+			// on purpose and a reload is opening a new one, and each of those has its own way of starting the reports.
+			const playing = !isUnmountedRef.current && avplayReadyRef.current && playbackMovingRef.current && avplayGetState() === 'PLAYING';
+			// The resume path starts a session again after a background stop, so it is waited for, but not for ever: a
+			// firmware that never sends the resume leaves the flag up while the picture plays.
+			pendingStopLooksRef.current = playing && playback.isBackgroundStopPending() ? pendingStopLooksRef.current + 1 : 0;
+			const waitingForResume = pendingStopLooksRef.current > 0 && pendingStopLooksRef.current <= PENDING_BACKGROUND_STOP_LOOKS;
+			const reloading = reloadInFlightRef.current || reloadActiveRef.current > 0
+				|| (reloadRunningSinceRef.current && Date.now() - reloadRunningSinceRef.current < RELOAD_STILL_RUNNING_MS);
+			if (!playing || waitingForResume || reloading) {
+				noSessionChecksRef.current = 0;
+				return;
+			}
+			const state = playback.getReportingState();
+			const now = Date.now();
+			noSessionChecksRef.current = state.hasSession ? 0 : noSessionChecksRef.current + 1;
+			const {heal, fault, log} = watchReporting({
+				state,
+				now,
+				noSessionChecks: noSessionChecksRef.current,
+				healedAt: reportingHealedAtRef.current,
+				loggedAt: reportingLoggedAtRef.current,
+				faultLoggedAt: reportingFaultLoggedAtRef.current,
+				reloadedAt: reloadedAtRef.current,
+				reloadedHere: reloadedItemRef.current === itemIdRef.current
+			});
+			if (!log) return;
+			if (heal) {
+				reportingHealedAtRef.current = now;
+				serverLogger.playbackError(log.message, state);
+				if (pendingStopLooksRef.current > PENDING_BACKGROUND_STOP_LOOKS) {
+					// A background stop ended the session and the resume never came: it starts again the way a resume does
+					playback.consumeBackgroundStopFired();
+					resumeReportingRef.current?.();
+				} else {
+					// The session is live on the server, so only the reports start again, not a second start
+					playback.startProgressReporting(
+						() => positionRef.current,
+						10000,
+						() => ({isPaused: avplayGetState() !== 'PLAYING'})
+					);
+				}
+				return;
+			}
+			const line = {positionTicks: positionRef.current, afterReloadMs: reloadedAtRef.current ? now - reloadedAtRef.current : null, ...state};
+			if (fault) reportingFaultLoggedAtRef.current = now;
+			else reportingLoggedAtRef.current = now;
+			if (log.level === 'error') serverLogger.playbackError(log.message, line);
+			else serverLogger.playback(log.message, line);
+		} catch (err) {
+			// A watch that only reads and reports must never get in the way of playback
+			void err;
+		} }, REPORTING_CHECK_MS);
+		return () => clearInterval(timer);
+	}, [isLiveTV]);
+
 	// The loading screen stands in place of the player until the stream is ready, so the
 	// canvas the renderer draws on is not in the page when the first track is picked.
 	// Waiting for it beats starting a renderer with nowhere to put anything.
@@ -2757,6 +2833,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// Reload the current item from its last position, used when a suspended
 	// session cant be restored after the app returns to the foreground
 	const reloadCurrentPlayback = useCallback(async (isSuperseded) => {
+		reloadActiveRef.current++;
 		const generation = loadGenerationRef.current;
 		// Back or another item while this runs, or a newer reload, leaves nothing to reload
 		const superseded = () => generation !== loadGenerationRef.current || Boolean(isSuperseded?.());
@@ -2774,6 +2851,13 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			if (superseded()) return null;
 			const restarted = await restartFromResult(result, positionRef.current, superseded);
 			if (restarted) {
+				reloadedAtRef.current = Date.now();
+				reloadedItemRef.current = itemIdRef.current;
+				serverLogger.playback('Standby diag: reload ready', {
+					positionTicks: positionRef.current,
+					playMethod: result.playMethod,
+					reporting: playback.getReportingState()
+				});
 				// a background stop or the old session's end left stall detection off
 				playback.startHealthMonitoring(handleUnhealthy);
 				healthMonitorRef.current = playback.getHealthMonitor();
@@ -2801,6 +2885,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		} catch (err) {
 			console.error('[Player] Stream reload failed:', err);
 			return superseded() ? null : false;
+		} finally {
+			reloadActiveRef.current--;
 		}
 	}, [item, selectedQuality, settings.maxBitrate, settings.stereoUpmixEnabled, mediaSourceId, selectedAudioIndex, restartFromResult, handleUnhealthy]);
 
