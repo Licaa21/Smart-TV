@@ -89,6 +89,7 @@ export const defaultSettings = {
 	showChapterMarkers: false,
 	assDirectPlay: true,
 	waitForAssSubtitles: false,
+	webosEmbeddedTextSubtitles: false,
 	audioPassthroughMode: 'auto',
 	maxAudioChannels: 0,
 	transcodeAudioCodecs: [],

@@ -17,6 +17,7 @@ import useSkipFailedTrack from './audio/useSkipFailedTrack';
 import {handleAudioFocusKey, exitAudioPanel, nextAudioFocusRow, focusAudioRow, forgetDockFocus} from './audio/audioFocus';
 import {detectPlatformVersion, getH264FallbackProfile} from '../../services/deviceProfile';
 import {initPgsRenderer, initPgsInBandRenderer, disposePgsRenderer} from '../../utils/pgsRenderer';
+import {createInBandTextSource} from '../../utils/mkvTextSource';
 import {supportsAssRenderer, initAssCanvasRenderer, disposeAssRenderer, setAssTime, clearAssCanvas} from '../../utils/assRenderer';
 import {waitForAssReady} from '../../utils/assRendererReady';
 import {
@@ -443,6 +444,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const lastSeekTimeRef = useRef(0);
 	const mediaUrlRef = useRef(null);
 	const pgsRendererRef = useRef(null);
+	const textSourceRef = useRef(null);
 	// Invalidates async PGS starts when the user changes track/item before one finishes.
 	const pgsInitGenRef = useRef(0);
 	// Re-runs the PGS setup of the current subtitle, for a seek that left the in band
@@ -803,6 +805,39 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		});
 	}, [trackSubtitleFetch]);
 
+	const disposeTextSource = useCallback(() => {
+		textSourceRef.current?.dispose();
+		textSourceRef.current = null;
+	}, []);
+
+	// An SRT track left inside the file is read out of it near the playhead, and only a
+	// track that can't be read that way is asked of the server.
+	const startInBandText = useCallback((stream) => {
+		disposeTextSource();
+		setSubtitleTrackEvents(null);
+		const {streamUrl, ordinal, language} = stream.inBandText;
+		const source = createInBandTextSource({
+			streamUrl,
+			subtitleOrdinal: ordinal,
+			language,
+			// The overlay looks lines up at the video time minus the offset, so the window does too.
+			getTime: () => (videoRef.current?.currentTime || 0) - subtitleOffsetRef.current,
+			onEvents: (events) => {
+				if (textSourceRef.current === source) setSubtitleTrackEvents((previous) => [...(previous || []), ...events]);
+			}
+		});
+		textSourceRef.current = source;
+		source.ready.then((ok) => {
+			if (textSourceRef.current !== source) return;
+			serverLogger.playback(ok ?
+				'Playback: reading the embedded text track out of the file' :
+				'Playback: embedded text track unreadable from the file, fetching it from the server', {index: stream.index, ordinal, language});
+			if (ok) return;
+			textSourceRef.current = null;
+			loadTextTrack(stream);
+		});
+	}, [disposeTextSource, loadTextTrack]);
+
 	useEffect(() => {
 		const init = async () => {
 			await initPlayerPlatform();
@@ -1053,6 +1088,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			// or burned in never reaches loadSubtitleData to clear these.
 			pgsInitGenRef.current++;
 			disposePgsRenderer(pgsRendererRef.current);
+			disposeTextSource();
 			pgsRendererRef.current = null;
 			pgsInitRef.current = null;
 			disposeAssRenderer(assRendererRef.current);
@@ -1247,6 +1283,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				const loadSubtitleData = async (sub) => {
 					pgsInitGenRef.current++;
 					disposePgsRenderer(pgsRendererRef.current);
+					disposeTextSource();
 					pgsRendererRef.current = null;
 					pgsInitRef.current = null;
 					assInitGenRef.current++;
@@ -1270,6 +1307,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 					} else if (sub && sub.hostRendered) {
 						showHostSubtitle(videoRef.current, sub.index);
 						setSubtitleTrackEvents(null);
+					} else if (sub && sub.inBandText) {
+						startInBandText(sub);
 					} else if (sub && sub.isTextBased) {
 						loadTextTrack(sub);
 					} else if (sub && sub.isImageBased && settings.enablePgsRendering) {
@@ -1384,12 +1423,15 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				clearTimeout(scrubSettleTimerRef.current);
 				pgsInitGenRef.current++; // eslint-disable-line react-hooks/exhaustive-deps
 				disposePgsRenderer(pgsRendererRef.current);
+				disposeTextSource();
 				pgsInitRef.current = null;
 				disposeAssRenderer(assRendererRef.current);
 				clearAssCanvas(assCanvas);
 				return;
 			}
 
+			// Its loop polls forever otherwise, and the next item starts its own.
+			disposeTextSource();
 			const videoTime = videoElement ? videoElement.currentTime + streamOffsetRef.current : 0;
 			const videoTicks = Math.floor(videoTime * 10000000);
 			const currentPos = videoTicks > 0 ? videoTicks : positionRef.current;
@@ -1426,7 +1468,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 			}
 		};
 	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [item, resume, onPlayNext, selectedQuality, settings.maxBitrate, settings.preferTranscode, settings.forceDirectPlay, settings.forceTruehdPassthrough, forceTranscode, settings.subtitleMode, settings.introAction, settings.outroAction, initialAudioIndex, initialSubtitleIndex, tuneRevision, loadTextTrack]);
+	}, [item, resume, onPlayNext, selectedQuality, settings.maxBitrate, settings.preferTranscode, settings.forceDirectPlay, settings.forceTruehdPassthrough, forceTranscode, settings.subtitleMode, settings.introAction, settings.outroAction, initialAudioIndex, initialSubtitleIndex, tuneRevision, loadTextTrack, startInBandText, disposeTextSource]);
 
 	// Another client can queue more while this plays, and what it puts behind this plays next.
 	useEffect(() => {
@@ -2915,6 +2957,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 
 		pgsInitGenRef.current++;
 		disposePgsRenderer(pgsRendererRef.current);
+		disposeTextSource();
 		pgsRendererRef.current = null;
 		pgsInitRef.current = null;
 		assInitGenRef.current++;
@@ -2964,6 +3007,8 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 				setSubtitleTrackEvents(null);
 			} else if (stream && stream.isAss && supportsAssRenderer()) {
 				await initAssRendererForStream(stream);
+			} else if (stream && stream.inBandText) {
+				startInBandText(stream);
 			} else if (stream && stream.isTextBased) {
 				loadTextTrack(stream);
 			} else if (stream && stream.isImageBased && settings.enablePgsRendering) {
@@ -2980,7 +3025,7 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 		if (shouldClose) {
 			closeModal();
 		}
-	}, [item, subtitleStreams, closeModal, settings.enablePgsRendering, initAssRendererForStream, initPgsRendererForStream, loadTextTrack, reloadWithSubtitleIndex, releaseSecondaryIfPrimary, clearSubtitleFetch]);
+	}, [item, subtitleStreams, closeModal, settings.enablePgsRendering, initAssRendererForStream, initPgsRendererForStream, loadTextTrack, startInBandText, disposeTextSource, reloadWithSubtitleIndex, releaseSecondaryIfPrimary, clearSubtitleFetch]);
 
 	const handleOpenRemoteSubtitleSearch = useCallback(async () => {
 		if (!item?.Id) return;
