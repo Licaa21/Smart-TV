@@ -194,6 +194,7 @@ did, what the fork keeps instead, and what to do on a merge.
   the Seerr screens, and `BackdropLayer.js` drops a picture still loading for a card focus has left.
 - **On a merge:** keep `LogoTile` as the only logo tile (Home's `SeerrTileRow.js` and the Seerr screen both use it, so the
   two cannot drift apart) and the `isSeerrTile` check in the backdrop code.
+- **2026-11-05 merge (upstream 64f23049 and 0d19d435):** upstream's Home Studios row (library studios, not the Seerr tiles) borrows Moonbase's TMDB logo by name (`withStudioLogos`, `_studioLogoUrl` read in `MediaCard.js`, `studioLogos.js`) and stays a Classic row under Modern. Taken as it came, since the fork's `LogoTile` is for the Seerr tiles. Known and left as upstream has them: the stored Home cache drops `_studioLogoUrl` (`stripItemForCache`), `api.getStudioLogos()` is asked at every Home build and the installed plugin 3.0.0.2 may not carry the route (one failing request, caught), and the loading placeholder of that row is still Modern.
 - **Files:** `components/LogoTile/`, `utils/logoTone.js`, `components/SeerrTileRow/SeerrTileRow.js`,
   `views/SeerrDiscover/SeerrDiscover.js`, `components/ScreenBackdrop/ScreenBackdrop.js`, `utils/seerrHomeRows.js`
   (`isSeerrTile`) and `views/Browse/Browse.js`.
