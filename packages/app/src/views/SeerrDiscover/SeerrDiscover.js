@@ -7,7 +7,7 @@ import MediaCard, {ModernMediaCard} from '../../components/MediaCard';
 import LogoTile from '../../components/LogoTile';
 import {useAuth} from '../../context/AuthContext';
 import {useSeerr} from '../../context/SeerrContext';
-import {pointerHover} from '../../utils/focusScroll';
+import {glideScroll, pointerHover, stopScrollAnimation} from '../../utils/focusScroll';
 import {layoutRectOf} from '../../utils/slideScroll';
 import {useSettings} from '../../context/SettingsContext';
 import seerrApi from '../../services/seerrApi';
@@ -427,6 +427,8 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		return () => window.removeEventListener('moonfin:seerrDiscoverRefresh', handleRefresh);
 	}, []);
 	const rowsContainerRef = useRef(null);
+	// The latest move to a row, so the passes of an older one can be dropped
+	const restRunRef = useRef(0);
 
 	// Back on a scrolled discover list returns it to the first row before it leaves
 	useEffect(() => {
@@ -434,6 +436,8 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 		const handler = () => {
 			const container = rowsContainerRef.current;
 			if (!isScrolledAway(container)) return false;
+			restRunRef.current += 1;
+			stopScrollAnimation(container);
 			container.scrollTop = 0;
 			Spotlight.focus(rowSpotlightId(0));
 			return true;
@@ -621,14 +625,18 @@ const SeerrDiscover = ({onSelectItem, onSelectGenre, onSelectNetwork, onSelectSt
 	// growing below it. Focus scrolling lands wherever the engine likes and after the handler, and the card
 	// that just lost focus is still shrinking, so the row is put back on the frames behind it too.
 	const keepRowInView = useCallback((rowIndex) => {
+		const run = ++restRunRef.current;
 		const rest = () => {
+			// Back to the first row ends the passes still to come
+			if (run !== restRunRef.current) return;
 			const container = rowsContainerRef.current;
 			const row = container && container.querySelector(`[data-row-index="${rowIndex}"]`);
 			if (!container || !row) return;
 			const offset = showDetailSection && settings.navbarPosition !== 'left' ? 20 : 0;
 			// the first row sits under a margin of its own, which is not scrolled away
 			const top = rowIndex === 0 ? 0 : layoutRectOf(row).top - container.getBoundingClientRect().top + container.scrollTop - offset;
-			if (Math.abs(container.scrollTop - top) > 1) container.scrollTop = Math.max(0, top);
+			// Glides to the row like Home's list does, and the passes behind this one find the glide already going there
+			if (Math.abs(container.scrollTop - top) > 1) glideScroll(container, 'y', Math.max(0, top));
 		};
 		rest();
 		window.requestAnimationFrame(rest);

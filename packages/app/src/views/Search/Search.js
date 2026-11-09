@@ -5,7 +5,7 @@ import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDeco
 import Spotlight from '@enact/spotlight';
 import {isPaused} from '@enact/spotlight/Pause';
 import {useAuth} from '../../context/AuthContext';
-import {keepFocusInView, pointerHover} from '../../utils/focusScroll';
+import {glideScroll, keepFocusInView, pointerHover, stopScrollAnimation, whenStill} from '../../utils/focusScroll';
 import {layoutRectOf} from '../../utils/slideScroll';
 import {isKidsMode} from '../../utils/kidsMode';
 import {withoutBlockedItems} from '../../services/parentalControls';
@@ -614,8 +614,14 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// Focus coming back up to the tabs or the field only scrolls that one element into view, which
 	// leaves the field, or the tabs, above the edge of the screen. The page goes back to its top.
 	const containerRef = useRef(null);
+	// The latest move to a row, so the reveals of an older one can be dropped when the page goes back to the top
+	const revealRunRef = useRef(0);
 	const scrollToTop = useCallback(() => {
-		if (containerRef.current) containerRef.current.scrollTop = 0;
+		revealRunRef.current += 1;
+		if (!containerRef.current) return;
+		// a glide still going to a row would write its place back over the top
+		stopScrollAnimation(containerRef.current);
+		containerRef.current.scrollTop = 0;
 	}, []);
 
 	// A row that arrives late pushes the rows below it down, which can leave the
@@ -625,7 +631,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 		if (!focused || !focused.closest('[data-row-index]')) return;
 		window.requestAnimationFrame(() => {
 			if (document.activeElement !== focused || !containerRef.current) return;
-			keepFocusInView({currentTarget: containerRef.current, target: focused});
+			// a glide going to a row would write its place back over this correction, so it waits for the glide
+			whenStill(() => {
+				if (document.activeElement !== focused || !containerRef.current) return;
+				keepFocusInView({currentTarget: containerRef.current, target: focused});
+			});
 		});
 	}, [rows]);
 
@@ -695,7 +705,9 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// scrolled for the size it had. The whole row is brought into view once it has settled, or the
 	// last row is left with its text running off the bottom of the screen.
 	const keepRowInView = useCallback((rowIndex) => {
+		const run = ++revealRunRef.current;
 		const reveal = () => {
+			if (run !== revealRunRef.current) return;
 			const container = containerRef.current;
 			const row = document.querySelector(`[data-spotlight-id="${rowSpotlightId(rowIndex)}"]`);
 			if (!container || !row) return;
@@ -704,11 +716,11 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 			// Coming up from the row below leaves this row's title above the top edge.
 			const hidden = view.top + ROW_TOP_MARGIN - rect.top;
 			if (hidden > 0) {
-				container.scrollTop -= hidden;
+				glideScroll(container, 'y', container.scrollTop - hidden);
 				return;
 			}
 			const overflow = rect.bottom - (view.bottom - ROW_BOTTOM_MARGIN);
-			if (overflow > 0) container.scrollTop += Math.min(overflow, Math.max(0, rect.top - view.top));
+			if (overflow > 0) glideScroll(container, 'y', container.scrollTop + Math.min(overflow, Math.max(0, rect.top - view.top)));
 		};
 		window.requestAnimationFrame(reveal);
 		window.setTimeout(reveal, 200);

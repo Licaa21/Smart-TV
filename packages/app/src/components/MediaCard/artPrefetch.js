@@ -10,6 +10,40 @@
 // drawing in from the top as it downloaded. Where a picture can't be read this way (no fetch, or an address that
 // does not allow it) it is loaded the plain way and the card asks the network for it as it used to.
 
+import {glideUnderway, whenStill} from '../../utils/focusScroll';
+
+// A fetch or a decode that would start while the rows glide up or down waits for the glide to be still, so the
+// work a new focus starts does not land in the glide's frames. Under way already, it carries on, and so do the
+// cards within GLIDE_HOLD_FROM places of focus: a held key chains glides, and those are the ones about to be reached.
+const GLIDE_HOLD_FROM = 3;
+// A held key chains glides one into the next, so the hold is bounded: after this long the work starts, glide or not.
+const GLIDE_HOLD_MAX_MS = 500;
+// A pause this long between two holds starts a count of its own, however the last one ended.
+const GLIDE_HOLD_GAP_MS = 300;
+let holdSince = 0;
+let holdSeenAt = 0;
+const startsLater = new Set();
+const afterGlide = (start) => {
+	if (!glideUnderway()) {
+		holdSince = 0;
+		return false;
+	}
+	const now = Date.now();
+	if (!holdSince || now - holdSeenAt > GLIDE_HOLD_GAP_MS) holdSince = now;
+	holdSeenAt = now;
+	if (now - holdSince > GLIDE_HOLD_MAX_MS) return false;
+	if (!startsLater.has(start)) {
+		startsLater.add(start);
+		whenStill(() => {
+			startsLater.delete(start);
+			// the glides are over, so the next hold starts its own count
+			holdSince = 0;
+			start();
+		});
+	}
+	return true;
+};
+
 const MAX_ACTIVE = 4;
 // A request that has not answered by now is let go, so it does not hold one of the places for good.
 const FETCH_TIMEOUT_MS = 15000;
@@ -140,6 +174,7 @@ const pumpDecode = () => {
 		if (!nearest || job.rank < nearest.job.rank) nearest = {url: queued, job};
 	});
 	if (!nearest) return;
+	if (nearest.job.rank >= GLIDE_HOLD_FROM && afterGlide(pumpDecode)) return;
 	const {url} = nearest;
 	decodeQueue.delete(url);
 	const entry = held.get(url);
@@ -290,6 +325,8 @@ const pump = () => {
 		for (let i = 1; i < waiting.length; i++) {
 			if (rankOf(waiting[i]) < rankOf(waiting[next])) next = i;
 		}
+		// The nearest of those waiting is the first to start, so when it is a far one they all are
+		if (rankOf(waiting[next]) >= GLIDE_HOLD_FROM && afterGlide(pump)) return;
 		const entry = waiting.splice(next, 1)[0];
 		active.add(entry);
 		// The status the request ended on, when it ended with no picture
@@ -304,6 +341,16 @@ const pump = () => {
 		if (readsAsBlob(entry.url)) startFetch(entry, finish);
 		else startPlain(entry, finish);
 	}
+};
+
+let pumpQueued = false;
+const pumpSoon = () => {
+	if (pumpQueued) return;
+	pumpQueued = true;
+	Promise.resolve().then(() => {
+		pumpQueued = false;
+		pump();
+	});
 };
 
 // Asks for the art at url. onFail hears of a request that came back with nothing: the status the server answered
@@ -323,6 +370,9 @@ export const prefetchArt = (url, rank, onFail, onDone) => {
 	return {
 		setRank: (next) => {
 			holder.rank = next;
+			// A fetch parked for a glide starts if its card has come within reach, once every card of the move has its
+			// new rank
+			pumpSoon(); // eslint-disable-line no-use-before-define
 		},
 		cancel: () => {
 			mine.holders.delete(holder);

@@ -1,3 +1,23 @@
+// Whether a glide is under way, and what waits for it to be still
+const mockGlide = {on: false, waiting: []};
+jest.mock('../../utils/focusScroll', () => ({
+	glideUnderway: () => mockGlide.on,
+	whenStill: (fn) => mockGlide.waiting.push(fn)
+}));
+beforeEach(() => {
+	mockGlide.on = false;
+	mockGlide.waiting.length = 0;
+});
+// What a test left parked is let go, so it cannot hold a start back from the next
+afterEach(() => {
+	mockGlide.on = false;
+	mockGlide.waiting.splice(0).forEach((fn) => fn());
+});
+const endGlide = () => {
+	mockGlide.on = false;
+	mockGlide.waiting.splice(0).forEach((fn) => fn());
+};
+
 import {hasArt, artSource, artState, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded, noteArtShown, setArtLogSink} from './artPrefetch';
 
 describe('prefetchArt', () => {
@@ -254,6 +274,108 @@ describe('prefetchArt reading the art as a blob', () => {
 		await flush();
 		expect(artSource(urls[0])).toMatch(/^blob:art\//);
 		expect(artSource(urls[1])).toBeNull();
+	});
+
+	it('starts no fetch while the rows glide, and starts them once the glide is still', async () => {
+		mockGlide.on = true;
+		ask('http://server/Moonfin/Tmdb/Thumb?tmdbId=21', 3);
+		ask('http://server/Moonfin/Tmdb/Thumb?tmdbId=22', 4);
+		expect(window.fetch).not.toHaveBeenCalled();
+		// asking again does not queue the start twice
+		expect(mockGlide.waiting).toHaveLength(1);
+		endGlide();
+		expect(window.fetch).toHaveBeenCalledTimes(2);
+		answer(0, ok());
+		answer(1, ok());
+		await flush();
+	});
+
+	it('starts no decode while the rows glide, and starts it once the glide is still', async () => {
+		const decodes = [];
+		window.Image = function FakeImage () {
+			const art = {decode: jest.fn(() => new Promise((resolve) => { art.finish = resolve; }))};
+			decodes.push(art);
+			return art;
+		};
+		const url = 'http://server/Moonfin/Tmdb/Thumb?tmdbId=23';
+		ask(url, 0);
+		answer(0, ok());
+		await flush();
+		await flush();
+		mockGlide.on = true;
+		decodeArt(url, 3);
+		expect(decodes).toHaveLength(0);
+		endGlide();
+		expect(decodes).toHaveLength(1);
+		decodes[0].finish();
+		await flush();
+	});
+
+	it('does not hold back the cards near focus while the rows glide, only the far ones', async () => {
+		mockGlide.on = true;
+		ask('http://server/Moonfin/Tmdb/Thumb?tmdbId=24', 5);
+		expect(window.fetch).not.toHaveBeenCalled();
+		ask('http://server/Moonfin/Tmdb/Thumb?tmdbId=25', 0);
+		ask('http://server/Moonfin/Tmdb/Thumb?tmdbId=26', 2);
+		// the focused card and its near neighbour start at once, and the far one still waits
+		expect(window.fetch).toHaveBeenCalledTimes(2);
+		endGlide();
+		expect(window.fetch).toHaveBeenCalledTimes(3);
+		answer(0, ok());
+		answer(1, ok());
+		answer(2, ok());
+		await flush();
+	});
+
+	it('lets the far cards start once a glide has held them back for too long, as a held key chains glides', async () => {
+		const now = jest.spyOn(Date, 'now').mockReturnValue(10000);
+		mockGlide.on = true;
+		// a held key moves focus about every 100 ms
+		[0, 1, 2].forEach((step) => {
+			now.mockReturnValue(10000 + step * 200);
+			ask(`http://server/Moonfin/Tmdb/Thumb?tmdbId=${40 + step}`, 6 + step);
+		});
+		expect(window.fetch).not.toHaveBeenCalled();
+		now.mockReturnValue(10600);
+		ask('http://server/Moonfin/Tmdb/Thumb?tmdbId=43', 9);
+		expect(window.fetch).toHaveBeenCalledTimes(4);
+		now.mockRestore();
+		[0, 1, 2, 3].forEach((i) => answer(i, ok()));
+		await flush();
+	});
+
+	it('counts a later hold from its own start, whatever the last one came to', async () => {
+		const now = jest.spyOn(Date, 'now').mockReturnValue(10000);
+		mockGlide.on = true;
+		[0, 1, 2, 3].forEach((step) => {
+			now.mockReturnValue(10000 + step * 200);
+			ask(`http://server/Moonfin/Tmdb/Thumb?tmdbId=${50 + step}`, 6 + step);
+		});
+		expect(window.fetch).toHaveBeenCalledTimes(4);
+		[0, 1, 2, 3].forEach((i) => answer(i, ok()));
+		await flush();
+		// a long time after, a new glide holds again for its own 500 ms
+		now.mockReturnValue(20000);
+		ask('http://server/Moonfin/Tmdb/Thumb?tmdbId=54', 8);
+		expect(window.fetch).toHaveBeenCalledTimes(4);
+		now.mockRestore();
+		endGlide();
+		expect(window.fetch).toHaveBeenCalledTimes(5);
+		answer(4, ok());
+		await flush();
+	});
+
+	it('starts a fetch parked for a glide when its card comes into focus', async () => {
+		mockGlide.on = true;
+		const parked = ask('http://server/Moonfin/Tmdb/Thumb?tmdbId=27', 6);
+		expect(window.fetch).not.toHaveBeenCalled();
+		parked.setRank(0);
+		// once the cards of the move all have their ranks
+		await Promise.resolve();
+		expect(window.fetch).toHaveBeenCalledTimes(1);
+		endGlide();
+		answer(0, ok());
+		await flush();
 	});
 
 	it('decodes one picture at a time, the nearest card first', async () => {

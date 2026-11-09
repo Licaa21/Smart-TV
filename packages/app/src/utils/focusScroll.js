@@ -17,8 +17,9 @@ const AXES = {
 	y: {offset: 'scrollTop', size: 'clientHeight', total: 'scrollHeight'}
 };
 
-// How long a row takes to glide to a newly focused card, and the ease-out it glides with.
-const GLIDE_MS = 220;
+// How long a row takes to glide to a newly focused card, and the ease-out it glides with. The fork's is shorter than
+// upstream's 220 ms, so less of the move overlaps with the work a new focus starts (entry 31 of CLAUDE.md).
+const GLIDE_MS = 160;
 const FRAME_MS = 16;
 const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
@@ -74,6 +75,9 @@ export const whenStill = (fn) => {
 	}
 	window.requestAnimationFrame(() => whenStill(fn));
 };
+
+/** Whether a glide is under way anywhere. */
+export const glideUnderway = () => moving.size > 0;
 
 const endGlide = (axis, node, glide) => {
 	window.cancelAnimationFrame(glide.frame);
