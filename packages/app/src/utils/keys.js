@@ -221,7 +221,7 @@ const spread = (list) => {
 // Up and down are told apart from left and right, which are different moves (a list slides one way, a row the other).
 // `context` gives what else a report should say about the moment, such as the settings that change the cost of a move.
 const isVertical = (e) => e.keyCode === KEYS.UP || e.keyCode === KEYS.DOWN || /^Arrow(Up|Down)$/.test(e.key || '');
-export const watchArrowResponse = (target = window, report, every = 20, context = () => ({})) => {
+export const watchArrowResponse = (target = window, report, every = 20, context = () => ({}), moves = null) => {
 	const empty = () => ({firsts: [], worsts: [], ages: [], ctx: null});
 	const batches = {v: empty(), h: empty()};
 	// Every press watched at the moment, each for its own window, by one loop of frames shared between them
@@ -238,6 +238,8 @@ export const watchArrowResponse = (target = window, report, every = 20, context 
 			inputAgeMs: spread(ages),
 			slow: worsts.filter((w) => w > SLOW_FRAME_MS).length,
 			...ctx,
+			// what became of the moves of the list, for the up and down batch: slid, or why not
+			...(axis === 'v' && moves ? {listMoves: moves()} : {}),
 			// cut short by leaving the app, so not an equal sample beside the full batches
 			...(partial ? {partial: true} : {})
 		};
