@@ -16,6 +16,8 @@ jest.mock('react/jsx-dev-runtime', () => {
 	};
 });
 jest.mock('../../utils/perfTier', () => ({getPerfTier: () => 'low'}));
+// The glide's scroll code pulls Spotlight in, which a test of the layer has no use for
+jest.mock('../../utils/focusScroll', () => ({whenStill: (fn) => fn()}));
 jest.mock('../../utils/softBackdrop', () => ({canSoften: () => true, softBackdropUrl: jest.fn()}));
 
 const OUTSIDE = 'https://image.tmdb.org/t/p/w1280/a.jpg';

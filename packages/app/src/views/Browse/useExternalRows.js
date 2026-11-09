@@ -168,8 +168,11 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 					radarrCalendarShowDigital: settings.radarrCalendarShowDigital,
 					radarrCalendarShowPhysical: settings.radarrCalendarShowPhysical,
 					radarrCalendarShowDate: settings.radarrCalendarShowDate,
+					radarrCalendarHideDownloaded: settings.radarrCalendarHideDownloaded,
 					sonarrCalendarShowDate: settings.sonarrCalendarShowDate,
-					sonarrCalendarShowEpisodeInfo: settings.sonarrCalendarShowEpisodeInfo
+					sonarrCalendarShowEpisodeInfo: settings.sonarrCalendarShowEpisodeInfo,
+					sonarrCalendarHideDownloaded: settings.sonarrCalendarHideDownloaded,
+					dateFormat: settings.dateFormat
 				};
 				const calendarRows = calendarsEnabled ? await fetchCalendarRows(calendarSettings, {radarrEnabled, sonarrEnabled}) : [];
 
@@ -178,7 +181,7 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 				let seasonalRow = null;
 				if (seasonalEnabled) {
 					const country = seasonalCountryParam(settings.seasonalRowCountry, await resolveDeviceCountry());
-					const payload = await fetchSeasonalRow({country});
+					const payload = await fetchSeasonalRow({country, allYear: settings.seasonalRowAllYear === true});
 					// The plugin builds the suggestions in English, so they are put into the language here.
 					const localized = payload && payload.suggestions && payload.suggestions.length
 						? {...payload, suggestions: await localizeExternalItems(payload.suggestions, language).catch(() => payload.suggestions)}
@@ -270,10 +273,11 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 		return stopWork;
 	}, [settings.useMoonfinPlugin, homeRows, kidsMode, settings.homeRows, settings.customHomeRows,
 		settings.uiLanguage, settings.mdblistWatchingNowEnabled,
-		settings.seasonalRowEnabled, settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays,
+		settings.seasonalRowEnabled, settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays, settings.seasonalRowAllYear,
 		settings.mergeRadarrSonarrCalendars,
 		settings.radarrCalendarShowCinema, settings.radarrCalendarShowDigital, settings.radarrCalendarShowPhysical,
-		settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo, owner, reloadKey,
+		settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo,
+		settings.radarrCalendarHideDownloaded, settings.sonarrCalendarHideDownloaded, settings.dateFormat, owner, reloadKey,
 		settings.imdbRowsSortBy, settings.imdbRowsSortOrder, settings.tmdbRowsSortBy, settings.tmdbRowsSortOrder]);
 
 	return {rows: externalRows, pending};

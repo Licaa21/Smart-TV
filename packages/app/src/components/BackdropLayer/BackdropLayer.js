@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useRef, memo} from 'react';
 import {getPerfTier} from '../../utils/perfTier';
+import {whenStill} from '../../utils/focusScroll';
 import {serverBlurredUrl} from '../../utils/serverBlur';
 import {canSoften, softBackdropUrl} from '../../utils/softBackdrop';
 
@@ -37,9 +38,8 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 	const layerBRef = useRef(null);
 	const activeLayerRef = useRef('a');
 	const currentUrlRef = useRef('');
-	const timeoutRef = useRef(null);
-	// What the screen wants now. A picture still loading for an earlier card is not drawn once focus has moved on.
 	const wantedUrlRef = useRef('');
+	const timeoutRef = useRef(null);
 	// Runs from the first move of a stretch of moves, and is dropped when focus rests on a card, a picture is drawn or the
 	// picture on screen is the one wanted again
 	const movingTimerRef = useRef(null);
@@ -130,8 +130,10 @@ const BackdropLayer = memo(({targetUrl: requestedUrl, blurAmount, overlayOpacity
 					currentUrlRef.current = drawKey;
 					stopMoving();
 				};
-				img.onload = apply;
-				img.onerror = apply;
+				// Swapped in once the rows have stopped gliding, so the fade and the scroll do not fight over the frames
+				const settle = () => whenStill(apply);
+				img.onload = settle;
+				img.onerror = settle;
 				img.src = drawUrl;
 			};
 			if (soften) {

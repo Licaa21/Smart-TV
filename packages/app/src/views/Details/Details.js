@@ -995,8 +995,10 @@ const Details = ({
 		try {
 			await effectiveApi.removeFromPlaylist(item.Id, [entryId]);
 			showToast($L('Removed from playlist'));
+			return true;
 		} catch {
 			setPlaylistItems(prevItems);
+			return false;
 		}
 	}, [playlistItems, effectiveApi, item, showToast, setPlaylistItems]);
 
@@ -1069,8 +1071,8 @@ const Details = ({
 
 	// A card on a collection's own page can be taken out of that collection from its menu.
 	const collectionMenu = useMemo(() => (item?.Type === 'BoxSet' ? {
-		collectionRemoval: {collectionName: item.Name || '', remove: removeFromCollection}
-	} : null), [item?.Type, item?.Name, removeFromCollection]);
+		collectionRemoval: {collectionId: item.Id, collectionName: item.Name || '', remove: removeFromCollection}
+	} : null), [item?.Type, item?.Id, item?.Name, removeFromCollection]);
 
 	// Reordering needs an entry id per track, which only a real playlist carries.
 	const canManagePlaylist = item?.Type === 'Playlist' && playlistItems.length > 0 &&
@@ -1100,6 +1102,7 @@ const Details = ({
 			: candidate.Id === entry.Id));
 		return {
 			playlist: {
+				playlistId: item.Id,
 				canManage: canManagePlaylist,
 				positionOf: (entry) => {
 					const at = indexOf(entry);
@@ -1110,7 +1113,7 @@ const Details = ({
 				move: (entry, direction) => handlePlaylistItemReorder(indexOf(entry), direction)
 			}
 		};
-	}, [item?.Type, playlistItems, canManagePlaylist, playTrack, handleRemoveFromPlaylist, handlePlaylistItemReorder, handleCollectionMove]);
+	}, [item?.Type, item?.Id, playlistItems, canManagePlaylist, playTrack, handleRemoveFromPlaylist, handlePlaylistItemReorder, handleCollectionMove]);
 
 	// What Seerr says of a person's titles, which orders the filmography in every details style when Popularity is chosen
 	const {ranking: personRanking} = usePersonSeerrCredits(item?.Type === 'Person' ? item.ProviderIds?.Tmdb : undefined);
@@ -1638,7 +1641,9 @@ const Details = ({
 					episodes={episodes}
 					episodeRatings={episodeRatings}
 					actionButtons={actionButtons}
+					extras={shownExtras}
 					onEpisodeSelect={handleEpisodeSelect}
+					onExtraSelect={handleExtraSelect}
 				/>
 			</DetailScrollPage>
 		);

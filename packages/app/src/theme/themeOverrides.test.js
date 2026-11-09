@@ -97,13 +97,14 @@ describe('buildThemeOverrideCss', () => {
 		const theme = resolveThemeById('moonfin');
 		applyThemeOverrides(theme, {focusBorderColor: '#ff0000'});
 		expect(document.getElementById('moonfin-theme-overrides').textContent).not.toContain('chapterItem');
-		registerThemeSheet('player', {liveBtn: 'liveBtn', chapterItem: 'chapterItem'});
+		registerThemeSheet('player', {liveBtn: 'liveBtn', chapterItem: 'chapterItem', trackItem: 'trackItem'});
 		registerThemeSheet('playerOverlays', {offsetBtn: 'offsetBtn', actionBtn: 'actionBtn', settingItem: 'settingItem', sliderItem: 'sliderItem'});
 		await Promise.resolve();
 		const lines = document.getElementById('moonfin-theme-overrides').textContent.split('\n');
 		const prefix = "html[data-theme-id='moonfin'][data-theme-id]";
 		expect(lines).toContain(`${prefix} .liveBtn:hover, ${prefix} .liveBtn:focus, ${prefix} .chapterItem:hover, ${prefix} .chapterItem:focus { border-color: rgb(255, 0, 0); }`);
 		expect(lines).toContain(`${prefix} .sliderItem:focus-within { border-color: rgb(255, 0, 0); }`);
+		expect(lines).toContain(`${prefix} .trackItem:focus { background: rgba(0, 164, 220, 0.3); }`);
 	});
 });
 
@@ -312,6 +313,14 @@ describe('per-surface accents', () => {
 			const lines = rulesFor({settingsFocus: '#4a72d7'});
 			expect(focusRule(lines, '.themeCard:focus')).toContain('background: rgb(74, 114, 215)');
 			expect(withHandRule(lines, '.listItem:focus .listItemHeading')).toContain('rgba(0, 0, 0, 0.96)');
+		});
+
+		it('gives the Settings pickers and checklists the picked focus fill, with the ink read from it', () => {
+			const option = (accents) => rulesFor(accents).find((line) => line.includes('.dialogOption:focus,') && line.includes('.checkRow:focus {'));
+			expect(option({settingsFocus: '#ffffff'})).toContain('background: rgb(255, 255, 255)');
+			expect(option({settingsFocus: '#ffffff'})).toContain('color: rgba(0, 0, 0, 0.96)');
+			// With no pick the theme's own focused button color stays, as it was
+			expect(option({})).toContain('background: ');
 		});
 
 		it('gives the details buttons the picked fill and readable icons', () => {

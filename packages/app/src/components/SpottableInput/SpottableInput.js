@@ -27,6 +27,7 @@ const SpottableInput = forwardRef(({
 	const [inputFocused, setInputFocused] = useState(false);
 	const [kbActive, setKbActive] = useState(false);
 	const kbActiveRef = useRef(false);
+	const [revealed, setRevealed] = useState(false);
 	const [cursorPos, setCursorPos] = useState(0);
 	const {settings} = useSettings();
 	const nativeKeyboard = settings.keyboardStyle === 'native';
@@ -96,9 +97,11 @@ const SpottableInput = forwardRef(({
 			},
 			onSystemKeyboard: activateInput,
 			onExitTop: onExitTopRef.current ? () => onExitTopRef.current() : undefined,
+			onReveal: setRevealed,
 			onClose: ({submitted, reason}) => {
 				kbActiveRef.current = false;
 				setKbActive(false);
+				setRevealed(false);
 				inputRef.current?.blur();
 				// Leaving through the top has already put focus where the screen
 				// wanted it, so taking it back here would undo that.
@@ -216,6 +219,7 @@ const SpottableInput = forwardRef(({
 					ref={inputRef}
 					disabled={disabled}
 					{...inputProps}
+					type={revealed ? 'text' : inputProps.type}
 					readOnly={kbActive || inputProps.readOnly}
 					className={css.innerInput}
 					onFocus={handleFocus}

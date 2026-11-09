@@ -33,6 +33,7 @@ export const AnimeCardPill = ({item, serverUrl, hasProgressBar, className = ''})
 			audio={audio}
 			compact
 			max={1}
+			overlay="anime"
 			className={`${css.cardOverlay} ${hasProgressBar ? css.aboveProgress : ''} ${className}`.trim()}
 		/>
 	);

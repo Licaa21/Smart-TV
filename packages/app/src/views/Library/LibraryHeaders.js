@@ -126,9 +126,9 @@ const IconButton = ({path, small, onClick, spotlightId}) => (
 // One bar with every control in it, each labelled with what it is set to.
 export const ModernBar = memo(({
 	canGroup, sortLabel, sortAscending, groupLabel, showLabel, showTitle, searchQuery, searchPlaceholder,
-	onSearchChange, onHome, onSort, onGroup, onShow, onShuffle, onSettings, onKeyDown
+	onSearchChange, onHome, onSort, onGroup, onShow, onShuffle, onSettings, onKeyDown, settingsPreview
 }) => (
-	<ToolbarContainer className={css.modernBar} spotlightId="library-bar" onKeyDown={onKeyDown}>
+	<ToolbarContainer className={css.modernBar} spotlightId={settingsPreview ? undefined : 'library-bar'} onKeyDown={onKeyDown}>
 		{onHome && <IconButton path={HOME_ICON} small onClick={onHome} spotlightId="library-home-btn" />}
 		{onSearchChange && <HeaderSearch className={css.barSearch} value={searchQuery} onChange={onSearchChange} placeholder={searchPlaceholder} />}
 		<SpottableButton className={css.barPill} onClick={onSort} spotlightId="library-sort-btn">
@@ -156,8 +156,8 @@ export const ModernBar = memo(({
 	</ToolbarContainer>
 ));
 
-export const ModernLetters = memo(({startLetter, onSelect}) => (
-	<ToolbarContainer className={css.letterRow} spotlightId="library-letters" onKeyDown={handleLetterRowKeyDown}>
+export const ModernLetters = memo(({startLetter, onSelect, settingsPreview}) => (
+	<ToolbarContainer className={css.letterRow} spotlightId={settingsPreview ? undefined : 'library-letters'} onKeyDown={handleLetterRowKeyDown}>
 		<Letters startLetter={startLetter} onSelect={onSelect} />
 	</ToolbarContainer>
 ));
@@ -177,9 +177,9 @@ export const LibraryDock = memo(({
 	isFolderView, folderStack, rootName, displayName, shownCount, onBreadcrumb,
 	canGroup, sortLabel, sortAscending, groupLabel, showLabel, showTitle, displayLabel, searchQuery, searchPlaceholder,
 	showLetters, startLetter, onLetterSelect,
-	onSearchChange, onHome, onSort, onGroup, onShow, onShuffle, onSettings
+	onSearchChange, onHome, onSort, onGroup, onShow, onShuffle, onSettings, settingsPreview
 }) => (
-	<ToolbarContainer className={css.dock} spotlightId="library-dock" onKeyDown={handleDockKeyDown}>
+	<ToolbarContainer className={css.dock} spotlightId={settingsPreview ? undefined : 'library-dock'} onKeyDown={handleDockKeyDown}>
 		<div className={css.dockHeader}>
 			{onHome && <IconButton path={HOME_ICON} small onClick={onHome} spotlightId="library-home-btn" />}
 			<div className={css.dockTitle}>

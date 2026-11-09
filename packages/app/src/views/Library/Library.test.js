@@ -1,4 +1,5 @@
 import {act, fireEvent, render, screen} from '@testing-library/react';
+import Spotlight from '@enact/spotlight';
 
 import {getFromStorage, saveToStorage} from '../../services/storage';
 import Library from './Library';
@@ -185,4 +186,46 @@ describe('the Songs grid of a music library', () => {
 		expect(mockApi.getItems).toHaveBeenCalledWith(expect.objectContaining({IncludeItemTypes: 'Audio', SortBy: 'Random', ParentId: 'music1'}));
 		expect(onPlay).toHaveBeenCalledWith(expect.objectContaining({Id: 't1'}), false, {audioPlaylist: [expect.objectContaining({Id: 't1'})]});
 	});
+});
+
+// The landing waits a beat after the first page, so the check waits past it.
+const previewMovies = {Id: 'lib1', Name: 'Movies', CollectionType: 'movies'};
+const renderLibrary = () => {
+	getFromStorage.mockImplementation(() => Promise.resolve(null));
+	mockApi.getItems.mockResolvedValue({Items: [{Id: 'm1', Name: 'Alien', Type: 'Movie'}], TotalRecordCount: 1});
+	return render(<Library library={previewMovies} backHandlerRef={{current: null}} onHome={jest.fn()} />);
+};
+const pastLanding = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 150)); });
+const CONTAINER_IDS = ['library-toolbar', 'library-bar', 'library-dock', 'library-letters', 'library-grid-area'];
+const containerIds = () => CONTAINER_IDS.filter((id) => document.querySelector(`[data-spotlight-id="${id}"]`));
+
+test('the screen lands focus on its grid and keeps its own container ids', async () => {
+	renderLibrary();
+	await settle();
+	await pastLanding();
+
+	expect(Spotlight.focus).toHaveBeenCalledWith('library-grid');
+	expect(containerIds()).toEqual(['library-bar', 'library-letters', 'library-grid-area']);
+	expect(screen.queryByText('Alien')).toBeNull();
+});
+
+test('the settings preview holds its first card, takes no focus and leaves the screen\'s container ids to it in every style', async () => {
+	const saved = mockSettings.settings;
+	getFromStorage.mockImplementation(() => Promise.resolve(null));
+	mockApi.getItems.mockResolvedValue({Items: [{Id: 'm1', Name: 'Alien', Type: 'Movie'}], TotalRecordCount: 1});
+	try {
+		for (const libraryStyle of ['classic', 'modern', 'docked']) {
+			mockSettings.settings = {...saved, libraryStyle, showAlphabeticalFilters: true};
+			const {unmount} = render(<Library library={previewMovies} settingsPreview />);
+			await settle();
+			await pastLanding();
+
+			expect(screen.getByText('Alien')).toBeTruthy();
+			expect(containerIds()).toEqual([]);
+			unmount();
+		}
+		expect(Spotlight.focus).not.toHaveBeenCalled();
+	} finally {
+		mockSettings.settings = saved;
+	}
 });

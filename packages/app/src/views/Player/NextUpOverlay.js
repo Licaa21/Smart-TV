@@ -3,7 +3,7 @@ import {useSettings} from '../../context/SettingsContext';
 import {SpottableButton} from './PlayerConstants';
 import {CountdownRing, PlayGlyph, formatRemaining, useOverlayFocus} from './overlayParts';
 import AnimeMarkerPills, {useEpisodeMarker, hasAnimeMarkerPills} from '../../components/AnimeMarkerPills';
-import {airsText} from './useNextAirDate';
+import {airsText} from '../../utils/calendarEntries';
 
 import css from './NextUpOverlay.module.less';
 
@@ -66,7 +66,7 @@ const NextUpOverlay = ({episode, airDate, imageUrl, serverUrl, countdown, timeou
 						</div>
 					)}
 					<div className={css.title}>{airDate ? airDate.title : episode?.Name}</div>
-					{airDate && <div className={css.airs}>{airsText(airDate.date)}</div>}
+					{airDate && <div className={css.airs}>{airsText(airDate.date, new Date(), settings.dateFormat)}</div>}
 					{showTimer && (
 						<div className={css.timer}>
 							{$L('Ends in {time}').replace('{time}', formatRemaining(countdown))}
