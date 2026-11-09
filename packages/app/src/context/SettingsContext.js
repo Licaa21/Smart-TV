@@ -183,6 +183,7 @@ const surfaceRatingSources = {
 };
 
 const VALUE_CONVERSIONS = {
+	watchPartyService: oneOf(['moonbase', 'syncplay']),
 	homeRowsPosterSize: {
 		toServer: v => POSTER_SIZES_TO_SERVER[v] || v,
 		fromServer: v => posterSizeFromServer(POSTER_SIZES_FROM_SERVER[v] || v)
@@ -365,6 +366,7 @@ export const SYNCABLE_KEYS = [
 	'preferredSecondarySubtitleLanguage', 'secondarySubtitleSize', 'secondarySubtitleOffset', 'secondarySubtitleColor',
 	'syncplayEnabled', 'syncplayAutoOpen',
 	'showSyncPlayButton',
+	'watchPartyService', 'watchPartyChatOverlay', 'watchPartyAlerts',
 	'syncPlayAdvancedCorrectionEnabled', 'syncPlayEnableSyncCorrection',
 	'syncPlayUseSkipToSync', 'syncPlayMinDelaySkipToSync', 'syncPlayExtraTimeOffset',
 	'videoStartDelay', 'cinemaModeEnabled', 'cinemaModeEpisodesEnabled', 'cinemaModeSkipEnabled',

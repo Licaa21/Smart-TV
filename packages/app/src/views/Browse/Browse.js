@@ -29,6 +29,10 @@ import MakdBanner from './MakdBanner';
 import GalleryBanner from './GalleryBanner';
 import AyaBanner from './AyaBanner';
 import BannerBar from './BannerBar';
+import WatchPartyRow, {WatchPartyAlert, useWatchPartyHomeRow} from '../../components/WatchPartyDialog/WatchPartyRow';
+import {watchParty} from '../../services/siloWatchParty';
+import {openWatchParties} from '../../hooks/useWatchPartyRooms';
+import {useSyncPlay} from '../../context/SyncPlayContext';
 import BookshelfBar from './BookshelfBar';
 import BackdropLayer from '../../components/BackdropLayer';
 import {FocusBackdrop} from '../../components/ScreenBackdrop';
@@ -330,7 +334,33 @@ const Browse = ({
 	}, [allRowData, seerrRows, externalRows, homeRowsConfig, pluginSectionsConfig, rowBuildSettings, pendingSections, pendingRows, emptySections]);
 	// The rows can come back from a cache built before the watched state last moved, so what's
 	// known now is laid over them rather than fetched again.
-	const filteredRows = useUserDataRows(builtRows);
+	const dataRows = useUserDataRows(builtRows);
+	// Watch Parties lead the rows while any exist, except on Silo, which has no list of them.
+	const {joinGroup: joinSyncPlayGroup, openDialog: openSyncPlayDialog} = useSyncPlay();
+	const {row: partyRow, alert: partyAlert} = useWatchPartyHomeRow({
+		enabled: !kidsMode && serverType !== 'silo' && settings.syncplayEnabled !== false,
+		active: isVisible,
+		sessionKey: `${serverUrl}|${user?.Id}`,
+		withSyncPlay: serverType === 'jellyfin',
+		alerts: settings.watchPartyAlerts === true
+	});
+	const filteredRows = useMemo(() => (partyRow ? [partyRow, ...dataRows] : dataRows), [partyRow, dataRows]);
+	const handleJoinParty = useCallback(async (room) => {
+		if (room.kind === 'syncplay') {
+			if (await joinSyncPlayGroup(room.roomId)) openSyncPlayDialog();
+			return;
+		}
+		watchParty.joinRoom(room);
+		openWatchParties();
+	}, [joinSyncPlayGroup, openSyncPlayDialog]);
+	const handleStartParty = useCallback(() => {
+		if (serverType === 'jellyfin' && settings.watchPartyService === 'syncplay') {
+			openSyncPlayDialog();
+			return;
+		}
+		watchParty.create();
+		openWatchParties();
+	}, [serverType, settings.watchPartyService, openSyncPlayDialog]);
 	const hasFocusableRow = filteredRows.some((row) => !row.isPlaceholder);
 	const loadingRowCount = filteredRows.filter((row) => row.isPlaceholder).length;
 
@@ -982,6 +1012,7 @@ const Browse = ({
 
 	return (
 		<div className={css.page}>
+			<WatchPartyAlert room={partyAlert} />
 			<div className={`${css.mainContent} ${navOffsetClass} ${rowPeek ? css.rowPeek : ''}`} ref={mainContentRef}>
 				<BackdropLayer
 					targetUrl={useModernRows && browseMode === 'rows' ? '' : targetBackdropUrl}
@@ -1155,6 +1186,25 @@ const Browse = ({
 									onNavigateUp={handleNavigateUp}
 									onNavigateDown={handleNavigateDown}
 									registerRowRef={registerRowRef}
+								/>
+							);
+						}
+						if (row.isWatchPartyRow) {
+							return (
+								<WatchPartyRow
+									key={row.id}
+									rowId={row.id}
+									title={row.title}
+									items={row.items}
+									labels={serverType === 'jellyfin'}
+									onFocus={handleRowFocus}
+									rowIndex={index}
+									onNavigateUp={handleNavigateUp}
+									onNavigateDown={handleNavigateDown}
+									rowSpacing={rowSpacing}
+									registerRowRef={registerRowRef}
+									onJoin={handleJoinParty}
+									onStart={handleStartParty}
 								/>
 							);
 						}
