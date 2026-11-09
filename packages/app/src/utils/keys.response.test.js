@@ -295,6 +295,23 @@ describe('watchArrowResponse', () => {
 		expect(report.mock.calls[0][0].partial).toBe(true);
 	});
 
+	it('adds what became of the moves of the list to the up and down batch only', () => {
+		const target = document.createElement('div');
+		const report = jest.fn();
+		const clock = rig();
+		watchArrowResponse(target, report, 1, () => ({}), () => ({slide: 3, late: 1}));
+		clock.down(target, 40);
+		clock.up(target, 40);
+		clock.smooth(700);
+		clock.wait(300);
+		clock.down(target, 39);
+		clock.up(target, 39);
+		clock.smooth(700);
+		expect(report.mock.calls[0][0]).toMatchObject({axis: 'up/down', listMoves: {slide: 3, late: 1}});
+		expect(report.mock.calls[1][0].axis).toBe('left/right');
+		expect(report.mock.calls[1][0].listMoves).toBeUndefined();
+	});
+
 	it('starts a new batch even when the report threw', () => {
 		const target = document.createElement('div');
 		const report = jest.fn(() => { throw new Error('logger'); });

@@ -1,4 +1,4 @@
-import {SLIDE_MS, installSlideScroll, slideDecision, slideMsFor, layoutRectOf, offsetOf, resetSlideScroll, shouldSlide, slideShiftOf, slidesAtLevel} from './slideScroll';
+import {SLIDE_MS, installSlideScroll, slideDecision, slideMsFor, layoutRectOf, offsetOf, resetSlideScroll, shouldSlide, slideShiftOf, slidesAtLevel, takeSlideMoves} from './slideScroll';
 import {slideUnderway, writingGlide} from './glideState';
 
 let mockLevel = 3;
@@ -17,6 +17,15 @@ describe('what slides', () => {
 	it('leaves a scroll no key made, such as a restore, a pointer or an old press', () => {
 		expect(shouldSlide({...press, sinceKey: 5000})).toBe(false);
 		expect(shouldSlide({...press, sinceKey: -1})).toBe(false);
+	});
+
+	it('slides a scroll that comes most of a second after the key, which a TV drawing slowly needs, and not one much later', () => {
+		expect(shouldSlide({...press, axis: 'y', sinceKey: 500})).toBe(true);
+		expect(shouldSlide({...press, axis: 'y', sinceKey: 700})).toBe(true);
+		expect(shouldSlide({...press, axis: 'y', sinceKey: 900})).toBe(false);
+		// a row that scrolls sideways keeps the short window, since nothing waits out its corrections
+		expect(shouldSlide({...press, axis: 'x', sinceKey: 500})).toBe(false);
+		expect(shouldSlide({...press, axis: 'x', sinceKey: 300})).toBe(true);
 	});
 
 	it('leaves a held key and a long jump to go as fast as they can', () => {
@@ -156,6 +165,7 @@ describe('on the page', () => {
 		expect(first.style.transition).toBe('none');
 		nextFrame();
 		expect(first.style.transition).toBe('none');
+		now += 60;
 		nextFrame();
 		expect(startsOf(first)).toContain('translate3d(0, 150px, 0)');
 		expect(first.style.transform).toBe('');
@@ -175,6 +185,7 @@ describe('on the page', () => {
 		expect(first.style.transform).toBe('translate3d(0, 200px, 0)');
 		nextFrame();
 		expect(first.style.transition).toBe('none');
+		now += 60;
 		nextFrame();
 		expect(first.style.transform).toBe('');
 		expect(first.style.transition).toContain(`${slideMsFor('y', 200)}ms`);
@@ -190,7 +201,7 @@ describe('on the page', () => {
 		// The row is put back at its resting place, a few pixels off, which is under what a move of its own needs
 		scrolled(container, 'scrollTop', 297);
 		expect(first.style.transform).toBe('translate3d(0, 297px, 0)');
-		nextFrame();
+		now += 60;
 		nextFrame();
 		expect(first.style.transform).toBe('');
 		expect(first.style.transition).toContain(`${slideMsFor('y', 297)}ms`);
@@ -238,7 +249,7 @@ describe('on the page', () => {
 		nextFrame();
 		scrolled(container, 'scrollTop', 200);
 		expect(mounted.style.transform).toBe('translate3d(0, 200px, 0)');
-		nextFrame();
+		now += 60;
 		nextFrame();
 		expect(first.style.transform).toBe('');
 		expect(mounted.style.transform).toBe('');
@@ -345,7 +356,7 @@ describe('on the page', () => {
 		arrow(40);
 		now += 20;
 		scrolled(released.container, 'scrollTop', 150);
-		nextFrame();
+		now += 60;
 		nextFrame();
 		expect(released.first.style.transition).toContain('transform');
 		scrolled(dropped.container, 'scrollTop', 150);
@@ -361,7 +372,7 @@ describe('on the page', () => {
 		arrow(40);
 		now += 20;
 		scrolled(container, 'scrollTop', 150);
-		nextFrame();
+		now += 60;
 		nextFrame();
 		expect(first.style.transition).toContain('transform');
 		// the next key comes at once, so it is held: the list jumps, and does not lurch back from where it was drawn
@@ -379,7 +390,7 @@ describe('on the page', () => {
 		arrow(40);
 		now += 20;
 		scrolled(container, 'scrollTop', 150);
-		nextFrame();
+		now += 60;
 		nextFrame();
 		expect(first.style.transition).toContain('transform');
 		now += 30;
@@ -403,11 +414,83 @@ describe('on the page', () => {
 		arrow(40);
 		now += 20;
 		scrolled(container, 'scrollTop', 150);
+		now += 60;
 		nextFrame();
-		nextFrame();
-		// the guess was the slide, two frames and 40 ms; the slide takes the length and 40 ms
+		// the guess was the slide, the wait and a margin of a frame or two; the slide takes the length and 40 ms
 		now += slideMsFor('y', 150) + 60;
 		expect(slideUnderway()).toBe(false);
+	});
+
+	it('lets a slide go after a few frames even when the clock does not move on, or went back', () => {
+		const {container, first} = row('y', 'children');
+		now += 5000;
+		arrow(40);
+		now += 20;
+		scrolled(container, 'scrollTop', 150);
+		[1, 2, 3].forEach(() => nextFrame());
+		expect(first.style.transition).toBe('none');
+		nextFrame();
+		expect(first.style.transform).toBe('');
+		expect(first.style.transition).toContain('transform');
+
+		// and one that went back lets it go at the first frame
+		const back = row('y', 'children');
+		now += 5000;
+		arrow(40);
+		now += 20;
+		scrolled(back.container, 'scrollTop', 150);
+		now -= 500;
+		nextFrame();
+		expect(back.first.style.transform).toBe('');
+	});
+
+	it('counts what became of the up and down moves for the report: slid, or why not', () => {
+		const {container} = row('y', 'children');
+		now += 5000;
+		arrow(40);
+		now += 20;
+		scrolled(container, 'scrollTop', 150);
+		// a correction in the slide that waits is no move of its own
+		scrolled(container, 'scrollTop', 120);
+		expect(takeSlideMoves()).toEqual({slide: 1});
+		expect(takeSlideMoves()).toEqual({});
+		// the slide is let go, so what comes after is a move of its own
+		now += 60;
+		nextFrame();
+		// a scroll a while after the next key, and one for a held key; one long after a key is a restore, and is not counted
+		now += 400;
+		arrow(40);
+		now += 1500;
+		scrolled(container, 'scrollTop', 400);
+		now += 5000;
+		scrolled(container, 'scrollTop', 500);
+		arrow(40);
+		now += 100;
+		arrow(40);
+		scrolled(container, 'scrollTop', 700);
+		expect(takeSlideMoves()).toEqual({late: 1, held: 1});
+		// small ones are not counted
+		now += 3000;
+		arrow(40);
+		scrolled(container, 'scrollTop', 703);
+		expect(takeSlideMoves()).toEqual({});
+	});
+
+	it('counts the refusal of a list that the glide moves, which the slide never sees, once for each key press', () => {
+		const {container} = row('y', 'children');
+		now += 5000;
+		arrow(40);
+		// the scroll comes long after the key: the decision is the glide, and it is counted, but only once
+		now += 1500;
+		expect(slideDecision(container, 'y', 150)).toBe('glide');
+		expect(slideDecision(container, 'y', 60)).toBe('glide');
+		expect(takeSlideMoves()).toEqual({late: 1});
+		// the next press is counted again
+		now += 100;
+		arrow(40);
+		now += 800;
+		slideDecision(container, 'y', 150);
+		expect(takeSlideMoves()).toEqual({late: 1});
 	});
 
 	it('says a slide of a list is under way until the end of it, and not after it was dropped', () => {
