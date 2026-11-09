@@ -1428,6 +1428,9 @@
 	padding: 0;
 	scrollbar-width: none;
 	position: relative;
+	/* The glide writes this scroller's offset every frame, so it gets a compositor layer of its own and moving it does
+	   not repaint the rows (the horizontal row scrollers have it too). */
+	will-change: scroll-position;
 
 	&::-webkit-scrollbar {
 		display: none;

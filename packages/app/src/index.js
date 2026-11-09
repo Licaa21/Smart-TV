@@ -8,7 +8,7 @@ import {createRoot, hydrateRoot} from 'react-dom/client';
 
 import App, {localeStringsReady} from './App';
 import {isTizen} from './platform';
-import {registerKeys, ESSENTIAL_KEY_NAMES, paceArrowKeys, watchArrowHolds} from './utils/keys';
+import {registerKeys, ESSENTIAL_KEY_NAMES, paceArrowKeys, watchArrowHolds, watchArrowResponse} from './utils/keys';
 import {registerBlockedKeys} from './utils/blockedKeys';
 import serverLogger from './services/serverLogger';
 import {scrollAtPointerEdges} from './utils/pointerEdgeScroll';
@@ -56,6 +56,8 @@ const appElement = (<App />);
 if (typeof window !== 'undefined') {
 	// The watcher goes first, so the report says what the set sent and not what the pacing let through
 	watchArrowHolds(window, (hold) => serverLogger.info('Navigation', 'Arrow held', hold));
+	// How the page answered the presses, in summaries of 20: the time to a frame and the worst frame after
+	watchArrowResponse(window, (summary) => serverLogger.info('Navigation', 'Move timing', summary));
 	// A card focused before its wide art was there is told to the report, with what became of the art
 	setArtLogSink((message, context) => serverLogger.info('Navigation', message, context));
 	paceArrowKeys();
