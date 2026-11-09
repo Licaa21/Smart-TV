@@ -1,4 +1,4 @@
-import {act, fireEvent, render, screen} from '@testing-library/react';
+import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 import Spotlight from '@enact/spotlight';
 
 import {defaultSettings} from '../../../context/defaultSettings';
@@ -132,5 +132,16 @@ describe('the Extras button', () => {
 
 		expect(handleEpisodePlay).toHaveBeenCalledWith(makingOf);
 		expect(screen.queryByText('Making of')).toBeNull();
+	});
+});
+
+describe('the backdrop', () => {
+	it('draws the backdrop until Details Screen Backdrop turns it off, and keeps the scrim', () => {
+		open({backdropUrl: 'backdrop.jpg'});
+		expect(document.querySelector('img[src="backdrop.jpg"]')).not.toBeNull();
+		cleanup();
+		open({backdropUrl: 'backdrop.jpg', settings: {...defaultSettings, detailsBackdropEnabled: false}});
+		expect(document.querySelector('img[src="backdrop.jpg"]')).toBeNull();
+		expect(document.querySelector('.scrim')).not.toBeNull();
 	});
 });

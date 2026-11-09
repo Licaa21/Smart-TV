@@ -44,6 +44,7 @@ import {buildBrowseRows, sameRowList} from './buildBrowseRows';
 import {markHomeReady} from '../../utils/homeReady';
 import {homeBackdropStyle} from '../../utils/homeBackdropStyle';
 import {rem} from '../../utils/rootScale';
+import {glideScroll, isGliding, smoothScrollingOn, stopScrollAnimation} from '../../utils/focusScroll';
 import {rowImageType, rowPeekHeight} from './rowPeek';
 
 import css from './Browse.module.less';
@@ -364,7 +365,8 @@ const Browse = ({
 	const settingsRef = useRef(settings);
 	settingsRef.current = settings;
 
-	const restRowScroll = useCallback((rowIndex) => {
+	// `instant` puts the rows there at once, for a return that has to be in place before the first paint
+	const restRowScroll = useCallback((rowIndex, start, instant) => {
 		const container = contentRowsRef.current;
 		if (!container) return;
 		// The ref a row hands over is the spotlight container component rather
@@ -381,22 +383,30 @@ const Browse = ({
 		const {showTopInfoArea: overlay, navbarPosition} = liveRef.current;
 		const topbarOffset = overlay && navbarPosition !== 'left' ? 20 : 0;
 		const top = Math.max(0, targetRow.offsetTop - topbarOffset);
-		if (Math.abs(container.scrollTop - top) > 1) container.scrollTop = top;
+		if (instant) {
+			stopScrollAnimation(container);
+			container.scrollTop = top;
+			return;
+		}
+		glideScroll(container, 'y', top, start);
 	}, []);
 
 	// Focus scrolling lands wherever the engine likes, sometimes with the row's bottom past the
 	// screen, and it lands after the focus handlers, so the row is put back at its resting spot on
 	// the frames behind it. However many moves ask, each frame settles once.
-	const settleRef = useRef({row: -1, passes: 0, frame: 0});
-	const settleRow = useCallback((rowIndex, passes) => {
+	// `start` is where the rows sat before the browser's focus scroll moved them, so the glide begins from there.
+	const settleRef = useRef({row: -1, passes: 0, frame: 0, start: undefined});
+	const settleRow = useCallback((rowIndex, passes, start) => {
 		const settle = settleRef.current;
 		settle.row = rowIndex;
+		if (typeof start === 'number' && settle.start === undefined) settle.start = start;
 		settle.passes = Math.max(settle.passes, passes);
 		if (settle.frame) return;
 		const step = () => {
 			settle.frame = 0;
 			pinMainScroll();
-			restRowScroll(settle.row);
+			restRowScroll(settle.row, settle.start);
+			settle.start = undefined;
 			settle.passes -= 1;
 			if (settle.passes > 0) settle.frame = window.requestAnimationFrame(step);
 		};
@@ -432,9 +442,10 @@ const Browse = ({
 
 		// A row is only measured once it renders, so landing on one that was still
 		// standing in at a guessed height leaves it above the screen with its cards
-		// cut off. Settling once it is real puts it where it was asked to go.
-		restRowScroll(rowIndex);
-		settleRow(rowIndex, 2);
+		// cut off. Settling once it is real puts it where it was asked to go. A glide from rest leaves the move
+		// to the settle passes, so it doesn't set off before the row losing focus has shrunk.
+		if (!smoothScrollingOn() || isGliding(container, 'y')) restRowScroll(rowIndex);
+		settleRow(rowIndex, 2, container.scrollTop);
 
 		if (thenFocus) {
 			let attempts = 0;
@@ -563,7 +574,7 @@ const Browse = ({
 		const {rowId, cardIndex} = lastFocusState;
 		const index = rowId ? filteredRowsRef.current.findIndex((row) => row.id === rowId && !row.isPlaceholder) : -1;
 		if (index < 0) return;
-		restRowScroll(index);
+		restRowScroll(index, undefined, true);
 		if (!focusRow(index, cardIndex)) return;
 		initialFocusSetRef.current = true;
 		// Does nothing unless the media bar settings changed while away
@@ -883,7 +894,7 @@ const Browse = ({
 			pinMainScroll();
 			return;
 		}
-		settleRow(rowIndex, rowChanged ? 2 : 1);
+		settleRow(rowIndex, rowChanged ? 2 : 1, contentRowsRef.current?.scrollTop);
 	}, [setBrowseMode, pinMainScroll, settleRow, loadSectionsNear]);
 
 	const backdropTimerRef = useRef(null);
@@ -938,7 +949,11 @@ const Browse = ({
 
 	// Rows mode leaves the scroller wherever the last row pinned it, and the peek shows its top.
 	useLayoutEffect(() => {
-		if (rowPeek && contentRowsRef.current) contentRowsRef.current.scrollTop = 0;
+		const container = contentRowsRef.current;
+		if (!rowPeek || !container) return;
+		// A row glide still under way would write its offset back over this on its next frame.
+		stopScrollAnimation(container);
+		container.scrollTop = 0;
 	}, [rowPeek]);
 
 	const navOffsetClass = settings.navbarPosition === 'left' ? css.sidebarOffset : css.topbarOffset;
@@ -1191,6 +1206,7 @@ const Browse = ({
 								menuOptions={rowMenuOptions}
 								ratingsSurface='homeRows'
 								hideOverview={settings.hideHomeMediaDescription === true}
+								posterLabels={!row.isSeerrRow && !row.isOnlineRecoRow && !row.isGenreRow}
 								onLoadMore={row.hasMore ? loadMoreRow : undefined}
 								onCalendarSeeAll={calendarSeeAll && CALENDAR_ROW_IDS.indexOf(row.id) >= 0 ? rowSelect.calendar : undefined}
 							/>

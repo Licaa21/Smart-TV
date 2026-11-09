@@ -9,6 +9,7 @@ import {showsWatchedCheck} from '../../utils/playedState';
 import SeerrIcon from '../icons/SeerrIcon';
 import {AnimeCardPill} from '../AnimeMarkerPills';
 import IncompleteBadge from '../IncompleteBadge';
+import PosterLabels from '../PosterLabels';
 import LoopMarquee from '../LoopMarquee';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {CARD_THUMB_SIZE, isUnownedSeerrTitle, seerrThumbUrl, seerrWideArtUrl, useTmdbThumbsAvailable} from '../../utils/tmdbThumb';
@@ -108,7 +109,7 @@ export const episodeArtwork = (item, serverUrl, imageType, useSeriesArt, width =
 	return preferred || still;
 };
 
-const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'poster', onSelect, onFocusItem, showServerBadge = false, eagerLoad = false, deferImage = false, seerrSeasonStatus, spotlightId, onSpotlightLeft, onSpotlightRight, menuOptions, size, current = false, homeText = false, overlay = null, showInfo = true}) => {
+const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'poster', onSelect, onFocusItem, showServerBadge = false, eagerLoad = false, deferImage = false, seerrSeasonStatus, spotlightId, onSpotlightLeft, onSpotlightRight, menuOptions, size, current = false, homeText = false, overlay = null, showInfo = true, posterLabels = false}) => {
 	const {settings} = useSettings();
 	const focusTimeoutRef = useRef(null);
 
@@ -298,10 +299,11 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 		return null;
 	}, [item.Type, item.AlbumArtist, item.AlbumArtists, item.Artists]);
 
-	// Classic home rows give a movie or series its year as the second line.
+	// Classic home rows give a movie or series its year as the second line, and a calendar card says when it releases.
 	const yearInfo = homeText && (item.Type === 'Movie' || item.Type === 'Series') && item.ProductionYear
 		? String(item.ProductionYear)
 		: null;
+	const secondLine = (item._calendarDate && item.Subtitle) || yearInfo || item.Subtitle;
 	// A home card's line that doesn't fit scrolls while the card has focus.
 	const line = (className, text) => (homeText
 		? <LoopMarquee className={className} text={text} active={focused} />
@@ -407,6 +409,15 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 
 						<IncompleteBadge itemId={item.Id} belowFavorite={item.UserData?.IsFavorite} belowBanner={Boolean(bannerStatus)} />
 						<AnimeCardPill item={item} serverUrl={itemServerUrl} hasProgressBar={showIndicators && progress > 0} />
+						{posterLabels && (
+							<PosterLabels
+								item={item}
+								serverUrl={itemServerUrl}
+								top={item.UserData?.IsFavorite ? 40 : 8}
+								topRight={(showIndicators && showsWatchedCheck(item)) || ((showServerBadge || item._external) && item._serverName) ? 40 : 8}
+								bottom={showIndicators && progress > 0 ? 26 : 8}
+							/>
+						)}
 					</>
 				)}
 			</div>
@@ -424,10 +435,10 @@ const MediaCard = ({item, serverUrl, cardType = 'portrait', rowImageType = 'post
 						{line(css.title, displayTitle)}
 						{line(css.episodeInfo, musicInfo)}
 					</>
-				) : (yearInfo || item.Subtitle) ? (
+				) : secondLine ? (
 					<>
 						{line(css.title, displayTitle)}
-						{line(css.episodeInfo, yearInfo || item.Subtitle)}
+						{line(css.episodeInfo, secondLine)}
 					</>
 				) : (
 					line(css.title, displayTitle)
