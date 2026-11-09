@@ -77,10 +77,18 @@ describe('profileToLocal', () => {
 	test("takes the other clients' media bar sources and new release settings", () => {
 		expect(profileToLocal({mediaBarSourceType: 'newReleases'}).mediaBarSourceType).toBe('newReleases');
 		expect(profileToLocal({mediaBarSourceType: 'recentlyAdded'}).mediaBarSourceType).toBe('recentlyAdded');
-		expect(profileToLocal({mediaBarSourceType: 'random'}).mediaBarSourceType).toBe('library');
+		expect(profileToLocal({mediaBarSourceType: 'random'}).mediaBarSourceType).toBe('random');
+		expect(profileToLocal({mediaBarSourceType: 'library'}).mediaBarSourceType).toBe('random');
+		expect(profileToLocal({mediaBarSourceType: 'collection'}).mediaBarSourceType).toBe('random');
 		expect(profileToLocal({mediaBarSourceType: 'trending'}).mediaBarSourceType).toBeUndefined();
 		expect(profileToLocal({mediaBarNewReleaseBanner: false, mediaBarNewReleaseDays: 14})).toEqual({mediaBarNewReleaseBanner: false, mediaBarNewReleaseDays: 14});
 		expect(profileToLocal({mediaBarNewReleaseDays: 45}).mediaBarNewReleaseDays).toBeUndefined();
+	});
+
+	test("takes the other clients' date format", () => {
+		expect(profileToLocal({dateFormat: 'dayMonth'}).dateFormat).toBe('dayMonth');
+		expect(profileToLocal({dateFormat: 'monthDay'}).dateFormat).toBe('monthDay');
+		expect(profileToLocal({dateFormat: 'yearFirst'}).dateFormat).toBeUndefined();
 	});
 
 	test('ignores a screensaver mode this app has no way to draw', () => {
@@ -608,7 +616,7 @@ describe('localToProfile for the seasonal effect', () => {
 
 describe('the seasonal row settings', () => {
 	test('are syncable', () => {
-		for (const key of ['seasonalRowEnabled', 'seasonalRowCountry', 'seasonalRowHiddenHolidays']) {
+		for (const key of ['seasonalRowEnabled', 'seasonalRowCountry', 'seasonalRowHiddenHolidays', 'seasonalRowAllYear']) {
 			expect(SYNCABLE_KEYS).toContain(key);
 		}
 	});
@@ -801,6 +809,27 @@ describe('the focus border color', () => {
 		expect(profileToLocal({focusColor: '#ff2e92'}).focusBorderColor).toBe('#ff2e92');
 		expect(profileToLocal({focusColor: ''}).focusBorderColor).toBe('');
 		expect(profileToLocal({focusColor: 'constructor'})).not.toHaveProperty('focusBorderColor');
+	});
+});
+
+describe('the calendar row hide downloaded toggles', () => {
+	test('are on by default and sync under their own names both ways', () => {
+		const keys = ['radarrCalendarHideDownloaded', 'sonarrCalendarHideDownloaded'];
+		for (const key of keys) {
+			expect(defaultSettings[key]).toBe(true);
+			expect(SYNCABLE_KEYS).toContain(key);
+			expect(profileToLocal({[key]: false})[key]).toBe(false);
+		}
+		expect(localToProfile({radarrCalendarHideDownloaded: false, sonarrCalendarHideDownloaded: true}, keys))
+			.toEqual({radarrCalendarHideDownloaded: false, sonarrCalendarHideDownloaded: true});
+	});
+});
+
+describe('the poster labels toggle', () => {
+	test('is on by default and syncs both ways', () => {
+		expect(defaultSettings.showPosterLabels).toBe(true);
+		expect(profileToLocal({showPosterLabels: false}).showPosterLabels).toBe(false);
+		expect(localToProfile({showPosterLabels: false}, ['showPosterLabels'])).toEqual({showPosterLabels: false});
 	});
 });
 

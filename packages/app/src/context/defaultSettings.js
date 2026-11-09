@@ -109,8 +109,10 @@ export const defaultSettings = {
 	radarrCalendarShowDigital: true,
 	radarrCalendarShowPhysical: true,
 	radarrCalendarShowDate: true,
+	radarrCalendarHideDownloaded: true,
 	sonarrCalendarShowDate: true,
 	sonarrCalendarShowEpisodeInfo: true,
+	sonarrCalendarHideDownloaded: true,
 	favoritesRowSortBy: 'SortName',
 	collectionsRowSortBy: 'PlaylistOrder',
 	genresRowSortBy: 'SortName',
@@ -163,7 +165,7 @@ export const defaultSettings = {
 	mediaBarTrailerCaptions: false,
 	mediaBarOverlayColor: 'gray',
 	mediaBarOverlayOpacity: 50,
-	mediaBarSourceType: 'library',
+	mediaBarSourceType: 'random',
 	mediaBarNewReleaseBanner: true,
 	mediaBarNewReleaseDays: 30,
 	mediaBarLibraryIds: [],
@@ -203,6 +205,7 @@ export const defaultSettings = {
 	seasonalRowEnabled: false,
 	seasonalRowCountry: 'auto',
 	seasonalRowHiddenHolidays: [],
+	seasonalRowAllYear: false,
 	sinceYouWatchedSource: 'local',
 	sinceYouWatchedSourceItem: 'recentlyWatched',
 	sinceYouWatchedSourceType: 'movies',
@@ -215,6 +218,7 @@ export const defaultSettings = {
 	rewatchSortBy: 'recentlyWatched',
 	showClock: true,
 	clockDisplay: '24-hour',
+	dateFormat: 'system',
 	// Hours added to every displayed time. Local only, because it corrects this TV
 	// rather than the account.
 	timeOffsetHours: 0,
@@ -263,6 +267,7 @@ export const defaultSettings = {
 	loadingAnimationSpeed: 'fast',
 	showLoadingAnimationText: true,
 	watchedIndicatorBehavior: 'always',
+	showPosterLabels: true,
 	cardFocusZoom: true,
 	useDetailedSubHeadings: true,
 	showMediaDetailsOnLibraryPage: true,
@@ -384,6 +389,8 @@ export const defaultSettings = {
 	// Calendar reminders are a phone feature.
 	calendarReminders: null,
 	performanceMode: 'auto',
+	// Kept on the TV, since the other clients have no such setting.
+	smoothScrolling: true,
 	keyboardStyle: 'docked',
 	focusBorderColor: '',
 	navbarOpacity: 50,

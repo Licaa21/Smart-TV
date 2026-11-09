@@ -27,6 +27,7 @@ import {isBackKey, KEYS} from '../utils/keys';
 import {drawsStage} from '../views/Details/stage/stageRules';
 import {QUICK_LOOK_ID} from '../views/Details/quickLook/quickLookRules';
 import {applyPerfTier} from '../utils/perfTier';
+import {setSmoothScrolling} from '../utils/focusScroll';
 import {isLiveTvChannel, isLiveTvLibrary} from '../utils/liveTvLibrary';
 import {OLED_TUNING} from '../utils/oledMode';
 import {isTizen} from '../platform';
@@ -47,7 +48,6 @@ import UpdateNotification from '../components/UpdateNotification';
 import {ItemMenuProvider} from '../components/ItemContextMenu';
 import SeerrNotificationToast from '../components/SeerrNotificationToast';
 import ServerMessagesDialog from '../components/ServerMessagesDialog';
-import DebugOverlay from '../components/DebugOverlay'; // Red Button on TV remote toggles this
 import NavBar from '../components/NavBar';
 import Sidebar from '../components/Sidebar';
 import AccountModal from '../components/AccountModal';
@@ -71,7 +71,7 @@ import SettingsPanel from '../components/SettingsPanel';
 import ShuffleOverlay from '../components/ShuffleOverlay';
 import SpottableInput from '../components/SpottableInput/SpottableInput';
 import TVKeyboard from '../components/TVKeyboard/TVKeyboard';
-import {isTvKeyboardVisible, closeTvKeyboard} from '../components/TVKeyboard/keyboardBus';
+import {isTvKeyboardVisible, closeTvKeyboard, subscribeTvKeyboardVisibility} from '../components/TVKeyboard/keyboardBus';
 import useInactivityTimer from '../hooks/useInactivityTimer';
 import useSignInPin from '../hooks/useSignInPin';
 import {useThemeMusic} from '../hooks/useThemeMusic';
@@ -369,6 +369,7 @@ const AppContent = (props) => {
 	const isPinGateActive = pinPending && isSignInPinEnabled(signInPin);
 	// Until the server has said whether the account has a PIN, nothing behind the gate shows.
 	const isPinChecking = pinPending && !isPinGateActive && pinChecked !== pinSession;
+	const [pinKeyboardOpen, setPinKeyboardOpen] = useState(false);
 	const screensaverTimeout = Number(settings.screensaverTimeout || 90);
 	const screensaverEnabled = Boolean(
 		settings.screensaverEnabled &&
@@ -528,6 +529,12 @@ const AppContent = (props) => {
 		return () => clearTimeout(timer);
 	}, [isPinGateActive]);
 
+	useEffect(() => {
+		if (!isPinGateActive) return;
+		setPinKeyboardOpen(isTvKeyboardVisible());
+		return subscribeTvKeyboardVisibility(({visible}) => setPinKeyboardOpen(visible));
+	}, [isPinGateActive]);
+
 	const fetchLibraries = useCallback(async () => {
 		if (isAuthenticated && api && user) {
 			try {
@@ -588,6 +595,10 @@ const AppContent = (props) => {
 	useEffect(() => {
 		applyPerfTier(settings.performanceMode === 'auto' ? null : settings.performanceMode);
 	}, [settings.performanceMode]);
+
+	useEffect(() => {
+		setSmoothScrolling(settings.smoothScrolling);
+	}, [settings.smoothScrolling]);
 
 	// The surfaces are crushed on the theme itself, so all this has to do is tell
 	// the stylesheet which artwork boost to draw with.
@@ -689,6 +700,7 @@ const AppContent = (props) => {
 		}
 	});
 	recheckAccessRef.current = recheckAccess;
+	const playerEndRef = useRef(null);
 	const timesUpRef = useRef(false);
 	timesUpRef.current = timesUp;
 
@@ -752,12 +764,9 @@ const AppContent = (props) => {
 			// there must not be allowed to skip it.
 			try {
 				releaseVideoElements();
-				setPlayingItem(null);
-				setPanelHistory([]);
+				// The player closes the way Back closes it, so the viewer lands where they were.
+				playerEndRef.current?.();
 				setPinCheckCount((count) => count + 1);
-				if (isAuthenticated) {
-					setPanelIndex(PANELS.BROWSE);
-				}
 				recheckAccessRef.current?.();
 			} finally {
 				activateApp();
@@ -795,7 +804,7 @@ const AppContent = (props) => {
 				cleanupHandlersRef.current();
 			}
 		};
-	}, [isAuthenticated, performAppCleanup, releaseVideoElements, revalidateSession]);
+	}, [performAppCleanup, releaseVideoElements, revalidateSession]);
 
 	useEffect(() => {
 		if (!isAuthenticated || !user?.Id) {
@@ -1367,6 +1376,7 @@ const AppContent = (props) => {
 		}
 		window.dispatchEvent(new CustomEvent('moonfin:browseRefresh'));
 	}, [handleBack, panelHistory, selectedItem, playingItem, panelIndex, watchPartyRoom, openWatchParty, isSyncPlayInGroup, openSyncPlay]);
+	playerEndRef.current = handlePlayerEnd;
 
 	const handlePlayerBackground = useCallback(() => {
 		setMusicInBackground(true);
@@ -1859,7 +1869,7 @@ const AppContent = (props) => {
 	if (isPinGateActive) {
 		return (
 			<div className={css.app} {...props}>
-				<div className={css.pinGate}>
+				<div className={`${css.pinGate} ${pinKeyboardOpen ? css.pinGateKeyboard : ''}`}>
 					<div className={css.pinCard}>
 						<h2 className={css.pinTitle}>{$L('Enter PIN')}</h2>
 						<p className={css.pinSubtitle}>{$L('This profile is protected by a 4-digit PIN.')}</p>
@@ -2416,7 +2426,6 @@ const AppContent = (props) => {
 				<SeasonalTheme theme={settings.seasonalTheme} density={settings.seasonalDensity} follower={settings.seasonalFollower} />
 			)}
 			<NoConnection />
-			<DebugOverlay />
 			{connectionState !== 'connected' && isAuthenticated && (
 				<div className={css.connectionBanner}>
 					<span>{connectionState === 'reconnecting' ? $L('Reconnecting to server...') : $L('Lost connection to server')}</span>
