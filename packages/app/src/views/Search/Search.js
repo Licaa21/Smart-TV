@@ -891,7 +891,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	return (
 		<div className={css.searchPage}>
 		<ScreenBackdrop item={backdropItem} serverUrl={serverUrl} />
-		<div ref={containerRef} className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : musicBar ? css.musicBarOffset : ''}`}>
+		<div ref={containerRef} className={`${css.searchContainer} ${settings.navbarPosition === 'left' ? css.sidebarOffset : musicBar ? css.musicBarOffset : ''}`} data-slide-scroll="y" data-slide-content="children">
 			<div className={css.searchInputSection} onFocus={scrollToTop}>
 				<div
 					className={`${css.searchInputWrapper} ${searchInputFocused ? css.searchInputFocused : ''}`}

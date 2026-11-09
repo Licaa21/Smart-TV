@@ -255,10 +255,10 @@ describe('ModernMediaCard growing on focus', () => {
 		expect(wide()).not.toBeNull();
 		rerender(<ModernMediaCard item={thumbed('farther')} serverUrl="http://server" warmRank={5} />);
 		expect(wide()).toBeNull();
-		// the card a neighbouring row is entered on (ranked 9) holds its picture, the rest of that row does not
-		rerender(<ModernMediaCard item={thumbed('farther')} serverUrl="http://server" warmRank={9} />);
+		// the card a neighbouring row is entered on (ranked 6) holds its picture, the rest of that row does not
+		rerender(<ModernMediaCard item={thumbed('farther')} serverUrl="http://server" warmRank={6} />);
 		expect(wide()).not.toBeNull();
-		rerender(<ModernMediaCard item={thumbed('farther')} serverUrl="http://server" warmRank={10} />);
+		rerender(<ModernMediaCard item={thumbed('farther')} serverUrl="http://server" warmRank={7} />);
 		expect(wide()).toBeNull();
 	});
 

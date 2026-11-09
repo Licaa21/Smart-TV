@@ -1,5 +1,10 @@
 import Spotlight from '@enact/spotlight';
 
+import {slideUnderway, smoothScrollingOn, writingGlide} from './glideState';
+import {slideDecision} from './slideScroll';
+
+export {setSmoothScrolling, smoothScrollingOn} from './glideState';
+
 // Spotlight focuses without scrolling, so anything taller than its box has to
 // bring the focused row into view itself. scrollIntoView options are ignored on
 // older Tizen and webOS WebKit, which would leave the row parked off screen, so
@@ -22,12 +27,6 @@ const AXES = {
 const GLIDE_MS = 160;
 const FRAME_MS = 16;
 const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
-
-let smooth = true;
-export const setSmoothScrolling = (on) => {
-	smooth = on !== false;
-};
-export const smoothScrollingOn = () => smooth;
 
 /**
  * The CSS cubic-bezier timing function, so a scroll can keep step with a transition on the same curve.
@@ -63,21 +62,20 @@ export const cubicBezier = (x1, y1, x2, y2) => {
 const glides = {x: new WeakMap(), y: new WeakMap()};
 // Every glide under way anywhere, so heavier work can hold off until the screen is still.
 const moving = new Set();
+/** Whether a glide, or a slide of a list up or down, is under way anywhere. */
+export const glideUnderway = () => moving.size > 0 || slideUnderway();
 
 /**
  * Runs `fn` once no glide is under way, so work that costs frames, like swapping the backdrop,
  * doesn't land in the middle of one.
  */
 export const whenStill = (fn) => {
-	if (moving.size === 0) {
+	if (!glideUnderway()) {
 		fn();
 		return;
 	}
 	window.requestAnimationFrame(() => whenStill(fn));
 };
-
-/** Whether a glide is under way anywhere. */
-export const glideUnderway = () => moving.size > 0;
 
 const endGlide = (axis, node, glide) => {
 	window.cancelAnimationFrame(glide.frame);
@@ -112,7 +110,7 @@ const animate = (node, axis, target, duration, start, ease = easeOutCubic) => {
 		if (!started) started = Date.now() - FRAME_MS;
 		const t = Math.min(1, (Date.now() - started) / duration);
 		glide.at = from + distance * ease(t);
-		node[offset] = glide.at;
+		writingGlide(() => { node[offset] = glide.at; });
 		if (t < 1) glide.frame = window.requestAnimationFrame(step);
 		else endGlide(axis, node, glide);
 	};
@@ -120,7 +118,7 @@ const animate = (node, axis, target, duration, start, ease = easeOutCubic) => {
 	moving.add(glide);
 	// The start goes straight in, so a node the browser scrolled on focus is back where it was before
 	// anything paints.
-	node[offset] = from;
+	writingGlide(() => { node[offset] = from; });
 	glide.frame = window.requestAnimationFrame(step);
 };
 
@@ -138,9 +136,16 @@ export const isGliding = (node, axis) => glides[axis].has(node);
 export const glideScroll = (node, axis, target, start, {duration = GLIDE_MS, ease} = {}) => {
 	const {offset, size, total} = AXES[axis];
 	const clamped = Math.max(0, Math.min(target, node[total] - node[size]));
+	// A list that asks for the slide jumps, and the slide draws the way there. A held key jumps too. What the slide leaves
+	// alone, such as a Low level or a scroll long after the key, still glides.
+	if (!ease && node.getAttribute && node.getAttribute('data-slide-scroll') === axis && slideDecision(node, axis, clamped - node[offset]) !== 'glide') {
+		stopScrollAnimation(node);
+		node[offset] = clamped;
+		return clamped;
+	}
 	const running = glides[axis].get(node);
 	if (running && Math.abs(running.target - clamped) < 1) return clamped;
-	if (!smooth && !ease) {
+	if (!smoothScrollingOn() && !ease) {
 		stopScrollAnimation(node);
 		node[offset] = clamped;
 		return clamped;

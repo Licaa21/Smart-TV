@@ -6,9 +6,11 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 // and below fetch their first cards, and the card they will be entered on with the ones ahead of it. A row
 // focus has left keeps that window, so what it was still fetching is not dropped.
 
-export const WARM_AHEAD = 8;
-const FIRST_CARDS = 5;
-const REST_AHEAD = 5;
+// Narrowed from 8, 5 and 5 (2026-11-09): on the Q67A every card in the window renders again on each press, and a press
+// took 65 to 85 ms to reach a frame before anything moved.
+export const WARM_AHEAD = 5;
+const FIRST_CARDS = 3;
+const REST_AHEAD = 3;
 
 // How near a card is to focus, which is how soon it is fetched: 0 and up, and -1 for a card that is not fetched.
 // restIndex is the card the row was left on, -1 when it has none or the row always starts at its first card. A

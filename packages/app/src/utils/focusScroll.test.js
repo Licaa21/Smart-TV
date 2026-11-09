@@ -1,6 +1,11 @@
 import {cubicBezier, glideScroll, glideToCard, glideUnderway, setSmoothScrolling, whenStill} from './focusScroll';
+import {noteSlide} from './glideState';
 
 jest.mock('@enact/spotlight', () => ({getPointerMode: () => false}));
+
+// What a list that asks for the slide is to do with its scroll
+let mockDecision = 'slide';
+jest.mock('./slideScroll', () => ({slideDecision: () => mockDecision}));
 
 // A scroller 1000 wide over 3000 of content, its view starting at 0 on screen.
 const lane = (scrollLeft = 0) => {
@@ -141,5 +146,48 @@ describe('focus glides', () => {
 		runFor(20);
 		expect(glideUnderway()).toBe(false);
 		expect(node.scrollLeft).toBe(500);
+	});
+
+	it('jumps a list that asks for the slide, since the slide draws the way there, and a held key too', () => {
+		['slide', 'jump'].forEach((decision) => {
+			mockDecision = decision;
+			const node = lane();
+			node.setAttribute('data-slide-scroll', 'x');
+			expect(glideScroll(node, 'x', 500, 0)).toBe(500);
+			expect(node.scrollLeft).toBe(500);
+			expect(frames).toHaveLength(0);
+		});
+		expect(glideUnderway()).toBe(false);
+		// what the slide leaves alone still glides
+		mockDecision = 'glide';
+		const left = lane();
+		left.setAttribute('data-slide-scroll', 'x');
+		glideScroll(left, 'x', 500, 0);
+		expect(left.scrollLeft).toBe(0);
+		expect(frames).toHaveLength(1);
+		runFor(1000);
+		runFor(1000);
+		mockDecision = 'slide';
+		// the other axis of that list still glides
+		const other = lane();
+		other.setAttribute('data-slide-scroll', 'y');
+		glideScroll(other, 'x', 500, 0);
+		expect(other.scrollLeft).toBe(0);
+		expect(frames).toHaveLength(1);
+	});
+
+	it('counts a slide of a list as a glide under way, so work waits for it too', () => {
+		expect(glideUnderway()).toBe(false);
+		noteSlide(200);
+		expect(glideUnderway()).toBe(true);
+		const held = jest.fn();
+		whenStill(held);
+		expect(held).not.toHaveBeenCalled();
+		runFor(150);
+		expect(glideUnderway()).toBe(true);
+		runFor(100);
+		runFor(16);
+		expect(glideUnderway()).toBe(false);
+		expect(held).toHaveBeenCalled();
 	});
 });

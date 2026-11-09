@@ -117,7 +117,7 @@ describe('ModernMediaRow', () => {
 			draw({items: many});
 			expect(warmCards()).toEqual([]);
 			focusCard(3);
-			expect(warmCards()).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+			expect(warmCards()).toEqual([2, 3, 4, 5, 6, 7, 8]);
 			focusCard(2);
 			expect(warmCards()).toEqual([0, 1, 2, 3]);
 		});
@@ -125,9 +125,9 @@ describe('ModernMediaRow', () => {
 		it('asks for the first cards of a row beside the focused one', () => {
 			draw({items: many});
 			act(() => announceFocusedRow(1));
-			expect(warmCards()).toEqual([0, 1, 2, 3, 4]);
+			expect(warmCards()).toEqual([0, 1, 2]);
 			act(() => announceFocusedRow(3));
-			expect(warmCards()).toEqual([0, 1, 2, 3, 4]);
+			expect(warmCards()).toEqual([0, 1, 2]);
 			act(() => announceFocusedRow(6));
 			expect(warmCards()).toEqual([]);
 		});
@@ -137,7 +137,7 @@ describe('ModernMediaRow', () => {
 			focusCard(9);
 			leaveRow();
 			act(() => announceFocusedRow(1));
-			expect(warmCards()).toEqual([0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13]);
+			expect(warmCards()).toEqual([0, 1, 2, 8, 9, 10, 11, 12]);
 		});
 
 		it('tells the other rows which row took focus', () => {

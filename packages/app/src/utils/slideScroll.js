@@ -1,3 +1,4 @@
+import {endPendingSlide, isWritingGlide, notePendingSlide, noteSlide, resetGlideState, smoothScrollingOn} from './glideState';
 import {getPerfLevelChoice, getPerfLevelIndex} from './perfTier';
 
 // A key press that moves a row or a list scrolls its container in one jump. Here the jump is kept, since all the
@@ -32,9 +33,11 @@ export const slidesAtLevel = (levelIndex) => levelIndex < LEAN_FROM_LEVEL;
 
 // extent is the size of the container along the axis: a jump past it is a long one, a Back to the first row or a
 // letter, which flies past more than it shows. auto is the viewer leaving the level to the app, which is not held back
-// by what a user agent makes of it. keyAxis is the axis of the key pressed, when that is known.
-export const shouldSlide = ({distance, extent, sinceKey, held: keyHeld, levelIndex, auto = false, axis, keyAxis}) => (
+// by what a user agent makes of it. keyAxis is the axis of the key pressed, when that is known. Up and down follow the
+// Smooth Scrolling switch, since the slide is what draws that move (the sideways slide has no switch).
+export const shouldSlide = ({distance, extent, sinceKey, held: keyHeld, levelIndex, auto = false, axis, keyAxis, smooth = true}) => (
 	(auto || slidesAtLevel(levelIndex)) &&
+	(axis !== 'y' || smooth) &&
 	!keyHeld &&
 	(!keyAxis || axis === keyAxis) &&
 	sinceKey >= 0 && sinceKey <= KEY_WINDOW_MS &&
@@ -66,6 +69,8 @@ let held = false;
 const positions = typeof WeakMap === 'function' ? new WeakMap() : null;
 // The slides waiting for their scrolling to be over, by container
 const waiting = positions ? new WeakMap() : null;
+// The lists with an up or down slide waiting, so one that drops its slide does not end what another is still doing
+const slidingLists = new Set();
 let installed = false;
 
 const onKeyDown = (e) => {
@@ -77,11 +82,20 @@ const onKeyDown = (e) => {
 	lastKeyAxis = axis;
 };
 
+const slideAxisOf = (container) => {
+	const axis = container && container.getAttribute ? container.getAttribute('data-slide-scroll') : null;
+	return axis === 'x' || axis === 'y' ? axis : null;
+};
+
 // Puts the content where it stands, with whatever slide it has on the way dropped
 const settle = (container) => {
 	const pending = waiting.get(container);
 	if (!pending) return;
 	waiting.delete(container);
+	if (pending.axis === 'y') {
+		slidingLists.delete(container);
+		if (slidingLists.size === 0) endPendingSlide();
+	}
 	window.cancelAnimationFrame(pending.frame);
 	pending.nodes.forEach((node) => {
 		node.style.transition = '';
@@ -95,19 +109,20 @@ const settle = (container) => {
 const release = (nodes, axis, distance) => {
 	window.getComputedStyle(nodes[0]).transform; // eslint-disable-line @babel/no-unused-expressions
 	const ms = slideMsFor(axis, distance);
+	// Whatever waits for a glide to be still waits for the slide as long as it really takes, which is known only now
+	if (axis === 'y') noteSlide(ms + 40);
 	nodes.forEach((node) => {
 		node.style.transition = `transform ${ms}ms ${EASE}`;
 		node.style.transform = '';
 	});
 };
 
-const slide = (container, axis, distance) => {
-	let pending = waiting.get(container);
+const slidesNow = (container, axis, distance, pending) => {
 	// A scroll that comes while the slide waits is part of it, however small: the code that puts the row back at its resting
 	// place moves it a few pixels, which is a correction and not a move of its own. It has to be the key's, and the same
 	// press: a key pressed since is a held key or a flurry, which jump as fast as they can.
 	const continuing = Boolean(pending) && pending.keyAt === lastKeyAt;
-	const ok = shouldSlide({
+	return shouldSlide({
 		distance: continuing ? MIN_DISTANCE : distance,
 		extent: continuing ? 0 : (axis === 'x' ? container.clientWidth : container.clientHeight),
 		sinceKey: Date.now() - lastKeyAt,
@@ -115,12 +130,35 @@ const slide = (container, axis, distance) => {
 		levelIndex: getPerfLevelIndex(),
 		auto: getPerfLevelChoice() === null,
 		axis,
-		keyAxis: lastKeyAxis
+		keyAxis: lastKeyAxis,
+		smooth: smoothScrollingOn()
 	});
-	if (!ok) {
+};
+
+// What a list that asks for the slide is to do with a scroll about to be made: slide it, jump it (a held key or a flurry
+// goes as fast as it can), or leave it to the glide, which draws what the slide does not take, such as a Low level.
+export const slideDecision = (container, axis, distance) => {
+	if (!waiting) return 'glide';
+	if (slidesNow(container, axis, distance, waiting.get(container))) return 'slide';
+	// A key held a while ago is not held now, and a held key of the other axis is not what moves this list
+	return held && lastKeyAxis === axis && Date.now() - lastKeyAt <= KEY_WINDOW_MS ? 'jump' : 'glide';
+};
+
+const slide = (container, axis, distance) => {
+	let pending = waiting.get(container);
+	if (!slidesNow(container, axis, distance, pending)) {
 		// A scroll that is not to be drawn takes the content to where it stands, and does not leave it part way
-		// through a slide that was for an earlier one
+		// through a slide that was for an earlier one. One already let go and easing is taken to where it ends only for a
+		// held key, which jumps; a correction of a few pixels leaves it to ease.
 		settle(container);
+		if (held && lastKeyAxis === axis && slideAxisOf(container) === axis) {
+			contentOf(container).forEach((node) => {
+				if (node.style.transition || node.style.transform) {
+					node.style.transition = '';
+					node.style.transform = '';
+				}
+			});
+		}
 		return;
 	}
 	// A container that scrolls smoothly by itself is not slid on top of that
@@ -129,9 +167,10 @@ const slide = (container, axis, distance) => {
 	if (!nodes.length) return;
 
 	const quiet = QUIET_FRAMES[axis];
+	if (axis === 'y') slidingLists.add(container);
 	if (!pending) {
 		// The content shows where it was, before the page is drawn
-		pending = {nodes, offset: offsetOf(window.getComputedStyle(nodes[0]).transform, axis), frame: 0, quiet: 0, keyAt: lastKeyAt};
+		pending = {nodes, offset: offsetOf(window.getComputedStyle(nodes[0]).transform, axis), frame: 0, quiet: 0, keyAt: lastKeyAt, axis};
 	}
 	// A row mounted while the slide waits is held with the others and let go with them, and one that has gone from the
 	// list is put where it stands
@@ -145,10 +184,15 @@ const slide = (container, axis, distance) => {
 	nodes.forEach((node) => { node.style.transition = 'none'; });
 	pending.offset += distance;
 	pending.quiet = 0;
+	// What waits for a glide to be still waits for this slide too: the frames it waits for the scrolling, and the slide as far as
+	// it is known now
+	if (axis === 'y') notePendingSlide(slideMsFor(axis, pending.offset) + quiet * 20 + 40);
 	nodes.forEach((node) => { node.style.transform = translate(axis, pending.offset); });
 
 	if (!quiet) {
 		waiting.delete(container);
+		slidingLists.delete(container);
+		if (axis === 'y' && slidingLists.size === 0) endPendingSlide();
 		release(nodes, axis, pending.offset);
 		return;
 	}
@@ -164,6 +208,8 @@ const slide = (container, axis, distance) => {
 			return;
 		}
 		waiting.delete(container);
+		slidingLists.delete(container);
+		if (axis === 'y' && slidingLists.size === 0) endPendingSlide();
 		release(now.nodes, axis, now.offset);
 	};
 	pending.frame = window.requestAnimationFrame(step);
@@ -174,11 +220,6 @@ const moved = (container, axis, position) => {
 	const previous = positions.has(container) ? positions.get(container) : 0;
 	positions.set(container, position);
 	return position - previous;
-};
-
-const slideAxisOf = (container) => {
-	const axis = container && container.getAttribute ? container.getAttribute('data-slide-scroll') : null;
-	return axis === 'x' || axis === 'y' ? axis : null;
 };
 
 // Where a node is without the slide that is moving it, for code that measures with getBoundingClientRect. The slide
@@ -235,6 +276,12 @@ const watchSetter = (name, axis) => {
 				descriptor.set.call(this, value);
 				return;
 			}
+			// A glide that draws what the slide does not take writes every frame, and none of it is for the slide
+			if (isWritingGlide()) {
+				descriptor.set.call(this, value);
+				positions.set(this, descriptor.get.call(this));
+				return;
+			}
 			const before = descriptor.get.call(this);
 			// A baseline for a container the setter is the first to see
 			if (!positions.has(this)) positions.set(this, before);
@@ -257,6 +304,8 @@ export const installSlideScroll = (target = typeof document !== 'undefined' ? do
 
 // For the tests
 export const resetSlideScroll = () => {
+	slidingLists.clear();
+	resetGlideState();
 	lastKeyAt = 0;
 	lastKeyAxis = null;
 	held = false;
