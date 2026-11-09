@@ -160,9 +160,9 @@ export const paceArrowKeys = (target = window) => {
 const HOLD_REPORT_MS = 600;
 // A key down this long after the last one is the start of a new hold, whatever came of the one before
 const HOLD_GAP_MS = 1500;
+const isArrow = (e) => (e.keyCode >= KEYS.LEFT && e.keyCode <= KEYS.DOWN) || /^Arrow/.test(e.key || '');
 export const watchArrowHolds = (target = window, report) => {
 	let hold = null;
-	const isArrow = (e) => (e.keyCode >= KEYS.LEFT && e.keyCode <= KEYS.DOWN) || /^Arrow/.test(e.key || '');
 	const finish = (endedBy) => {
 		if (hold && report && hold.last - hold.start >= HOLD_REPORT_MS) {
 			const gaps = [...hold.gaps].sort((a, b) => a - b);
@@ -194,6 +194,81 @@ export const watchArrowHolds = (target = window, report) => {
 		hold.last = performance.now();
 		finish('key up');
 	}, true);
+};
+
+// Says how the page answered the arrow presses, which is what lag is on a TV: for each press (not a held key), how long it
+// took to reach a frame, and the longest frame in the 600 ms after it, and how old the set's stamp on the key was when the page
+// got it. A summary of `every` presses goes to the
+// diagnostic report, as the median, the 90th percentile and the worst, so a report says whether Home is slow to start
+// moving, slow while it moves, or both.
+const RESPONSE_WINDOW_MS = 600;
+const SLOW_FRAME_MS = 100;
+// A frame this late is a standby, not a lag
+const STANDBY_MS = 120000;
+// A key stamp older than this is from another clock, or a key that sat in a queue for good, and is read as no age
+const RESPONSE_STAMP_MAX_MS = 1000;
+const spread = (list) => {
+	const sorted = [...list].sort((a, b) => a - b);
+	return [sorted[Math.floor(sorted.length / 2)], sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))], sorted[sorted.length - 1]].map(Math.round);
+};
+export const watchArrowResponse = (target = window, report, every = 20) => {
+	let firsts = [];
+	let worsts = [];
+	let ages = [];
+	// Every press watched at the moment, each for its own window, by one loop of frames shared between them
+	let pending = [];
+	let previous = 0;
+	const down = new Map();
+	const flush = () => {
+		const summary = {presses: firsts.length, firstMs: spread(firsts), worstGapMs: spread(worsts), inputAgeMs: spread(ages), slow: worsts.filter((w) => w > SLOW_FRAME_MS).length};
+		firsts = [];
+		worsts = [];
+		ages = [];
+		report(summary);
+	};
+	const step = () => {
+		const at = performance.now();
+		pending = pending.filter((press) => {
+			const since = at - press.start;
+			// The loop keeps frames coming, so the frame that closes the window is as far from the last as a stall made it
+			if (press.first < 0) press.first = since;
+			else press.worst = Math.max(press.worst, at - previous);
+			if (since <= RESPONSE_WINDOW_MS) return true;
+			// A page that was hidden or in standby comes back with a frame hours late, which says nothing about a press
+			if (!press.hidden && press.first < STANDBY_MS && press.worst < STANDBY_MS) {
+				firsts.push(press.first);
+				worsts.push(press.worst);
+				ages.push(press.age);
+			}
+			return false;
+		});
+		previous = at;
+		if (pending.length) window.requestAnimationFrame(step);
+		if (firsts.length >= every) flush();
+	};
+	target.addEventListener('keydown', (e) => {
+		if (!isArrow(e)) return;
+		const at = performance.now();
+		// Tizen never flags a repeat, so a key that has not come up since its last key down is a hold, unless that was long
+		// ago, which is a key up that never came. Each key is followed apart, for a hold and a tap of another arrow.
+		const repeat = e.repeat || (down.has(e.keyCode) && at - down.get(e.keyCode) <= HOLD_GAP_MS);
+		down.set(e.keyCode, at);
+		if (repeat || !report) return;
+		// How old the set's stamp is when the page gets the key: the set's own delay, or a page too busy to take it. The
+		// press itself is counted from here, so the two causes read apart.
+		const stamp = e.timeStamp;
+		const age = stamp > 0 && stamp <= at && at - stamp <= RESPONSE_STAMP_MAX_MS ? at - stamp : 0;
+		pending.push({start: at, first: -1, worst: 0, age, hidden: false});
+		if (pending.length === 1) {
+			previous = at;
+			window.requestAnimationFrame(step);
+		}
+	}, true);
+	target.addEventListener('keyup', (e) => {
+		down.delete(e.keyCode);
+	}, true);
+	// A page that was hidden while a press was watched answers it hours late, which says nothing about the press
+	(target.document || target.ownerDocument || document).addEventListener('visibilitychange', () => pending.forEach((press) => { press.hidden = true; }));
 };
 
 export const ESSENTIAL_KEY_NAMES = [
