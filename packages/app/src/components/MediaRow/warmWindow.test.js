@@ -7,11 +7,11 @@ const warmed = (count, state) => ranked(count, state).map(([i]) => i);
 
 describe('decodesAhead', () => {
 	it('holds the nearest cards and the one a neighbouring row is entered on, and no others', () => {
-		[0, 1, 1.5, 2, 3, 4, 9].forEach((rank) => expect(decodesAhead(rank)).toBe(true));
-		[-1, 5, 6, 8, 10, 13].forEach((rank) => expect(decodesAhead(rank)).toBe(false));
+		[0, 1, 1.5, 2, 3, 4, 6].forEach((rank) => expect(decodesAhead(rank)).toBe(true));
+		[-1, 5, 7, 8, 10, 13].forEach((rank) => expect(decodesAhead(rank)).toBe(false));
 	});
 
-	it('gives the entry card of a neighbouring row rank 9, from the media bar and with a remembered card', () => {
+	it('gives the entry card of a neighbouring row rank 6, from the media bar and with a remembered card', () => {
 		const entry = (state) => [0, 1, 2, 3, 4, 5].filter((i) => decodesAhead(warmRank(i, {focusedIndex: -1, direction: 1, neighbour: true, ...state})));
 		expect(entry({restIndex: -1})).toEqual([0]);
 		expect(entry({restIndex: 3})).toEqual([0, 3]);
@@ -19,17 +19,17 @@ describe('decodesAhead', () => {
 });
 
 describe('warmRank', () => {
-	it('fetches eight cards ahead of the focused one and one behind, going right, nearest first', () => {
+	it('fetches five cards ahead of the focused one and one behind, going right, nearest first', () => {
 		const state = {focusedIndex: 6, direction: 1, neighbour: false, restIndex: -1};
-		expect(warmed(20, state)).toEqual([5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+		expect(warmed(20, state)).toEqual([5, 6, 7, 8, 9, 10, 11]);
 		expect(warmRank(6, state)).toBe(0);
 		expect(warmRank(7, state)).toBe(1);
 		expect(warmRank(5, state)).toBe(1.5);
-		expect(warmRank(14, state)).toBe(8);
+		expect(warmRank(11, state)).toBe(5);
 	});
 
 	it('fetches the same the other way going left', () => {
-		expect(warmed(20, {focusedIndex: 10, direction: -1, neighbour: false, restIndex: -1})).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+		expect(warmed(20, {focusedIndex: 10, direction: -1, neighbour: false, restIndex: -1})).toEqual([5, 6, 7, 8, 9, 10, 11]);
 	});
 
 	it('stops at the ends of the row', () => {
@@ -41,16 +41,16 @@ describe('warmRank', () => {
 		expect(warmed(20, {focusedIndex: -1, direction: 1, neighbour: false, restIndex: 4})).toEqual([]);
 	});
 
-	it('fetches the first five of a neighbouring row, after everything the focused row still has to fetch', () => {
+	it('fetches the first three of a neighbouring row, after everything the focused row still has to fetch', () => {
 		const state = {focusedIndex: -1, direction: 1, neighbour: true, restIndex: -1};
-		expect(warmed(20, state)).toEqual([0, 1, 2, 3, 4]);
-		expect(warmRank(0, state)).toBeGreaterThan(8);
+		expect(warmed(20, state)).toEqual([0, 1, 2]);
+		expect(warmRank(0, state)).toBeGreaterThan(5);
 		expect(warmRank(1, state)).toBeGreaterThan(warmRank(0, state));
 	});
 
-	it('adds the card a neighbouring row will be entered on, with the five after it and one before', () => {
-		expect(warmed(20, {focusedIndex: -1, direction: 1, neighbour: true, restIndex: 9})).toEqual([0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13, 14]);
-		expect(warmed(20, {focusedIndex: -1, direction: 1, neighbour: true, restIndex: 3})).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+	it('adds the card a neighbouring row will be entered on, with the three after it and one before', () => {
+		expect(warmed(20, {focusedIndex: -1, direction: 1, neighbour: true, restIndex: 9})).toEqual([0, 1, 2, 8, 9, 10, 11, 12]);
+		expect(warmed(20, {focusedIndex: -1, direction: 1, neighbour: true, restIndex: 3})).toEqual([0, 1, 2, 3, 4, 5, 6]);
 		// the card it will be entered on comes before the cards at the start
 		const state = {focusedIndex: -1, direction: 1, neighbour: true, restIndex: 9};
 		expect(warmRank(9, state)).toBeLessThan(warmRank(2, state));
@@ -91,9 +91,9 @@ describe('useWarmRow', () => {
 		const {result} = renderHook(() => useWarmRow(3, true));
 		act(() => result.current.noteFocus(6));
 		act(() => result.current.noteFocus(7));
-		expect(warmedBy(result.current.rankOf, 7)).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+		expect(warmedBy(result.current.rankOf, 7)).toEqual([6, 7, 8, 9, 10, 11, 12]);
 		act(() => result.current.noteFocus(6));
-		expect(warmedBy(result.current.rankOf, 6)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+		expect(warmedBy(result.current.rankOf, 6)).toEqual([1, 2, 3, 4, 5, 6, 7]);
 	});
 
 	it('does not take entering the row for a move', () => {
@@ -101,14 +101,14 @@ describe('useWarmRow', () => {
 		act(() => result.current.noteFocus(8));
 		act(() => result.current.noteBlur());
 		act(() => result.current.noteFocus(0));
-		expect(warmedBy(result.current.rankOf, 0)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+		expect(warmedBy(result.current.rankOf, 0)).toEqual([0, 1, 2, 3, 4, 5]);
 	});
 
 	it('fetches the first cards when a row beside the focused one is asked', () => {
 		const {result} = renderHook(() => useWarmRow(3, true));
 		expect(warmedBy(result.current.rankOf, -1)).toEqual([]);
 		act(() => announceFocusedRow(2));
-		expect(warmedBy(result.current.rankOf, -1)).toEqual([0, 1, 2, 3, 4]);
+		expect(warmedBy(result.current.rankOf, -1)).toEqual([0, 1, 2]);
 	});
 
 	it('forgets the card it was left on when the setting says to start at the first', () => {
@@ -116,7 +116,7 @@ describe('useWarmRow', () => {
 		act(() => result.current.noteFocus(9));
 		act(() => result.current.noteBlur());
 		act(() => announceFocusedRow(4));
-		expect(warmedBy(result.current.rankOf, -1)).toEqual([0, 1, 2, 3, 4]);
+		expect(warmedBy(result.current.rankOf, -1)).toEqual([0, 1, 2]);
 	});
 });
 

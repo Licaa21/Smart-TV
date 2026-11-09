@@ -210,6 +210,91 @@ describe('watchArrowResponse', () => {
 		expect(report.mock.calls[0][0].firstMs[2]).toBe(8000);
 	});
 
+	it('keeps up and down apart from left and right, each in its own batch, and adds what the context says', () => {
+		const target = document.createElement('div');
+		const report = jest.fn();
+		const clock = rig();
+		watchArrowResponse(target, report, 2, () => ({smooth: true, perf: 'auto'}));
+		const tapKey = (keyCode) => {
+			clock.down(target, keyCode);
+			clock.up(target, keyCode);
+			clock.smooth(700);
+			clock.wait(300);
+		};
+		tapKey(40);
+		tapKey(39);
+		expect(report).not.toHaveBeenCalled();
+		tapKey(38);
+		expect(report).toHaveBeenCalledTimes(1);
+		expect(report.mock.calls[0][0]).toMatchObject({axis: 'up/down', presses: 2, smooth: true, perf: 'auto'});
+		tapKey(37);
+		expect(report.mock.calls[1][0]).toMatchObject({axis: 'left/right', presses: 2});
+	});
+
+	const tapDownWith = (clock, target) => {
+		clock.down(target, 40);
+		clock.up(target, 40);
+		clock.smooth(700);
+		clock.wait(300);
+	};
+
+	it('lets go a few presses taken under settings that then changed, and reports a batch under the ones it was taken with', () => {
+		const target = document.createElement('div');
+		const report = jest.fn();
+		const clock = rig();
+		let smooth = true;
+		watchArrowResponse(target, report, 3, () => ({smooth}));
+		// two taken with it on are no sample, and are let go when it is turned off
+		tapDownWith(clock, target);
+		tapDownWith(clock, target);
+		smooth = false;
+		tapDownWith(clock, target);
+		expect(report).not.toHaveBeenCalled();
+		tapDownWith(clock, target);
+		tapDownWith(clock, target);
+		expect(report).toHaveBeenCalledTimes(1);
+		expect(report.mock.calls[0][0]).toMatchObject({presses: 3, smooth: false});
+		expect(report.mock.calls[0][0].partial).toBeUndefined();
+	});
+
+	it('reports five presses or more as they were when the settings change, marked as cut short', () => {
+		const target = document.createElement('div');
+		const report = jest.fn();
+		const clock = rig();
+		let smooth = false;
+		watchArrowResponse(target, report, 10, () => ({smooth}));
+		[1, 2, 3, 4, 5].forEach(() => tapDownWith(clock, target));
+		smooth = true;
+		tapDownWith(clock, target);
+		expect(report).toHaveBeenCalledTimes(1);
+		expect(report.mock.calls[0][0]).toMatchObject({presses: 5, smooth: false, partial: true});
+	});
+
+	it('reports a batch of a few presses as it is when the app is left, and none that is too short to say anything', () => {
+		const target = document.createElement('div');
+		const report = jest.fn();
+		const clock = rig();
+		watchArrowResponse(target, report, 10);
+		const tapDown = () => {
+			clock.down(target, 40);
+			clock.up(target, 40);
+			clock.smooth(700);
+			clock.wait(300);
+		};
+		[1, 2, 3, 4].forEach(tapDown);
+		Object.defineProperty(document, 'hidden', {value: true, configurable: true});
+		document.dispatchEvent(new Event('visibilitychange'));
+		expect(report).not.toHaveBeenCalled();
+		Object.defineProperty(document, 'hidden', {value: false, configurable: true});
+		tapDown();
+		Object.defineProperty(document, 'hidden', {value: true, configurable: true});
+		document.dispatchEvent(new Event('visibilitychange'));
+		Object.defineProperty(document, 'hidden', {value: false, configurable: true});
+		expect(report).toHaveBeenCalledTimes(1);
+		expect(report.mock.calls[0][0].presses).toBe(5);
+		expect(report.mock.calls[0][0].partial).toBe(true);
+	});
+
 	it('starts a new batch even when the report threw', () => {
 		const target = document.createElement('div');
 		const report = jest.fn(() => { throw new Error('logger'); });

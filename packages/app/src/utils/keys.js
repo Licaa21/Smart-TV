@@ -203,27 +203,45 @@ export const watchArrowHolds = (target = window, report) => {
 // moving, slow while it moves, or both.
 const RESPONSE_WINDOW_MS = 600;
 const SLOW_FRAME_MS = 100;
+// A batch left short by leaving the app is reported from this many presses
+const MIN_REPORTED = 5;
 // A frame this late is a standby, not a lag
 const STANDBY_MS = 120000;
 // A key stamp older than this is from another clock, or a key that sat in a queue for good, and is read as no age
 const RESPONSE_STAMP_MAX_MS = 1000;
+// The same settings, compared by what they say
+const sameContext = (a, b) => {
+	const keys = Object.keys(a);
+	return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
+};
 const spread = (list) => {
 	const sorted = [...list].sort((a, b) => a - b);
 	return [sorted[Math.floor(sorted.length / 2)], sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))], sorted[sorted.length - 1]].map(Math.round);
 };
-export const watchArrowResponse = (target = window, report, every = 20) => {
-	let firsts = [];
-	let worsts = [];
-	let ages = [];
+// Up and down are told apart from left and right, which are different moves (a list slides one way, a row the other).
+// `context` gives what else a report should say about the moment, such as the settings that change the cost of a move.
+const isVertical = (e) => e.keyCode === KEYS.UP || e.keyCode === KEYS.DOWN || /^Arrow(Up|Down)$/.test(e.key || '');
+export const watchArrowResponse = (target = window, report, every = 20, context = () => ({})) => {
+	const empty = () => ({firsts: [], worsts: [], ages: [], ctx: null});
+	const batches = {v: empty(), h: empty()};
 	// Every press watched at the moment, each for its own window, by one loop of frames shared between them
 	let pending = [];
 	let previous = 0;
 	const down = new Map();
-	const flush = () => {
-		const summary = {presses: firsts.length, firstMs: spread(firsts), worstGapMs: spread(worsts), inputAgeMs: spread(ages), slow: worsts.filter((w) => w > SLOW_FRAME_MS).length};
-		firsts = [];
-		worsts = [];
-		ages = [];
+	const flush = (axis, partial) => {
+		const {firsts, worsts, ages, ctx} = batches[axis];
+		const summary = {
+			axis: axis === 'v' ? 'up/down' : 'left/right',
+			presses: firsts.length,
+			firstMs: spread(firsts),
+			worstGapMs: spread(worsts),
+			inputAgeMs: spread(ages),
+			slow: worsts.filter((w) => w > SLOW_FRAME_MS).length,
+			...ctx,
+			// cut short by leaving the app, so not an equal sample beside the full batches
+			...(partial ? {partial: true} : {})
+		};
+		batches[axis] = empty();
 		report(summary);
 	};
 	const step = () => {
@@ -236,15 +254,25 @@ export const watchArrowResponse = (target = window, report, every = 20) => {
 			if (since <= RESPONSE_WINDOW_MS) return true;
 			// A page that was hidden or in standby comes back with a frame hours late, which says nothing about a press
 			if (!press.hidden && press.first < STANDBY_MS && press.worst < STANDBY_MS) {
-				firsts.push(press.first);
-				worsts.push(press.worst);
-				ages.push(press.age);
+				// A batch is reported with the settings it was taken under, so one that spans a change says so in two
+				if (batches[press.axis].ctx && !sameContext(batches[press.axis].ctx, press.ctx)) {
+					// a few presses are no sample: they are let go when the settings change under them
+					if (batches[press.axis].firsts.length >= MIN_REPORTED) flush(press.axis, true);
+					else batches[press.axis] = empty();
+				}
+				const batch = batches[press.axis];
+				batch.ctx = press.ctx;
+				batch.firsts.push(press.first);
+				batch.worsts.push(press.worst);
+				batch.ages.push(press.age);
 			}
 			return false;
 		});
 		previous = at;
 		if (pending.length) window.requestAnimationFrame(step);
-		if (firsts.length >= every) flush();
+		['v', 'h'].forEach((axis) => {
+			if (batches[axis].firsts.length >= every) flush(axis);
+		});
 	};
 	target.addEventListener('keydown', (e) => {
 		if (!isArrow(e)) return;
@@ -258,7 +286,7 @@ export const watchArrowResponse = (target = window, report, every = 20) => {
 		// press itself is counted from here, so the two causes read apart.
 		const stamp = e.timeStamp;
 		const age = stamp > 0 && stamp <= at && at - stamp <= RESPONSE_STAMP_MAX_MS ? at - stamp : 0;
-		pending.push({start: at, first: -1, worst: 0, age, hidden: false});
+		pending.push({start: at, first: -1, worst: 0, age, hidden: false, axis: isVertical(e) ? 'v' : 'h', ctx: context()});
 		if (pending.length === 1) {
 			previous = at;
 			window.requestAnimationFrame(step);
@@ -268,7 +296,12 @@ export const watchArrowResponse = (target = window, report, every = 20) => {
 		down.delete(e.keyCode);
 	}, true);
 	// A page that was hidden while a press was watched answers it hours late, which says nothing about the press
-	(target.document || target.ownerDocument || document).addEventListener('visibilitychange', () => pending.forEach((press) => { press.hidden = true; }));
+	// and what was counted is not lost when the app is left: a batch of a few presses is reported as it is
+	const doc = target.document || target.ownerDocument || document;
+	doc.addEventListener('visibilitychange', () => {
+		pending.forEach((press) => { press.hidden = true; });
+		if (doc.hidden) ['v', 'h'].forEach((axis) => { if (batches[axis].firsts.length >= MIN_REPORTED) flush(axis, true); });
+	});
 };
 
 export const ESSENTIAL_KEY_NAMES = [

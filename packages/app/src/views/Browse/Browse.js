@@ -45,6 +45,7 @@ import {markHomeReady} from '../../utils/homeReady';
 import {homeBackdropStyle} from '../../utils/homeBackdropStyle';
 import {rem} from '../../utils/rootScale';
 import {glideScroll, isGliding, smoothScrollingOn, stopScrollAnimation} from '../../utils/focusScroll';
+import {writingGlide} from '../../utils/glideState';
 import {rowImageType, rowPeekHeight} from './rowPeek';
 
 import css from './Browse.module.less';
@@ -388,7 +389,8 @@ const Browse = ({
 		const top = Math.max(0, targetRow.offsetTop - topbarOffset);
 		if (instant || Date.now() < instantUntilRef.current) {
 			stopScrollAnimation(container);
-			container.scrollTop = top;
+			// A restore is not a move for the slide, whatever key came before it
+			writingGlide(() => { container.scrollTop = top; });
 			return;
 		}
 		glideScroll(container, 'y', top, start);
@@ -445,8 +447,9 @@ const Browse = ({
 
 		// A row is only measured once it renders, so landing on one that was still
 		// standing in at a guessed height leaves it above the screen with its cards
-		// cut off. Settling once it is real puts it where it was asked to go. A glide from rest leaves the move
-		// to the settle passes, so it doesn't set off before the row losing focus has shrunk.
+		// cut off. Settling once it is real puts it where it was asked to go. With Smooth Scrolling on the move is left
+		// to the settle passes, so the slide or glide does not set off before the row losing focus has shrunk. A glide in
+		// the way (a move the slide leaves to it) is retargeted at once, and a slide that waits is corrected by the passes.
 		if (!smoothScrollingOn() || isGliding(container, 'y')) restRowScroll(rowIndex);
 		settleRow(rowIndex, 2, container.scrollTop);
 
@@ -1095,6 +1098,8 @@ const Browse = ({
 					onBlur={handleRowsBlur}
 					style={rowPeek ? {height: rem(rowPeek)} : undefined}
 					data-pointer-rows
+					data-slide-scroll="y"
+					data-slide-content="children"
 				>
 					{filteredRows.map((row, index) => {
 						if (filling && Math.abs(index - landingIndex) > fillStep + 1) {
