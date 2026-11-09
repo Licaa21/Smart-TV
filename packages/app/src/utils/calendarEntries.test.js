@@ -2,8 +2,8 @@ jest.mock('./uiLocale', () => ({uiLocale: () => 'en-US'}));
 
 import {
 	BADGE, PROBLEM, addDays, airsText, buildEntries, calendarAllows, daysBetween, followsEpisode, inLibrary, isoDay, monthGridDays,
-	nextOf, parseRadarrEntries, parseSonarrEntry, problemFrom, readyToWatchOf, recentOf, seriesProgressOf, statusAt,
-	thisWeekOf, upcomingOf, worstProblem
+	backdropOf, nextOf, parseRadarrEntries, parseSonarrEntry, posterOf, problemFrom, readyToWatchOf, recentOf, seriesProgressOf, statusAt,
+	stillOf, thisWeekOf, thumbOf, upcomingOf, withLibraryArt, worstProblem
 } from './calendarEntries';
 
 const series = (extra = {}) => ({
@@ -292,5 +292,56 @@ describe('airsText', () => {
 		const now = new Date(2026, 10, 5, 23, 30);
 		expect(airsText(new Date(2026, 10, 8), now, 'dayMonth')).toBe('In 3 days (8 Nov)');
 		expect(airsText(new Date(2026, 10, 8), now, 'monthDay')).toBe('In 3 days (Nov 8)');
+	});
+});
+
+describe('the artwork of an entry', () => {
+	const imageUrl = (id, type) => `server/${id}/${type}`;
+	const upcoming = () => parseSonarrEntry(episode());
+	const downloaded = () => parseSonarrEntry(episode({hasFile: true, moonfinEpisodeId: 'ep1'}));
+
+	it('takes the series poster and backdrop from the server for an upcoming episode of a series it holds', () => {
+		const e = withLibraryArt(upcoming(), imageUrl);
+		expect(e.library).toEqual({poster: 'server/series1/Primary', backdrop: 'server/series1/Backdrop', still: null});
+	});
+
+	it('takes the picture of a downloaded episode as its still', () => {
+		expect(withLibraryArt(downloaded(), imageUrl).library.still).toBe('server/ep1/Primary');
+	});
+
+	it('takes a movie the server holds by its poster and backdrop', () => {
+		const [entry] = parseRadarrEntries(movie({digitalRelease: '2010-06-01'}), day(2010, 1, 1), day(2010, 12, 31));
+		const e = withLibraryArt(entry, imageUrl);
+		expect(e.library).toEqual({poster: 'server/movie1/Primary', backdrop: 'server/movie1/Backdrop', still: null});
+	});
+
+	it('leaves a title the server has nothing on as it was', () => {
+		const e = parseSonarrEntry(episode({moonfinItemId: null}));
+		expect(withLibraryArt(e, imageUrl)).toBe(e);
+	});
+
+	it('lists the picture from the server before the one from Sonarr, so a missing one falls back', () => {
+		const e = withLibraryArt(upcoming(), imageUrl);
+		expect(posterOf(e)).toEqual(['server/series1/Primary', e.posterUrl]);
+		expect(backdropOf(e)).toEqual(['server/series1/Backdrop', e.backdropUrl]);
+		expect(posterOf(upcoming())).toEqual([upcoming().posterUrl]);
+	});
+
+	it('orders a thumbnail still, then backdrop, then poster, each from the server first', () => {
+		const e = withLibraryArt(downloaded(), imageUrl);
+		expect(thumbOf(e, false)).toEqual([
+			'server/ep1/Primary', e.stillUrl, 'server/series1/Backdrop', e.backdropUrl, 'server/series1/Primary', e.posterUrl
+		]);
+	});
+
+	it('leaves the stills out while spoilers are hidden', () => {
+		const e = withLibraryArt(downloaded(), imageUrl);
+		expect(stillOf(e, true)).toEqual([]);
+		expect(thumbOf(e, true)).not.toContain('server/ep1/Primary');
+		expect(thumbOf(e, true)[0]).toBe('server/series1/Backdrop');
+	});
+
+	it('is empty for an entry with no art at all', () => {
+		expect(thumbOf({}, false)).toEqual([]);
 	});
 });

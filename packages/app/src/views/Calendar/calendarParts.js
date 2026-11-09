@@ -66,17 +66,26 @@ export const CalendarTag = ({label, color}) => (
 	<span className={css.tag} style={{color: toCssColor(color), background: toCssColorWithAlpha(color, 0.18)}}>{label}</span>
 );
 
-// TMDB sizes the artwork by its path, and a thumbnail this small doesn't need the big file.
-const thumbSized = (url) => (url ? url.replace(/\/t\/p\/(original|w\d+)\//, '/t/p/w300/') : null);
+// TMDB sizes the artwork by its path and the server by maxWidth, and a thumbnail this small doesn't need the big file.
+const thumbSized = (url) => (url ? url.replace(/\/t\/p\/(original|w\d+)\//, '/t/p/w300/').replace(/([?&]maxWidth=)\d+/, '$1480') : null);
 
-/** Artwork with a plain fallback, so a title with no art still holds its slot. */
+/**
+ * Artwork with a plain fallback, so a title with no art still holds its slot. url is one address or a
+ * list to try in order: a picture that fails to load gives way to the next.
+ */
 export const CalendarArt = ({url, icon, className, thumb}) => {
-	const [failed, setFailed] = useState(null);
-	const src = url ? seerrApi.getImageUrl(thumb ? thumbSized(url) : url) : null;
-	const handleError = useCallback(() => setFailed(src), [src]);
+	const urls = [].concat(url || []);
+	const key = urls.join('|');
+	const [failed, setFailed] = useState({key, count: 0});
+	// A new list starts from its first picture, so one seen before does not resume where it failed.
+	if (failed.key !== key) setFailed({key, count: 0});
+	const {count} = failed;
+	const next = urls[count];
+	const src = next ? seerrApi.getImageUrl(thumb ? thumbSized(next) : next) : null;
+	const handleError = useCallback(() => setFailed({key, count: count + 1}), [key, count]);
 	return (
 		<div className={`${css.art} ${className || ''}`}>
-			{src && failed !== src ? (
+			{src ? (
 				<img className={css.artImage} src={src} alt="" loading="lazy" onError={handleError} />
 			) : (
 				<CalendarIcon name={icon} className={css.artFallback} />
@@ -136,9 +145,6 @@ export const titleButton = (e, actions) => ({
 	icon: isEpisode(e) ? 'tv_rounded' : 'info_outline_rounded',
 	onClick: () => actions.openTitle(e)
 });
-
-/** The episode still when spoilers allow it, otherwise the series or movie backdrop. */
-export const thumbOf = (e, hideSpoilers) => (!hideSpoilers && e.stillUrl) || e.backdropUrl || e.posterUrl;
 
 export const problemText = (problem, seerrLabel) => {
 	switch (problem) {
