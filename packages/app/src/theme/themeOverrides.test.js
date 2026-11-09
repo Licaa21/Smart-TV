@@ -315,6 +315,14 @@ describe('per-surface accents', () => {
 			expect(withHandRule(lines, '.listItem:focus .listItemHeading')).toContain('rgba(0, 0, 0, 0.96)');
 		});
 
+		it('gives the Settings pickers and checklists the picked focus fill, with the ink read from it', () => {
+			const option = (accents) => rulesFor(accents).find((line) => line.includes('.dialogOption:focus,') && line.includes('.checkRow:focus {'));
+			expect(option({settingsFocus: '#ffffff'})).toContain('background: rgb(255, 255, 255)');
+			expect(option({settingsFocus: '#ffffff'})).toContain('color: rgba(0, 0, 0, 0.96)');
+			// With no pick the theme's own focused button color stays, as it was
+			expect(option({})).toContain('background: ');
+		});
+
 		it('gives the details buttons the picked fill and readable icons', () => {
 			const lines = rulesFor({details: '#ffffff'});
 			expect(withHandRule(lines, '.btnWrapper:focus .btnAction {')).toContain('background: rgb(255, 255, 255)');

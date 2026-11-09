@@ -455,7 +455,7 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 	rule(`.${settingsCss.appBarTitle}`, `color: ${onSurface};`);
 	rule(`.${settingsCss.sectionTitle}`, `color: ${settingsAccent.css};`);
 	// Pickers and checklists follow Core's dialog theme: the surface made opaque, the theme's
-	// corners, accent controls, and rows that fill with the focused button color under black ink.
+	// corners, accent controls, and rows that fill with the Settings Focus color (the focused button color unless picked) under its ink.
 	const dialogShape = theme.isGlass
 		? `border-radius: ${rem(20)}; border: ${rem(1)} solid rgba(255, 255, 255, 0.2);`
 		: (theme.isPixel ? `border-radius: 0; border: ${rem(2)} solid ${surfaceVariant};` : '');
@@ -464,19 +464,19 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		rule(`.${settingsCss.dialogOption}, .${settingsCss.checkRow}, .${settingsCss.dialogFilledButton}`, 'border-radius: 0;');
 	}
 	rule(`.${settingsCss.dialogOption}, .${settingsCss.checkRow}`, `color: ${onSurface};`);
-	rule(`.${settingsCss.dialogOption}:focus, .${settingsCss.checkRow}:focus`, `background: ${buttonFocused}; color: rgba(0, 0, 0, 0.87);`);
+	rule(`.${settingsCss.dialogOption}:focus, .${settingsCss.checkRow}:focus`, `background: ${settingsFocus.fill}; color: ${settingsFocus.strong};`);
 	rule(`.${settingsCss.dialogRadio}`, `color: ${os(0.45)};`);
-	rule(`.${settingsCss.dialogRadioOn}`, `color: ${settingsAccent.css};`);
-	rule(`.${settingsCss.dialogOption}:focus .${settingsCss.dialogRadio}`, 'color: rgba(0, 0, 0, 0.5);');
-	rule(`.${settingsCss.dialogOption}:focus .${settingsCss.dialogRadioOn}`, 'color: rgba(0, 0, 0, 0.87);');
+	rule(`.${settingsCss.dialogRadioOn}`, `color: ${settingsMark};`);
+	rule(`.${settingsCss.dialogOption}:focus .${settingsCss.dialogRadio}`, `color: ${settingsFocus.soft};`);
+	rule(`.${settingsCss.dialogOption}:focus .${settingsCss.dialogRadioOn}`, `color: ${settingsFocus.strong};`);
 	rule(`.${settingsCss.dialogHint}`, `color: ${os(0.65)};`);
-	rule(`.${settingsCss.dialogOption}:focus .${settingsCss.dialogHint}`, 'color: rgba(0, 0, 0, 0.6);');
-	rule(`.${settingsCss.checkBox}`, `border-color: ${settingsAccent.css};`);
-	rule(`.${settingsCss.checkBoxOn}`, `background: ${settingsAccent.css}; color: ${settingsAccent.on};`);
-	rule(`.${settingsCss.checkRow}:focus .${settingsCss.checkBox}`, 'border-color: rgba(0, 0, 0, 0.8);');
-	rule(`.${settingsCss.checkRow}:focus .${settingsCss.checkBoxOn}`, 'border-color: rgba(0, 0, 0, 0.87); background: rgba(0, 0, 0, 0.87); color: #fff;');
-	rule(`.${settingsCss.dialogButton}`, `color: ${settingsAccent.css};`);
-	rule(`.${settingsCss.dialogButton}:focus`, `background: ${settingsAccent.a(0.1)};`);
+	rule(`.${settingsCss.dialogOption}:focus .${settingsCss.dialogHint}`, `color: ${settingsFocus.soft};`);
+	rule(`.${settingsCss.checkBox}`, `border-color: ${settingsMark};`);
+	rule(`.${settingsCss.checkBoxOn}`, `background: ${settingsMark}; color: ${settingsMarkInk};`);
+	rule(`.${settingsCss.checkRow}:focus .${settingsCss.checkBox}`, `border-color: ${settingsFocus.soft};`);
+	rule(`.${settingsCss.checkRow}:focus .${settingsCss.checkBoxOn}`, `border-color: ${settingsFocus.strong}; background: ${settingsFocus.strong}; color: ${settingsFocus.fill};`);
+	rule(`.${settingsCss.dialogButton}`, `color: ${settingsMark};`);
+	rule(`.${settingsCss.dialogButton}:focus`, `background: ${settingsMarkA(0.1)};`);
 	rule(`.${settingsCss.dialogFilledButton}`, `background: ${buttonNormal}; color: ${onButtonNormal};`);
 	rule(`.${settingsCss.dialogFilledButton}:focus`, `background: ${buttonNormal}; background-image: linear-gradient(${toCssColorWithAlpha(c.onButtonNormal, 0.1)}, ${toCssColorWithAlpha(c.onButtonNormal, 0.1)});`);
 	// Neon Pulse's dialog titles glow in its accent, and the pixel theme sets the picker's title in its own font

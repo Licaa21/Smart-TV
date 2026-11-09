@@ -365,6 +365,9 @@ const Browse = ({
 	const settingsRef = useRef(settings);
 	settingsRef.current = settings;
 
+	// A hidden Home loses its scroll, so the rows put back on a return are not glided down from the top: until this time
+	// the rows are put at their place at once
+	const instantUntilRef = useRef(0);
 	// `instant` puts the rows there at once, for a return that has to be in place before the first paint
 	const restRowScroll = useCallback((rowIndex, start, instant) => {
 		const container = contentRowsRef.current;
@@ -383,7 +386,7 @@ const Browse = ({
 		const {showTopInfoArea: overlay, navbarPosition} = liveRef.current;
 		const topbarOffset = overlay && navbarPosition !== 'left' ? 20 : 0;
 		const top = Math.max(0, targetRow.offsetTop - topbarOffset);
-		if (instant) {
+		if (instant || Date.now() < instantUntilRef.current) {
 			stopScrollAnimation(container);
 			container.scrollTop = top;
 			return;
@@ -623,6 +626,7 @@ const Browse = ({
 				initialFocusSetRef.current = true;
 				const above = focusableRowFrom(nearest, -1);
 				setBrowseMode('rows');
+				instantUntilRef.current = Date.now() + 300;
 				scrollToRow(above >= 0 ? above : focusableRowFrom(nearest, 1), true, cardIndex);
 			} else if (showFeaturedBar !== false && featuredItems.length > 0) {
 				setBrowseMode('featured');
