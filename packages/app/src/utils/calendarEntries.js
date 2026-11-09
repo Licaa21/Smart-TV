@@ -171,6 +171,31 @@ export const parseRadarrEntries = (json, start, end) => {
 	return out;
 };
 
+/**
+ * The server's own pictures for an entry it holds: the series or movie poster and backdrop, and the
+ * still of a downloaded episode. imageUrl(id, type, options) builds the address. An entry the server
+ * has nothing on comes back as it was.
+ */
+export const withLibraryArt = (e, imageUrl) => {
+	if (!e.itemId && !e.episodeId) return e;
+	return {
+		...e,
+		library: {
+			poster: e.itemId ? imageUrl(e.itemId, 'Primary', {maxHeight: 450}) : null,
+			backdrop: e.itemId ? imageUrl(e.itemId, 'Backdrop', {maxWidth: 1280}) : null,
+			still: e.episodeId ? imageUrl(e.episodeId, 'Primary', {maxWidth: 780}) : null
+		}
+	};
+};
+
+// Pictures to try in order, the server's own first, so one it does not have falls back to Sonarr's or Radarr's.
+const pictures = (...urls) => urls.filter(Boolean);
+export const posterOf = (e) => pictures(e.library?.poster, e.posterUrl);
+export const backdropOf = (e) => pictures(e.library?.backdrop, e.backdropUrl);
+export const stillOf = (e, hideSpoilers) => (hideSpoilers ? [] : pictures(e.library?.still, e.stillUrl));
+/** The episode still when spoilers allow it, then the backdrop, then the poster. */
+export const thumbOf = (e, hideSpoilers) => [...stillOf(e, hideSpoilers), ...backdropOf(e), ...posterOf(e)];
+
 export const isEpisode = (e) => e.kind === 'episode';
 export const isMovie = (e) => e.kind === 'movie';
 

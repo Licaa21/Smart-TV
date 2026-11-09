@@ -5,9 +5,9 @@ import Spottable from '@enact/spotlight/Spottable';
 import {useSettings} from '../../context/SettingsContext';
 import {uiLocale} from '../../utils/uiLocale';
 import {formatShortDayName} from '../../utils/dateFormat';
-import {inLibrary, recentOf, sameDay, upcomingOf} from '../../utils/calendarEntries';
+import {backdropOf, inLibrary, recentOf, sameDay, stillOf, thumbOf, upcomingOf} from '../../utils/calendarEntries';
 import {
-	CalendarArt, CalendarButton, CalendarTag, artIcon, calendarDayName, calendarSubtitle, calendarTime, calendarWhen, centerIn, focusedSpotlightId, thumbOf, titleButton
+	CalendarArt, CalendarButton, CalendarTag, artIcon, calendarDayName, calendarSubtitle, calendarTime, calendarWhen, centerIn, focusedSpotlightId, titleButton
 } from './calendarParts';
 import CalendarState from './CalendarState';
 
@@ -105,14 +105,14 @@ const Preview = ({entry: e, c, look, actions, clockDisplay, dateFormat, onBackTo
 	const spoilers = c.hidesSpoilers(e);
 	const kicker = [look.badgeOf(e), calendarWhen(e, c.today, clockDisplay, dateFormat)].filter(Boolean).join(' · ');
 	const subtitle = calendarSubtitle(e, spoilers);
-	const art = (!spoilers && e.stillUrl) || e.backdropUrl;
+	const art = [...stillOf(e, spoilers), ...backdropOf(e)];
 	const buttons = [];
 	if (inLibrary(e)) buttons.push({key: 'play', label: $L('Play'), icon: 'play_arrow_rounded', primary: true, onClick: () => actions.play(e)});
 	if (actions.showsRequest(e)) buttons.push({key: 'request', label: $L('Request'), icon: 'add_rounded', primary: !inLibrary(e), onClick: () => actions.request(e)});
 	if (actions.canOpen(e)) buttons.push(titleButton(e, actions));
 	return (
 		<div className={css.preview}>
-			<CalendarArt key={art || 'none'} url={art} icon={artIcon(e)} className={css.previewArt} />
+			<CalendarArt key={art.join('|') || 'none'} url={art} icon={artIcon(e)} className={css.previewArt} />
 			<div className={css.previewScrim} style={{background: `linear-gradient(to bottom, ${look.bg(0.1)} 0%, ${look.bg(0.75)} 50%, ${look.bg(0.97)} 100%)`}} />
 			<div className={css.previewInfo}>
 				<div className={css.kicker} style={{color: look.color(e, c.now)}}>{kicker}</div>

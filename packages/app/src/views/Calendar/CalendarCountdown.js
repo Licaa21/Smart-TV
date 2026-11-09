@@ -4,8 +4,8 @@ import Spotlight from '@enact/spotlight';
 import Spottable from '@enact/spotlight/Spottable';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 import {useSettings} from '../../context/SettingsContext';
-import {inLibrary, nextOf, pad, readyToWatchOf, thisWeekOf} from '../../utils/calendarEntries';
-import {CalendarArt, CalendarButton, artIcon, calendarSubtitle, calendarWhen, centerIn, focusedSpotlightId, thumbOf, titleButton, READY_COLOR} from './calendarParts';
+import {backdropOf, inLibrary, nextOf, pad, posterOf, readyToWatchOf, stillOf, thisWeekOf, thumbOf} from '../../utils/calendarEntries';
+import {CalendarArt, CalendarButton, artIcon, calendarSubtitle, calendarWhen, centerIn, focusedSpotlightId, titleButton, READY_COLOR} from './calendarParts';
 import {toCssColor} from '../../theme/themeSpec';
 import CalendarState from './CalendarState';
 
@@ -49,7 +49,7 @@ const Hero = ({entry: e, counting, c, look, actions, clockDisplay, dateFormat, o
 		? [look.badgeOf(e), calendarWhen(e, c.today, clockDisplay, dateFormat)].filter(Boolean).join(' · ')
 		: $L('Ready to watch');
 	const subtitle = calendarSubtitle(e, spoilers);
-	const art = e.backdropUrl || (!spoilers ? e.stillUrl : null);
+	const art = [...backdropOf(e), ...stillOf(e, spoilers)];
 	const buttons = [];
 	if (!counting && inLibrary(e)) buttons.push({key: 'play', label: $L('Play'), icon: 'play_arrow_rounded', primary: true, onClick: () => actions.play(e)});
 	if (actions.showsRequest(e)) buttons.push({key: 'request', label: $L('Request'), icon: 'add_rounded', onClick: () => actions.request(e)});
@@ -62,7 +62,7 @@ const Hero = ({entry: e, counting, c, look, actions, clockDisplay, dateFormat, o
 	}, []);
 	return (
 		<div className={css.hero} style={{background: look.bg(1)}} onFocus={handleFocus}>
-			<CalendarArt key={art || 'none'} url={art} icon={artIcon(e)} className={css.heroArt} />
+			<CalendarArt key={art.join('|') || 'none'} url={art} icon={artIcon(e)} className={css.heroArt} />
 			<div className={css.heroScrim} style={{background: `linear-gradient(to right, ${look.bg(1)} 0%, ${look.bg(0.92)} 38%, ${look.bg(0.15)} 75%)`}} />
 			<div className={css.heroInfo}>
 				<div className={css.kicker} style={{color: counting ? look.color(e, c.now) : toCssColor(READY_COLOR)}}>{kicker}</div>
@@ -92,7 +92,7 @@ const Card = memo(({entry: e, poster, look, now, today, spoilers, clockDisplay, 
 	const line = inLibrary(e) ? calendarSubtitle(e, spoilers) : calendarWhen(e, today, clockDisplay, dateFormat);
 	return (
 		<SpottableDiv className={`${css.card} ${poster ? css.cardPoster : css.cardThumb}`} onClick={handleClick} onFocus={handleFocus} spotlightId={`calendar-card-${e.key}`}>
-			<CalendarArt url={poster ? e.posterUrl : thumbOf(e, spoilers)} icon={artIcon(e)} className={css.cardArt} thumb />
+			<CalendarArt url={poster ? posterOf(e) : thumbOf(e, spoilers)} icon={artIcon(e)} className={css.cardArt} thumb />
 			<div className={css.cardTitle}>{e.title}</div>
 			<div className={css.cardLine} style={{color: look.color(e, now)}}>{line}</div>
 		</SpottableDiv>

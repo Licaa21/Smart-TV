@@ -1,4 +1,4 @@
-import {cubicBezier, glideScroll, glideToCard, setSmoothScrolling, whenStill} from './focusScroll';
+import {cubicBezier, glideScroll, glideToCard, glideUnderway, setSmoothScrolling, whenStill} from './focusScroll';
 
 jest.mock('@enact/spotlight', () => ({getPointerMode: () => false}));
 
@@ -125,5 +125,21 @@ describe('focus glides', () => {
 		runFor(300);
 		runFor(16);
 		expect(held).toHaveBeenCalled();
+	});
+
+	it('tells while a glide is under way, and a glide takes about 160 ms from its first frame', () => {
+		expect(glideUnderway()).toBe(false);
+		const node = lane(0);
+		glideScroll(node, 'x', 500, 0);
+		expect(glideUnderway()).toBe(true);
+		// the clock starts a frame in (16 ms before the first frame at 100), so the glide ends at 84 + 160 = 244
+		runFor(100);
+		expect(glideUnderway()).toBe(true);
+		runFor(140);
+		expect(glideUnderway()).toBe(true);
+		expect(node.scrollLeft).toBeGreaterThan(400);
+		runFor(20);
+		expect(glideUnderway()).toBe(false);
+		expect(node.scrollLeft).toBe(500);
 	});
 });

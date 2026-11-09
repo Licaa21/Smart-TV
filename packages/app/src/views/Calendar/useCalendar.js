@@ -4,7 +4,8 @@ import {useSettings} from '../../context/SettingsContext';
 import {useSeerr} from '../../context/SeerrContext';
 import {loadCalendar, seriesProgress} from '../../services/calendarApi';
 import {shiftedNow} from '../../utils/clock';
-import {addDays, behindOnSeries, calendarAllows, followsSeries, isEpisode, isoDay, startOfDay} from '../../utils/calendarEntries';
+import {getImageUrl} from '../../utils/helpers';
+import {addDays, behindOnSeries, calendarAllows, followsSeries, isEpisode, isoDay, startOfDay, withLibraryArt} from '../../utils/calendarEntries';
 
 // Minutes are the smallest unit the countdown shows, so a tick every 20 s keeps it within a third
 // of a minute.
@@ -78,11 +79,16 @@ const useCalendar = ({tick = false} = {}) => {
 
 	const {calendarShowEpisodes, calendarShowMovies, calendarShowSpecials, calendarScope, calendarLibraryIds,
 		radarrCalendarShowCinema, radarrCalendarShowDigital, radarrCalendarShowPhysical} = settings;
+	// Made once per load, so an entry keeps its identity when only a filter changes.
+	const withArt = useMemo(() => {
+		const imageUrl = (id, type, options) => getImageUrl(serverUrl, id, type, options);
+		return state.all.map((e) => withLibraryArt(e, imageUrl));
+	}, [state.all, serverUrl]);
 	const entries = useMemo(() => {
 		const filter = {calendarShowEpisodes, calendarShowMovies, calendarShowSpecials, calendarScope, calendarLibraryIds,
 			radarrCalendarShowCinema, radarrCalendarShowDigital, radarrCalendarShowPhysical};
-		return state.all.filter((e) => calendarAllows(e, filter, followed));
-	}, [state.all, followed, calendarShowEpisodes, calendarShowMovies, calendarShowSpecials, calendarScope, calendarLibraryIds,
+		return withArt.filter((e) => calendarAllows(e, filter, followed));
+	}, [withArt, followed, calendarShowEpisodes, calendarShowMovies, calendarShowSpecials, calendarScope, calendarLibraryIds,
 		radarrCalendarShowCinema, radarrCalendarShowDigital, radarrCalendarShowPhysical]);
 
 	const spoilerSafe = settings.calendarSpoilerSafe === true;
