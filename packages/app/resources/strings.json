@@ -3291,5 +3291,12 @@
 	"Month / Day (Nov 10)": "Month / Day (Nov 10)",
 	"Day / Month (10 Nov)": "Day / Month (10 Nov)",
 	"Date Format": "Date Format",
-	"Choose between month-day, day-month, or locale default for calendar and release dates": "Choose between month-day, day-month, or locale default for calendar and release dates"
+	"Choose between month-day, day-month, or locale default for calendar and release dates": "Choose between month-day, day-month, or locale default for calendar and release dates",
+	"Episode Director": "Episode Director",
+	"{role} (Episode Director)": "{role} (Episode Director)",
+	"Episode Writer": "Episode Writer",
+	"{role} (Episode Writer)": "{role} (Episode Writer)",
+	"Guest Star": "Guest Star",
+	"{role} (Guest Star)": "{role} (Guest Star)",
+	"Remember PIN on this device": "Remember PIN on this device"
 }
