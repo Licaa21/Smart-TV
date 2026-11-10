@@ -3492,5 +3492,12 @@
     "{name} skipped to {time}": "{name} a sărit la {time}",
     "{name} started a watch party": "{name} a pornit un watch party",
     "{name} switched to {title}": "{name} a trecut la {title}",
-    "Voted": "A votat"
+    "Voted": "A votat",
+    "Episode Director": "Regizor episod",
+    "{role} (Episode Director)": "{role} (regizor episod)",
+    "Episode Writer": "Scenarist episod",
+    "{role} (Episode Writer)": "{role} (scenarist episod)",
+    "Guest Star": "Actor invitat",
+    "{role} (Guest Star)": "{role} (actor invitat)",
+    "Remember PIN on this device": "Ține minte PIN-ul pe acest dispozitiv"
 }
