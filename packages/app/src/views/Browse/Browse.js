@@ -50,7 +50,7 @@ import {homeBackdropStyle} from '../../utils/homeBackdropStyle';
 import {rem} from '../../utils/rootScale';
 import {glideScroll, isGliding, smoothScrollingOn, stopScrollAnimation} from '../../utils/focusScroll';
 import {writingGlide} from '../../utils/glideState';
-import {homeRowSpacing} from '../../components/MediaCard/modernCardLayout';
+import {homeRowSpacing, isCarouselRow} from '../../components/MediaCard/modernCardLayout';
 import {rowImageType, rowPeekHeight} from './rowPeek';
 
 import css from './Browse.module.less';
@@ -1010,7 +1010,7 @@ const Browse = ({
 				<div className={`${css.mainContent} ${navOffsetClass}`}>
 					<SkeletonShimmer className={`${css.contentRows} ${rowsClipClass}`}>
 						{LOADING_ROW_TITLE_WIDTHS.map((titleWidth, index) => (
-							<RowComponent key={index} loading titleWidth={titleWidth} rowSpacing={rowSpacing} />
+							<RowComponent key={index} loading titleWidth={titleWidth} rowSpacing={rowSpacing} carousel={isCarouselRow({}, settings)} />
 						))}
 					</SkeletonShimmer>
 				</div>
@@ -1159,6 +1159,7 @@ const Browse = ({
 									subtitle={row.subtitle}
 									cardType={row.type}
 									rowSpacing={rowSpacing}
+									carousel={isCarouselRow(row, settings)}
 								/>
 							);
 						}
@@ -1299,6 +1300,7 @@ const Browse = ({
 								onLoadMore={row.hasMore ? loadMoreRow : undefined}
 								onCalendarSeeAll={seeAllTarget || (calendarSeeAll && CALENDAR_ROW_IDS.indexOf(row.id) >= 0) ? rowSelect.seeAll : undefined}
 								seeAllIcon={seeAllTarget ? 'grid_view_rounded' : undefined}
+								carousel={isCarouselRow(row, settings)}
 							/>
 						);
 					})}

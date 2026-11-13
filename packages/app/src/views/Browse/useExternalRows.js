@@ -49,6 +49,7 @@ const useExternalRows = ({settings, homeRows, kidsMode, pluginInfo = null, serve
 	const tmdbAvailable = pluginInfo?.tmdbAvailable === true;
 	const mdblistAvailable = pluginInfo?.mdblistAvailable === true;
 	const calendarAvailable = pluginInfo?.calendarAvailable === true;
+	const discoverChartsSupported = pluginInfo?.discoverChartsSupported === true;
 
 	// A refresh the viewer asked for, which brings these rows in again as well as the library's.
 	const [reloadKey, setReloadKey] = useState(0);
@@ -61,13 +62,14 @@ const useExternalRows = ({settings, homeRows, kidsMode, pluginInfo = null, serve
 	}, []);
 
 	useEffect(() => {
-		const info = hasPlugin ? {tmdbAvailable, mdblistAvailable, calendarAvailable} : null;
+		const info = hasPlugin ? {tmdbAvailable, mdblistAvailable, calendarAvailable, discoverChartsSupported} : null;
 		// The rows arrive already filtered, and the pasted list rows go the way the plugin rows do,
 		// since nothing here can vouch for what an outside catalogue returns.
 		const rows = homeRows || settings.homeRows || [];
 		const keys = {useMoonfinPlugin: settings.useMoonfinPlugin, tmdbApiKey: settings.tmdbApiKey, mdblistApiKey: settings.mdblistApiKey};
 		const shown = (r) => r.enabled && isExternalRowAvailable(r.id, {settings: keys, pluginInfo: info, serverType}) === true;
-		const enabledPresets = rows.filter((r) => (r.id.startsWith('tmdb_') || r.id.startsWith('imdb-')) && shown(r)).map((r) => r.id);
+		const presetConfigs = getExternalHomeRowConfigs();
+		const enabledPresets = rows.filter((r) => presetConfigs.some((c) => c.id === r.id) && shown(r)).map((r) => r.id);
 		const customRows = kidsMode || !settings.useMoonfinPlugin ? [] : (settings.customHomeRows || []).filter((r) => r.enabled);
 		const radarrEnabled = rows.some((r) => r.id === 'radarr_calendar' && shown(r));
 		const sonarrEnabled = rows.some((r) => r.id === 'sonarr_calendar' && shown(r));
@@ -129,7 +131,6 @@ const useExternalRows = ({settings, homeRows, kidsMode, pluginInfo = null, serve
 			return stopWork;
 		}
 
-		const presetConfigs = getExternalHomeRowConfigs();
 		const pendingRows = [
 			...enabledPresets
 				.map((id) => presetConfigs.find((c) => c.id === id))
@@ -275,7 +276,7 @@ const useExternalRows = ({settings, homeRows, kidsMode, pluginInfo = null, serve
 
 		return stopWork;
 	}, [settings.useMoonfinPlugin, homeRows, kidsMode, settings.homeRows, settings.customHomeRows,
-		settings.uiLanguage, hasPlugin, tmdbAvailable, mdblistAvailable, calendarAvailable, serverType,
+		settings.uiLanguage, hasPlugin, tmdbAvailable, mdblistAvailable, calendarAvailable, discoverChartsSupported, serverType,
 		settings.tmdbApiKey, settings.mdblistApiKey,
 		settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays, settings.seasonalRowAllYear,
 		settings.mergeRadarrSonarrCalendars,

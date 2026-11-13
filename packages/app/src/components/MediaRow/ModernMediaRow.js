@@ -11,6 +11,7 @@ import {MODERN_CAPTION_ROOM, modernCardMetrics} from '../MediaCard/modernCardLay
 import PlaceholderRow from './PlaceholderRow';
 import {useWarmRow, cardPosition} from './warmWindow';
 import CalendarSeeAllCard from './CalendarSeeAllCard';
+import CarouselPanel from './CarouselPanel';
 import {nearRowEnd} from '../../views/Browse/rowPaging';
 
 import css from './ModernMediaRow.module.less';
@@ -57,9 +58,11 @@ const ModernMediaRow = ({
 	hideUnwatchedCount = false,
 	leadingInset = 0,
 	onCalendarSeeAll,
-	seeAllIcon
+	seeAllIcon,
+	carousel = false
 }) => {
 	const {settings} = useSettings();
+	const lastFocusedIdRef = useRef(null);
 	const scrollerRef = useRef(null);
 	const scrollerLayoutRef = useRef(null);
 	const scrollTimeoutRef = useRef(null);
@@ -169,6 +172,8 @@ const ModernMediaRow = ({
 					cardStart += parseFloat(cards[i].style.width) + layout.gap;
 				}
 				scroller.scrollLeft = cardStart;
+				// Carousel cards leave their details to the panel, so there's no width to hand them.
+				if (carousel) return;
 				const cardLeft = layout.paddingLeft + cardStart - scroller.scrollLeft;
 				setDetails({
 					spotlightId: grownCard.getAttribute('data-spotlight-id'),
@@ -176,7 +181,7 @@ const ModernMediaRow = ({
 				});
 			});
 		}
-	}, [onFocus, rowIndex, items, onLoadMore, itemCount, rowId, noteFocus]);
+	}, [onFocus, rowIndex, items, onLoadMore, itemCount, rowId, noteFocus, carousel]);
 
 	const handleBlur = useCallback((e) => {
 		const nextTarget = e.relatedTarget;
@@ -231,6 +236,7 @@ const ModernMediaRow = ({
 		platform === 'tizen' ? css.platformTizen : '',
 		settings.fullScreenRows === true ? css.fullScreenRows : '',
 		coreLook ? css.coreLook : '',
+		carousel ? css.carousel : '',
 		typeof document !== 'undefined' && document.documentElement.classList.contains('legacy') ? css.platformLegacy : ''
 	].filter(Boolean).join(' ');
 	const rowStyle = typeof rowSpacing === 'number' ? {marginBottom: rowSpacing + 'px'} : undefined;
@@ -254,15 +260,21 @@ const ModernMediaRow = ({
 				cardWidth={cardWidth}
 				imageHeight={imageHeight}
 				isModern
-			/>
+			>
+				{carousel && <CarouselPanel />}
+			</PlaceholderRow>
 		);
 	}
 
 	if (!items || items.length === 0) return null;
 
 	const focusedIndex = focusedItemId ? items.findIndex((item) => item.Id === focusedItemId) : -1;
+	// The Carousel panel shows the card focus last stood on while the row has none
+	if (focusedIndex >= 0) lastFocusedIdRef.current = focusedItemId;
+	const landingIndex = Math.max(0, items.findIndex((item) => item.Id === lastFocusedIdRef.current));
 	// Every row keeps room for three caption lines, so the next row never sits on a card's text.
-	const captionFloor = modernCardMetrics({posterSize: settings.homeRowsPosterSize}).imageHeight + MODERN_CAPTION_ROOM;
+	// Carousel cards have no captions, so the panel sits right under them.
+	const captionFloor = carousel ? 0 : modernCardMetrics({posterSize: settings.homeRowsPosterSize}).imageHeight + MODERN_CAPTION_ROOM;
 
 	return (
 		<RowContainer
@@ -309,6 +321,7 @@ const ModernMediaRow = ({
 								posterLabels={posterLabels}
 								hideWatchProgress={hideWatchProgress}
 								hideUnwatchedCount={hideUnwatchedCount}
+								carousel={carousel}
 							/>
 						);
 					})}
@@ -324,6 +337,7 @@ const ModernMediaRow = ({
 					)}
 				</div>
 			</div>
+			{carousel && <CarouselPanel item={items[focusedIndex >= 0 ? focusedIndex : landingIndex]} serverUrl={serverUrl} hideOverview={hideOverview} rowFocused={focusedIndex >= 0} deferImage={deferImages} />}
 		</RowContainer>
 	);
 };
@@ -346,7 +360,7 @@ const areRowPropsEqual = (prev, next) => {
 	if (prev.deferImages !== next.deferImages || prev.ratingsSurface !== next.ratingsSurface || prev.hideOverview !== next.hideOverview) return false;
 	if (prev.coreLook !== next.coreLook || prev.leadingInset !== next.leadingInset || prev.posterLabels !== next.posterLabels) return false;
 	if (prev.hideWatchProgress !== next.hideWatchProgress || prev.hideUnwatchedCount !== next.hideUnwatchedCount) return false;
-	if (!prev.onCalendarSeeAll !== !next.onCalendarSeeAll) return false;
+	if (!prev.onCalendarSeeAll !== !next.onCalendarSeeAll || prev.carousel !== next.carousel) return false;
 	if (prev.items === next.items) return true;
 	if (prev.items?.length !== next.items?.length) return false;
 	for (let i = 0; i < prev.items.length; i++) {
