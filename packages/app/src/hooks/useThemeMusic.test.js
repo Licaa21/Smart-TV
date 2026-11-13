@@ -470,4 +470,26 @@ describe("useThemeMusic asked for the track that's fading out", () => {
 		expect(audio.volume).toBeCloseTo(0.3);
 		expect(jellyfinApi.api.getThemeSongs).toHaveBeenCalledTimes(1);
 	});
+
+	test('a delayed start for the same card turns the fade-out around and does not fetch again', async () => {
+		mockSettings.themeMusicOnHomeRows = true;
+		const {result} = renderHook(() => useThemeMusic());
+		await startPlaying(result);
+		await act(() => Promise.resolve());
+		act(() => jest.advanceTimersByTime(1500));
+		const audio = FakeAudio.last;
+
+		act(() => result.current.stopThemeMusic());
+		act(() => jest.advanceTimersByTime(750));
+		const halfway = audio.volume;
+		expect(halfway).toBeLessThan(0.3);
+
+		act(() => result.current.playThemeMusicDelayed('item1'));
+		act(() => jest.advanceTimersByTime(3000));
+		expect(FakeAudio.last).toBe(audio);
+		expect(audio.paused).toBe(false);
+		expect(audio.volume).toBeCloseTo(0.3);
+		expect(jellyfinApi.api.getThemeSongs).toHaveBeenCalledTimes(1);
+		delete mockSettings.themeMusicOnHomeRows;
+	});
 });

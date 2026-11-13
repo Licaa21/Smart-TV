@@ -263,11 +263,11 @@ const rowShowing = (key, focusRowId) => {
 // An item with the artwork its card on Home picks: the modern card's at rest and focused, or the
 // classic card's for the row's image type. A wide classic card without that art falls back to
 // a thumb or backdrop, and a genre card draws on one of its own items.
-const previewItem = (item, {modern, imageType, shape, serverUrl, useSeriesThumbnails, isStaticMyMedia}) => {
+const previewItem = (item, {modern, imageType, shape, serverUrl, useSeriesThumbnails, isStaticMyMedia, posterSize}) => {
 	const adapted = adaptItem(item);
 	const itemServerUrl = item._serverUrl || serverUrl;
 	if (modern) {
-		const look = {itemServerUrl, isStaticMyMedia, useSeriesThumbnails};
+		const look = {itemServerUrl, isStaticMyMedia, useSeriesThumbnails, posterSize};
 		return {...adapted, cardUrl: modernCardImageUrl(item, false, look), focusUrl: modernCardImageUrl(item, true, look)};
 	}
 	const art = (item.Type === 'Genre' && item._representative) || item;
@@ -287,7 +287,7 @@ const previewRow = (row, settings, serverUrl) => {
 	const staticCards = modern && isStaticLibraryCard(row.id === 'library-tiles', settings);
 	// Home leaves the poster labels off its Seerr, recommendation and genre rows.
 	const labels = !row.isSeerrRow && !row.isOnlineRecoRow && !row.isGenreRow;
-	const look = {modern, imageType, shape, serverUrl, useSeriesThumbnails: settings.useSeriesThumbnails, isStaticMyMedia: staticCards};
+	const look = {modern, imageType, shape, serverUrl, useSeriesThumbnails: settings.useSeriesThumbnails, isStaticMyMedia: staticCards, posterSize: settings.homeRowsPosterSize};
 	const items = row.items.slice(0, 8).map((item) => ({...previewItem(item, look), labelItem: labels ? item : null}));
 	return {id: row.id, title: row.title, items, shape, staticCards};
 };

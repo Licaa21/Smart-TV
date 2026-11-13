@@ -102,7 +102,6 @@ export const useThemeMusic = () => {
 		fadingOutRef.current = true;
 		const steps = FADE_DURATION / FADE_INTERVAL;
 		let step = 0;
-		fadingOutRef.current = true;
 		fadeTimerRef.current = setInterval(() => {
 			step++;
 			if (step >= steps) {
@@ -195,7 +194,11 @@ export const useThemeMusic = () => {
 			clearTimeout(delayTimerRef.current);
 		}
 
-		if (currentItemIdRef.current === itemId && audioRef.current && !fadingOutRef.current) return;
+		if (currentItemIdRef.current === itemId && audioRef.current) {
+			// focus came back to the card whose theme was fading out, so it fades back in from where it had got to
+			if (fadingOutRef.current) fadeIn(audioRef.current);
+			return;
+		}
 
 		// A theme plays while its own card is in focus, so the one playing for another card fades out now and the
 		// new one starts after the delay, if it has any
@@ -207,7 +210,7 @@ export const useThemeMusic = () => {
 			pendingIdRef.current = null;
 			playThemeMusic(itemId);
 		}, HOME_ROW_DELAY);
-	}, [settings.themeMusicEnabled, settings.themeMusicOnHomeRows, playThemeMusic, fadeOut, stopAudio]);
+	}, [settings.themeMusicEnabled, settings.themeMusicOnHomeRows, playThemeMusic, fadeOut, fadeIn, stopAudio]);
 
 	const cancelDelayed = useCallback(() => {
 		pendingIdRef.current = null;
