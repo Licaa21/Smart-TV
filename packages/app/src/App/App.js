@@ -22,6 +22,7 @@ import {libraryIdOf, seerrCardTarget, seerrDetailStub} from '../utils/seerrTarge
 import {setTmdbThumbsAvailable} from '../utils/tmdbThumb';
 import {configureIncompleteRecordings} from '../services/incompleteRecordings';
 import serverLogger from '../services/serverLogger';
+import {makeDeepLinkGate, readRequestedDeepLink} from '../utils/appControlRequest';
 import * as remoteControl from '../services/remoteControl';
 import * as serverSocket from '../services/serverSocket';
 import {isBackKey, isChannelMenuKey, KEYS, remoteShortcut} from '../utils/keys';
@@ -1429,9 +1430,40 @@ const AppContent = (props) => {
 	const handleAutoPlayed = useCallback(() => setDetailsAutoPlay(false), []);
 
 	useEffect(() => {
-		const onDeepLink = (e) => setDeepLink(e.detail || null);
+		const gate = makeDeepLinkGate();
+		const log = (message, data) => serverLogger.info(serverLogger.LOG_CATEGORIES.APP, `Deep link: ${message}`, data);
+		const onDeepLink = (e) => {
+			const accepted = gate(e.detail);
+			log(accepted ? 'request from the platform layer' : 'same request ignored', {id: e.detail?.id, type: e.detail?.type});
+			if (accepted) setDeepLink(e.detail);
+		};
+		// A running app is asked again by the same app control, and the Q67A has only been seen bringing it to the front, so the
+		// request is read again when the page is shown or focused. It only counts there when it is not the one acted on last.
+		const lookAgain = (source, onlyNew = true) => {
+			const found = readRequestedDeepLink();
+			const accepted = Boolean(found) && gate(found.detail, {onlyNew});
+			// the event is rare and always told, a focus or a page shown again only when it found a new request
+			if (accepted || source === 'appcontrol') log(`looked again on ${source}`, {found: Boolean(found), accepted, id: found?.detail?.id});
+			if (accepted) setDeepLink(found.detail);
+		};
+		// The request the app started with is the platform's to keep answering, so it is known as handled and is not
+		// taken for a new one by the first look. A cold start is acted on by the platform layer's own event.
+		const startup = readRequestedDeepLink();
+		if (startup) gate.markHandled(startup.detail);
+		const onVisible = () => { if (!document.hidden) lookAgain('visibilitychange'); };
+		const onFocus = () => lookAgain('focus');
+		// the event itself is a new request, so even the title acted on last counts again
+		const onAppControl = () => lookAgain('appcontrol', false);
 		window.addEventListener('moonfin:deepLink', onDeepLink);
-		return () => window.removeEventListener('moonfin:deepLink', onDeepLink);
+		window.addEventListener('appcontrol', onAppControl);
+		document.addEventListener('visibilitychange', onVisible);
+		window.addEventListener('focus', onFocus);
+		return () => {
+			window.removeEventListener('moonfin:deepLink', onDeepLink);
+			window.removeEventListener('appcontrol', onAppControl);
+			document.removeEventListener('visibilitychange', onVisible);
+			window.removeEventListener('focus', onFocus);
+		};
 	}, []);
 
 	// The tiles are Continue Watching and Next Up, so they go where those cards go on Home. A tile
