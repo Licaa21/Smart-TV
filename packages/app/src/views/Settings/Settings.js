@@ -27,7 +27,8 @@ import {canTranscodeAudioCodecAway} from '../../utils/deviceProfileTuning';
 import {clearImageCache} from '../../services/imageProxy';
 import {clearProxiedImageCache} from '../../hooks/useProxiedImage';
 import {detectCustomSource, validateCustomRow, buildManualCustomSource, sourceKeyForRow} from '../../utils/externalHomeRows';
-import {fetchCustomRow} from '../../services/externalRowsApi';
+import {fetchCustomRow, constructSourceUrl} from '../../services/externalRowsApi';
+import {forgetPlexMoonbase} from '../../services/plexMoonbase';
 import {checkForUpdatesDetailed} from '../../services/versionChecker';
 import QrLinkView from './QrLinkView';
 import {formatPlaybackTimeSlot} from '../../utils/playbackTimeLabels';
@@ -43,6 +44,7 @@ import useThemeStore from './useThemeStore';
 import useHomeRowsEditor from './useHomeRowsEditor';
 import useButtonLayoutEditor from './useButtonLayoutEditor';
 import useLibraryVisibility from './useLibraryVisibility';
+import useNotificationPrefs from './useNotificationPrefs';
 import useMediaBarSources from './useMediaBarSources';
 import useScreensaverSources from './useScreensaverSources';
 import useCalendarLibraries from './useCalendarLibraries';
@@ -77,6 +79,7 @@ import LibraryOrderView from './LibraryOrderView';
 import SeerrAccountPanel from './SeerrAccountPanel';
 import RommAccountPanel from './RommAccountPanel';
 import MoonbasePanel from './MoonbasePanel';
+import MoonbaseAddressRow from './MoonbaseAddressRow';
 import {LOG_RENDER_STEP} from './useDiagnosticsLog';
 import {DETAIL_SECTIONS_HIDDEN_KEY, toggleHiddenSection} from '../../utils/detailSectionLayout';
 import {isWatchTogetherOpen, openWatchParties, useWatchPartyBackend} from '../../hooks/useWatchPartyRooms';
@@ -394,8 +397,20 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	);
 
 	const refreshPlugin = useCallback(() => {
+		// A Moonbase for Plex that didn't answer isn't asked again for a while, and this is the viewer asking now.
+		forgetPlexMoonbase(serverUrl);
 		if (serverUrl && accessToken) seerr.refreshPluginInfo(serverUrl, accessToken);
 	}, [seerr, serverUrl, accessToken]);
+
+	// With Moonbase on, a new address for Moonbase for Plex sets it all up again there, sync and Seerr too.
+	const moonbaseAddressSaved = useCallback(() => {
+		if (!settings.useMoonfinPlugin || !serverUrl || !accessToken) {
+			refreshPlugin();
+			return;
+		}
+		forgetPlexMoonbase(serverUrl);
+		seerr.configureWithMoonfin(serverUrl, accessToken).catch((e) => console.warn('[Settings] Moonbase for Plex not found:', e.message));
+	}, [settings.useMoonfinPlugin, serverUrl, accessToken, seerr, refreshPlugin]);
 
 	// The Tizen profile keeps what it detected, so the next playback only offers TrueHD once
 	// that's thrown away
@@ -769,7 +784,8 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		seerrPassword, onSeerrPasswordChange, seerrAuthSubmitting, seerrAuthMessage, seerrAuthError,
 		handleMoonfinToggle, handleSeerrAuthTypeChange, handleSeerrLogin,
 		handleSeerrPasswordKeyDown, handleSeerrLogout
-	} = useSeerrAccount({seerr, seerrLabel, settings, updateSetting, serverUrl, accessToken});
+	} = useSeerrAccount({seerr, seerrLabel, settings, updateSetting, serverUrl, accessToken, serverType});
+	const {notificationPrefs, toggleNotificationPref} = useNotificationPrefs({serverUrl, accessToken, userId: user?.Id});
 
 	const {
 		activeProfile, profileSyncBusy, profileSyncMessage, pickProfile, loadProfile, saveProfile, resetProfile
@@ -802,9 +818,9 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 
 	const {
 		tempHomeRows, loading: homeRowsLoading, serverHasLiveTv,
-		toggleHomeRowEnabled, toggleSeerrHomeRow, toggleSeerrSlider, openHomeRows, commitHomeRows, resetHomeRows,
+		toggleSeerrHomeRow, toggleSeerrSlider, openHomeRows, commitHomeRows, resetHomeRows,
 		toggleHomeRow, moveHomeRow
-	} = useHomeRowsEditor({api, serverUrl, servers, settings, updateSetting, updateSettings, pushView});
+	} = useHomeRowsEditor({api, serverUrl, servers, settings, updateSetting, updateSettings, pushView, pluginInfo: seerr.pluginInfo});
 
 	const {
 		tempButtons, buttonLayoutKind, openDetailButtons, openOsdButtons, openDetailMetadata,
@@ -812,7 +828,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	} = useButtonLayoutEditor({settings, updateSettings, pushView, hasLiveTv});
 
 	const {
-		allLibraries, hiddenLibraries, libraryLoading, librarySaving,
+		allLibraries, hiddenLibraries, libraryLoading, librarySaving, librarySaveFailures,
 		openLibraries, toggleLibraryVisibility, saveLibraryVisibility
 	} = useLibraryVisibility({api, settings, hasMultipleServers, pushView, popView, onLibrariesChanged});
 
@@ -1016,14 +1032,20 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		customRowName, customRowSortBy, customRowSortOrder, customRowShowUserRatings,
 		editingCustomRowId, settings.customHomeRows, settings.uiLanguage, updateSetting, resetCustomRowForm]);
 
-	// Loads a stored row into the manual form so its ids and sorting can change
+	// Loads a stored row into the form so its ids and sorting can change
 	// without removing and re-adding it.
 	const editCustomRow = useCallback((id) => {
 		const row = (settings.customHomeRows || []).find((r) => r.id === id);
 		if (!row) return;
-		setCustomRowMode('manual');
-		setCustomRowSourceKey(sourceKeyForRow(row));
 		const params = row.params || {};
+		// The manual form has no place for an official list's movies or shows choice, so that row opens as its URL.
+		if (params.mediatype) {
+			setCustomRowMode('url');
+			setCustomRowUrl(constructSourceUrl(row.source, row.type, params));
+		} else {
+			setCustomRowMode('manual');
+		}
+		setCustomRowSourceKey(sourceKeyForRow(row));
 		setCustomRowParamA(params.id || params.username || params.user || '');
 		setCustomRowParamB(params.listname || '');
 		setCustomRowName(row.name || '');
@@ -1097,7 +1119,9 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		signInPin,
 		calendarLibraries,
 		watchParties,
+		notificationPrefs,
 		actions: {
+			toggleNotificationPref,
 			openWatchParties,
 			openThemes,
 			openThemeStore,
@@ -1152,7 +1176,8 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		signInPin, toggleSignInPin, changeSignInPin, removeSignInPin, openKidsMode, openLibraries, openLibraryOrder, openParentalControls, openSubtitleDownloadLanguages, openTranscodeAudioCodecs, openQrLink, openRatingSources, openRowImageTypes, openExcludedGenres, openMediaBarLibraries,
 		openMediaBarCollections, openMediaBarExternalLists, openScreensaverLibraries, openScreensaverCollections, openScreensaverGenres, openCalendarLibraries,
 		openImdbLists, openSeasonalRow, openExternalTmdbLists, openExternalCalendars,
-		openExternalCustomRows, openSeerrHomeRows, openScreen, onRunSetupWizard, canProbeDevice, afterHours.press, watchParties
+		openExternalCustomRows, openSeerrHomeRows, openScreen, onRunSetupWizard, canProbeDevice, afterHours.press, watchParties,
+		notificationPrefs, toggleNotificationPref
 	]);
 
 	// The live preview's inspector names rows with the same context the list draws them with.
@@ -1214,6 +1239,11 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		if (onPreviewTry && currentView.view !== 'options') onPreviewTry(null);
 	}, [onPreviewTry, currentView]);
 
+	// The Rows screen saves its arrangement on the way out, so until then the preview tries it.
+	useEffect(() => {
+		if (onPreviewTry && currentView.view === 'homeRows') onPreviewTry('homeRows', tempHomeRows, -1);
+	}, [onPreviewTry, currentView, tempHomeRows]);
+
 	const openSubcategory = useCallback((sub) => {
 		// An entry that is a screen in its own right rather than a list of settings rows opens
 		// that screen, instead of a page holding nothing but a link to it.
@@ -1260,6 +1290,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 	// Kept out of settingsCtx because the search index has no use for them and they are
 	// rebuilt every render, which would defeat the memo above.
 	const customRenderers = {
+		moonbaseAddress: () => <MoonbaseAddressRow serverId={activeServerInfo?.serverId} serverUrl={serverUrl} onSaved={moonbaseAddressSaved} />,
 		moonbasePlugin: () => (
 			<MoonbasePanel
 				enabled={settings.useMoonfinPlugin}
@@ -1280,6 +1311,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 		seerrPanel: () => (
 			<SeerrAccountPanel
 				pluginEnabled={settings.useMoonfinPlugin}
+				plex={serverType === 'plex'}
 				seerr={seerr}
 				seerrLabel={seerrLabel}
 				authType={seerrAuthType}
@@ -1491,6 +1523,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 					tempHomeRows={tempHomeRows}
 					loading={homeRowsLoading}
 					serverHasLiveTv={serverHasLiveTv}
+					pluginInfo={seerr.pluginInfo}
 					onToggleHomeRow={toggleHomeRow}
 					onMoveHomeRow={moveHomeRow}
 					onReset={resetHomeRows}
@@ -1537,7 +1570,6 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			{viewName === 'imdbLists' && (
 				<ImdbListsView
 					settings={settings}
-					onUpdateSettings={updateSettings}
 					onOpenOptions={openOptionsDialog}
 				/>
 			)}
@@ -1546,8 +1578,6 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 			)}
 			{viewName === 'externalTmdbLists' && (
 				<ExternalTmdbListsView
-					enabledMap={homeRowEnabledMap}
-					onToggleRow={toggleHomeRowEnabled}
 					settings={settings}
 					onOpenOptions={openOptionsDialog}
 				/>
@@ -1557,7 +1587,6 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 					enabledMap={homeRowEnabledMap}
 					calendarAvailable={seerr.pluginInfo?.calendarAvailable === true}
 					settings={settings}
-					onToggleRow={toggleHomeRowEnabled}
 					onToggleSetting={toggleSetting}
 				/>
 			)}
@@ -1659,6 +1688,7 @@ const Settings = ({ onBack, onLibrariesChanged, onRunSetupWizard, onSelectItem, 
 					showServerName={settings.unifiedLibraryMode && hasMultipleServers}
 					loading={libraryLoading}
 					saving={librarySaving}
+					saveFailures={librarySaveFailures}
 					onToggleLibrary={toggleLibraryVisibility}
 					onCancel={popView}
 					onSave={saveLibraryVisibility}

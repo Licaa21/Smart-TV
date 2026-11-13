@@ -54,8 +54,11 @@ const ModernMediaRow = ({
 	hideOverview = false,
 	coreLook = false,
 	posterLabels = false,
+	hideWatchProgress = false,
+	hideUnwatchedCount = false,
 	leadingInset = 0,
-	onCalendarSeeAll
+	onCalendarSeeAll,
+	seeAllIcon
 }) => {
 	const {settings} = useSettings();
 	const scrollerRef = useRef(null);
@@ -214,6 +217,8 @@ const ModernMediaRow = ({
 		Spotlight.focus(`media-${keyPrefix}-${items[0].Id}`);
 	}, [items, keyPrefix]);
 
+	const handleCalendarSeeAll = useCallback(() => onCalendarSeeAll(rowId), [onCalendarSeeAll, rowId]);
+
 	const rowClassName = [
 		css.row,
 		className || '',
@@ -268,7 +273,7 @@ const ModernMediaRow = ({
 			{subtitle && <div className={css.subtitle}>{subtitle}</div>}
 			{/* Core starts the cards a little in from the title, 20 points against its 16. */}
 			<div className={css.scroller} ref={scrollerRef} onFocus={handleFocus} style={coreLook ? {paddingLeft: `${leadingInset + 6}px`} : undefined}>
-				<div className={css.items} style={coreLook ? undefined : {minHeight: `${captionFloor}px`}}>
+				<div className={css.items} style={{minHeight: `${captionFloor}px`}}>
 					{items.map((item, index) => {
 						const spotlightId = `media-${keyPrefix}-${item.Id}`;
 						// Wide art loads ahead for the cards a step or two along from focus, and in a row
@@ -301,6 +306,8 @@ const ModernMediaRow = ({
 								hideOverview={hideOverview}
 								coreLook={coreLook}
 								posterLabels={posterLabels}
+								hideWatchProgress={hideWatchProgress}
+								hideUnwatchedCount={hideUnwatchedCount}
 							/>
 						);
 					})}
@@ -308,9 +315,10 @@ const ModernMediaRow = ({
 						<CalendarSeeAllCard
 							{...seeAllSize(settings.homeRowsPosterSize)}
 							spotlightId={`media-${keyPrefix}-calendar-see-all`}
-							onClick={onCalendarSeeAll}
+							onClick={handleCalendarSeeAll}
 							onFocus={handleSeeAllFocus}
 							onSpotlightRight={handleWrapRight}
+							icon={seeAllIcon}
 						/>
 					)}
 				</div>
@@ -335,6 +343,7 @@ const areRowPropsEqual = (prev, next) => {
 	if (prev.loading !== next.loading || prev.titleWidth !== next.titleWidth || prev.cardType !== next.cardType) return false;
 	if (prev.deferImages !== next.deferImages || prev.ratingsSurface !== next.ratingsSurface || prev.hideOverview !== next.hideOverview) return false;
 	if (prev.coreLook !== next.coreLook || prev.leadingInset !== next.leadingInset || prev.posterLabels !== next.posterLabels) return false;
+	if (prev.hideWatchProgress !== next.hideWatchProgress || prev.hideUnwatchedCount !== next.hideUnwatchedCount) return false;
 	if (!prev.onCalendarSeeAll !== !next.onCalendarSeeAll) return false;
 	if (prev.items === next.items) return true;
 	if (prev.items?.length !== next.items?.length) return false;

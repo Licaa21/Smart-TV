@@ -3,16 +3,18 @@ import {getFromStorage, saveToStorage} from '../services/storage';
 import {getMoonfinSettings, getMoonfinThemes, saveMoonfinProfile, moonfinPing} from '../services/seerrApi';
 import {isValidHexColor, parseThemeSpec} from '../theme/themeSpec';
 import {normalizeOverlayColorKey} from '../theme/overlayColors';
-import {noteAnsweredSettings, SETUP_QUESTION_KEYS} from '../utils/setupWizardGate';
+import {beginSignInRead, finishSignInRead, noteAnsweredSettings, SETUP_QUESTION_KEYS} from '../utils/setupWizardGate';
 import {getAvailableThemeList, getAvailableThemes, isBuiltInThemeId, registerStoreTheme, removeStoreTheme, replaceCustomThemes, resolveThemeById} from '../theme/themeRegistry';
 import {applyOledMode} from '../utils/oledMode';
 import {normalizeRatingSources, ratingSourcesToServer} from '../utils/ratingSources';
 import {SEASONAL_DENSITIES, normalizeSeasonalTheme} from '../utils/seasonalEffects';
 import {normalizeSeasonalHiddenHolidays, normalizeSeasonalRowCountry} from '../utils/seasonalRow';
 import {sharePending} from '../utils/sharePending';
+import {isPlexServer} from '../utils/plexUrls';
 import {pickedRowsFromLegacySections} from '../utils/pickedRows';
 import {LEGACY_MEDIA_BAR_SOURCES, MEDIA_BAR_SOURCES, NEW_RELEASE_DAYS} from '../utils/mediaBarNewRelease';
 import {DATE_FORMATS} from '../utils/dateFormat';
+import {SUBTITLE_FONTS} from '../services/subtitleFonts';
 import {
 	IMAGES as LOADING_IMAGES,
 	POSITIONS as LOADING_POSITIONS,
@@ -76,6 +78,14 @@ const SERVER_TO_LOCAL = {
 	mediaSegmentCountdown: 'nextUpCountdownStyle',
 	defaultAudioLanguage: 'audioLanguage',
 	defaultSubtitleLanguage: 'subtitleLanguage',
+	subtitlesTextWeight: 'subtitleBold',
+	subtitlesHdrTextWeight: 'subtitleBoldHdr',
+	subtitlesStrokeWidth: 'subtitleStrokeWidth',
+	subtitlesShadow: 'subtitleDropShadow',
+	subtitlesShadowIntensity: 'subtitleDropShadowIntensity',
+	subtitlesShadowOffset: 'subtitleDropShadowOffset',
+	subtitlesShadowBlur: 'subtitleDropShadowBlur',
+	subtitlesFont: 'subtitleFont',
 	unpauseRewindDuration: 'unpauseRewind',
 	confirmExit: 'exitConfirmation',
 	DetailMetadataOrderTv: 'detailMetadataOrderTv',
@@ -161,6 +171,8 @@ const surfaceRatingSources = {
 	toServer: ratingSourcesToServer,
 	fromServer: (v) => (Array.isArray(v) && v.length === 0 ? undefined : normalizeRatingSources(v))
 };
+
+const subtitleWeight = {toServer: v => (v ? 700 : 400), fromServer: v => v >= 600};
 
 const VALUE_CONVERSIONS = {
 	watchPartyService: oneOf(['moonbase', 'syncplay']),
@@ -253,6 +265,10 @@ const VALUE_CONVERSIONS = {
 		toServer: v => (v === '' ? 'auto' : v),
 		fromServer: v => (v === 'auto' ? '' : v)
 	},
+	// The synced settings store a weight, and anything from 600 up is bold.
+	subtitleBold: subtitleWeight,
+	subtitleBoldHdr: subtitleWeight,
+	subtitleFont: oneOf(['', ...SUBTITLE_FONTS.map((font) => font.family)]),
 	// This app predates the foreign mode and calls the flagged one default.
 	subtitleMode: {
 		toServer: v => (v === 'default' ? 'flagged' : v),
@@ -335,9 +351,10 @@ export const SYNCABLE_KEYS = [
 	'homeRows', 'homeRowsStyle', 'modernCardsOnMyMediaRow', 'detailScreenStyle', 'detailExpandedTabs', 'fullScreenRows', 'homeRowsPosterSize', 'useSeriesThumbnails',
 	'episodePreviewEnabled', 'mediaPreviewMode', 'previewAudioEnabled', 'previewVolume',
 	'hideDetailsMediaDescription', 'detailUseSeriesThumbnails', 'hideHomeMediaDescription',
+	'hideHomeWatchProgress', 'hideHomeUnwatchedCount',
 	'personPageSortOption', 'personPageGroupItems',
-	'personalRatingStyle', 'recentlyReleasedSeriesType', 'mergeRecentRowsByType', 'playlistsGroupByType', 'groupItemsIntoCollections',
-	'useDetailedSubHeadings', 'showMediaDetailsOnLibraryPage', 'libraryCardTitles', 'hideBackdropsInLibraries', 'libraryStyle', 'bookLibraryStyle', 'showBookDiscoverTab', 'musicLibraryStyle',
+	'personalRatingStyle', 'recentlyReleasedSeriesType', 'mergeRecentRowsByType', 'hideWatchedInRecentRows', 'playlistsGroupByType', 'groupItemsIntoCollections',
+	'useDetailedSubHeadings', 'showMediaDetailsOnLibraryPage', 'libraryCardTitles', 'hideBackdropsInLibraries', 'libraryStyle', 'bookLibraryStyle', 'showBookDiscoverTab', 'bookFoldersAsSeries', 'musicLibraryStyle',
 	'libraryPosterSize', 'playlistPosterSize',
 	'keyboardStyle',
 	'syncplayEnabled', 'syncplayAutoOpen',
@@ -348,8 +365,11 @@ export const SYNCABLE_KEYS = [
 	'videoStartDelay', 'cinemaModeEnabled', 'cinemaModeEpisodesEnabled', 'cinemaModeSkipEnabled',
 	'audioLanguage', 'fallbackAudioLanguage', 'preferDefaultAudioTrack', 'preferAudioDescription',
 	'subtitleLanguage', 'fallbackSubtitleLanguage', 'preferSdhSubtitles', 'preferTextSubtitles', 'preferExternalSubtitles', 'subtitleMode',
+	'subtitleBold', 'subtitleBoldHdr', 'subtitleStrokeWidth', 'subtitleDropShadow', 'subtitleDropShadowIntensity',
+	'subtitleDropShadowOffset', 'subtitleDropShadowBlur', 'subtitleFont',
 	'assDirectPlay',
 	'resumeSubtractDuration', 'unpauseRewind', 'skipBackLength', 'skipForwardLength', 'showChapterMarkers',
+	'controlsHideDelay', 'hdrControlsDimming',
 	'maxVideoResolution', 'playerZoomMode', 'mediaSegmentAutoHide',
 	'exitConfirmation',
 	'diagnosticLoggingEnabled',
@@ -369,6 +389,7 @@ export const SYNCABLE_KEYS = [
 	'screensaverBackdrop', 'screensaverComponent', 'screensaverMovement',
 	'screensaverPosition', 'screensaverSize', 'screensaverContentType',
 	'screensaverLibraryIds', 'screensaverCollectionIds', 'screensaverExcludedGenres',
+	'screensaverDuringAudio', 'sleepAfterIdle',
 	'loadingAnimationImage', 'loadingAnimationSize', 'loadingAnimationPosition', 'loadingAnimationSpeed',
 	'showLoadingAnimationText',
 	'navbarAlwaysExpanded', 'oledMode', 'themeMusicLoop',
@@ -407,10 +428,14 @@ export const profileToLocal = (serverProfile) => {
 	// Continue Watching syncs on its own server key, while this app keeps it with the other rows.
 	const continueWatching = rowImageTypeFromServer(serverProfile.homeImageTypeContinueWatching);
 	if (continueWatching) local.homeRowImageTypes = {...local.homeRowImageTypes, resume: continueWatching};
-	// The TMDB key is read only. We pull it so online rows can call TMDB, but it
-	// stays out of SYNCABLE_KEYS so the client never pushes it back.
+	// The TMDB and MDBList keys are read only. We pull them so online rows can call TMDB and the
+	// row editor knows which rows the plugin can fill, but they stay out of SYNCABLE_KEYS so the
+	// client never pushes them back.
 	if (serverProfile.tmdbApiKey !== undefined && serverProfile.tmdbApiKey !== null) {
 		local.tmdbApiKey = serverProfile.tmdbApiKey;
+	}
+	if (serverProfile.mdblistApiKey !== undefined && serverProfile.mdblistApiKey !== null) {
+		local.mdblistApiKey = serverProfile.mdblistApiKey;
 	}
 	return local;
 };
@@ -487,6 +512,8 @@ export const resolveFromEnvelope = (envelope, adminDefaults, profile) => {
 	else delete resolved.homeRowImageTypes;
 	const tmdbLayer = firstWith('tmdbApiKey');
 	if (tmdbLayer) resolved.tmdbApiKey = tmdbLayer.tmdbApiKey;
+	const mdblistLayer = firstWith('mdblistApiKey');
+	if (mdblistLayer) resolved.mdblistApiKey = mdblistLayer.mdblistApiKey;
 
 	// Same precedence as everything else, except the layout moves as one unit. The first
 	// profile that has any layout supplies all of it, so admin defaults only reach a user
@@ -622,18 +649,21 @@ const normalizeServerKey = (serverUrl) => (serverUrl || '')
 	.replace(/^https?:\/\//i, '')
 	.replace(/\/+$/, '')
 	.toLowerCase();
+// Older marks are a plain true. A Plex server got one before Moonbase for Plex existed, when it could only ever
+// come back as having no plugin, so a Plex server with one counts as new and is looked at once more.
+const PLUGIN_SYNC_MARK = 2;
 export const isServerSyncInitialized = async (serverUrl) => {
 	const key = normalizeServerKey(serverUrl);
 	if (!key) return false;
-	const map = await getFromStorage(PLUGIN_SYNC_INIT_KEY);
-	return Boolean(map && map[key]);
+	const mark = (await getFromStorage(PLUGIN_SYNC_INIT_KEY))?.[key];
+	return isPlexServer(serverUrl) ? mark === PLUGIN_SYNC_MARK : Boolean(mark);
 };
-const markServerSyncInitialized = async (serverUrl) => {
+export const markServerSyncInitialized = async (serverUrl) => {
 	const key = normalizeServerKey(serverUrl);
 	if (!key) return;
 	const map = (await getFromStorage(PLUGIN_SYNC_INIT_KEY)) || {};
-	if (map[key]) return;
-	map[key] = true;
+	if (map[key] === PLUGIN_SYNC_MARK) return;
+	map[key] = PLUGIN_SYNC_MARK;
 	await saveToStorage(PLUGIN_SYNC_INIT_KEY, map);
 };
 // App boots before the async settings store loads, and on webOS that store is
@@ -660,10 +690,6 @@ export const migrateKeyboardStyle = (stored) => {
 export function SettingsProvider({children}) {
 	const [settings, setSettings] = useState(defaultSettings);
 	const [loaded, setLoaded] = useState(false);
-	// True once the login sync has finished, whichever way it went. The setup
-	// wizard waits on this so the answers it collects dont get overwritten by a
-	// profile that lands a moment later.
-	const [initialSyncSettled, setInitialSyncSettled] = useState(false);
 	const [themeCatalogVersion, setThemeCatalogVersion] = useState(0);
 	const serverCredsRef = useRef(null);
 	// Set once a sync has replaced the custom themes with a fresh set from the
@@ -1122,7 +1148,8 @@ export function SettingsProvider({children}) {
 
 			const resolved = resolveFromEnvelope(serverData, adminDefaults, settingsRef.current.syncProfile);
 
-			const hasServerValues = resolved.tmdbApiKey !== undefined || SYNCABLE_KEYS.some(key => resolved[key] !== undefined);
+			const hasServerValues = resolved.tmdbApiKey !== undefined || resolved.mdblistApiKey !== undefined ||
+				SYNCABLE_KEYS.some(key => resolved[key] !== undefined);
 			if (!hasServerValues) return pluginAnswered ? 'empty' : 'unavailable';
 			// A value the profile carries was chosen somewhere, on this device or
 			// another, so the setup wizard has nothing left to ask about it.
@@ -1144,6 +1171,7 @@ export function SettingsProvider({children}) {
 						: incoming;
 				}
 				const tmdbApiKey = resolved.tmdbApiKey !== undefined ? resolved.tmdbApiKey : prev.tmdbApiKey;
+				const mdblistApiKey = resolved.mdblistApiKey !== undefined ? resolved.mdblistApiKey : prev.mdblistApiKey;
 				const homeRowsStyle = normalizeHomeRowsStyle(nextValues.homeRowsStyle);
 				const detailScreenStyle = normalizeDetailScreenStyle(nextValues.detailScreenStyle);
 
@@ -1159,6 +1187,7 @@ export function SettingsProvider({children}) {
 				// Unchanged values kept their previous reference, so comparing identity is
 				// enough here.
 				const changed = tmdbApiKey !== prev.tmdbApiKey ||
+					mdblistApiKey !== prev.mdblistApiKey ||
 					homeRowsStyle !== prev.homeRowsStyle ||
 					detailScreenStyle !== prev.detailScreenStyle ||
 					customThemeId !== prev.customThemeId ||
@@ -1170,6 +1199,7 @@ export function SettingsProvider({children}) {
 						...prev,
 						...nextValues,
 						tmdbApiKey,
+						mdblistApiKey,
 						homeRowsStyle,
 						detailScreenStyle,
 						customThemeId,
@@ -1202,8 +1232,11 @@ export function SettingsProvider({children}) {
 	// so it isn't probed again, and a network failure is left unmarked to retry on
 	// the next login. After that first pass the pull only runs while the user keeps
 	// the plugin enabled.
-	const syncOnLogin = useCallback(async (serverUrl, token) => {
+	const syncOnLogin = useCallback(async (serverUrl, token, userId) => {
 		if (!serverUrl || !token) return;
+		// The setup wizard waits for this user's read to finish, so the answers it collects
+		// don't get overwritten by a profile that lands a moment later.
+		beginSignInRead(serverUrl, userId);
 		// Known before any of the network work below, so a change made while that
 		// runs still has somewhere to go. Marks left over from another server were
 		// for that server's profile and would only hold this one's values back.
@@ -1235,7 +1268,7 @@ export function SettingsProvider({children}) {
 			if (pendingPush && !pushTimer) {
 				pushTimer = setTimeout(flushProfilePush, PUSH_DEBOUNCE_MS);
 			}
-			setInitialSyncSettled(true);
+			finishSignInRead(serverUrl, userId);
 		}
 	}, [syncFromServer, updateSetting]);
 
@@ -1243,7 +1276,6 @@ export function SettingsProvider({children}) {
 		<SettingsContext.Provider value={{
 			settings,
 			loaded,
-			initialSyncSettled,
 			availableThemes,
 			activeThemeId,
 			activeTheme,

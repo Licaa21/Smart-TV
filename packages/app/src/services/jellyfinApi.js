@@ -176,6 +176,13 @@ const homeNextUpQuery = (seriesId, maxDays, type) => {
 	return `&NextUpDateCutoff=${encodeURIComponent(cutoff.toISOString())}`;
 };
 
+// Emby reads its own name for keeping a collection's titles under it.
+const itemsQueryFor = (params, type) => {
+	if (type !== 'emby' || !('CollapseBoxSetItems' in params)) return params;
+	const {CollapseBoxSetItems, ...rest} = params;
+	return {...rest, GroupItemsIntoCollections: CollapseBoxSetItems};
+};
+
 // Folds the two filter responses into one shape. Genres arrive as plain names
 // from the older endpoint and as objects from the newer one, and languages
 // carry a display name beside the code the query takes.
@@ -223,6 +230,19 @@ const toQuery = (params) => Object.entries(params)
 	.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
 	.join('&');
 
+// A 4xx reply says what the server couldn't read, so its body rides along on the error for the logs.
+const withReplyBody = async (error, response) => {
+	if (response.status >= 400 && response.status < 500) {
+		try {
+			const text = String(await response.text()).replace(/\s+/g, ' ').trim();
+			if (text) error.body = text.length > 500 ? text.slice(0, 500) + '...' : text;
+		} catch {
+			// A reply that can't be read leaves the status to speak for itself
+		}
+	}
+	return error;
+};
+
 const request = async (endpoint, options = {}) => {
 	const url = `${currentServer}${trimQuerySeparator(endpoint)}`;
 	const parentId = parentIdOf(endpoint);
@@ -259,7 +279,7 @@ const request = async (endpoint, options = {}) => {
 		const error = new Error('API Error: ' + response.status);
 		error.status = response.status;
 		error.connectionType = classifyError(error);
-		throw error;
+		throw await withReplyBody(error, response);
 	}
 
 	if (response.status === 204) {
@@ -541,6 +561,9 @@ export const api = {
 
 	getPublicUsers: () => request('/Users/Public'),
 
+	// Everyone the signed-in user can see on the server, hidden logins included.
+	getUsers: () => request('/Users'),
+
 	authenticateByName: (username, password) => request('/Users/AuthenticateByName', {
 		method: 'POST',
 		body: {Username: username, Pw: password}
@@ -564,7 +587,7 @@ export const api = {
 
 	getAllLibraries: () => request(`${userRoutes.views()}IncludeHidden=true`),
 
-	getItems: (params = {}) => request(`${userRoutes.items()}${toQuery(params)}`),
+	getItems: (params = {}) => request(`${userRoutes.items()}${toQuery(itemsQueryFor(params, serverType))}`),
 
 	getLatestItems: (params = {}) => request(`${userRoutes.latest()}${toQuery(params)}`),
 
@@ -598,8 +621,8 @@ export const api = {
 	getLatest: (libraryId, limit = 20) =>
 		request(`${userRoutes.latest()}ParentId=${libraryId}&Limit=${limit}&Fields=${encodeURIComponent(HOME_ROW_ITEM_FIELDS)}&ImageTypeLimit=1&GroupItems=true`),
 
-	getRecentlyReleased: (libraryId, limit = 20, includeItemTypes = 'Movie,Series') =>
-		request(`${userRoutes.items()}IncludeItemTypes=${includeItemTypes}&Recursive=true&ParentId=${libraryId}&Limit=${limit}&Fields=${encodeURIComponent(HOME_ROW_ITEM_FIELDS)}&ImageTypeLimit=1&SortBy=PremiereDate&SortOrder=Descending&MaxPremiereDate=${encodeURIComponent(new Date().toISOString())}`),
+	getRecentlyReleased: (libraryId, limit = 20, includeItemTypes = 'Movie,Series', hideWatched = null) =>
+		request(`${userRoutes.items()}IncludeItemTypes=${includeItemTypes}&Recursive=true&ParentId=${libraryId}&Limit=${limit}&Fields=${encodeURIComponent(HOME_ROW_ITEM_FIELDS)}&ImageTypeLimit=1&SortBy=PremiereDate&SortOrder=Descending&MaxPremiereDate=${encodeURIComponent(new Date().toISOString())}${hideWatched === true ? '&Filters=IsUnplayed' : ''}`),
 
 	getCollections: (limit = 50, sortBy = 'SortName', sortOrder = 'Ascending') =>
 		request(`${userRoutes.items()}IncludeItemTypes=BoxSet&Recursive=true&SortBy=${encodeURIComponent(sortBy)}&SortOrder=${encodeURIComponent(sortOrder)}&Limit=${limit}&Fields=PrimaryImageAspectRatio,ProductionYear,OfficialRating`),
@@ -1199,7 +1222,7 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 			const error = new Error('API Error: ' + response.status);
 			error.status = response.status;
 			error.connectionType = classifyError(error);
-			throw error;
+			throw await withReplyBody(error, response);
 		}
 
 		if (response.status === 204) {
@@ -1240,7 +1263,7 @@ export const createApiForServer = (serverUrl, token, userId, serverTypeOverride 
 		getItems: (params = {}) => {
 			// Manually build query string to match main api.getItems behavior
 			const queryParts = [];
-			for (const [key, value] of Object.entries(params)) {
+			for (const [key, value] of Object.entries(itemsQueryFor(params, serverTypeOverride))) {
 				if (value !== undefined && value !== null && value !== '') {
 					queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
 				}
