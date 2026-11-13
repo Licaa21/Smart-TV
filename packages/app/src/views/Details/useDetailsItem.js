@@ -24,6 +24,8 @@ import {useUserDataVersion} from '../../hooks/useUserDataSync';
 import {currentMetadataLanguage} from '../../utils/metadataLanguage';
 import {isStreamlessStaticSource, probedSources} from '../../utils/placeholderSource';
 import {mergeEpisodeCast, mergeEpisodePeople, resolveParentCast} from '../../utils/episodeCast';
+import {getUserId} from '../../services/jellyfinApi';
+import {detailsKey, isCacheableType, readDetails, saveDetails} from './detailsCache';
 
 // Everything the screen shows about one item. The item itself is fetched first and rendered
 // on its own, then the rows that hang off it fill in behind, because waiting for all of them
@@ -86,38 +88,55 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 	// Counts Next Up requests, so an older answer that lands late can't replace a newer one.
 	const nextUpRequestRef = useRef(0);
 
-	const [item, setItem] = useState(() => seedToShow(initialItem, itemId));
+	// The screen of this title as it was kept when it last finished loading, when nothing it was made from has changed, so it
+	// opens whole in the first frame. Anything else starts from the row it was opened from, as before.
+	const [restored] = useState(() => {
+		if (skip) return null;
+		const kept = readDetails(detailsKey(effectiveServerUrl, getUserId(), itemId, settings), initialItem);
+		return kept && !isBlockedNow(kept.item) ? kept : null;
+	});
+	const r = restored || {};
+	// What the first render drew from, which the first run of the load takes as it is rather than asking again
+	const mountedFromRef = useRef(restored);
+
+	const [item, setItem] = useState(() => (restored ? restored.item : seedToShow(initialItem, itemId)));
 	// Whether what is on screen is still the row it was opened from rather than the record
 	// the server holds, which is what the buttons are properly built from.
-	const [isSeed, setIsSeed] = useState(() => Boolean(seedToShow(initialItem, itemId)));
+	const [isSeed, setIsSeed] = useState(() => !restored && Boolean(seedToShow(initialItem, itemId)));
 	const [isBlocked, setIsBlocked] = useState(false);
-	const [seasons, setSeasons] = useState([]);
-	const [episodes, setEpisodes] = useState([]);
-	const [seriesEpisodes, setSeriesEpisodes] = useState([]);
-	const [similar, setSimilar] = useState([]);
-	const [similarLoaded, setSimilarLoaded] = useState(false);
+	const [seasons, setSeasons] = useState(r.seasons || []);
+	const [episodes, setEpisodes] = useState(r.episodes || []);
+	const [seriesEpisodes, setSeriesEpisodes] = useState(r.seriesEpisodes || []);
+	const [similar, setSimilar] = useState(r.similar || []);
+	const [similarLoaded, setSimilarLoaded] = useState(Boolean(restored));
 	// Whether the lists Play picks from have come in, which is what an automatic start waits on.
-	const [playListsLoaded, setPlayListsLoaded] = useState(false);
-	const [extras, setExtras] = useState([]);
-	const [cast, setCast] = useState([]);
-	const [nextUp, setNextUp] = useState([]);
+	const [playListsLoaded, setPlayListsLoaded] = useState(Boolean(restored));
+	const [extras, setExtras] = useState(r.extras || []);
+	const [cast, setCast] = useState(r.cast || []);
+	const [nextUp, setNextUp] = useState(r.nextUp || []);
 	const [nextEpisode, setNextEpisode] = useState(null);
 	const [collectionItems, setCollectionItems] = useState([]);
 	const [missingCollectionItems, setMissingCollectionItems] = useState([]);
-	const [parentCollections, setParentCollections] = useState([]);
-	const [similarSource, setSimilarSource] = useState('jellyfin');
+	const [parentCollections, setParentCollections] = useState(r.parentCollections || []);
+	const [similarSource, setSimilarSource] = useState(r.similarSource || 'jellyfin');
 	const [albumTracks, setAlbumTracks] = useState([]);
 	const [artistAlbums, setArtistAlbums] = useState([]);
 	const [playlistItems, setPlaylistItems] = useState([]);
 	const [collectionSort, setCollectionSort] = useState(DEFAULT_SORT);
 	const [collectionCustomOrder, setCollectionCustomOrder] = useState([]);
 	const [collectionPlaylistLoading, setCollectionPlaylistLoading] = useState(false);
-	const [isLoading, setIsLoading] = useState(() => !seedToShow(initialItem, itemId));
-	const [episodeRatings, setEpisodeRatings] = useState({});
+	const [isLoading, setIsLoading] = useState(() => !restored && !seedToShow(initialItem, itemId));
+	const [episodeRatings, setEpisodeRatings] = useState(r.episodeRatings || {});
 
-	const [selectedVersionIndex, setSelectedVersionIndex] = useState(0);
-	const [selectedAudioIndex, setSelectedAudioIndex] = useState(0);
-	const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState(-1);
+	const [selectedVersionIndex, setSelectedVersionIndex] = useState(r.selectedVersionIndex || 0);
+	const [selectedAudioIndex, setSelectedAudioIndex] = useState(r.selectedAudioIndex || 0);
+	const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState(restored ? r.selectedSubtitleIndex : -1);
+	// What the kept screen is made of, read when the load has settled
+	const latestRef = useRef({});
+	latestRef.current = {
+		item, isSeed, isLoading, playListsLoaded, similarLoaded, seasons, episodes, seriesEpisodes, similar, similarSource, extras, cast,
+		nextUp, parentCollections, episodeRatings, selectedVersionIndex, selectedAudioIndex, selectedSubtitleIndex
+	};
 
 	const loadMoreCollectionItems = useCallback(async () => {
 		if (collectionLoadingRef.current || !collectionHasMoreRef.current) return;
@@ -201,6 +220,34 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 		// The Seerr pass is the one thing here that settles after the load has moved
 		// on, so its answer is dropped when the screen already shows something else.
 		let cancelled = false;
+		let stopKeeping = () => {};
+
+		// The screen of this title as it was kept, which is taken back whole while nothing it was made from has changed
+		const key = detailsKey(effectiveServerUrl, getUserId(), itemId, settingsRef.current);
+		const drawn = mountedFromRef.current;
+		mountedFromRef.current = null;
+		const kept = drawn && drawn.item?.Id === itemId ? drawn : readDetails(key, seedRef.current);
+		if (kept && !isBlockedNow(kept.item)) {
+			setItem(kept.item);
+			setIsSeed(false);
+			setIsLoading(false);
+			setSelectedVersionIndex(kept.selectedVersionIndex || 0);
+			setSelectedAudioIndex(kept.selectedAudioIndex || 0);
+			setSelectedSubtitleIndex(kept.selectedSubtitleIndex ?? -1);
+			setSeasons(kept.seasons);
+			setEpisodes(kept.episodes);
+			setSeriesEpisodes(kept.seriesEpisodes);
+			setSimilar(kept.similar);
+			setSimilarSource(kept.similarSource);
+			setExtras(kept.extras);
+			setCast(kept.cast);
+			setNextUp(kept.nextUp);
+			setParentCollections(kept.parentCollections);
+			setEpisodeRatings(kept.episodeRatings);
+			setSimilarLoaded(true);
+			setPlayListsLoaded(true);
+			return () => { cancelled = true; };
+		}
 
 		const refuse = () => {
 			setItem(null);
@@ -247,51 +294,6 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 
 			setItem(tagWithServerInfo(data));
 			setSelectedVersionIndex(0);
-			// A series' track choice made on another device comes in before this page reads it.
-			const tracksSynced = syncSeriesTrackChoices(tagWithServerInfo(data));
-			const ms = data.MediaSources?.[0];
-			if (ms) {
-				await tracksSynced;
-				const initAudioStreams = ms.MediaStreams?.filter(s => s.Type === 'Audio') || [];
-				// The track playback will start on, picked the way the player picks it: a track remembered for the
-				// title or its series, then the audio language and codec order from Settings, and only when
-				// neither names one the server's own default.
-				const rememberAudio = settingsRef.current?.rememberSeriesAudio !== false;
-				const itemAudioPref = rememberAudio ? await getItemAudioPref(data.Id) : undefined;
-				const seriesAudioPref = data.SeriesId && rememberAudio ? await getSeriesAudioPref(data.SeriesId) : undefined;
-				const matchedAudio = initAudioStreams.some((s) => s.Index === itemAudioPref)
-					? itemAudioPref
-					: (seriesAudioPref ? matchSeriesTrackIndex(initAudioStreams.map(fromServerStream), seriesAudioPref) : null);
-				const rememberedAudioPos = matchedAudio !== null && matchedAudio >= 0
-					? initAudioStreams.findIndex(s => s.Index === matchedAudio)
-					: -1;
-				let audioPos = rememberedAudioPos;
-				if (audioPos < 0) {
-					const audioSettings = await playback.audioSettingsForItem(settingsRef.current || {}, data);
-					const preferredAudio = selectPreferredAudioStream(initAudioStreams.map(fromServerAudio), audioSettings);
-					audioPos = preferredAudio ? initAudioStreams.findIndex(s => s.Index === preferredAudio.index) : -1;
-				}
-				if (audioPos < 0 && ms.DefaultAudioStreamIndex != null) {
-					audioPos = initAudioStreams.findIndex(s => s.Index === ms.DefaultAudioStreamIndex);
-				}
-				if (audioPos >= 0) setSelectedAudioIndex(audioPos);
-				// Show the track playback will start on as active, picked the way the player picks it: the remembered pick for
-				// this episode or its series first, then the subtitle mode and languages from Settings.
-				const subtitlePos = await detailsSubtitlePosition(data, ms, settingsRef.current, initAudioStreams[Math.max(0, audioPos)]);
-				if (cancelled) return;
-				serverLogger.playback('Details: subtitle button pick', {
-					itemId,
-					mode: settingsRef.current?.subtitleMode,
-					language: settingsRef.current?.subtitleLanguage,
-					serverDefault: ms.DefaultSubtitleStreamIndex ?? null,
-					tracks: (ms.MediaStreams || []).filter(s => s.Type === 'Subtitle').map(s => `${s.Index}:${s.Language || '?'}${s.IsDefault ? ':default' : ''}${s.IsForced ? ':forced' : ''}`),
-					picked: subtitlePos
-				});
-				setSelectedSubtitleIndex(subtitlePos);
-			} else {
-				setSelectedAudioIndex(0);
-				setSelectedSubtitleIndex(-1);
-			}
 			// Kept whole, because the screens split this into cast and crew and
 			// capping here would drop the crew off the end of a long list.
 			if (data.People?.length > 0) {
@@ -300,15 +302,24 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					: data.People);
 			}
 
-			// Still a seed until the picked tracks above are in, or the track buttons read their
-			// unset defaults (Subtitle: Off) for as long as the prefs take to come back.
-			setIsSeed(false);
-			setIsLoading(false);
-
+			// The rows hang off the record alone, so they are asked for now and not after the track picks below,
+			// which wait on storage and on the plugin. The action row waits for both, so it shows when the slower is in.
 			// What an unrated season or episode is judged by, so blocking a series takes its
 			// episodes with it.
 			const fallbackRating = data.OfficialRating;
 
+			// Whether anything the rows asked for failed, which keeps this screen from being kept as if it had finished
+			let rowsFailed = false;
+			let picksFailed = false;
+			const noteRowFailed = () => {
+				rowsFailed = true;
+				return null;
+			};
+			const noteListFailed = () => {
+				rowsFailed = true;
+				return [];
+			};
+			let bgDone = false;
 			const bg = async () => {
 				let boxSetMembers = [];
 				if (data.Type === 'Series') {
@@ -319,9 +330,9 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					const wantsEpisodes = ['v4', 'v5', 'v6', 'v7', 'v9'].indexOf(style) >= 0;
 					const nextUpRequest = ++nextUpRequestRef.current;
 					const [seasonsData, nextUpData, episodesData] = await Promise.all([
-						effectiveApi.getSeasons(itemId).catch(() => null),
-						effectiveApi.getNextUp(1, itemId).catch(() => null),
-						wantsEpisodes ? effectiveApi.getEpisodes(itemId).catch(() => null) : null
+						effectiveApi.getSeasons(itemId).catch(noteRowFailed),
+						effectiveApi.getNextUp(1, itemId).catch(noteRowFailed),
+						wantsEpisodes ? effectiveApi.getEpisodes(itemId).catch(noteRowFailed) : null
 					]);
 					if (seasonsData) setSeasons(tagWithServerInfo(withoutBlockedItems(seasonsData.Items || [], fallbackRating)));
 					if (nextUpData?.Items?.length > 0 && nextUpRequest === nextUpRequestRef.current) setNextUp(tagWithServerInfo(nextUpData.Items));
@@ -336,7 +347,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 							setCast(mergeEpisodeCast({episodeActors: data.People || [], parentActors}));
 						});
 					}
-					const episodesData = await effectiveApi.getEpisodes(data.SeriesId, data.Id).catch(() => null);
+					const episodesData = await effectiveApi.getEpisodes(data.SeriesId, data.Id).catch(noteRowFailed);
 					if (cancelled) return;
 					if (episodesData) setEpisodes(tagWithServerInfo(withoutBlockedItems(episodesData.Items || [], fallbackRating)));
 				}
@@ -360,9 +371,9 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					});
 					const [seasonData, seriesData] = await Promise.all([
 						data.SeriesId && seasonId
-							? effectiveApi.getEpisodes(data.SeriesId, seasonId).catch(() => null)
+							? effectiveApi.getEpisodes(data.SeriesId, seasonId).catch(noteRowFailed)
 							: null,
-						wantsWholeSeries ? effectiveApi.getEpisodes(data.SeriesId).catch(() => null) : null
+						wantsWholeSeries ? effectiveApi.getEpisodes(data.SeriesId).catch(noteRowFailed) : null
 					]);
 					if (cancelled) return;
 					if (seasonData) setEpisodes(tagWithServerInfo(withoutBlockedItems(seasonData.Items || [], fallbackRating)));
@@ -375,7 +386,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						SortBy: 'ProductionYear,SortName',
 						SortOrder: 'Ascending',
 						Fields: 'PrimaryImageAspectRatio,ProductionYear,ProviderIds'
-					}).catch(() => null);
+					}).catch(noteRowFailed);
 					boxSetMembers = collectionData?.Items || [];
 					if (collectionData) {
 						const tagged = tagWithServerInfo(withoutBlockedItems(collectionData.Items || []));
@@ -395,8 +406,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 
 				if (data.Type === 'MusicAlbum') {
 					const [tracksData, albumSimilarData] = await Promise.all([
-						effectiveApi.getAlbumTracks(data.Id).catch(() => null),
-						effectiveApi.getSimilar(itemId).catch(() => null)
+						effectiveApi.getAlbumTracks(data.Id).catch(noteRowFailed),
+						effectiveApi.getSimilar(itemId).catch(noteRowFailed)
 					]);
 					if (tracksData) setAlbumTracks(tagWithServerInfo(withoutBlockedItems(tracksData.Items || [])));
 					if (albumSimilarData) setSimilar(tagWithServerInfo(withoutBlockedItems(albumSimilarData.Items || [])));
@@ -404,15 +415,15 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 
 				if (data.Type === 'MusicArtist') {
 					const [albumsData, artistSimilarData] = await Promise.all([
-						effectiveApi.getAlbumsByArtist(data.Id).catch(() => null),
-						effectiveApi.getSimilar(itemId).catch(() => null)
+						effectiveApi.getAlbumsByArtist(data.Id).catch(noteRowFailed),
+						effectiveApi.getSimilar(itemId).catch(noteRowFailed)
 					]);
 					if (albumsData) setArtistAlbums(tagWithServerInfo(withoutBlockedItems(albumsData.Items || [])));
 					if (artistSimilarData) setSimilar(tagWithServerInfo(withoutBlockedItems(artistSimilarData.Items || [])));
 				}
 
 				if (data.Type === 'Playlist') {
-					const entries = await fetchAllPlaylistItems(effectiveApi, data.Id).catch(() => null);
+					const entries = await fetchAllPlaylistItems(effectiveApi, data.Id).catch(noteRowFailed);
 					if (entries) setPlaylistItems(tagWithServerInfo(withoutBlockedItems(entries)));
 				}
 
@@ -433,17 +444,17 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					const currentSettings = settingsRef.current;
 					const source = currentSettings?.recommendationSystemSource || 'local';
 					const canScore = scoringRef.current && !!effectiveApi.getMoonfinSimilar;
-					const stock = () => effectiveApi.getSimilar(itemId, SIMILAR_LIMIT, 'moonfin').catch(() => null);
-					const scored = () => effectiveApi.getMoonfinSimilar(itemId, SIMILAR_LIMIT).catch(() => null);
+					const stock = () => effectiveApi.getSimilar(itemId, SIMILAR_LIMIT, 'moonfin').catch(noteRowFailed);
+					const scored = () => effectiveApi.getMoonfinSimilar(itemId, SIMILAR_LIMIT).catch(noteRowFailed);
 					const localScored = () => (canScoreSeedLocally(data)
-						? getRecommendations(effectiveApi, data, {includeWatched: true, limit: SIMILAR_LIMIT}).catch(() => [])
+						? getRecommendations(effectiveApi, data, {includeWatched: true, limit: SIMILAR_LIMIT}).catch(noteListFailed)
 						: Promise.resolve([]));
 
 					if (source === 'server') return {data: await stock(), source: 'jellyfin'};
 
 					if (source === 'online') {
 						const onlineLanguage = await currentMetadataLanguage().catch(() => null);
-						const onlineCards = await getOnlineRecommendations(data, onlineLanguage).catch(() => []);
+						const onlineCards = await getOnlineRecommendations(data, onlineLanguage).catch(noteListFailed);
 						if (onlineCards.length) return {data: {Items: onlineCards}, source: 'tmdb'};
 					}
 
@@ -465,16 +476,16 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						if (localRecs.length) return {data: {Items: localRecs}, source: 'moonfin'};
 					}
 
-					return {data: await effectiveApi.getSimilar(itemId, SIMILAR_LIMIT).catch(() => null), source: 'jellyfin'};
+					return {data: await effectiveApi.getSimilar(itemId, SIMILAR_LIMIT).catch(noteRowFailed), source: 'jellyfin'};
 				};
 
 				// Older servers have to ask every collection what it holds, so the rest isnt kept
 				// waiting on that.
-				const collectionsLookup = needsBoxSet ? findParentCollections(effectiveApi, data).catch(() => []) : Promise.resolve([]);
+				const collectionsLookup = needsBoxSet ? findParentCollections(effectiveApi, data).catch(noteListFailed) : Promise.resolve([]);
 				const [similarResult, extrasData, partsData] = await Promise.all([
 					fetchSimilar(),
-					needsExtras ? effectiveApi.getSpecialFeatures(itemId).catch(() => null) : Promise.resolve(null),
-					needsExtras && data.PartCount > 1 ? effectiveApi.getAdditionalParts(itemId).catch(() => null) : Promise.resolve(null)
+					needsExtras ? effectiveApi.getSpecialFeatures(itemId).catch(noteRowFailed) : Promise.resolve(null),
+					needsExtras && data.PartCount > 1 ? effectiveApi.getAdditionalParts(itemId).catch(noteRowFailed) : Promise.resolve(null)
 				]);
 
 				if (similarResult?.data) {
@@ -497,7 +508,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						// A box set has no people of its own, so its Cast card pools them from
 						// everything inside it.
 						Fields: 'PrimaryImageAspectRatio,ProductionYear,ProviderIds,People'
-					}).catch(() => null);
+					}).catch(noteRowFailed);
 					// A collection holding nothing but the title being looked at says nothing.
 					const members = withoutBlockedItems(colData?.Items || []);
 					if (members.length <= 1) continue;
@@ -534,7 +545,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					setCollectionPlaylistLoading(true);
 					const [scanned, saved] = await Promise.all([
 						buildCollectionIndex(effectiveApi, itemId),
-						Promise.resolve(effectiveApi.getCollectionOrder?.(itemId)).catch(() => null)
+						Promise.resolve(effectiveApi.getCollectionOrder?.(itemId)).catch(noteRowFailed)
 					]);
 					if (cancelled || generation !== playlistGenerationRef.current) return;
 					// A scan that finds nothing leaves the collection's own playable members to stand in.
@@ -550,16 +561,106 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				}
 
 				if (data.Type === 'Person') {
-					const filmography = await effectiveApi.getItemsByPerson(itemId, 50).catch(() => null);
+					const filmography = await effectiveApi.getItemsByPerson(itemId, 50).catch(noteRowFailed);
 					if (filmography) setSimilar(tagWithServerInfo(withPersonRoles(withoutBlockedItems(filmography.Items || []), itemId)));
 				}
+				bgDone = true;
 			};
 
 			bg().catch(() => {});
+
+			// Once the rows and the track picks are all in, the screen is kept for the next time this title is opened. A
+			// title in a collection that Seerr is asked about for its missing titles is left out, since those arrive later.
+			const openedFrom = seedFrom(seedRef.current, itemId);
+			let keepTimer = null;
+			stopKeeping = () => { if (keepTimer) clearTimeout(keepTimer); };
+			const keepWhenSettled = (tries) => {
+				if (cancelled || !isCacheableType(data)) return;
+				if (rowsFailed || picksFailed) return;
+				const now = latestRef.current;
+				if (bgDone && !now.isSeed && !now.isLoading && now.item?.Id === data.Id) {
+					if (now.parentCollections.length > 0 && seerrEnabledRef.current) return;
+					saveDetails(key, {
+						item: now.item, seasons: now.seasons, episodes: now.episodes, seriesEpisodes: now.seriesEpisodes, similar: now.similar,
+						similarSource: now.similarSource, extras: now.extras, cast: now.cast, nextUp: now.nextUp, parentCollections: now.parentCollections,
+						episodeRatings: now.episodeRatings, selectedVersionIndex: now.selectedVersionIndex, selectedAudioIndex: now.selectedAudioIndex,
+						selectedSubtitleIndex: now.selectedSubtitleIndex
+					}, openedFrom);
+					return;
+				}
+				if (tries < 40) keepTimer = setTimeout(() => keepWhenSettled(tries + 1), 150);
+			};
+			keepTimer = setTimeout(() => keepWhenSettled(0), 300);
+
+			// A pick that cannot be read (storage, the plugin) leaves the tracks at their defaults rather than the screen as a seed
+			try {
+				// A series' track choice made on another device comes in before this page reads it.
+				const tracksSynced = syncSeriesTrackChoices(tagWithServerInfo(data));
+				const ms = data.MediaSources?.[0];
+				if (ms) {
+					await tracksSynced;
+					if (cancelled) return;
+					const initAudioStreams = ms.MediaStreams?.filter(s => s.Type === 'Audio') || [];
+					// The track playback will start on, picked the way the player picks it: a track remembered for the
+					// title or its series, then the audio language and codec order from Settings, and only when
+					// neither names one the server's own default.
+					const rememberAudio = settingsRef.current?.rememberSeriesAudio !== false;
+					// The two remembered picks are read together, since neither waits on the other
+					const [itemAudioPref, seriesAudioPref] = await Promise.all([
+						rememberAudio ? getItemAudioPref(data.Id) : undefined,
+						data.SeriesId && rememberAudio ? getSeriesAudioPref(data.SeriesId) : undefined
+					]);
+					if (cancelled) return;
+					const matchedAudio = initAudioStreams.some((s) => s.Index === itemAudioPref)
+						? itemAudioPref
+						: (seriesAudioPref ? matchSeriesTrackIndex(initAudioStreams.map(fromServerStream), seriesAudioPref) : null);
+					const rememberedAudioPos = matchedAudio !== null && matchedAudio >= 0
+						? initAudioStreams.findIndex(s => s.Index === matchedAudio)
+						: -1;
+					let audioPos = rememberedAudioPos;
+					if (audioPos < 0) {
+						const audioSettings = await playback.audioSettingsForItem(settingsRef.current || {}, data);
+						const preferredAudio = selectPreferredAudioStream(initAudioStreams.map(fromServerAudio), audioSettings);
+						audioPos = preferredAudio ? initAudioStreams.findIndex(s => s.Index === preferredAudio.index) : -1;
+					}
+					if (audioPos < 0 && ms.DefaultAudioStreamIndex != null) {
+						audioPos = initAudioStreams.findIndex(s => s.Index === ms.DefaultAudioStreamIndex);
+					}
+					if (cancelled) return;
+					if (audioPos >= 0) setSelectedAudioIndex(audioPos);
+					// Show the track playback will start on as active, picked the way the player picks it: the remembered pick for
+					// this episode or its series first, then the subtitle mode and languages from Settings.
+					const subtitlePos = await detailsSubtitlePosition(data, ms, settingsRef.current, initAudioStreams[Math.max(0, audioPos)]);
+					if (cancelled) return;
+					serverLogger.playback('Details: subtitle button pick', {
+						itemId,
+						mode: settingsRef.current?.subtitleMode,
+						language: settingsRef.current?.subtitleLanguage,
+						serverDefault: ms.DefaultSubtitleStreamIndex ?? null,
+						tracks: (ms.MediaStreams || []).filter(s => s.Type === 'Subtitle').map(s => `${s.Index}:${s.Language || '?'}${s.IsDefault ? ':default' : ''}${s.IsForced ? ':forced' : ''}`),
+						picked: subtitlePos
+					});
+					setSelectedSubtitleIndex(subtitlePos);
+				} else {
+					setSelectedAudioIndex(0);
+					setSelectedSubtitleIndex(-1);
+				}
+			} catch (err) {
+				picksFailed = true;
+				console.warn('[Details] Could not pick the tracks', err);
+			}
+			// Still a seed until the picked tracks above are in, or the track buttons read their
+			// unset defaults (Subtitle: Off) for as long as the prefs take to come back.
+			if (cancelled) return;
+			setIsSeed(false);
+			setIsLoading(false);
 		};
 		loadItem();
-		return () => { cancelled = true; };
-	}, [effectiveApi, itemId, tagWithServerInfo, skip, startCollectionPlaylist]);
+		return () => {
+			cancelled = true;
+			stopKeeping();
+		};
+	}, [effectiveApi, effectiveServerUrl, itemId, tagWithServerInfo, skip, startCollectionPlaylist]);
 
 	const chooseCollectionSort = useCallback((option) => {
 		if (option === collectionSortRef.current) return;

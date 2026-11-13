@@ -90,12 +90,13 @@ import {accentSignature, pickedAccents} from '../theme/accentSurfaces';
 import {resolveOverlayColor} from '../theme/overlayColors';
 import Login from '../views/Login';
 import Browse from '../views/Browse';
+// Not lazy: the details screen is what a title opens, so its code is read with the app and not on the first title opened
+import Details from '../views/Details';
 import {isGameLibrary, refreshGameLibraries, resolveGameLibraryId} from '../utils/gameLibrary';
 import {dropEpisodeDialog} from '../utils/episodeDialogReturn';
 import {afterHomeReady} from '../utils/homeReady';
 import {setMusicPlaying} from '../utils/sharedVideoOwner';
 
-const Details = lazy(() => import('../views/Details'));
 const Library = lazy(() => import('../views/Library'));
 const Search = lazy(() => import('../views/Search'));
 const Settings = lazy(() => import('../views/Settings'));

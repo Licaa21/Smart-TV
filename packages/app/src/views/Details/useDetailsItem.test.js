@@ -15,12 +15,14 @@ jest.mock('../../services/blockedContentGate', () => ({
 	isBlocked: () => Promise.resolve(false), isBlockedNow: () => false, observeItem: () => {}
 }));
 jest.mock('../../services/parentalControls', () => ({
-	getActiveParentalFilter: () => ({isActive: false}), withoutBlockedItems: (items) => items
+	getActiveParentalFilter: () => ({isActive: false}), withoutBlockedItems: (items) => items,
+	getBlockedRatings: () => [], getBlockedSeriesIds: () => []
 }));
 jest.mock('./parentCollection', () => ({findParentCollections: () => Promise.resolve([])}));
 
 import * as userDataSync from '../../services/userDataSync';
 import useDetailsItem from './useDetailsItem';
+import {clearDetailsCache} from './detailsCache';
 
 const SERIES = {Id: 'series', Type: 'Series', Name: 'Show'};
 const episode = (id, userData = {}) => ({Id: id, Type: 'Episode', SeriesId: 'series', UserData: userData});
@@ -113,5 +115,81 @@ describe('a series Next Up', () => {
 		await settle();
 
 		expect(result.current.nextUp[0].Id).toBe('e3');
+	});
+});
+
+describe('a title opened again', () => {
+	beforeEach(() => clearDetailsCache());
+
+	const MOVIE = {Id: 'movie', Type: 'Movie', Name: 'Film', UserData: {Played: false, PlaybackPositionTicks: 0}, People: [{Id: 'p1', Name: 'Actor', Type: 'Actor'}]};
+	const movieApi = () => ({
+		...makeApi(() => Promise.resolve(page([]))),
+		getItemForDetail: jest.fn(() => Promise.resolve(MOVIE)),
+		getSimilar: jest.fn(() => Promise.resolve(page([{Id: 'sim1', Type: 'Movie'}])))
+	});
+	const renderMovie = (api, initialItem = null) => renderHook(() => useDetailsItem({
+		itemId: 'movie',
+		initialItem,
+		effectiveApi: api,
+		effectiveServerUrl: 'https://server',
+		settings: {...SETTINGS, uiLanguage: 'ro-opened-again'},
+		recommendationsSupported: false,
+		seerrEnabled: false,
+		tagWithServerInfo: identity,
+		skip: false
+	}));
+	const loadAndKeep = async (api, seed) => {
+		const view = renderMovie(api, seed);
+		await settle();
+		// the screen is kept once the rows and the picks are in, a moment after the load
+		await act(async () => { await new Promise((resolve) => setTimeout(resolve, 600)); });
+		view.unmount();
+	};
+
+	test('is drawn whole in the first frame with no request when nothing changed', async () => {
+		const api = movieApi();
+		await loadAndKeep(api, {...MOVIE});
+		expect(api.getItemForDetail).toHaveBeenCalledTimes(1);
+
+		const view = renderMovie(api, {...MOVIE});
+		expect(view.result.current.item.Id).toBe('movie');
+		expect(view.result.current.isLoading).toBe(false);
+		expect(view.result.current.isSeed).toBe(false);
+		expect(view.result.current.similar.map((s) => s.Id)).toEqual(['sim1']);
+		expect(view.result.current.cast).toHaveLength(1);
+		await settle();
+		expect(api.getItemForDetail).toHaveBeenCalledTimes(1);
+		expect(api.getSimilar).toHaveBeenCalledTimes(1);
+	});
+
+	test('opens the normal way when the card it is opened from has changed', async () => {
+		const api = movieApi();
+		await loadAndKeep(api, {...MOVIE});
+
+		const resumed = {...MOVIE, UserData: {Played: false, PlaybackPositionTicks: 90000000}};
+		const view = renderMovie(api, resumed);
+		await settle();
+		expect(api.getItemForDetail).toHaveBeenCalledTimes(2);
+		expect(view.result.current.item.Id).toBe('movie');
+	});
+
+	test('is not kept when a row it asked for failed, so the next open asks again', async () => {
+		const api = movieApi();
+		api.getSimilar.mockImplementation(() => Promise.reject(new Error('plugin down')));
+		await loadAndKeep(api, {...MOVIE});
+
+		renderMovie(api, {...MOVIE});
+		await settle();
+		expect(api.getItemForDetail).toHaveBeenCalledTimes(2);
+	});
+
+	test('opens the normal way once anything played or watched changed in the app', async () => {
+		const api = movieApi();
+		await loadAndKeep(api, {...MOVIE});
+
+		act(() => userDataSync.publish('some-episode', {Played: true}));
+		renderMovie(api, {...MOVIE});
+		await settle();
+		expect(api.getItemForDetail).toHaveBeenCalledTimes(2);
 	});
 });

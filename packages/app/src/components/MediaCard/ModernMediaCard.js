@@ -67,6 +67,9 @@ const BACKDROP_WARM_DELAY_MS = 120;
 
 // The same speeds and curve Moonfin Core opens its modern cards with
 const EXPAND_MS = {extraSlow: 450, slow: 300, medium: 180, fast: 90, off: 0};
+// How long a card takes to open at the speed picked. The fork animates at every performance tier, as the setting says,
+// and the Carousel panel fades in the same time.
+export const expandMs = (speed) => EXPAND_MS[speed] || 0;
 const EXPAND_CURVE = 'cubic-bezier(0.65, 0, 0.35, 1)';
 
 const expandTransition = (speed) => {

@@ -834,7 +834,7 @@ export const getMoonfinMediaBar = async (serverUrl, token, profile = 'tv') => {
 	}
 };
 
-const request = async (endpoint, options = {}) => {
+const performRequest = async (endpoint, options = {}) => {
 	const result = await moonfinRequest(endpoint, options);
 	// A request or a watchlist change alters what the cards of Seerr rows say, and the home screen keeps those rows
 	// for a return, so it is told to fetch them again
@@ -842,6 +842,26 @@ const request = async (endpoint, options = {}) => {
 		window.dispatchEvent(new window.CustomEvent('moonfin:seerrChanged'));
 	}
 	return result;
+};
+
+// A read already out is answered to every caller that asks for the same thing while it is, since a details screen asks
+// for the same recommendations and the same title from several places at once. Nothing is kept once it lands. Every
+// caller gets its own copy, made before any of them has seen the answer, so one that changes what it got does not
+// change it for the rest.
+const reading = new Map();
+const copyOf = (value) => (value && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value);
+
+const request = (endpoint, options = {}) => {
+	const isRead = !options.method || options.method === 'GET';
+	if (!isRead || options.signal) return performRequest(endpoint, options);
+	const key = `${jellyfinServerUrl}|${jellyfinAccessToken}|${endpoint}|${JSON.stringify(options)}`;
+	if (!reading.has(key)) {
+		const call = performRequest(endpoint, options);
+		const done = () => { if (reading.get(key) === call) reading.delete(key); };
+		reading.set(key, call);
+		call.then(done, done);
+	}
+	return reading.get(key).then(copyOf);
 };
 
 export const getUser = async () => {

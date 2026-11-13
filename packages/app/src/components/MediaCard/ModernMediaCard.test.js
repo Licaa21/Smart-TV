@@ -1,6 +1,6 @@
 import {act, fireEvent, render, screen} from '@testing-library/react';
 
-import ModernMediaCard from './ModernMediaCard';
+import ModernMediaCard, {expandMs} from './ModernMediaCard';
 import MediaPreviewContext from './MediaPreviewContext';
 import {setTmdbThumbsAvailable} from '../../utils/tmdbThumb';
 import {warmBackdrop} from '../../utils/backdropWarm';
@@ -611,4 +611,11 @@ describe('ModernMediaCard asking the server for the size it draws', () => {
 		const wide = sources({isFocused: true}).find((src) => src.includes('/Thumb'));
 		expect(wide).toContain('maxWidth=640');
 	});
+});
+
+it('gives the Carousel panel the time a card takes to open at the speed picked', () => {
+	expect(expandMs('fast')).toBe(90);
+	expect(expandMs('extraSlow')).toBe(450);
+	expect(expandMs('off')).toBe(0);
+	expect(expandMs(undefined)).toBe(0);
 });
