@@ -171,7 +171,7 @@ export const defaultSettings = {
 	featuredItemCount: 10,
 	featuredBarStyle: 'moonfin',
 	mediaBarRowPeek: false,
-	featuredTrailerPreview: true,
+	featuredTrailerPreview: false,
 	featuredTrailerMuted: false,
 	trailerVolume: 100,
 	mediaBarTrailerCaptions: false,
@@ -316,7 +316,7 @@ export const defaultSettings = {
 	homeRowsImageType: 'poster',
 	// Per row overrides keyed by row id. An absent id uses the global type above.
 	homeRowImageTypes: {},
-	homeRowsStyle: 'v2',
+	homeRowsStyle: 'carousel',
 	modernCardsOnMyMediaRow: false,
 	modernCardTransitionSpeed: 'off',
 	detailScreenStyle: 'v9',
