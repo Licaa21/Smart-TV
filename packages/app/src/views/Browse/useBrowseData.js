@@ -56,7 +56,7 @@ const loadSignatureOf = (settings, homeRowsConfig, unifiedMode, seerrEnabled, se
 		settings.sinceYouWatchedSourceType, settings.sinceYouWatchedIncludeWatched,
 		settings.rewatchIncludeMovies, settings.rewatchIncludeShows, settings.rewatchIncludeCollections, settings.rewatchSortBy,
 		settings.displayAudioRows, settings.displayRewatchRow, settings.displayStudiosRows, settings.studiosRowSortBy,
-		settings.studiosRowSortOrder, settings.playlistsRowShowEpisodes, settings.recentlyReleasedSeriesType,
+		settings.studiosRowSortOrder, settings.playlistsRowShowEpisodes, settings.recentlyReleasedSeriesType, settings.hideWatchedInRecentRows,
 		settings.featuredBarStyle, homeRowsConfig, unifiedMode, seerrEnabled, seerrAuthenticated, recommendationsSupported
 	]);
 
@@ -270,7 +270,7 @@ const useBrowseData = ({
 
 			// Merged libraries keep the random draw, since the dated sources read one server.
 			if (items.length === 0 && datedSource && !unifiedMode) {
-				const options = {contentType: s.featuredContentType, days: s.mediaBarNewReleaseDays};
+				const options = {contentType: s.featuredContentType, days: s.mediaBarNewReleaseDays, hideWatched: s.hideWatchedInRecentRows === true};
 				const readSource = async (parentId) => ({Items: await readDatedSource(api, sourceType, parentId, options)});
 				items = pickFrom(await readFeaturedSources(hasSourceFilter ? sourceIds : [null], readSource, isUsable, count));
 			}
@@ -592,7 +592,8 @@ const useBrowseData = ({
 			// answer for another. Series keeps the key rows were stored under before.
 			const releasedType = settings.recentlyReleasedSeriesType;
 			const rowConfigKey = (settings.mergeRecentRowsByType ? 'merged-recent' : 'per-library') +
-				(releasedType && releasedType !== 'series' ? `:${releasedType}` : '');
+				(releasedType && releasedType !== 'series' ? `:${releasedType}` : '') +
+				(settings.hideWatchedInRecentRows === true ? ':hide-watched' : '');
 
 			if (hasDynamicRowConfig || unifiedMode) {
 				memoryCache.rowConfigKey = rowConfigKey;
@@ -785,7 +786,7 @@ const useBrowseData = ({
 							.filter((r) => r && r.latest?.length > 0)
 							.map((r) => ({
 								lib: r.lib,
-								items: normalizeLatestMediaItems(r.latest, {collectionType: r.lib?.CollectionType, limit: 16})
+								items: normalizeLatestMediaItems(r.latest, {collectionType: r.lib?.CollectionType, limit: 16, hideWatched: settings.hideWatchedInRecentRows === true})
 							}));
 						for (const merged of mergeRecentRows(entries, 'DateCreated')) {
 							newRows.push({
@@ -799,7 +800,7 @@ const useBrowseData = ({
 					} else {
 						for (const result of latestResults) {
 							if (result && result.latest?.length > 0) {
-								const items = normalizeLatestMediaItems(result.latest, {collectionType: result.lib?.CollectionType, limit: 16});
+								const items = normalizeLatestMediaItems(result.latest, {collectionType: result.lib?.CollectionType, limit: 16, hideWatched: settings.hideWatchedInRecentRows === true});
 								if (items.length > 0) {
 									const libraryTitle = result.lib._serverName
 										? `${result.lib.Name} (${result.lib._serverName})`
@@ -912,6 +913,7 @@ const useBrowseData = ({
 		settings.playlistsRowShowEpisodes,
 		settings.uiLanguage,
 		settings.mergeRecentRowsByType,
+		settings.hideWatchedInRecentRows,
 		settings.recentlyReleasedSeriesType,
 		settings.mergeContinueWatchingNextUp,
 		settings.kidsModeEnabled,

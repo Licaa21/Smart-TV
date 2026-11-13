@@ -30,11 +30,13 @@ jest.mock('../../utils/metadataLanguage', () => ({currentMetadataLanguage: async
 
 const settings = {useMoonfinPlugin: true};
 const homeRows = [{id: 'tmdb_popular_movies', enabled: true}];
-const watchingNowSettings = {useMoonfinPlugin: true, mdblistWatchingNowEnabled: true};
+const watchingNowSettings = {useMoonfinPlugin: true};
+// The plugin's ping, with every key and the calendars set up.
+const pluginInfo = {tmdbAvailable: true, mdblistAvailable: true, calendarAvailable: true};
 const watchingNowRows = [{id: 'mdblist_watching_now', enabled: true}];
 
 const load = async () => {
-	const {result} = renderHook(() => useExternalRows({settings, homeRows, kidsMode: false}));
+	const {result} = renderHook(() => useExternalRows({settings, homeRows, kidsMode: false, pluginInfo}));
 	expect(result.current.pending.map((row) => row.id)).toEqual(['tmdb_popular_movies']);
 	await waitFor(() => expect(result.current.pending).toEqual([]));
 };
@@ -71,7 +73,7 @@ describe('empty external rows', () => {
 				{title: 'Invalid Movie', public_id: 'pub123'}
 			]
 		});
-		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false}));
+		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false, pluginInfo}));
 		await waitFor(() => expect(result.current.rows.length).toBe(1));
 		expect(result.current.rows[0].items.length).toBe(1);
 		expect(result.current.rows[0].items[0].Name).toBe('Valid Movie');
@@ -83,7 +85,7 @@ describe('empty external rows', () => {
 		fetchWatchingNow.mockResolvedValue({items: [{title: 'Valid Movie', imdb_id: 'tt123456'}]});
 		let hidden = true;
 		jest.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
-		renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false}));
+		renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false, pluginInfo}));
 		await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
 		expect(fetchWatchingNow).toHaveBeenCalledTimes(1);
 		hidden = false;
@@ -95,11 +97,11 @@ describe('empty external rows', () => {
 	test('watching now keeps refreshing after the rows are taken back from memory', async () => {
 		jest.useFakeTimers();
 		fetchWatchingNow.mockResolvedValue({items: [{title: 'Valid Movie', imdb_id: 'tt123456'}]});
-		const view = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false}));
+		const view = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false, pluginInfo}));
 		await jest.advanceTimersByTimeAsync(50);
 		view.unmount();
 		fetchWatchingNow.mockClear();
-		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false, reuse: true}));
+		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false, pluginInfo, reuse: true}));
 		// The kept rows come back at once, with no new fetch
 		expect(result.current.rows.map((row) => row.id)).toEqual(['mdblist_watching_now']);
 		expect(fetchWatchingNow).not.toHaveBeenCalled();
@@ -121,7 +123,7 @@ describe('empty external rows', () => {
 		fetchWatchingNow.mockReturnValue(new Promise(() => {}));
 		fetchExternalPresetRow.mockResolvedValue([{Id: 'a', Name: 'A'}]);
 		const bothRows = [...homeRows, ...watchingNowRows];
-		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: bothRows, kidsMode: false}));
+		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: bothRows, kidsMode: false, pluginInfo}));
 		await waitFor(() => expect(result.current.rows.map((row) => row.id)).toEqual(['tmdb_popular_movies']));
 		expect(result.current.pending.map((row) => row.id)).toEqual(['mdblist_watching_now']);
 	});
@@ -129,7 +131,7 @@ describe('empty external rows', () => {
 	test('owned watching now titles become library items', async () => {
 		fetchWatchingNow.mockResolvedValue({items: [{title: 'Valid Movie', imdb_id: 'tt123456'}]});
 		resolveItemsByProviderIds.mockImplementation(async (items) => items.map((item) => ({...item, Id: 'library-id', _resolvedFromExternal: true})));
-		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false}));
+		const {result} = renderHook(() => useExternalRows({settings: watchingNowSettings, homeRows: watchingNowRows, kidsMode: false, pluginInfo}));
 		await waitFor(() => expect(result.current.rows.length).toBe(1));
 		expect(result.current.rows[0].items[0]).toMatchObject({Id: 'library-id', _resolvedFromExternal: true, Rank: 1});
 	});
@@ -140,12 +142,31 @@ describe('calendar rows', () => {
 		fetchCalendarRows.mockResolvedValue([]);
 		const rows = [{id: 'radarr_calendar', enabled: true}];
 		const {rerender} = renderHook(
-			({dateFormat}) => useExternalRows({settings: {useMoonfinPlugin: true, dateFormat}, homeRows: rows, kidsMode: false}),
+			({dateFormat}) => useExternalRows({settings: {useMoonfinPlugin: true, dateFormat}, homeRows: rows, kidsMode: false, pluginInfo}),
 			{initialProps: {dateFormat: 'system'}}
 		);
 		await waitFor(() => expect(fetchCalendarRows).toHaveBeenLastCalledWith(expect.objectContaining({dateFormat: 'system'}), expect.anything()));
 
 		rerender({dateFormat: 'dayMonth'});
 		await waitFor(() => expect(fetchCalendarRows).toHaveBeenLastCalledWith(expect.objectContaining({dateFormat: 'dayMonth'}), expect.anything()));
+	});
+});
+
+describe('what the server can fill', () => {
+	test("a row that's on is drawn only while the server can fill it, whatever its old switch says", async () => {
+		const rows = [{id: 'tmdb_popular_movies', enabled: true}, {id: 'mdblist_watching_now', enabled: true}];
+		const oldSwitchesOff = {useMoonfinPlugin: true, mdblistWatchingNowEnabled: false};
+		const {result} = renderHook(() => useExternalRows({
+			settings: oldSwitchesOff,
+			homeRows: rows,
+			kidsMode: false,
+			pluginInfo: {tmdbAvailable: false, mdblistAvailable: true, calendarAvailable: false}
+		}));
+		expect(result.current.pending.map((row) => row.id)).toEqual(['mdblist_watching_now']);
+	});
+
+	test('nothing is drawn before the plugin answers', () => {
+		const {result} = renderHook(() => useExternalRows({settings, homeRows, kidsMode: false, pluginInfo: null}));
+		expect(result.current.pending).toEqual([]);
 	});
 });

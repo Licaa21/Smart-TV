@@ -147,6 +147,8 @@ const PlayerControls = ({
 	const showRemoteSubtitleResults = !remoteSubtitleBusy && !remoteSubtitleError;
 	const showSubtitleFetch = useSubtitleFetchShown(subtitleFetching) && !isAudioMode;
 	const controlsShown = controlsVisible && !activeModal;
+	// White reads far brighter next to an HDR picture. Opacity is the cheap way to tone it down on a raster bound set.
+	const hdrDimming = controlsShown && isHdrContent ? settings.hdrControlsDimming : 0;
 
 	const subtitleSlotLabel = (index) => {
 		const stream = subtitleStreams.find((s) => s.index === index);
@@ -280,7 +282,10 @@ const PlayerControls = ({
 
 	return (
 		<>
-			<div className={`${css.playerControls} ${controlsShown ? css.visible : ''} ${isAudioMode ? css.audioControls : ''}`}>
+			<div
+				className={`${css.playerControls} ${controlsShown ? css.visible : ''} ${isAudioMode ? css.audioControls : ''}`}
+				style={hdrDimming > 0 ? {opacity: 1 - hdrDimming / 100} : undefined}
+			>
 				{!isAudioMode && (
 				<div className={css.controlsTop}>
 					{isLiveTV ? (

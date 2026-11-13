@@ -10,6 +10,7 @@ import {seasonalCountryParam} from '../../utils/seasonalRow';
 import {resolveDeviceCountry} from '../../utils/deviceCountry';
 import {currentMetadataLanguage} from '../../utils/metadataLanguage';
 import {localizeExternalItems, localizeSeerrCards, pluginTranslatesRow} from '../../utils/localizeExternalItems';
+import {isExternalRowAvailable} from '../../utils/homeRowGates';
 
 // Owned titles become library items so they open and play without Seerr, the rest open in Seerr.
 const loadWatchingNowRow = async (forceRefresh = false) => {
@@ -39,10 +40,15 @@ const withRow = (rows, row) => {
 // the local library first: what the server owns becomes playable, the rest falls back to Seerr.
 // The rows still on their way come back as [pending], so they can hold their place.
 // A return to the home screen takes the rows it left from memory, and does not fetch and resolve them again.
-const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = ''}) => {
+const useExternalRows = ({settings, homeRows, kidsMode, pluginInfo = null, serverType, reuse = false, owner = ''}) => {
 	const [externalRows, setExternalRows] = useState(() => (reuse && memoryCache.externalRows?.owner === owner ? memoryCache.externalRows.rows : []));
 	const [pending, setPending] = useState([]);
 	const reuseRef = useRef(reuse);
+	// Only what the rows depend on, so a fresh ping with the same answers doesn't reload them.
+	const hasPlugin = Boolean(pluginInfo);
+	const tmdbAvailable = pluginInfo?.tmdbAvailable === true;
+	const mdblistAvailable = pluginInfo?.mdblistAvailable === true;
+	const calendarAvailable = pluginInfo?.calendarAvailable === true;
 
 	// A refresh the viewer asked for, which brings these rows in again as well as the library's.
 	const [reloadKey, setReloadKey] = useState(0);
@@ -55,22 +61,19 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 	}, []);
 
 	useEffect(() => {
-		if (!settings.useMoonfinPlugin) {
-			setExternalRows([]);
-			setPending([]);
-			return undefined;
-		}
+		const info = hasPlugin ? {tmdbAvailable, mdblistAvailable, calendarAvailable} : null;
 		// The rows arrive already filtered, and the pasted list rows go the way the plugin rows do,
 		// since nothing here can vouch for what an outside catalogue returns.
 		const rows = homeRows || settings.homeRows || [];
-		const enabledPresets = rows.filter((r) => r.enabled && (r.id.startsWith('tmdb_') || r.id.startsWith('imdb-'))).map((r) => r.id);
-		const customRows = kidsMode ? [] : (settings.customHomeRows || []).filter((r) => r.enabled);
-		const radarrEnabled = rows.some((r) => r.enabled && r.id === 'radarr_calendar');
-		const sonarrEnabled = rows.some((r) => r.enabled && r.id === 'sonarr_calendar');
+		const keys = {useMoonfinPlugin: settings.useMoonfinPlugin, tmdbApiKey: settings.tmdbApiKey, mdblistApiKey: settings.mdblistApiKey};
+		const shown = (r) => r.enabled && isExternalRowAvailable(r.id, {settings: keys, pluginInfo: info, serverType}) === true;
+		const enabledPresets = rows.filter((r) => (r.id.startsWith('tmdb_') || r.id.startsWith('imdb-')) && shown(r)).map((r) => r.id);
+		const customRows = kidsMode || !settings.useMoonfinPlugin ? [] : (settings.customHomeRows || []).filter((r) => r.enabled);
+		const radarrEnabled = rows.some((r) => r.id === 'radarr_calendar' && shown(r));
+		const sonarrEnabled = rows.some((r) => r.id === 'sonarr_calendar' && shown(r));
 		const calendarsEnabled = radarrEnabled || sonarrEnabled;
-		// The seasonal row is stored as a home row and as its own synced toggle, and both have to be on.
-		const seasonalEnabled = settings.seasonalRowEnabled === true && rows.some((r) => r.enabled && r.id === 'seasonal');
-		const watchingNowEnabled = settings.mdblistWatchingNowEnabled === true && rows.some((r) => r.enabled && r.id === 'mdblist_watching_now');
+		const seasonalEnabled = rows.some((r) => r.id === 'seasonal' && shown(r));
+		const watchingNowEnabled = rows.some((r) => r.id === 'mdblist_watching_now' && shown(r));
 		if (enabledPresets.length === 0 && customRows.length === 0 && !calendarsEnabled && !seasonalEnabled && !watchingNowEnabled) {
 			setExternalRows([]);
 			setPending([]);
@@ -272,8 +275,9 @@ const useExternalRows = ({settings, homeRows, kidsMode, reuse = false, owner = '
 
 		return stopWork;
 	}, [settings.useMoonfinPlugin, homeRows, kidsMode, settings.homeRows, settings.customHomeRows,
-		settings.uiLanguage, settings.mdblistWatchingNowEnabled,
-		settings.seasonalRowEnabled, settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays, settings.seasonalRowAllYear,
+		settings.uiLanguage, hasPlugin, tmdbAvailable, mdblistAvailable, calendarAvailable, serverType,
+		settings.tmdbApiKey, settings.mdblistApiKey,
+		settings.seasonalRowCountry, settings.seasonalRowHiddenHolidays, settings.seasonalRowAllYear,
 		settings.mergeRadarrSonarrCalendars,
 		settings.radarrCalendarShowCinema, settings.radarrCalendarShowDigital, settings.radarrCalendarShowPhysical,
 		settings.radarrCalendarShowDate, settings.sonarrCalendarShowDate, settings.sonarrCalendarShowEpisodeInfo,

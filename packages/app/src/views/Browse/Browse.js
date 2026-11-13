@@ -12,7 +12,6 @@ import {useSeerr} from '../../context/SeerrContext';
 import {ClassicMediaRow, ModernMediaRow} from '../../components/MediaRow';
 import {announceFocusedRow} from '../../components/MediaRow/warmWindow';
 import MediaPreviewContext from '../../components/MediaCard/MediaPreviewContext';
-import {modernRowSpacing} from '../../components/MediaCard/modernCardLayout';
 import SeerrTileRow from '../../components/SeerrTileRow';
 import LibraryButtonRow from '../../components/LibraryButtonRow';
 import WatchingNowRow from '../../components/WatchingNowRow';
@@ -24,6 +23,7 @@ import {createApiForServer} from '../../services/jellyfinApi';
 import {channelForProgram, isLiveTvProgram} from '../../utils/liveTvLibrary';
 import {radiusToCss, shadowToCss, toCssColor} from '../../theme/themeSpec';
 import DetailSection from './DetailSection';
+import * as gamesApi from '../../services/gamesApi';
 import FeaturedBanner from './FeaturedBanner';
 import MakdBanner from './MakdBanner';
 import GalleryBanner from './GalleryBanner';
@@ -50,6 +50,7 @@ import {homeBackdropStyle} from '../../utils/homeBackdropStyle';
 import {rem} from '../../utils/rootScale';
 import {glideScroll, isGliding, smoothScrollingOn, stopScrollAnimation} from '../../utils/focusScroll';
 import {writingGlide} from '../../utils/glideState';
+import {homeRowSpacing} from '../../components/MediaCard/modernCardLayout';
 import {rowImageType, rowPeekHeight} from './rowPeek';
 
 import css from './Browse.module.less';
@@ -94,6 +95,8 @@ const Browse = ({
 	onSelectSeerrNetwork,
 	onOpenSeerrShortcut,
 	onOpenCalendarMonth,
+	onSelectStudio,
+	onSelectGame,
 	isVisible = true,
 	onFocusItemThemeMusic,
 	onBlurItemThemeMusic,
@@ -143,7 +146,7 @@ const Browse = ({
 		sortBy: settings.seerrRowsSortBy,
 		sortOrder: settings.seerrRowsSortOrder
 	});
-	const {rows: externalRows, pending: externalPending} = useExternalRows({settings, homeRows: homeRowsConfig, kidsMode, reuse: returning, owner: homeOwner});
+	const {rows: externalRows, pending: externalPending} = useExternalRows({settings, homeRows: homeRowsConfig, kidsMode, pluginInfo, serverType, reuse: returning, owner: homeOwner});
 	const pendingRows = useMemo(() => [...seerrPending, ...externalPending], [seerrPending, externalPending]);
 	const unifiedMode = settings.unifiedLibraryMode && hasMultipleServers;
 	const isLegacy = typeof document !== 'undefined' && (' ' + document.documentElement.className + ' ').indexOf(' legacy ') >= 0;
@@ -218,13 +221,7 @@ const Browse = ({
 	const useModernRows = settings.homeRowsStyle !== 'v1';
 	const RowComponent = useModernRows ? ModernMediaRow : ClassicMediaRow;
 	const showTopInfoArea = !useModernRows && settings.homeRowOverlay !== false;
-	// The other clients size these sliders in their own units, so the stored value
-	// lands here as the space below each row. Classic rows count from the slider's
-	// lowest step, so they sit a little closer at every setting. Full screen rows pace
-	// themselves.
-	const rowSpacing = settings.fullScreenRows ? null : useModernRows
-		? modernRowSpacing(settings)
-		: Math.max(0, (settings.classicHomeRowsPadding ?? 30) - 10);
+	const rowSpacing = homeRowSpacing(settings);
 
 	const {
 		isLoading, browseMode, allRowData, featuredItems: loadedFeaturedItems, pendingSections, emptySections,
@@ -299,21 +296,11 @@ const Browse = ({
 		displayAudioRows: settings.displayAudioRows,
 		displayStudiosRows: settings.displayStudiosRows,
 		displayRewatchRow: settings.displayRewatchRow,
-		imdbTop250MoviesEnabled: settings.imdbTop250MoviesEnabled,
-		imdbTop250TvShowsEnabled: settings.imdbTop250TvShowsEnabled,
-		imdbMostPopularMoviesEnabled: settings.imdbMostPopularMoviesEnabled,
-		imdbMostPopularTvShowsEnabled: settings.imdbMostPopularTvShowsEnabled,
-		imdbLowestRatedMoviesEnabled: settings.imdbLowestRatedMoviesEnabled,
-		imdbTopEnglishMoviesEnabled: settings.imdbTopEnglishMoviesEnabled,
-		seasonalRowEnabled: settings.seasonalRowEnabled,
 		parentalFilter,
 		kidsModeEnabled: settings.kidsModeEnabled
 	}), [settings.kidsModeEnabled, parentalFilter, mergeContinueWatchingNextUp, settings.hiddenContinueWatchingItems, settings.hiddenNextUpSeries,
 		settings.displayFavoritesRows, settings.displayCollectionsRows, settings.displayGenresRows, settings.displayPlaylistsRows,
-		settings.displayAudioRows, settings.displayStudiosRows, settings.displayRewatchRow,
-		settings.imdbTop250MoviesEnabled, settings.imdbTop250TvShowsEnabled, settings.imdbMostPopularMoviesEnabled,
-		settings.imdbMostPopularTvShowsEnabled, settings.imdbLowestRatedMoviesEnabled, settings.imdbTopEnglishMoviesEnabled,
-		settings.seasonalRowEnabled]);
+		settings.displayAudioRows, settings.displayStudiosRows, settings.displayRewatchRow]);
 
 	const builtRows = useMemo(() => {
 		const result = buildBrowseRows({
@@ -719,6 +706,11 @@ const Browse = ({
 		if (focusedItemForBackdrop._externalBackdropUrl) {
 			return focusedItemForBackdrop._externalBackdropUrl;
 		}
+		// A game shows its in-game screenshot, the way its details screen does. The address carries
+		// the sign-in token, so it's built here rather than kept on the cached row.
+		if (focusedItemForBackdrop.isGame) {
+			return gamesApi.gameThumbUrl(focusedItemForBackdrop._library?.Id, focusedItemForBackdrop.id, 'snap') || '';
+		}
 
 		let targetItem = focusedItemForBackdrop;
 		if (focusedItemForBackdrop.Type === 'Genre' && focusedItemForBackdrop._representative) {
@@ -784,18 +776,33 @@ const Browse = ({
 			onPlayRecording?.(item);
 		} else if (isLiveTvProgram(item)) {
 			onSelectItem?.(channelForProgram(item));
+		} else if (item.isGame) {
+			onSelectGame?.(item._library, item);
 		} else {
 			onSelectItem?.(item, autoPlay);
 		}
-	}, [onSelectItem, onSelectLibrary, onOpenRecordings, onPlayRecording, onBlurItemThemeMusic, onLeaveThemeMusic, rememberFocus, mediaPreview]);
+	}, [onSelectItem, onSelectLibrary, onSelectGame, onOpenRecordings, onPlayRecording, onBlurItemThemeMusic, onLeaveThemeMusic, rememberFocus, mediaPreview]);
 
-	const handleCalendarSeeAll = useCallback(() => {
+	// The last card of an Upcoming row opens the calendar, a library's Latest row its library and a
+	// picked collection's row the collection.
+	const handleSeeAll = useCallback((rowId) => {
+		const row = filteredRowsRef.current.find((entry) => entry.id === rowId) || {};
 		mediaPreview.stop('select');
 		onBlurItemThemeMusic?.();
 		onLeaveThemeMusic?.();
 		rememberFocus();
-		onOpenCalendarMonth?.(new Date());
-	}, [onOpenCalendarMonth, onBlurItemThemeMusic, onLeaveThemeMusic, rememberFocus, mediaPreview]);
+		if (row.collection) onSelectItem?.(row.collection);
+		else if (row.isLatestRow && row.library) onSelectLibrary?.(row.library);
+		else if (CALENDAR_ROW_IDS.indexOf(rowId) >= 0) onOpenCalendarMonth?.(new Date());
+	}, [onOpenCalendarMonth, onSelectItem, onSelectLibrary, onBlurItemThemeMusic, onLeaveThemeMusic, rememberFocus, mediaPreview]);
+
+	const handleSelectStudioItem = useCallback((item) => {
+		mediaPreview.stop('select');
+		onBlurItemThemeMusic?.();
+		onLeaveThemeMusic?.();
+		rememberFocus();
+		onSelectStudio?.(item.Name);
+	}, [onSelectStudio, onBlurItemThemeMusic, onLeaveThemeMusic, rememberFocus, mediaPreview]);
 
 	const handleSelectGenreItem = useCallback((item) => {
 		mediaPreview.stop('select');
@@ -852,15 +859,16 @@ const Browse = ({
 	// handler that cant navigate. These always call the current one.
 	const latestSelectRef = useRef(null);
 	useLayoutEffect(() => {
-		latestSelectRef.current = {item: handleSelectItem, genre: handleSelectGenreItem, seerr: handleSelectSeerrItem, external: handleSelectExternalItem, calendar: handleCalendarSeeAll};
-	}, [handleSelectItem, handleSelectGenreItem, handleSelectSeerrItem, handleSelectExternalItem, handleCalendarSeeAll]);
+		latestSelectRef.current = {item: handleSelectItem, genre: handleSelectGenreItem, seerr: handleSelectSeerrItem, external: handleSelectExternalItem, studio: handleSelectStudioItem, seeAll: handleSeeAll};
+	}, [handleSelectItem, handleSelectGenreItem, handleSelectSeerrItem, handleSelectExternalItem, handleSelectStudioItem, handleSeeAll]);
 	const rowSelect = useMemo(() => ({
 		item: (picked, autoPlay) => latestSelectRef.current.item(picked, autoPlay),
 		cwPlay: (picked) => latestSelectRef.current.item(picked, true),
 		genre: (picked) => latestSelectRef.current.genre(picked),
 		seerr: (picked) => latestSelectRef.current.seerr(picked),
 		external: (picked) => latestSelectRef.current.external(picked),
-		calendar: () => latestSelectRef.current.calendar()
+		studio: (picked) => latestSelectRef.current.studio(picked),
+		seeAll: (rowId) => latestSelectRef.current.seeAll(rowId)
 	}), []);
 	const calendarSeeAll = settings.calendarRowSeeAll !== false && pluginInfo?.calendarAvailable === true && Boolean(onOpenCalendarMonth);
 
@@ -1189,6 +1197,24 @@ const Browse = ({
 								/>
 							);
 						}
+						if (row.isGameRow) {
+							return (
+								<SeerrTileRow
+									key={row.id}
+									rowId={row.id}
+									title={row.title}
+									items={row.items}
+									cardType="game"
+									onSelectItem={rowSelect.item}
+									onFocus={handleRowFocus}
+									onFocusItem={handleFocusItem}
+									rowIndex={index}
+									onNavigateUp={handleNavigateUp}
+									onNavigateDown={handleNavigateDown}
+									registerRowRef={registerRowRef}
+								/>
+							);
+						}
 						if (row.isWatchPartyRow) {
 							return (
 								<WatchPartyRow
@@ -1236,6 +1262,8 @@ const Browse = ({
 						if (row.isSeerrRow || row.isOnlineRecoRow) selectHandler = rowSelect.seerr;
 						else if (row.isExternalRow) selectHandler = rowSelect.external;
 						else if (row.isGenreRow) selectHandler = rowSelect.genre;
+						else if (row.id === 'studios') selectHandler = rowSelect.studio;
+						const seeAllTarget = row.collection || (row.isLatestRow && row.library);
 						const rowMenuOptions = isCwOrNextUp
 							? continueWatchingMenuOptions
 							: undefined;
@@ -1266,8 +1294,11 @@ const Browse = ({
 								ratingsSurface='homeRows'
 								hideOverview={settings.hideHomeMediaDescription === true}
 								posterLabels={!row.isSeerrRow && !row.isOnlineRecoRow && !row.isGenreRow}
+								hideWatchProgress={settings.hideHomeWatchProgress === true}
+								hideUnwatchedCount={settings.hideHomeUnwatchedCount === true}
 								onLoadMore={row.hasMore ? loadMoreRow : undefined}
-								onCalendarSeeAll={calendarSeeAll && CALENDAR_ROW_IDS.indexOf(row.id) >= 0 ? rowSelect.calendar : undefined}
+								onCalendarSeeAll={seeAllTarget || (calendarSeeAll && CALENDAR_ROW_IDS.indexOf(row.id) >= 0) ? rowSelect.seeAll : undefined}
+								seeAllIcon={seeAllTarget ? 'grid_view_rounded' : undefined}
 							/>
 						);
 					})}

@@ -3,12 +3,11 @@ import {isMdblistEnabled} from '../../services/mdblistApi';
 import Spottable from '@enact/spotlight/Spottable';
 import $L from '@enact/i18n/$L';
 import RatingsRow from '../RatingsRow';
-import {getImageUrl, toAbsoluteImageUrl} from '../../utils/helpers';
 import {useSettings} from '../../context/SettingsContext';
 import {getPlatform} from '../../platform';
 import {isStaticLibraryCard, modernCardMetrics, getEpisodeLabels, getCardDisplayTitle} from './modernCardLayout';
 import SeerrIcon from '../icons/SeerrIcon';
-import {requestedArtwork, episodeArtwork} from './MediaCard';
+import {requestedArtwork, episodeArtwork} from './cardArtwork';
 import {externalArtwork} from '../../utils/externalArtwork';
 import SeerrStatusBanner, {seerrBadgeStyle, seerrTitleStatus} from '../seerr/SeerrStatusBanner';
 import SeerrStatusDot from '../seerr/SeerrStatusDot';
@@ -24,6 +23,7 @@ import {backdropUrlFor, isLegacyBuild} from '../ScreenBackdrop/ScreenBackdrop';
 import {warmBackdrop} from '../../utils/backdropWarm';
 import useItemMenuHold from '../../hooks/useItemMenuHold';
 import {useMediaPreviewSlot} from './MediaPreviewContext';
+import {modernCardImageUrl} from './cardArtwork';
 
 import css from './ModernMediaCard.module.less';
 
@@ -95,147 +95,6 @@ const thumbFailedBefore = (url) => {
 	return at !== undefined && Date.now() - at < FAILED_THUMB_MS;
 };
 
-// The art a card shows, at rest or focused. It asks the server for the size the card draws, which the Poster Size
-// setting scales (the poster as tall as the card, the wide art as wide as the card grows).
-const cardImageUrl = (item, focused, {itemServerUrl, isStaticMyMedia, rowArtwork, seerrWide, useSeriesThumbnails, posterSize}) => {
-	if (!item) return null;
-	const {imageHeight: posterHeight, expandedWidth: wideWidth} = modernCardMetrics({posterSize});
-
-	// The titled thumb a focused Seerr title grows into comes ahead of the plain backdrop its row asked for
-	if (seerrWide) return toAbsoluteImageUrl(seerrWide, itemServerUrl);
-	if (rowArtwork) return rowArtwork;
-
-	const providerIds = item.ProviderIds || {};
-	const externalPoster = item._externalPosterUrl ||
-		providerIds.SeerrPoster ||
-		providerIds.SonarrPoster ||
-		providerIds.RadarrPoster ||
-		providerIds.LidarrPoster ||
-		providerIds.ReadarrPoster;
-
-	// A title the server owns shows the library's own art, with the outside poster as the
-	// last resort further down.
-	if ((item._external || externalPoster) && !item._resolvedFromExternal) {
-		if (focused && item._externalBackdropUrl) {
-			return toAbsoluteImageUrl(item._externalBackdropUrl, itemServerUrl);
-		}
-		if (externalPoster) {
-			return toAbsoluteImageUrl(externalPoster, itemServerUrl);
-		}
-	}
-
-	if (item.Type === 'Episode') {
-		// An episode at rest wears its series poster. The image tag only names the
-		// exact version when the server sent one, so a missing tag still asks the
-		// series itself rather than letting a cropped episode still stand in.
-		const seriesPosterId = (item.SeriesPrimaryImageTag && item.SeriesId) || item.ParentPrimaryImageItemId || item.SeriesId;
-		const seriesPoster = seriesPosterId
-			? getImageUrl(itemServerUrl, seriesPosterId, 'Primary', {maxHeight: posterHeight, quality: 80})
-			: null;
-		const seriesThumb = item.ParentThumbItemId
-			? getImageUrl(itemServerUrl, item.ParentThumbItemId, 'Thumb', {tag: item.ParentThumbImageTag, maxWidth: wideWidth, quality: 80})
-			: null;
-		const episodeThumb = item.ImageTags?.Primary
-			? getImageUrl(itemServerUrl, item.Id, 'Primary', {maxWidth: wideWidth, quality: 80})
-			: item.ImageTags?.Thumb
-				? getImageUrl(itemServerUrl, item.Id, 'Thumb', {maxWidth: wideWidth, quality: 80})
-				: item.BackdropImageTags?.length > 0
-					? getImageUrl(itemServerUrl, item.Id, 'Backdrop', {maxWidth: wideWidth, quality: 80})
-					: item.ParentBackdropItemId
-						? getImageUrl(itemServerUrl, item.ParentBackdropItemId, 'Backdrop', {maxWidth: wideWidth, quality: 80})
-						: null;
-
-		if (focused) {
-			return (useSeriesThumbnails ? (seriesThumb || episodeThumb) : (episodeThumb || seriesThumb)) || seriesPoster;
-		} else {
-			return seriesPoster || episodeThumb || seriesThumb;
-		}
-	}
-
-	if (item.Type === 'Genre' && item._representative) {
-		const rep = item._representative;
-		const repServerUrl = itemServerUrl;
-		if (focused) {
-			if (rep.ImageTags?.Thumb) {
-				return getImageUrl(repServerUrl, rep.Id, 'Thumb', {maxWidth: wideWidth, quality: 80});
-			}
-			if (rep.BackdropImageTags?.length > 0) {
-				return getImageUrl(repServerUrl, rep.Id, 'Backdrop', {maxWidth: wideWidth, quality: 80});
-			}
-		}
-		if (rep.ImageTags?.Primary) {
-			return getImageUrl(repServerUrl, rep.Id, 'Primary', {maxHeight: posterHeight, quality: 80});
-		}
-	}
-
-	if (item.Type === 'Movie' || item.Type === 'Series' || item.Type === 'BoxSet') {
-		if (focused) {
-			if (item.ImageTags?.Thumb) {
-				return getImageUrl(itemServerUrl, item.Id, 'Thumb', {tag: item.ImageTags.Thumb, maxWidth: wideWidth, quality: 80});
-			}
-			if (item.ParentThumbItemId) {
-				return getImageUrl(itemServerUrl, item.ParentThumbItemId, 'Thumb', {tag: item.ParentThumbImageTag, maxWidth: wideWidth, quality: 80});
-			}
-			if (item.BackdropImageTags?.length > 0) {
-				return getImageUrl(itemServerUrl, item.Id, 'Backdrop', {tag: item.BackdropImageTags[0], maxWidth: wideWidth, quality: 80});
-			}
-			if (item._externalBackdropUrl) {
-				return toAbsoluteImageUrl(item._externalBackdropUrl, itemServerUrl);
-			}
-		}
-		if (item.ImageTags?.Primary) {
-			return getImageUrl(itemServerUrl, item.Id, 'Primary', {tag: item.ImageTags.Primary, maxHeight: posterHeight, quality: 80});
-		}
-	}
-
-	if (item.Type === 'CollectionFolder' || item.isLibraryTile) {
-		if (isStaticMyMedia || focused) {
-			if (item.ImageTags?.Thumb) {
-				return getImageUrl(itemServerUrl, item.Id, 'Thumb', {maxWidth: wideWidth, quality: 80});
-			}
-			if (item.BackdropImageTags?.length > 0) {
-				return getImageUrl(itemServerUrl, item.Id, 'Backdrop', {maxWidth: wideWidth, quality: 80});
-			}
-		}
-
-		if (!isStaticMyMedia && item.ImageTags?.Primary) {
-			return getImageUrl(itemServerUrl, item.Id, 'Primary', {maxHeight: posterHeight, quality: 80});
-		}
-		if (item.ImageTags?.Thumb) {
-			return getImageUrl(itemServerUrl, item.Id, 'Thumb', {maxWidth: wideWidth, quality: 80});
-		}
-		if (item.ImageTags?.Primary) {
-			return getImageUrl(itemServerUrl, item.Id, 'Primary', {maxWidth: wideWidth, quality: 80});
-		}
-	}
-
-	if (item.Type === 'Audio' && item.AlbumId && item.AlbumPrimaryImageTag) {
-		return getImageUrl(itemServerUrl, item.AlbumId, 'Primary', {maxHeight: posterHeight, quality: 80});
-	}
-
-	if (focused) {
-		if (item.ImageTags?.Thumb) {
-			return getImageUrl(itemServerUrl, item.Id, 'Thumb', {maxWidth: wideWidth, quality: 80});
-		}
-		if (item.ParentThumbItemId) {
-			return getImageUrl(itemServerUrl, item.ParentThumbItemId, 'Thumb', {tag: item.ParentThumbImageTag, maxWidth: wideWidth, quality: 80});
-		}
-		if (item.BackdropImageTags?.length > 0) {
-			return getImageUrl(itemServerUrl, item.Id, 'Backdrop', {maxWidth: wideWidth, quality: 80});
-		}
-	}
-
-	if (item.ImageTags?.Primary) {
-		return getImageUrl(itemServerUrl, item.Id, 'Primary', {maxHeight: posterHeight, quality: 80});
-	}
-
-	if (externalPoster) {
-		return toAbsoluteImageUrl(externalPoster, itemServerUrl);
-	}
-
-	return null;
-};
-
 const ModernMediaCard = ({
 	item,
 	serverUrl,
@@ -257,7 +116,9 @@ const ModernMediaCard = ({
 	ratingsSurface,
 	hideOverview = false,
 	coreLook = false,
-	posterLabels = false
+	posterLabels = false,
+	hideWatchProgress = false,
+	hideUnwatchedCount = false
 }) => {
 	const {settings} = useSettings();
 	const focusTimeoutRef = useRef(null);
@@ -314,9 +175,9 @@ const ModernMediaCard = ({
 
 	const useSeriesThumbnails = settings.useSeriesThumbnails;
 	const posterSize = settings.homeRowsPosterSize;
-	const restingUrl = useMemo(() => cardImageUrl(item, false, {itemServerUrl, isStaticMyMedia, rowArtwork, useSeriesThumbnails, posterSize}),
+	const restingUrl = useMemo(() => modernCardImageUrl(item, false, {itemServerUrl, isStaticMyMedia, rowArtwork, useSeriesThumbnails, posterSize}),
 		[item, itemServerUrl, isStaticMyMedia, rowArtwork, useSeriesThumbnails, posterSize]);
-	const focusUrl = useMemo(() => cardImageUrl(item, true, {itemServerUrl, isStaticMyMedia, rowArtwork, seerrWide, useSeriesThumbnails, posterSize}),
+	const focusUrl = useMemo(() => modernCardImageUrl(item, true, {itemServerUrl, isStaticMyMedia, rowArtwork, seerrWide, useSeriesThumbnails, posterSize}),
 		[item, itemServerUrl, isStaticMyMedia, rowArtwork, seerrWide, useSeriesThumbnails, posterSize]);
 
 	const {
@@ -352,10 +213,10 @@ const ModernMediaCard = ({
 		onPreviewBlur();
 	}, [onMenuMouseLeave, onPreviewBlur]);
 
-	const progress = item?.UserData?.PlayedPercentage || 0;
+	const progress = hideWatchProgress ? 0 : item?.UserData?.PlayedPercentage || 0;
 	const watchedBehavior = settings.watchedIndicatorBehavior || 'always';
 	const showIndicators = watchedBehavior === 'always' || watchedBehavior === 'hideCount' || (watchedBehavior === 'episodesOnly' && item?.Type === 'Episode');
-	const unplayedCount = item?.UserData?.UnplayedItemCount;
+	const unplayedCount = hideUnwatchedCount ? 0 : item?.UserData?.UnplayedItemCount;
 	const showUnplayedCount = showIndicators && watchedBehavior !== 'hideCount' && !item?.UserData?.Played && unplayedCount > 0;
 	const seerrStyle = seerrBadgeStyle(settings);
 	const bannerStatus = seerrStyle === 'banner' ? seerrTitleStatus(item) : null;
@@ -617,7 +478,7 @@ const ModernMediaCard = ({
 
 				{showIndicators && showsWatchedCheck(item) && (
 					<div className={css.watchedBadge}>
-						<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+						<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
 					</div>
 				)}
 

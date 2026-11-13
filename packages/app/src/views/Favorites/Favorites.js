@@ -30,9 +30,12 @@ import FilterPopup, {FilterOption} from '../../components/FilterPopup';
 
 import FocusedItemHud from './FocusedItemHud';
 import useFavoriteTabs from './useFavoriteTabs';
-import {cardMetrics, clampTabIndex, favoriteCardImage} from './favoriteTabs';
+import {cardMetrics, clampTabIndex, currentCard, favoriteCardImage} from './favoriteTabs';
+import {registerThemeSheet} from '../../theme/themeOverrides';
 
 import css from './Favorites.module.less';
+
+registerThemeSheet('favorites', css);
 
 const SpottableDiv = Spottable('div');
 const SpottableButton = Spottable('button');
@@ -100,7 +103,7 @@ const Favorites = ({onSelectItem, onSelectPerson, onSelectSeerrItem, onHome, bac
 	const isHome = viewStyle === 'home';
 
 	const [tabIndex, setTabIndex] = useState(0);
-	const [focusedItem, setFocusedItem] = useState(null);
+	const [focusedCard, setFocusedCard] = useState(null);
 
 	const {getScrollTo: getGridScrollTo, quickReturn} = useQuickReturnGrid('favorites-grid');
 
@@ -286,7 +289,7 @@ const Favorites = ({onSelectItem, onSelectPerson, onSelectSeerrItem, onHome, bac
 	const handleItemFocus = useCallback((ev) => {
 		const itemIndex = ev.currentTarget?.dataset?.index;
 		if (itemIndex === undefined) return;
-		setFocusedItem(itemsRef.current[parseInt(itemIndex, 10)] || null);
+		setFocusedCard(itemsRef.current[parseInt(itemIndex, 10)] || null);
 	}, []);
 
 	const handleScrollStop = useCallback(() => {
@@ -361,8 +364,10 @@ const Favorites = ({onSelectItem, onSelectPerson, onSelectSeerrItem, onHome, bac
 
 	useEffect(() => {
 		gridScrollToRef.current?.({index: 0, animate: false});
-		setFocusedItem(null);
+		setFocusedCard(null);
 	}, [activeTab]);
+
+	const focusedItem = useMemo(() => currentCard(focusedCard, displayItems), [focusedCard, displayItems]);
 
 	const {posterHeight, itemSize: gridItemSize} = cardMetrics(cardType, imageSize);
 	const isRound = cardType === 'circle';
@@ -433,7 +438,7 @@ const Favorites = ({onSelectItem, onSelectPerson, onSelectSeerrItem, onHome, bac
 					<IncompleteBadge itemId={item.Id} belowFavorite={unifiedMode && Boolean(item._serverName)} />
 					{showsWatchedCheck(item) && (
 						<div className={css.watchedBadge}>
-							<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+							<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
 						</div>
 					)}
 					<PosterLabels

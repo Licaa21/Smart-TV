@@ -4,7 +4,8 @@ import {setNetworkLogSink} from '../utils/networkLogSink';
 import {redact, redactContext} from '../utils/logRedaction';
 import {PERSIST_KEY, PERSIST_MAX, persistableLines, restoreLines, trimLogBuffer} from '../utils/logBuffer';
 import {setSyncLogSink} from '../utils/syncLog';
-import {acceptsReports, clientLogRequest} from './clientLogUpload';
+import {acceptsReports, clientLogRequest, logsGoToMoonbase} from './clientLogUpload';
+import {moonbaseEndpoint} from './moonbaseEndpoint';
 
 const LOG_LEVELS = {
 	DEBUG: 'Debug',
@@ -133,9 +134,12 @@ const formatLogAsText = (entry) => {
 	return lines.join('\n');
 };
 
-const postDocument = (auth, body) => {
-	const {url, init} = clientLogRequest(auth, logEndpointName, body);
-	return fetch(url, init);
+const postDocument = async (auth, body) => {
+	const toMoonbase = logsGoToMoonbase(auth.serverType);
+	const moonbase = toMoonbase ? await moonbaseEndpoint(auth.serverUrl, auth.accessToken, auth.serverType) : null;
+	if (toMoonbase && !moonbase) throw new Error("Moonbase couldn't be reached");
+	const {url, init, send} = clientLogRequest(auth, logEndpointName, body, moonbase);
+	return (send || fetch)(url, init);
 };
 
 const sendLogToServer = async (entry) => {
@@ -235,7 +239,8 @@ const uploadReport = async () => {
 // in, or the server has nowhere to take one.
 const documentRequest = (name) => {
 	const auth = authGetter ? authGetter() : null;
-	if (!auth?.serverUrl || !auth?.accessToken || !acceptsReports(auth.serverType, clientLogSupported)) return null;
+	// The probe page can't look Moonbase up, so on Plex and Silo it keeps its report.
+	if (!auth?.serverUrl || !auth?.accessToken || logsGoToMoonbase(auth.serverType) || !acceptsReports(auth.serverType, clientLogSupported)) return null;
 	const {url, init} = clientLogRequest(auth, name);
 	return {url, method: init.method, headers: init.headers};
 };

@@ -120,7 +120,7 @@ const seerrSections = (items, query) => {
 	];
 };
 
-const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, onPlayChannel, remoteSearch, musicBar}) => {
+const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, onPlayChannel, remoteSearch, musicBar, preferRequests = false}) => {
 	const {api, serverUrl, serverType, hasMultipleServers} = useAuth();
 	const {settings} = useSettings();
 	const unifiedMode = settings.unifiedLibraryMode && hasMultipleServers;
@@ -231,7 +231,8 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 	// over once there is something to show. It stays put when the viewer has already gone to another
 	// tab or into the results, and carries focus along only if that sat on a tab pill.
 	const openOnSeerr = useCallback((count) => {
-		if (settings.searchDefaultTab !== 'seerr') return;
+		// [preferRequests] is Search opened from Discover, which lands on the Requests tab like a search set to open on Seerr.
+		if (settings.searchDefaultTab !== 'seerr' && !preferRequests) return;
 		const stay = (reason) => serverLogger.info(serverLogger.LOG_CATEGORIES.APP, 'Search: stayed on the open tab', {reason, seerrResults: count});
 		if (!count) return stay('Seerr found nothing');
 		if (activeTabRef.current !== 'all') return stay('another tab is open');
@@ -256,7 +257,7 @@ const Search = ({onSelectItem, onSelectSeerrItem, onSelectPerson, onSelectGame, 
 				}
 			}, 50);
 		}
-	}, [settings.searchDefaultTab]);
+	}, [settings.searchDefaultTab, preferRequests]);
 
 	const doSearch = useCallback(async (searchQuery) => {
 		const requestId = ++requestIdRef.current;

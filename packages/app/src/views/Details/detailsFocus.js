@@ -12,7 +12,7 @@ import css from './Details.module.less';
 // episode this screen is for, and otherwise its first. A row that has a bar of tabs over its cards asks to be entered
 // on the bar from above, since coming down onto the cards would skip it.
 const entryOf = (row, fromAbove = false) => (fromAbove && row.querySelector('[data-enter-from-above="true"]'))
-	|| row.querySelector('[data-current="true"]') || row.querySelector('.spottable');
+	|| row.querySelector('[data-current="true"]') || row.querySelector('[data-row-start]') || row.querySelector('.spottable');
 
 export const handleSectionKeyDown = (ev) => {
 	const currentSpottable = ev.target.closest('.spottable');
@@ -124,6 +124,12 @@ export const handleSeasonButtonKeyDown = (ev) => {
 			Spotlight.focus(firstSpottable);
 		}
 	}
+};
+
+// A ref for a plain horizontal scroller whose row starts past its first card, so it opens there.
+export const scrollToRowStart = (scroller) => {
+	const card = scroller && scroller.querySelector('[data-row-start]');
+	if (card) scroller.scrollLeft += card.getBoundingClientRect().left - scroller.getBoundingClientRect().left - 50;
 };
 
 // Keeps a focused card inside a plain horizontal scroller, which doesn't scroll itself.

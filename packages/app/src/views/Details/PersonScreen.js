@@ -171,6 +171,7 @@ const PersonScreen = ({
 						cardType={active.cardType}
 						onSelectItem={active.select}
 						className={css.inlineRow}
+						posterLabels
 					/>
 				</div>
 			)}

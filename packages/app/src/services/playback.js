@@ -149,8 +149,7 @@ const DEFAULT_PASSTHROUGH_SETTINGS = {
 	eac3Passthrough: true,
 	dtsPassthrough: true,
 	dtshdPassthrough: true,
-	truehdPassthrough: true,
-	forceTruehdPassthrough: false
+	truehdPassthrough: true
 };
 
 // Which of the three passthrough modes applies. Settings saved before the mode
@@ -187,8 +186,7 @@ const getPlaybackAudioSettings = async (options = {}, preloadedSettings = null) 
 		eac3Passthrough: claim(options.eac3Passthrough, stored.eac3Passthrough, DEFAULT_PASSTHROUGH_SETTINGS.eac3Passthrough),
 		dtsPassthrough: claim(options.dtsPassthrough, stored.dtsPassthrough, DEFAULT_PASSTHROUGH_SETTINGS.dtsPassthrough),
 		dtshdPassthrough: claim(options.dtshdPassthrough, stored.dtshdPassthrough, DEFAULT_PASSTHROUGH_SETTINGS.dtshdPassthrough),
-		truehdPassthrough: claim(options.truehdPassthrough, stored.truehdPassthrough, DEFAULT_PASSTHROUGH_SETTINGS.truehdPassthrough),
-		forceTruehdPassthrough: off ? false : (options.forceTruehdPassthrough ?? stored.forceTruehdPassthrough ?? DEFAULT_PASSTHROUGH_SETTINGS.forceTruehdPassthrough)
+		truehdPassthrough: claim(options.truehdPassthrough, stored.truehdPassthrough, DEFAULT_PASSTHROUGH_SETTINGS.truehdPassthrough)
 	};
 };
 
@@ -630,7 +628,7 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	// it fits the stream to the link itself, and a capability ceiling below a file's bitrate rules out a remux
 	// (a Dolby Vision strip to HDR10 among them) for a tone-mapped transcode.
 	const userMaxBitrate = options.maxBitrate > 0 ? options.maxBitrate : null;
-	const maxBitrate = userMaxBitrate || (serverType === 'silo' ? null : await autoMaxBitrate(capabilities, creds, !currentSession && !options.dryRun, api));
+	const autoBitrate = !userMaxBitrate && serverType !== 'silo';
 
 	const requestedStartTime = isLiveTV ? 0 : (options.startPositionTicks || 0);
 	const hasExplicitSubtitle = options.subtitleStreamIndex != null;
@@ -660,6 +658,12 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 	const plexBurnsSubtitle = serverType === 'plex' && !options.forceDirectPlay && !!requestedSubStream && requestedSubStream.Codec !== 'none' &&
 		!plexReadsFromFile(requestedSubStream, sourceContainer, storedSettings.enablePgsRendering === false);
 	const enableDirectPlay = allowDirectPlay && options.enableDirectPlay !== false && !plexBurnsSubtitle;
+	// Auto starts on the link's last measurement, so direct play never waits on a test. Only a start that has to
+	// transcode, or a live one that can't be asked for again, measures first. The rest measure once the server
+	// answers with a transcode, further down.
+	const maxBitrate = userMaxBitrate || (autoBitrate
+		? options.linkCappedBitrate || await autoMaxBitrate(capabilities, creds, !currentSession && !options.dryRun && (isLiveTV || !enableDirectPlay), api)
+		: null);
 	// When the user hasn't explicitly picked a subtitle, omit the index entirely so
 	// the server applies their preferred-subtitle-language / SubtitleMode default.
 	const sentSubtitleStreamIndex = hasExplicitSubtitle ? subtitleStreamIndex : undefined;
@@ -1043,6 +1047,12 @@ export const getPlaybackInfo = async (itemId, options = {}) => {
 		mediaSource = playbackInfo.MediaSources[0];
 		playMethod = PlayMethod.Transcode;
 		console.log('[playback] After forcing transcode - TranscodingUrl:', mediaSource.TranscodingUrl ? 'present' : 'none');
+	}
+
+	// An opened live stream is left as it is, since asking again would open a second one.
+	if (autoBitrate && !options.linkCappedBitrate && playMethod === PlayMethod.Transcode && !mediaSource.LiveStreamId) {
+		const measured = await autoMaxBitrate(capabilities, creds, !currentSession && !options.dryRun, api);
+		if (measured !== maxBitrate) return getPlaybackInfo(itemId, {...options, linkCappedBitrate: measured});
 	}
 
 	// A preview stops where a start would begin to commit to what it found: it has asked the server everything a
@@ -1985,11 +1995,11 @@ class PlaybackHealthMonitor {
 		this.isPaused = false;
 	}
 
+	// Resuming starts a fresh stall window too, or a pause longer than the limit reads as a stall
+	// before the first progress comes in.
 	setPaused(paused) {
 		this.isPaused = paused;
-		if (paused) {
-			this.lastProgressTime = Date.now();
-		}
+		this.lastProgressTime = Date.now();
 	}
 
 	recordBuffer() {

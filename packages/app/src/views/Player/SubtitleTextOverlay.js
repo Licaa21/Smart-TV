@@ -1,10 +1,11 @@
 /* eslint-disable react/no-danger */
+import {languageTag} from '../../utils/audioLanguage';
 import {getSubtitleOverlayStyle, getSubtitleTextStyle, sanitizeSubtitleHtml} from '../../utils/subtitleConstants';
 import {DEFAULT_SECONDARY_OFFSET, secondaryTextStyle} from './secondarySubtitle';
 
 // The second track stacks right above the first in one column, so the two never overlap
 // however many lines either has. While it's loaded, its vertical offset moves the pair.
-const SubtitleTextOverlay = ({css, settings, primaryText, secondaryText, secondaryLoaded, lift = 0}) => {
+const SubtitleTextOverlay = ({css, settings, primaryText, secondaryText, secondaryLoaded, primaryLanguage, secondaryLanguage, lift = 0}) => {
 	if (!primaryText && !secondaryText) return null;
 
 	const textStyle = getSubtitleTextStyle(settings);
@@ -17,6 +18,7 @@ const SubtitleTextOverlay = ({css, settings, primaryText, secondaryText, seconda
 		>
 			{secondaryText && (
 				<div
+					lang={languageTag(secondaryLanguage)}
 					className={css.subtitleText}
 					data-subtitle-text="true"
 					style={secondaryTextStyle(settings, textStyle)}
@@ -25,6 +27,7 @@ const SubtitleTextOverlay = ({css, settings, primaryText, secondaryText, seconda
 			)}
 			{primaryText && (
 				<div
+					lang={languageTag(primaryLanguage)}
 					className={css.subtitleText}
 					data-subtitle-text="true"
 					style={textStyle}
