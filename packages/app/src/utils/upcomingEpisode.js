@@ -42,12 +42,23 @@ const sonarrCalendarByTvdb = new Map();
 const sonarrCalendarByTmdb = new Map();
 let lastSonarrFetch = 0;
 const SONARR_CACHE_TTL_MS = 30 * 60 * 1000;
+// A read that came back with nothing (no Sonarr behind Moonbase, an answer that failed) is not asked for again at once,
+// since every title a viewer opens or focuses would pay the same failing round trips.
+let lastSonarrFailure = 0;
+const SONARR_FAILURE_TTL_MS = 30 * 1000;
+// One read for everyone asking while it is out, so Home's cards and a details screen opening together send one request.
+let sonarrInFlight = null;
+// Moves when the cache is cleared, so a read that was out for the account before does not fill it for the next one
+let sonarrGeneration = 0;
 
 export const clearUpcomingEpisodeCache = () => {
 	seriesCache.clear();
 	sonarrCalendarByTvdb.clear();
 	sonarrCalendarByTmdb.clear();
 	lastSonarrFetch = 0;
+	lastSonarrFailure = 0;
+	sonarrInFlight = null;
+	sonarrGeneration += 1;
 };
 
 const pickDefaultServer = (servers) => {
@@ -67,12 +78,8 @@ const isoDate = (offsetDays) => {
 	return d.toISOString().slice(0, 10);
 };
 
-const ensureSonarrCalendar = async () => {
-	const now = Date.now();
-	if (lastSonarrFetch && (now - lastSonarrFetch < SONARR_CACHE_TTL_MS)) {
-		return;
-	}
-
+const loadSonarrCalendar = async () => {
+	const generation = sonarrGeneration;
 	// Through Moonbase first, which keeps the API key on the server. A plugin without the route falls
 	// back to asking Sonarr directly.
 	let episodes = (await seerrApi.getArrCalendar('Sonarr', {start: isoDate(0), end: isoDate(90)})).items;
@@ -102,6 +109,8 @@ const ensureSonarrCalendar = async () => {
 		}
 	}
 
+	// The cache was cleared while this was out (another account), so what it read is not for the next one
+	if (generation !== sonarrGeneration) return;
 	sonarrCalendarByTvdb.clear();
 	sonarrCalendarByTmdb.clear();
 
@@ -142,6 +151,24 @@ const ensureSonarrCalendar = async () => {
 	}
 
 	lastSonarrFetch = Date.now();
+};
+
+const ensureSonarrCalendar = () => {
+	const now = Date.now();
+	if (lastSonarrFetch && (now - lastSonarrFetch < SONARR_CACHE_TTL_MS)) return Promise.resolve();
+	if (lastSonarrFailure && (now - lastSonarrFailure < SONARR_FAILURE_TTL_MS)) return Promise.resolve();
+	if (!sonarrInFlight) {
+		const startedAt = now;
+		const generation = sonarrGeneration;
+		const noteFailure = () => {
+			if (generation === sonarrGeneration && lastSonarrFetch < startedAt) lastSonarrFailure = Date.now();
+		};
+		const handle = loadSonarrCalendar().then(noteFailure, noteFailure).then(() => {
+			if (sonarrInFlight === handle) sonarrInFlight = null;
+		});
+		sonarrInFlight = handle;
+	}
+	return sonarrInFlight;
 };
 
 export const fetchUpcomingEpisode = async ({item, settings, serverUrl, serverToken}) => {

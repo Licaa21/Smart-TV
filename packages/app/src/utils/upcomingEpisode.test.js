@@ -66,3 +66,50 @@ describe('formatUpcomingEpisode', () => {
 		expect(result).toBe('Next: Tomorrow');
 	});
 });
+
+describe('fetchUpcomingEpisode reading Sonarr\'s calendar', () => {
+	const mockCalendar = jest.fn();
+	const series = (id, tvdb) => ({Id: id, Type: 'Series', ProviderIds: {Tvdb: tvdb}});
+	let fetchUpcomingEpisode;
+	let clearCache;
+
+	beforeEach(() => {
+		jest.resetModules();
+		mockCalendar.mockReset();
+		jest.doMock('../services/seerrApi', () => ({
+			__esModule: true,
+			getArrCalendar: (...args) => mockCalendar(...args),
+			getSonarrSettings: () => Promise.reject(new Error('none'))
+		}));
+		({fetchUpcomingEpisode, clearUpcomingEpisodeCache: clearCache} = require('./upcomingEpisode'));
+		clearCache();
+	});
+
+	afterEach(() => {
+		jest.dontMock('../services/seerrApi');
+	});
+
+	it('sends one request for titles asking while it is out', async () => {
+		mockCalendar.mockResolvedValue({items: []});
+		await Promise.all([
+			fetchUpcomingEpisode({item: series('a', '1'), settings: {}}),
+			fetchUpcomingEpisode({item: series('b', '2'), settings: {}}),
+			fetchUpcomingEpisode({item: series('c', '3'), settings: {}})
+		]);
+		expect(mockCalendar).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not ask again at once when the read came back with nothing', async () => {
+		mockCalendar.mockResolvedValue({items: null});
+		await fetchUpcomingEpisode({item: series('a', '1'), settings: {}});
+		await fetchUpcomingEpisode({item: series('b', '2'), settings: {}});
+		expect(mockCalendar).toHaveBeenCalledTimes(1);
+	});
+
+	it('keeps a good read for the next titles', async () => {
+		mockCalendar.mockResolvedValue({items: []});
+		await fetchUpcomingEpisode({item: series('a', '1'), settings: {}});
+		await fetchUpcomingEpisode({item: series('b', '2'), settings: {}});
+		expect(mockCalendar).toHaveBeenCalledTimes(1);
+	});
+});
