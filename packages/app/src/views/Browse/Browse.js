@@ -622,6 +622,8 @@ const Browse = ({
 	useLayoutEffect(() => {
 		if (!isVisible) {
 			wasVisibleRef.current = false;
+			// A restore still waiting for its moment is not run on a Home that is hidden again, which would use up the place
+			clearTimeout(restoreTimerRef.current);
 			return;
 		}
 		if (isLoading || !hasFocusableRow) return;
@@ -659,6 +661,10 @@ const Browse = ({
 				setBrowseMode('rows');
 				instantUntilRef.current = Date.now() + 300;
 				scrollToRow(above >= 0 ? above : focusableRowFrom(nearest, 1), true, cardIndex);
+				// The place is used once, for the return from what was opened from Home. Kept, it was put back every time Home
+				// showed again (from Library, Settings, any menu), on the card that title was opened from, whatever
+				// Remember Card in Row says.
+				lastFocusState = null;
 			} else if (showFeaturedBar !== false && featuredItems.length > 0) {
 				setBrowseMode('featured');
 				setTimeout(() => Spotlight.focus('featured-banner'), 50);
