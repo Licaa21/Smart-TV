@@ -15,7 +15,11 @@ export const readRequestedDeepLink = (tizenApi = typeof window !== 'undefined' ?
 			if (data[i].key !== 'PAYLOAD') continue;
 			const values = JSON.parse(JSON.parse(data[i].value?.[0]).values);
 			if (!values?.id) return null;
-			return {detail: {id: values.id, type: values.type, serverId: values.serverid, seasonId: values.seasonid, seriesId: values.seriesid}};
+			const detail = {id: values.id, type: values.type, serverId: values.serverid, seasonId: values.seasonid, seriesId: values.seriesid};
+			// A sender that stamps each press (the Couch TV app sends the time as `n`) makes a repeat of the same title a request of
+			// its own: the platform keeps answering with the last request, so only a stamp tells that repeat from the stale one.
+			if (values.n !== undefined && values.n !== null) detail.n = String(values.n);
+			return {detail};
 		}
 	} catch (e) {
 		return null;
@@ -23,24 +27,37 @@ export const readRequestedDeepLink = (tizenApi = typeof window !== 'undefined' ?
 	return null;
 };
 
-const keyOf = (detail) => `${detail.id}|${detail.type}|${detail.serverId}`;
+const keyOf = (detail) => `${detail.id}|${detail.type}|${detail.serverId}|${detail.n === undefined ? '' : detail.n}`;
 
-// Says whether a request is one to act on. The same title twice within a moment is one request (the event and the page
+// Says whether a request is one to act on. The same request twice within a moment is one request (the event and the page
 // coming back both report it), and with `onlyNew` a request that is the one acted on last is left alone, since the
-// platform keeps answering with the request the app started with after it was dealt with.
+// platform keeps answering with the request the app started with after it was dealt with. A request that carries a stamp
+// (`n`) is told from the last one by it, so the same title pressed again is new whichever way it arrives.
 export const makeDeepLinkGate = () => {
 	let last = {key: null, at: 0};
+	// The newest stamp seen: a look that finds an older one has found the stale request the platform keeps answering with
+	let newest = -Infinity;
+	const stamped = (detail) => (detail.n !== undefined && Number.isFinite(Number(detail.n)) ? Number(detail.n) : null);
+	const note = (detail) => {
+		const stamp = stamped(detail);
+		if (stamp !== null && stamp > newest) newest = stamp;
+	};
 	const gate = (detail, {onlyNew = false, now = Date.now()} = {}) => {
 		if (!detail?.id) return false;
 		const key = keyOf(detail);
 		if (key === last.key && (onlyNew || now - last.at < SAME_REQUEST_MS)) return false;
+		if (onlyNew && stamped(detail) !== null && stamped(detail) < newest) return false;
 		last = {key, at: now};
+		note(detail);
 		return true;
 	};
 	// A request already known to be dealt with, such as the one the app started with. It only stops a later look from
 	// taking it for a new one, and a fresh report of it from the platform still counts.
 	gate.markHandled = (detail) => {
-		if (detail?.id) last = {key: keyOf(detail), at: 0};
+		if (detail?.id) {
+			last = {key: keyOf(detail), at: 0};
+			note(detail);
+		}
 	};
 	return gate;
 };

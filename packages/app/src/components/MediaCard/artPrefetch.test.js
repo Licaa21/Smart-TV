@@ -18,7 +18,7 @@ const endGlide = () => {
 	mockGlide.waiting.splice(0).forEach((fn) => fn());
 };
 
-import {hasArt, artSource, artState, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded, noteArtShown, setArtLogSink} from './artPrefetch';
+import {hasArt, artSource, artState, pinArt, touchArt, decodeArt, dropDecode, prefetchArt, noteArtFocus, noteArtArrived, noteArtDecoded, noteArtShown, setArtLogSink} from './artPrefetch';
 
 describe('prefetchArt', () => {
 	const RealImage = window.Image;
@@ -274,6 +274,26 @@ describe('prefetchArt reading the art as a blob', () => {
 		await flush();
 		expect(artSource(urls[0])).toMatch(/^blob:art\//);
 		expect(artSource(urls[1])).toBeNull();
+	});
+
+	it('does not let go of a pinned picture when too much is held, only of the others', async () => {
+		jest.useFakeTimers();
+		const urls = ['http://pin.test/a.jpg', 'http://pin.test/b.jpg', 'http://pin.test/c.jpg'];
+		ask(urls[0], 0);
+		answer(0, ok(12 * 1024 * 1024));
+		await flush();
+		pinArt(urls[0]);
+		ask(urls[1], 1);
+		ask(urls[2], 2);
+		answer(1, ok(12 * 1024 * 1024));
+		answer(2, ok(12 * 1024 * 1024));
+		await flush();
+		await flush();
+		expect(artSource(urls[0])).toMatch(/^blob:art\//);
+		expect(artSource(urls[1])).toBeNull();
+		expect(artSource(urls[2])).toMatch(/^blob:art\//);
+		// the pin is given up (ten newer ones push it out), so later tests hold what they like
+		for (let i = 0; i < 10; i++) pinArt(`http://pin.test/later-${i}`);
 	});
 
 	it('starts no fetch while the rows glide, and starts them once the glide is still', async () => {

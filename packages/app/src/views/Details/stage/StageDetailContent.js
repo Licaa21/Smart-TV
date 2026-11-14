@@ -25,6 +25,7 @@ import {
 } from './stageRules';
 
 import css from './StageDetailContent.module.less';
+import {heldBackdrop} from '../../../utils/detailsBackdrop';
 
 // The poster-led detail screen. The poster stands on the left with play and the other buttons under
 // it, and the title, ratings, tracks and episodes sit beside it. Extras and the rows of other titles
@@ -166,7 +167,7 @@ const StageScreen = (props) => {
 				{backdropShown && (
 					<img
 						className={css.backdropImage}
-						src={blurredUrl || backdropUrl}
+						src={heldBackdrop(blurredUrl || backdropUrl)}
 						alt=""
 						style={!blurredUrl && blur > 0 ? {filter: `blur(${blur}px)`} : undefined}
 					/>

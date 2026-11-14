@@ -26,6 +26,7 @@ import {isStreamlessStaticSource, probedSources} from '../../utils/placeholderSo
 import {mergeEpisodeCast, mergeEpisodePeople, resolveParentCast} from '../../utils/episodeCast';
 import {getUserId} from '../../services/jellyfinApi';
 import {detailsKey, dropKeptScreen, isCacheableType, readDetails, saveDetails} from './detailsCache';
+import {warmDetailsBackdrop} from '../../utils/detailsBackdrop';
 
 // Everything the screen shows about one item. The item itself is fetched first and rendered
 // on its own, then the rows that hang off it fill in behind, because waiting for all of them
@@ -597,6 +598,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						episodeRatings: now.episodeRatings, selectedVersionIndex: now.selectedVersionIndex, selectedAudioIndex: now.selectedAudioIndex,
 						selectedSubtitleIndex: now.selectedSubtitleIndex
 					}, openedFrom);
+					// its picture is read ahead too, so opening the screen again draws it at once
+					warmDetailsBackdrop(now.item, effectiveServerUrl, settingsRef.current);
 					return;
 				}
 				if (tries < 40) keepTimer = setTimeout(() => keepWhenSettled(tries + 1), 150);

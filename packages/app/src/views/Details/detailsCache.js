@@ -154,6 +154,15 @@ export const loadKeptScreens = async () => {
 		});
 };
 
+// The titles of the screens kept, the most recently kept first, up to [limit]. [account] is the server and user the screens
+// were kept for (the start of their key), since the store holds the screens of every account used on the device.
+export const keptTitles = (limit, account = '') => Array.from(entries.entries())
+	.filter(([key, entry]) => key.startsWith(account) && entry.snapshot && entry.snapshot.item)
+	.map(([, entry]) => entry)
+	.sort((a, b) => b.at - a.at)
+	.slice(0, limit)
+	.map((entry) => entry.snapshot.item);
+
 // How long ago the screen of this title was kept, or null when it was not.
 export const keptAge = (key) => {
 	const entry = entries.get(key);

@@ -50,6 +50,7 @@ import NouveauSortDialog from './nouveau/sections/NouveauSortDialog';
 
 import css from './ModernDetailContent.module.less';
 import sectionsCss from './nouveau/sections/NouveauSections.module.less';
+import {heldBackdrop} from '../../utils/detailsBackdrop';
 
 const SpottableDiv = Spottable('div');
 
@@ -848,7 +849,7 @@ const ModernDetailContent = (props) => {
 	return (
 		<>
 			<div className={`${css.backdrop} ${isPerson ? css.backdropPerson : ''}`} style={backdropStyle}>
-				{settings.detailsBackdropEnabled !== false && backdropUrl && !isPerson && <img className={css.backdropImage} src={backdropUrl} alt="" />}
+				{settings.detailsBackdropEnabled !== false && backdropUrl && !isPerson && <img className={css.backdropImage} src={heldBackdrop(backdropUrl)} alt="" />}
 				<div className={css.scrim} style={scrimStyle(isPerson ? PERSON_SCRIM : SCRIM, gradientScale)} />
 			</div>
 			<Scroller cbScrollTo={handleScrollTo} onScroll={handleScroll} className={css.scroller} direction="vertical" horizontalScrollbar="hidden" verticalScrollbar="hidden">

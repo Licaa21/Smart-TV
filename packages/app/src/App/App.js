@@ -93,7 +93,8 @@ import Browse from '../views/Browse';
 // Not lazy: the details screen is what a title opens, so its code is read with the app and not on the first title opened
 import Details from '../views/Details';
 import DetailsPrefetcher from '../views/Details/DetailsPrefetcher';
-import {clearDetailsCache, loadKeptScreens} from '../views/Details/detailsCache';
+import {clearDetailsCache, keptTitles, loadKeptScreens} from '../views/Details/detailsCache';
+import {warmDetailsBackdrop} from '../utils/detailsBackdrop';
 import {isGameLibrary, refreshGameLibraries, resolveGameLibraryId} from '../utils/gameLibrary';
 import {dropEpisodeDialog} from '../utils/episodeDialogReturn';
 import {afterHomeReady} from '../utils/homeReady';
@@ -1435,6 +1436,8 @@ const AppContent = (props) => {
 	// The details screens kept in an earlier run are read once Home has shown, and then the first titles of Continue Watching and
 	// Next Up are filled in while Home rests (DetailsPrefetcher), so they open whole at once
 	const [detailsKeptRead, setDetailsKeptRead] = useState(false);
+	const keptWarmRef = useRef(null);
+	keptWarmRef.current = {serverUrl, settings, account: `${serverUrl}|${user?.Id}|`};
 	// Signing out takes the kept screens of that account with it
 	const signedInRef = useRef(false);
 	useEffect(() => {
@@ -1445,7 +1448,10 @@ const AppContent = (props) => {
 		let gone = false;
 		// the read of what an earlier run kept waits a few seconds more, since it is a lot to take in at once
 		afterHomeReady().then(() => new Promise((resolve) => setTimeout(resolve, 4000))).then(() => loadKeptScreens()).catch(() => {}).then(() => {
-			if (!gone) setDetailsKeptRead(true);
+			if (gone) return;
+			// the pictures behind the four screens kept most recently are read ahead, so they open on their backdrop
+			keptTitles(4, keptWarmRef.current.account).forEach((title) => warmDetailsBackdrop(title, keptWarmRef.current.serverUrl, keptWarmRef.current.settings));
+			setDetailsKeptRead(true);
 		});
 		return () => { gone = true; };
 	}, []);

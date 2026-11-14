@@ -28,6 +28,7 @@ import {
 
 import stageCss from '../stage/StageDetailContent.module.less';
 import css from './QuickLookDetailContent.module.less';
+import {heldBackdrop} from '../../../utils/detailsBackdrop';
 
 // A title in a drawer down the right of the screen it was picked on, rather than a page of its own:
 // the backdrop, the name and its numbers, the buttons, the overview, the tracks, and the seasons or
@@ -179,7 +180,7 @@ const QuickLookScreen = (props) => {
 				<div className={css.header}>
 					{showImage && (
 						<div className={css.backdrop}>
-							<img className={css.backdropImage} src={backdropUrl} alt="" />
+							<img className={css.backdropImage} src={heldBackdrop(backdropUrl)} alt="" />
 							<div
 								className={css.fade}
 								style={scrimStyle(quickLookFade(surface)) || {backgroundImage: `linear-gradient(to bottom, rgba(${surface}, 0) 40%, rgb(${surface}))`}}

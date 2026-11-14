@@ -20,7 +20,7 @@ import {saveAudioPref, saveSubtitlePref} from '../../services/subtitlePrefs';
 import {fromServerStream} from '../../utils/seriesTrackPrefs';
 import ModernDetailContent from './ModernDetailContent';
 import DetailSkeleton from './DetailSkeleton';
-import {formatDuration, getImageUrl, getBackdropId, getLogoUrl} from '../../utils/helpers';
+import {formatDuration, getImageUrl, getLogoUrl} from '../../utils/helpers';
 import {KEYS} from '../../utils/keys';
 import {MATERIAL_ICON_PATHS} from '../Settings/materialIconMap';
 import {fetchPrerolls} from '../../utils/cinemaMode';
@@ -55,6 +55,7 @@ import useDetailsReviews from './useDetailsReviews';
 import useSeerrOverlay from './useSeerrOverlay';
 import DetailScrollPage from './DetailScrollPage';
 import DetailBackdrop from './DetailBackdrop';
+import {detailsBackdropUrl} from '../../utils/detailsBackdrop';
 import DetailActionButtons from './DetailActionButtons';
 import DetailTrackModals from './DetailTrackModals';
 import DetailDialogs from './DetailDialogs';
@@ -1187,10 +1188,8 @@ const Details = ({
 		return page(<DetailSkeleton detailStyle={detailStyle} sidebar={settings.navbarPosition === 'left'} />);
 	}
 
-	const backdropId = getBackdropId(item);
 	// Seerr artwork already arrives as a finished url, since it lives on TMDB rather than here.
-	const backdropUrl = item._externalBackdropUrl ||
-		(backdropId ? getImageUrl(effectiveServerUrl, backdropId, 'Backdrop', {maxWidth: 1920, quality: 90}) : null);
+	const backdropUrl = detailsBackdropUrl(item, effectiveServerUrl);
 
 	const isEpisode = item.Type === 'Episode';
 	const isSeries = item.Type === 'Series';
