@@ -140,7 +140,7 @@ const CalendarCountdown = ({c, look, actions: baseActions, onOpenMonth: baseOpen
 	const clockDisplay = settings.clockDisplay;
 	const dateFormat = settings.dateFormat;
 	const next = nextOf(c.entries, c.now);
-	const ready = readyToWatchOf(c.entries, c.today);
+	const ready = readyToWatchOf(c.entries, c.today, c.isWatched);
 	const hero = next || ready[0] || null;
 	const handleSelect = useCallback((e) => actions.select(e), [actions]);
 

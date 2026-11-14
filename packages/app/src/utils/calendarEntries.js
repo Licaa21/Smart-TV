@@ -295,9 +295,11 @@ export const recentOf = (entries, today) => entries.filter((e) => e.day < today)
 
 export const nextOf = (entries, now) => entries.find((e) => !inLibrary(e) && airedAt(e) > now) || null;
 
-export const readyToWatchOf = (entries, today) => {
+// What aired and is on the server and is not watched yet, newest first. [isWatched] says whether an entry's episode or movie
+// is watched, and without it everything on the server counts as not watched.
+export const readyToWatchOf = (entries, today, isWatched) => {
 	const cutoff = addDays(today, 1);
-	return entries.filter((e) => e.day < cutoff && inLibrary(e)).reverse();
+	return entries.filter((e) => e.day < cutoff && inLibrary(e) && !(isWatched && isWatched(e))).reverse();
 };
 
 export const thisWeekOf = (entries, today, now) => {
