@@ -2,7 +2,7 @@ import {fetchWithTimeout} from '../utils/fetchTimeout';
 import {getUser, requestTv, setMoonfinConfig} from './seerrApi';
 
 jest.mock('../utils/fetchTimeout', () => ({fetchWithTimeout: jest.fn()}));
-jest.mock('../platform', () => ({isWebOS: () => false, isLegacyTizen: () => false}));
+jest.mock('../platform', () => ({isWebOS: () => false, isLegacyWebOS: () => false, isLegacyTizen: () => false}));
 jest.mock('./jellyfinApi', () => ({createApiForServer: jest.fn(), getUserId: () => null}));
 jest.mock('./siloSession', () => ({loadSiloSessions: () => Promise.resolve()}));
 jest.mock('./moonbaseEndpoint', () => ({moonbaseEndpoint: jest.fn(), isSiloLogin: () => false}));
