@@ -824,12 +824,17 @@ const AppContent = (props) => {
 
 	useEffect(() => {
 		if (panelIndex === PANELS.DETAILS && selectedItem && THEME_MUSIC_TYPES.includes(selectedItem.Type) && !backgroundMusic) {
+			// a start Home was waiting on for another card is called off, which playing the same theme again would leave alone
+			themeMusic.cancelDelayed();
 			themeMusic.playThemeMusic(selectedItem.SeriesId || selectedItem.Id);
 		} else if (panelIndex === PANELS.PLAYER) {
 			themeMusic.stopThemeMusicImmediate();
 		} else if (panelIndex !== PANELS.DETAILS) {
 			themeMusic.cancelDelayed();
 			themeMusic.stopThemeMusic();
+		} else {
+			// a details screen with no theme of its own (a person, a collection) still calls off a start Home was waiting on
+			themeMusic.cancelDelayed();
 		}
 	}, [panelIndex, selectedItem?.Id, backgroundMusic]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1499,6 +1504,9 @@ const AppContent = (props) => {
 		if (!deepLink?.id || !isAuthenticated || !settingsLoaded || !user || pinPending || timesUp) return;
 		setDeepLink(null);
 		if (deepLink.serverId && user.ServerId && deepLink.serverId !== user.ServerId) return;
+		// Opens like a card chosen on Home, which ends the theme of the card in focus, one still waiting to start for it and one
+		// still being fetched. A title already open keeps its own theme.
+		if (themeScreenRef.current.panelIndex === PANELS.BROWSE) themeScreenRef.current.themeMusic.stopForFocus();
 		handleSelectItem({Id: deepLink.id, Type: deepLink.type === 'episode' ? 'Episode' : 'Movie'}, settings.continueWatchingDefaultAction === 'play');
 	}, [deepLink, isAuthenticated, settingsLoaded, user, pinPending, timesUp, handleSelectItem, settings.continueWatchingDefaultAction]);
 

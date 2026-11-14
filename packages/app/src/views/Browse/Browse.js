@@ -969,6 +969,10 @@ const Browse = ({
 		// Continue Watching and Next Up rows have one, and the next episode of the same show keeps it going.
 		// A library title that a TMDB or Seerr row swapped in keeps its real Id, and so its theme. One that is only
 		// on TMDB or Seerr has no theme to fetch.
+		// Home stays mounted under the screens opened from it, and a focus landing on a card while one of them (or Settings) is up,
+		// as the app comes back to the front or Home restores its card, is not the viewer choosing it: it must neither start
+		// its theme nor end the one the other screen is playing.
+		if (!isVisibleRef.current) return;
 		const notInLibrary = (item?._external || item?._seerr) && !item?._resolvedFromExternal;
 		const themeId = notInLibrary ? null
 			: (item?.Type === 'Movie' || item?.Type === 'Series') ? item.Id
