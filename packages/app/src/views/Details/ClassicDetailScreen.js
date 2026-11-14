@@ -88,7 +88,8 @@ const ClassicDetailScreen = ({
 	onExtraSelect,
 	onCastSelect,
 	onSelectItem,
-	collectionMenu
+	collectionMenu,
+	loadMoreCollectionTitles
 }) => {
 	const [upcomingEpisode, setUpcomingEpisode] = useState(null);
 
@@ -431,6 +432,8 @@ const ClassicDetailScreen = ({
 					className={css.inlineRow}
 					menuOptions={collectionMenu}
 					posterLabels
+					onLoadMore={loadMoreCollectionTitles}
+					loadMoreAhead={8}
 				/>
 			)}
 

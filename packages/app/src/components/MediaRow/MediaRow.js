@@ -56,7 +56,8 @@ const MediaRow = ({
 	posterLabels = false,
 	hideWatchProgress = false,
 	hideUnwatchedCount = false,
-	onLoadMore
+	onLoadMore,
+	loadMoreAhead
 }) => {
 	const {settings} = useSettings();
 	const scrollerRef = useRef(null);
@@ -114,7 +115,7 @@ const MediaRow = ({
 		if (onLoadMore && focused && focused.parentNode) {
 			const cards = focused.parentNode.querySelectorAll('[data-media-card]');
 			const index = Array.prototype.indexOf.call(cards, focused);
-			if (nearRowEnd(index, itemCount)) onLoadMore(rowId);
+			if (nearRowEnd(index, itemCount, loadMoreAhead)) onLoadMore(rowId);
 		}
 
 		// A hovered card already sits under the cursor, so nudging the lane
@@ -140,7 +141,7 @@ const MediaRow = ({
 				}
 			});
 		}
-	}, [onFocus, rowIndex, items, onLoadMore, itemCount, rowId]);
+	}, [onFocus, rowIndex, items, onLoadMore, loadMoreAhead, itemCount, rowId]);
 
 	const handleKeyDown = useCallback((e) => {
 		if (e.keyCode === KEYS.UP && onNavigateUp) {

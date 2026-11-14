@@ -31,9 +31,9 @@ import css from './QuickLookDetailContent.module.less';
 import {heldBackdrop} from '../../../utils/detailsBackdrop';
 
 // A title in a drawer down the right of the screen it was picked on, rather than a page of its own:
-// the backdrop, the name and its numbers, the buttons, the overview, the tracks, and the seasons or
-// the people behind it, with the full page a press away. A title that's only in Seerr gets Request
-// in place of play, and its seasons each open the request dialog.
+// the backdrop, the name and its numbers, the buttons, the overview, the tracks, and the seasons, a
+// collection's titles or the people behind it, with the full page a press away. A title that's only
+// in Seerr gets Request in place of play, and its seasons each open the request dialog.
 
 const SEASONS_ID = 'quick-look-seasons';
 const OPEN_ID = 'quick-look-open';
@@ -172,7 +172,8 @@ const QuickLookScreen = (props) => {
 
 	const tracks = page.tracksStop({shareRow: true});
 	const seasonCards = item.Type === 'Series' ? seasonsRow() : null;
-	stopsRef.current = [tracks && tracks.id, seasonCards && SEASONS_ID, OPEN_ID].filter(Boolean);
+	const collectionRows = page.collectionStops();
+	stopsRef.current = [tracks && tracks.id, seasonCards && SEASONS_ID, ...collectionRows.map((row) => row.id), OPEN_ID].filter(Boolean);
 
 	return (
 		<div className={css.content} onKeyDownCapture={handleKeyDown}>
@@ -229,6 +230,7 @@ const QuickLookScreen = (props) => {
 					{overview && <p className={css.overview}>{overview}</p>}
 					{tracks && <div className={css.section} data-quick-look-stop={tracks.id}>{tracks.node}</div>}
 					{seasonCards && <div className={css.section} data-quick-look-stop={SEASONS_ID}>{seasonCards}</div>}
+					{collectionRows.map((row) => <div key={row.id} className={css.section} data-quick-look-stop={row.id}>{row.node}</div>)}
 					{facts.length > 0 && (
 						<div className={`${css.section} ${css.facts}`}>
 							{facts.map((fact) => (

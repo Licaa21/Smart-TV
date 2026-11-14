@@ -992,6 +992,8 @@ export const buildThemeOverrideCss = (theme, options = {}) => {
 		rule(`.${cardCss.seerr2}`, `background: ${onSurface}; border-color: ${statusPending};`);
 		rule(`.${cardCss.seerrMissing}`, `background: ${homeAccent.css};`);
 		rule(`.${cardCss.seerrMissing} svg`, `fill: ${onBadge};`);
+		// Sheets keep their Seerr mark in Seerr's own color whatever the theme.
+		if (cardCss.seerrLeft) rule(`.${cardCss.seerrMissing}.${cardCss.seerrLeft}`, 'background: #6366f1;');
 		rule(`.${cardCss.seerrBanner}`, `border-width: ${b.cardBorder.width}px ${b.cardBorder.width}px 0; border-radius: ${b.cardRadius.topLeft}px ${b.cardRadius.topRight}px 0 0;`);
 		rule(`.${cardCss.card}:focus .${cardCss.seerrBanner}`, 'border-width: 4px 4px 0;');
 	}

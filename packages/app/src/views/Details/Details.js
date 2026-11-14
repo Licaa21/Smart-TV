@@ -70,7 +70,7 @@ import {personCalendarDate, personDateLines, rankLibraryItems, splitFilmography}
 import {featuredBook, readingOrder} from '../BookBrowse/bookScreens';
 import {loadBookSeries} from '../BookBrowse/useBookLibrary';
 import {useUserDataList} from '../../hooks/useUserDataSync';
-import {mergeCollectionWithMissing, mergeMissingByReleaseOrder} from './seerrMissingCollectionItems';
+import {collectionTitles, mergeCollectionWithMissing} from './seerrMissingCollectionItems';
 import ClassicDetailScreen from './ClassicDetailScreen';
 import SpotlightDetailContent from './spotlight/SpotlightDetailContent';
 import NouveauDetailContent from './nouveau/NouveauDetailContent';
@@ -208,7 +208,8 @@ const Details = ({
 	});
 	const {
 		setItem, isLoading: libraryLoading, isBlocked: blockedByRating, isSeed, seasons: librarySeasons, episodes, seriesEpisodes: librarySeriesEpisodes, similar, extras, cast, nextUp, nextEpisode,
-		collectionItems, missingCollectionItems, parentCollections, similarSource, similarLoaded, playListsLoaded, loadMoreCollectionItems, removeFromCollection, albumTracks, artistAlbums,
+		collectionItems, collectionMembers, missingCollectionItems, parentCollections, similarSource, similarLoaded, playListsLoaded, loadMoreCollectionItems,
+		loadMoreCollectionTitles, removeFromCollection, albumTracks, artistAlbums,
 		playlistItems, setPlaylistItems, collectionIndexRef, collectionSort, collectionPlaylistLoading, chooseCollectionSort, moveCollectionItem,
 		episodeRatings, refreshItem,
 		selectedVersionIndex, setSelectedVersionIndex,
@@ -404,6 +405,10 @@ const Details = ({
 
 	const isBoxSet = item?.Type === 'BoxSet';
 
+	// The styles read a title's directors and writers off its People, and a collection's are its
+	// titles', so its page gets those. The hooks above keep the record itself.
+	const pageItem = useMemo(() => (isBoxSet ? {...item, People: cast} : item), [isBoxSet, item, cast]);
+
 	// A moved row can be drawn afresh, so focus is put back on it in its new place.
 	const handleCollectionMove = useCallback((itemIndex, direction) => {
 		const newIndex = itemIndex + direction;
@@ -570,8 +575,9 @@ const Details = ({
 			}
 		} else if (item.Type === 'BoxSet') {
 			// The rest of the collection rides along in playlist order, so finishing one film starts
-			// the next rather than sending the viewer back to pick it.
-			const queue = orderItemsByIds(collectionQueue(collectionItems), collectionIndexRef.current);
+			// the next rather than sending the viewer back to pick it. The rows load a page at a time, so
+			// this reads the whole membership.
+			const queue = orderItemsByIds(collectionQueue(collectionMembers), collectionIndexRef.current);
 			const target = collectionPlayTarget(queue);
 			if (target) {
 				onPlay?.(target, shouldResumeTarget(target), {videoQueue: queue});
@@ -603,7 +609,7 @@ const Details = ({
 				onPlay?.(item, false, parts.length ? {...playbackOptions, videoQueue: [item, ...parts]} : playbackOptions);
 			}
 		}
-	}, [item, seerrOnly, episodes, nextUp, seasons, collectionItems, albumTracks, playlistItems, onPlay, onSelectItem, buildPlaybackOptions, effectiveApi, settings, tagWithServerInfo, isSyncPlayInGroup, playListFrom, fetchAdditionalParts, collectionIndexRef]);
+	}, [item, seerrOnly, episodes, nextUp, seasons, collectionMembers, albumTracks, playlistItems, onPlay, onSelectItem, buildPlaybackOptions, effectiveApi, settings, tagWithServerInfo, isSyncPlayInGroup, playListFrom, fetchAdditionalParts, collectionIndexRef]);
 
 	const handleResume = useCallback(async () => {
 		if (!item) return;
@@ -673,7 +679,7 @@ const Details = ({
 		}
 
 		if (item.Type === 'BoxSet') {
-			const queue = shuffleArray(collectionQueue(collectionItems));
+			const queue = shuffleArray(collectionQueue(collectionMembers));
 			if (queue.length === 0) return;
 			onPlay?.(queue[0], false, {videoQueue: queue});
 			return;
@@ -688,7 +694,7 @@ const Details = ({
 		}
 
 		onPlay?.(item, false, {});
-	}, [item, episodes, collectionItems, albumTracks, onPlay, effectiveApi, tagWithServerInfo]);
+	}, [item, episodes, collectionMembers, albumTracks, onPlay, effectiveApi, tagWithServerInfo]);
 
 	const handleToggleFavorite = useCallback(async () => {
 		if (!item) return;
@@ -1119,10 +1125,12 @@ const Details = ({
 		pageScrollToRef.current = fn;
 	}, []);
 
-	// A card on a collection's own page can be taken out of that collection from its menu.
-	const collectionMenu = useMemo(() => (item?.Type === 'BoxSet' ? {
+	// A card on a collection's own page can be taken out of that collection from its menu, where the
+	// server lets this viewer change it. Silo only lets a profile change the collections it made.
+	const canRemoveFromCollection = item?.Type === 'BoxSet' && effectiveApi.canEditCollection?.(item) !== false;
+	const collectionMenu = useMemo(() => (canRemoveFromCollection ? {
 		collectionRemoval: {collectionId: item.Id, collectionName: item.Name || '', remove: removeFromCollection}
-	} : null), [item?.Type, item?.Id, item?.Name, removeFromCollection]);
+	} : null), [canRemoveFromCollection, item?.Id, item?.Name, removeFromCollection]);
 
 	// Reordering needs an entry id per track, which only a real playlist carries.
 	const canManagePlaylist = item?.Type === 'Playlist' && playlistItems.length > 0 &&
@@ -1294,9 +1302,7 @@ const Details = ({
 		].filter(Boolean)
 	}));
 	// A collection's own page slots its missing titles in by release date in every style.
-	const shownCollectionItems = isBoxSet && showsMissingTitles
-		? mergeMissingByReleaseOrder(collectionItems, missingCollectionItems)
-		: collectionItems;
+	const shownCollectionItems = isBoxSet ? collectionTitles(collectionItems, missingCollectionItems, settings) : collectionItems;
 
 	// With Popularity chosen, the most popular first by what Seerr says of the same titles, and the one the backdrop comes
 	// from ahead of them. Any other sort stands as the filmography came.
@@ -1401,7 +1407,7 @@ const Details = ({
 					inSyncPlayGroup={isSyncPlayInGroup || canPickForWatchParty}
 					onWatchWithGroup={canPickForWatchParty ? handlePickForWatchParty : handlePlay}
 					key={item.Id}
-					item={item}
+					item={pageItem}
 					bookSeriesItem={bookSeriesItem}
 					settings={settings}
 					showsSection={showsSection}
@@ -1501,6 +1507,7 @@ const Details = ({
 					missingCollectionItems={NO_ITEMS}
 					parentCollections={shownParentCollections}
 					loadMoreCollectionItems={loadMoreCollectionItems}
+					loadMoreCollectionTitles={loadMoreCollectionTitles}
 					collectionMenu={collectionMenu}
 					filmography={filmography}
 					canManagePlaylist={canManagePlaylist}
@@ -1704,9 +1711,10 @@ const Details = ({
 	return (
 		<DetailScrollPage backdrop={backdrop} scrollerRef={pageScrollerRef} onScrollTo={handlePageScrollTo} sidebarDocked={sidebarDocked} footer={overlays}>
 			<ClassicDetailScreen
-				item={item}
+				item={pageItem}
 				bookSeriesItem={bookSeriesItem}
 				collectionMenu={collectionMenu}
+				loadMoreCollectionTitles={loadMoreCollectionTitles}
 				serverUrl={effectiveServerUrl}
 				serverToken={initialItem?._serverAccessToken || jellyfinApi.getApiKey()}
 				settings={settings}
