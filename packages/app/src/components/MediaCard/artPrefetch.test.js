@@ -276,24 +276,43 @@ describe('prefetchArt reading the art as a blob', () => {
 		expect(artSource(urls[1])).toBeNull();
 	});
 
-	it('does not let go of a pinned picture when too much is held, only of the others', async () => {
+	it('does not let go of a pinned picture when too much is held, only of the others, which are the ones counted', async () => {
 		jest.useFakeTimers();
 		const urls = ['http://pin.test/a.jpg', 'http://pin.test/b.jpg', 'http://pin.test/c.jpg'];
+		const mb = 13 * 1024 * 1024;
 		ask(urls[0], 0);
-		answer(0, ok(12 * 1024 * 1024));
+		answer(0, ok(mb));
 		await flush();
 		pinArt(urls[0]);
 		ask(urls[1], 1);
 		ask(urls[2], 2);
-		answer(1, ok(12 * 1024 * 1024));
-		answer(2, ok(12 * 1024 * 1024));
+		answer(1, ok(mb));
+		answer(2, ok(mb));
 		await flush();
 		await flush();
+		// b and c are over the 24 MB of what is not pinned, so b goes, and the pinned a does not count against them
 		expect(artSource(urls[0])).toMatch(/^blob:art\//);
 		expect(artSource(urls[1])).toBeNull();
 		expect(artSource(urls[2])).toMatch(/^blob:art\//);
-		// the pin is given up (ten newer ones push it out), so later tests hold what they like
-		for (let i = 0; i < 10; i++) pinArt(`http://pin.test/later-${i}`);
+		// the pins are given up (a hundred newer ones push it out), so later tests hold what they like
+		for (let i = 0; i < 100; i++) pinArt(`http://pin.test/later-${i}`);
+	});
+
+	it('gives up the oldest pins when the pinned pictures are over their own budget', async () => {
+		jest.useFakeTimers();
+		const urls = ['http://pinbudget.test/a.jpg', 'http://pinbudget.test/b.jpg', 'http://pinbudget.test/c.jpg'];
+		const mb = 12 * 1024 * 1024;
+		urls.forEach((url, index) => {
+			pinArt(url);
+			ask(url, index);
+		});
+		urls.forEach((url, index) => answer(index, ok(mb)));
+		await flush();
+		await flush();
+		// 36 MB pinned is over 32 MB, so the oldest pin (a) is let go of, and the pins that are left are held
+		expect(artSource(urls[1])).toMatch(/^blob:art\//);
+		expect(artSource(urls[2])).toMatch(/^blob:art\//);
+		for (let i = 0; i < 100; i++) pinArt(`http://pinbudget.test/later-${i}`);
 	});
 
 	it('starts no fetch while the rows glide, and starts them once the glide is still', async () => {

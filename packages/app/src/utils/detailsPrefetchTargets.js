@@ -18,6 +18,21 @@ export const pickPrefetchTargets = (rows) => {
 	});
 };
 
+// The cards of those rows whose details screens may be opened, all of them and in the order Home shows them, for the
+// backdrop behind each to be read ahead (utils/detailsBackdrop.js). A title of another server, or one of Seerr or an outside
+// list, is left out, since its screen draws another way.
+export const pickBackdropTargets = (rows) => {
+	const all = (id) => ((rows || []).find((row) => row.id === id)?.items || []).filter((item) => item?.Id && !item._serverUrl && !item._seerr && !item._external);
+	const merged = all('continue-nextup');
+	const picked = merged.length ? merged : [...all('resume'), ...all('nextup')];
+	const seen = new Set();
+	return picked.filter((item) => {
+		if (seen.has(item.Id)) return false;
+		seen.add(item.Id);
+		return true;
+	});
+};
+
 let targets = [];
 const listeners = new Set();
 
