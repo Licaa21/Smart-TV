@@ -52,6 +52,7 @@ import {glideScroll, isGliding, smoothScrollingOn, stopScrollAnimation} from '..
 import {writingGlide} from '../../utils/glideState';
 import {homeRowSpacing, isCarouselRow} from '../../components/MediaCard/modernCardLayout';
 import {rowImageType, rowPeekHeight} from './rowPeek';
+import {pickPrefetchTargets, setPrefetchTargets} from '../../utils/detailsPrefetchTargets';
 
 import css from './Browse.module.less';
 
@@ -332,6 +333,13 @@ const Browse = ({
 		alerts: settings.watchPartyAlerts === true
 	});
 	const filteredRows = useMemo(() => (partyRow ? [partyRow, ...dataRows] : dataRows), [partyRow, dataRows]);
+
+	// What Home shows of Continue Watching and Next Up is what gets its details screens filled in ahead of time
+	useEffect(() => {
+		setPrefetchTargets(pickPrefetchTargets(filteredRows));
+	}, [filteredRows]);
+	// Home going away (sign out, another account) takes its titles with it, so nothing is filled in for them
+	useEffect(() => () => setPrefetchTargets([]), []);
 	const handleJoinParty = useCallback(async (room) => {
 		if (room.kind === 'syncplay') {
 			if (await joinSyncPlayGroup(room.roomId)) openSyncPlayDialog();

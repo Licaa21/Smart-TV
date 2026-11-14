@@ -25,7 +25,7 @@ import {currentMetadataLanguage} from '../../utils/metadataLanguage';
 import {isStreamlessStaticSource, probedSources} from '../../utils/placeholderSource';
 import {mergeEpisodeCast, mergeEpisodePeople, resolveParentCast} from '../../utils/episodeCast';
 import {getUserId} from '../../services/jellyfinApi';
-import {detailsKey, isCacheableType, readDetails, saveDetails} from './detailsCache';
+import {detailsKey, dropKeptScreen, isCacheableType, readDetails, saveDetails} from './detailsCache';
 
 // Everything the screen shows about one item. The item itself is fetched first and rendered
 // on its own, then the rows that hang off it fill in behind, because waiting for all of them
@@ -221,6 +221,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 		// on, so its answer is dropped when the screen already shows something else.
 		let cancelled = false;
 		let stopKeeping = () => {};
+		// Reading the title again behind a kept screen that is already on screen, which changes nothing until the answers land
+		let quiet = false;
 
 		// The screen of this title as it was kept, which is taken back whole while nothing it was made from has changed
 		const key = detailsKey(effectiveServerUrl, getUserId(), itemId, settingsRef.current);
@@ -234,19 +236,21 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			setSelectedVersionIndex(kept.selectedVersionIndex || 0);
 			setSelectedAudioIndex(kept.selectedAudioIndex || 0);
 			setSelectedSubtitleIndex(kept.selectedSubtitleIndex ?? -1);
-			setSeasons(kept.seasons);
-			setEpisodes(kept.episodes);
-			setSeriesEpisodes(kept.seriesEpisodes);
-			setSimilar(kept.similar);
+			setSeasons(kept.seasons || []);
+			setEpisodes(kept.episodes || []);
+			setSeriesEpisodes(kept.seriesEpisodes || []);
+			setSimilar(kept.similar || []);
 			setSimilarSource(kept.similarSource);
-			setExtras(kept.extras);
-			setCast(kept.cast);
-			setNextUp(kept.nextUp);
-			setParentCollections(kept.parentCollections);
-			setEpisodeRatings(kept.episodeRatings);
+			setExtras(kept.extras || []);
+			setCast(kept.cast || []);
+			setNextUp(kept.nextUp || []);
+			setParentCollections(kept.parentCollections || []);
+			setEpisodeRatings(kept.episodeRatings || {});
 			setSimilarLoaded(true);
 			setPlayListsLoaded(true);
-			return () => { cancelled = true; };
+			// A screen kept a while ago, or before something else was played, is read again behind what is drawn
+			if (kept.fresh) return () => { cancelled = true; };
+			quiet = true;
 		}
 
 		const refuse = () => {
@@ -263,7 +267,9 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				return;
 			}
 			const seed = rowCopy && seedIsDecided(rowCopy) ? rowCopy : null;
-			if (seed) {
+			if (quiet) {
+				// the kept screen is up and stays up
+			} else if (seed) {
 				setItem(tagWithServerInfo(seed));
 				setIsSeed(true);
 				setIsLoading(false);
@@ -277,6 +283,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				data = await withProbedSources(effectiveApi, await effectiveApi.getItemForDetail(itemId));
 			} catch (err) {
 				console.error('[Details] Error loading item', err);
+				// the title is gone from the server, so what was kept of it is not kept any longer
+				if (quiet && err?.status === 404) dropKeptScreen(key);
 				setIsSeed(false);
 				setIsLoading(false);
 				return;
@@ -293,10 +301,10 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			observeItem(data);
 
 			setItem(tagWithServerInfo(data));
-			setSelectedVersionIndex(0);
+			if (!quiet) setSelectedVersionIndex(0);
 			// Kept whole, because the screens split this into cast and crew and
 			// capping here would drop the crew off the end of a long list.
-			if (data.People?.length > 0) {
+			if (!quiet && data.People?.length > 0) {
 				setCast(data.Type === 'Episode'
 					? mergeEpisodePeople({episodePeople: data.People, parentActors: []})
 					: data.People);
@@ -311,6 +319,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			// Whether anything the rows asked for failed, which keeps this screen from being kept as if it had finished
 			let rowsFailed = false;
 			let picksFailed = false;
+			let picksDone = false;
 			const noteRowFailed = () => {
 				rowsFailed = true;
 				return null;
@@ -336,6 +345,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					]);
 					if (seasonsData) setSeasons(tagWithServerInfo(withoutBlockedItems(seasonsData.Items || [], fallbackRating)));
 					if (nextUpData?.Items?.length > 0 && nextUpRequest === nextUpRequestRef.current) setNextUp(tagWithServerInfo(nextUpData.Items));
+					// a kept screen whose series has nothing left to watch no longer shows a next up
+					else if (quiet && nextUpData && nextUpRequest === nextUpRequestRef.current) setNextUp([]);
 					if (episodesData) setSeriesEpisodes(tagWithServerInfo(withoutBlockedItems(episodesData.Items || [], fallbackRating)));
 				}
 
@@ -578,7 +589,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				if (cancelled || !isCacheableType(data)) return;
 				if (rowsFailed || picksFailed) return;
 				const now = latestRef.current;
-				if (bgDone && !now.isSeed && !now.isLoading && now.item?.Id === data.Id) {
+				if (bgDone && picksDone && !now.isSeed && !now.isLoading && now.item?.Id === data.Id) {
 					if (now.parentCollections.length > 0 && seerrEnabledRef.current) return;
 					saveDetails(key, {
 						item: now.item, seasons: now.seasons, episodes: now.episodes, seriesEpisodes: now.seriesEpisodes, similar: now.similar,
@@ -627,7 +638,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						audioPos = initAudioStreams.findIndex(s => s.Index === ms.DefaultAudioStreamIndex);
 					}
 					if (cancelled) return;
-					if (audioPos >= 0) setSelectedAudioIndex(audioPos);
+					// a screen read again behind a kept one leaves the picks that are on it, which the viewer may have changed
+					if (!quiet && audioPos >= 0) setSelectedAudioIndex(audioPos);
 					// Show the track playback will start on as active, picked the way the player picks it: the remembered pick for
 					// this episode or its series first, then the subtitle mode and languages from Settings.
 					const subtitlePos = await detailsSubtitlePosition(data, ms, settingsRef.current, initAudioStreams[Math.max(0, audioPos)]);
@@ -640,15 +652,18 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						tracks: (ms.MediaStreams || []).filter(s => s.Type === 'Subtitle').map(s => `${s.Index}:${s.Language || '?'}${s.IsDefault ? ':default' : ''}${s.IsForced ? ':forced' : ''}`),
 						picked: subtitlePos
 					});
-					setSelectedSubtitleIndex(subtitlePos);
+					if (!quiet) setSelectedSubtitleIndex(subtitlePos);
 				} else {
-					setSelectedAudioIndex(0);
-					setSelectedSubtitleIndex(-1);
+					if (!quiet) {
+						setSelectedAudioIndex(0);
+						setSelectedSubtitleIndex(-1);
+					}
 				}
 			} catch (err) {
 				picksFailed = true;
 				console.warn('[Details] Could not pick the tracks', err);
 			}
+			picksDone = true;
 			// Still a seed until the picked tracks above are in, or the track buttons read their
 			// unset defaults (Subtitle: Off) for as long as the prefs take to come back.
 			if (cancelled) return;

@@ -162,6 +162,32 @@ describe('a title opened again', () => {
 		expect(api.getSimilar).toHaveBeenCalledTimes(1);
 	});
 
+	test('is drawn at once and read again behind itself when it was kept a while ago', async () => {
+		const api = movieApi();
+		await loadAndKeep(api, {...MOVIE});
+		const later = Date.now() + 10 * 60 * 1000;
+		const clock = jest.spyOn(Date, 'now').mockReturnValue(later);
+		const seen = [];
+		const view = renderHook(() => {
+			const data = useDetailsItem({
+				itemId: 'movie', initialItem: {...MOVIE}, effectiveApi: api, effectiveServerUrl: 'https://server',
+				settings: {...SETTINGS, uiLanguage: 'ro-opened-again'}, recommendationsSupported: false, seerrEnabled: false,
+				tagWithServerInfo: identity, skip: false
+			});
+			seen.push(data.isSeed);
+			return data;
+		});
+		// whole in the first frame, from the kept screen
+		expect(view.result.current.item.Id).toBe('movie');
+		expect(view.result.current.isLoading).toBe(false);
+		await settle();
+		clock.mockRestore();
+		// read again, and the screen never went back to showing the row it was opened from
+		expect(api.getItemForDetail).toHaveBeenCalledTimes(2);
+		expect(seen.every((isSeed) => isSeed === false)).toBe(true);
+		expect(view.result.current.item.Id).toBe('movie');
+	});
+
 	test('opens the normal way when the card it is opened from has changed', async () => {
 		const api = movieApi();
 		await loadAndKeep(api, {...MOVIE});
@@ -191,5 +217,50 @@ describe('a title opened again', () => {
 		renderMovie(api, {...MOVIE});
 		await settle();
 		expect(api.getItemForDetail).toHaveBeenCalledTimes(2);
+	});
+
+	test('read again behind itself, drops a next up the series no longer has', async () => {
+		const series = {Id: 'show', Type: 'Series', Name: 'Show', UserData: {Played: false}};
+		let answers = [page([episode('e2')]), page([])];
+		const api = {
+			...makeApi(() => Promise.resolve(answers.shift())),
+			getItemForDetail: jest.fn(() => Promise.resolve(series))
+		};
+		const renderShow = () => renderHook(() => useDetailsItem({
+			itemId: 'show', initialItem: {...series}, effectiveApi: api, effectiveServerUrl: 'https://server',
+			settings: {...SETTINGS, uiLanguage: 'ro-next-up'}, recommendationsSupported: false, seerrEnabled: false,
+			tagWithServerInfo: identity, skip: false
+		}));
+		const {result: openedResult, unmount: closeOpened} = renderShow();
+		await settle();
+		await act(async () => { await new Promise((resolve) => setTimeout(resolve, 600)); });
+		expect(openedResult.current.nextUp[0].Id).toBe('e2');
+		closeOpened();
+
+		const clock = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 10 * 60 * 1000);
+		const view = renderShow();
+		expect(view.result.current.nextUp[0].Id).toBe('e2');
+		await settle();
+		clock.mockRestore();
+		expect(view.result.current.nextUp).toEqual([]);
+		answers = [];
+	});
+
+	test('read again behind itself, lets go of a title the server no longer has', async () => {
+		const api = movieApi();
+		await loadAndKeep(api, {...MOVIE});
+		const clock = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 10 * 60 * 1000);
+		api.getItemForDetail.mockImplementation(() => Promise.reject(Object.assign(new Error('Not found'), {status: 404})));
+		const view = renderMovie(api, {...MOVIE});
+		expect(view.result.current.item.Id).toBe('movie');
+		await settle();
+		clock.mockRestore();
+		view.unmount();
+		// the kept screen was dropped, so the next open goes to the server
+		api.getItemForDetail.mockImplementation(() => Promise.resolve(MOVIE));
+		const count = api.getItemForDetail.mock.calls.length;
+		renderMovie(api, {...MOVIE});
+		await settle();
+		expect(api.getItemForDetail.mock.calls.length).toBe(count + 1);
 	});
 });
