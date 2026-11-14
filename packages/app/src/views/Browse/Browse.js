@@ -52,7 +52,7 @@ import {glideScroll, isGliding, smoothScrollingOn, stopScrollAnimation} from '..
 import {writingGlide} from '../../utils/glideState';
 import {homeRowSpacing, isCarouselRow} from '../../components/MediaCard/modernCardLayout';
 import {rowImageType, rowPeekHeight} from './rowPeek';
-import {pickBackdropTargets, pickPrefetchTargets, setPrefetchTargets} from '../../utils/detailsPrefetchTargets';
+import {pickBackdropTargets} from '../../utils/detailsPrefetchTargets';
 import {decodeDetailsBackdrop, feedBackdrops, stopFeedingBackdrops} from '../../utils/detailsBackdrop';
 
 import css from './Browse.module.less';
@@ -337,17 +337,12 @@ const Browse = ({
 	});
 	const filteredRows = useMemo(() => (partyRow ? [partyRow, ...dataRows] : dataRows), [partyRow, dataRows]);
 
-	// What Home shows of Continue Watching and Next Up is what gets its details screens filled in ahead of time
+	// The backdrop behind every card of Continue Watching and Next Up is read ahead, so any of them opens on its picture
 	useEffect(() => {
-		setPrefetchTargets(pickPrefetchTargets(filteredRows));
-		// and the backdrop behind every card of those rows is read ahead, so any of them opens on its picture
 		feedBackdrops(pickBackdropTargets(filteredRows), serverUrl, settings);
 	}, [filteredRows, serverUrl, settings.backdropBlurDetail, settings.detailsBackdropEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
-	// Home going away (sign out, another account) takes its titles with it, so nothing is filled in for them
-	useEffect(() => () => {
-		setPrefetchTargets([]);
-		stopFeedingBackdrops();
-	}, []);
+	// Home going away (playback, sign out) stops the reading
+	useEffect(() => () => stopFeedingBackdrops(), []);
 	const handleJoinParty = useCallback(async (room) => {
 		if (room.kind === 'syncplay') {
 			if (await joinSyncPlayGroup(room.roomId)) openSyncPlayDialog();

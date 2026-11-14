@@ -2,10 +2,12 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useAuth} from '../../context/AuthContext';
 import {useSettings} from '../../context/SettingsContext';
 import {useSeerr} from '../../context/SeerrContext';
-import {loadCalendar, seriesProgress} from '../../services/calendarApi';
+import {loadCalendar, seriesProgress, watchedIds} from '../../services/calendarApi';
+import * as userDataSync from '../../services/userDataSync';
+import {useUserDataVersion} from '../../hooks/useUserDataSync';
 import {shiftedNow} from '../../utils/clock';
 import {getImageUrl} from '../../utils/helpers';
-import {addDays, behindOnSeries, calendarAllows, followsSeries, isEpisode, isoDay, startOfDay, withLibraryArt} from '../../utils/calendarEntries';
+import {addDays, behindOnSeries, calendarAllows, followsSeries, inLibrary, isEpisode, isoDay, playableId, startOfDay, withLibraryArt} from '../../utils/calendarEntries';
 
 // Minutes are the smallest unit the countdown shows, so a tick every 20 s keeps it within a third
 // of a minute.
@@ -33,7 +35,10 @@ const useCalendar = ({tick = false} = {}) => {
 
 	const [state, setState] = useState({loading: true, all: [], problem: null});
 	const [progress, setProgress] = useState({});
+	// The episodes and movies on the server that aired and are watched, which Ready to watch leaves out
+	const [watched, setWatched] = useState(() => new Set());
 	const progressRef = useRef(progress);
+	const watchedRef = useRef(watched);
 	const generationRef = useRef(0);
 
 	const unmonitored = settings.calendarIncludeUnmonitored === true;
@@ -51,16 +56,30 @@ const useCalendar = ({tick = false} = {}) => {
 		const result = await loadCalendar({serverUrl, token: accessToken, start: windowStart, end: windowEnd, unmonitored, refresh});
 		// My shows and spoiler safe read watch state, fetched once per series.
 		let nextProgress = progressRef.current;
+		// Ready to watch lists only what is not watched yet, so the watch state of what is on the server is read with each
+		// load, at the same time as the series' progress
+		const tomorrow = addDays(startOfDay(shiftedNow(offset)), 1);
+		const readyIds = [];
+		result.entries.forEach((e) => {
+			const id = e.day < tomorrow && inLibrary(e) ? playableId(e) : null;
+			if (id && readyIds.indexOf(id) < 0) readyIds.push(id);
+		});
+		const progressIds = [];
 		if (needsProgress && api) {
-			const ids = [];
 			result.entries.forEach((e) => {
-				if (isEpisode(e) && e.itemId && !nextProgress[e.itemId] && ids.indexOf(e.itemId) < 0) ids.push(e.itemId);
+				if (isEpisode(e) && e.itemId && !nextProgress[e.itemId] && progressIds.indexOf(e.itemId) < 0) progressIds.push(e.itemId);
 			});
-			if (ids.length) nextProgress = {...nextProgress, ...(await seriesProgress(api, ids))};
 		}
+		const [progressRead, nextWatched] = await Promise.all([
+			progressIds.length ? seriesProgress(api, progressIds) : null,
+			readyIds.length && api ? watchedIds(api, readyIds, watchedRef.current) : new Set()
+		]);
+		if (progressRead) nextProgress = {...nextProgress, ...progressRead};
 		if (generation !== generationRef.current) return;
 		progressRef.current = nextProgress;
+		watchedRef.current = nextWatched;
 		setProgress(nextProgress);
+		setWatched(nextWatched);
 		setNow(shiftedNow(offset));
 		setState({loading: false, all: result.entries, problem: result.problem});
 	}, [serverUrl, accessToken, api, windowStart, windowEnd, unmonitored, needsProgress, offset]);
@@ -95,8 +114,16 @@ const useCalendar = ({tick = false} = {}) => {
 	// Spoiler safe hides an episode's name and still for a series the user is part way through.
 	const hidesSpoilers = useCallback((e) => spoilerSafe && isEpisode(e) && behindOnSeries(progress[e.itemId]), [spoilerSafe, progress]);
 	const reload = useCallback(() => load(true), [load]);
+	// What was watched or marked watched in the app since the load counts at once
+	const userDataVersion = useUserDataVersion();
+	const isWatched = useCallback((e) => {
+		const id = playableId(e);
+		if (!id) return false;
+		const known = {Id: id, UserData: {Played: watched.has(id)}};
+		return userDataSync.apply(known).UserData.Played === true;
+	}, [watched, userDataVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	return {loading: state.loading, problem: state.problem, entries, now, today, windowStart, windowEnd, hidesSpoilers, reload};
+	return {loading: state.loading, problem: state.problem, entries, now, today, windowStart, windowEnd, hidesSpoilers, isWatched, reload};
 };
 
 export default useCalendar;

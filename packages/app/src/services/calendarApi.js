@@ -41,6 +41,34 @@ export const loadCalendar = ({serverUrl, token, start, end, unmonitored = false,
 	return run;
 };
 
+/**
+ * The ids among the given episodes and movies of the library that are watched. [known] is what an earlier read found: a chunk
+ * whose read fails keeps what was known of it, so a blip does not bring watched titles back, and with none known it says
+ * nothing is watched.
+ */
+export const watchedIds = async (api, ids, known = new Set()) => {
+	const out = new Set();
+	for (let i = 0; i < ids.length; i += 50) {
+		try {
+			const page = await api.getItems({
+				Ids: ids.slice(i, i + 50).join(','),
+				EnableUserData: true,
+				EnableImages: false,
+				EnableTotalRecordCount: false
+			});
+			(page?.Items || []).forEach((item) => {
+				if (item.UserData?.Played === true) out.add(item.Id);
+			});
+		} catch (err) {
+			console.warn('[Calendar] Watch state failed:', err);
+			ids.slice(i, i + 50).forEach((id) => {
+				if (known.has(id)) out.add(id);
+			});
+		}
+	}
+	return out;
+};
+
 /** Favorite and watch state of the given library series, keyed by id. */
 export const seriesProgress = async (api, seriesIds) => {
 	const out = {};

@@ -244,6 +244,13 @@ describe('the derived lists', () => {
 		expect(keys(thisWeekOf(entries, today, now))).toEqual(['sonarr:4']);
 	});
 
+	it('leaves out what is watched already from what is ready to watch', () => {
+		const watchedKeys = ['sonarr:2'];
+		const isWatched = (e) => watchedKeys.indexOf(e.key) >= 0;
+		expect(keys(readyToWatchOf(entries, today, isWatched))).toEqual(['sonarr:1']);
+		expect(keys(readyToWatchOf(entries, today, () => true))).toEqual([]);
+	});
+
 	it('tells ready, upcoming and missing apart', () => {
 		expect(statusAt(entries[0], now)).toBe('ready');
 		expect(statusAt(entries[2], now)).toBe('missing');

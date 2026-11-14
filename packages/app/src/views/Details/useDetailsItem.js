@@ -24,9 +24,6 @@ import {useUserDataVersion} from '../../hooks/useUserDataSync';
 import {currentMetadataLanguage} from '../../utils/metadataLanguage';
 import {isStreamlessStaticSource, probedSources} from '../../utils/placeholderSource';
 import {mergeEpisodeCast, mergeEpisodePeople, resolveParentCast} from '../../utils/episodeCast';
-import {getUserId} from '../../services/jellyfinApi';
-import {detailsKey, dropKeptScreen, isCacheableType, readDetails, saveDetails} from './detailsCache';
-import {warmDetailsBackdrop} from '../../utils/detailsBackdrop';
 import {boxSetPeople} from './detailsMedia';
 
 // Everything the screen shows about one item. The item itself is fetched first and rendered
@@ -96,57 +93,40 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 	// Counts Next Up requests, so an older answer that lands late can't replace a newer one.
 	const nextUpRequestRef = useRef(0);
 
-	// The screen of this title as it was kept when it last finished loading, when nothing it was made from has changed, so it
-	// opens whole in the first frame. Anything else starts from the row it was opened from, as before.
-	const [restored] = useState(() => {
-		if (skip) return null;
-		const kept = readDetails(detailsKey(effectiveServerUrl, getUserId(), itemId, settings), initialItem);
-		return kept && !isBlockedNow(kept.item) ? kept : null;
-	});
-	const r = restored || {};
-	// What the first render drew from, which the first run of the load takes as it is rather than asking again
-	const mountedFromRef = useRef(restored);
-
-	const [item, setItem] = useState(() => (restored ? restored.item : seedToShow(initialItem, itemId)));
+	const [item, setItem] = useState(() => seedToShow(initialItem, itemId));
 	// Whether what is on screen is still the row it was opened from rather than the record
 	// the server holds, which is what the buttons are properly built from.
-	const [isSeed, setIsSeed] = useState(() => !restored && Boolean(seedToShow(initialItem, itemId)));
+	const [isSeed, setIsSeed] = useState(() => Boolean(seedToShow(initialItem, itemId)));
 	const [isBlocked, setIsBlocked] = useState(false);
-	const [seasons, setSeasons] = useState(r.seasons || []);
-	const [episodes, setEpisodes] = useState(r.episodes || []);
-	const [seriesEpisodes, setSeriesEpisodes] = useState(r.seriesEpisodes || []);
-	const [similar, setSimilar] = useState(r.similar || []);
-	const [similarLoaded, setSimilarLoaded] = useState(Boolean(restored));
+	const [seasons, setSeasons] = useState([]);
+	const [episodes, setEpisodes] = useState([]);
+	const [seriesEpisodes, setSeriesEpisodes] = useState([]);
+	const [similar, setSimilar] = useState([]);
+	const [similarLoaded, setSimilarLoaded] = useState(false);
 	// Whether the lists Play picks from have come in, which is what an automatic start waits on.
-	const [playListsLoaded, setPlayListsLoaded] = useState(Boolean(restored));
-	const [extras, setExtras] = useState(r.extras || []);
-	const [cast, setCast] = useState(r.cast || []);
-	const [nextUp, setNextUp] = useState(r.nextUp || []);
+	const [playListsLoaded, setPlayListsLoaded] = useState(false);
+	const [extras, setExtras] = useState([]);
+	const [cast, setCast] = useState([]);
+	const [nextUp, setNextUp] = useState([]);
 	const [nextEpisode, setNextEpisode] = useState(null);
 	const [collectionItems, setCollectionItems] = useState([]);
 	// Every title in the collection, unpaged and without people, which Play and Shuffle take.
 	const [collectionMembers, setCollectionMembers] = useState([]);
 	const [missingCollectionItems, setMissingCollectionItems] = useState([]);
-	const [parentCollections, setParentCollections] = useState(r.parentCollections || []);
-	const [similarSource, setSimilarSource] = useState(r.similarSource || 'jellyfin');
+	const [parentCollections, setParentCollections] = useState([]);
+	const [similarSource, setSimilarSource] = useState('jellyfin');
 	const [albumTracks, setAlbumTracks] = useState([]);
 	const [artistAlbums, setArtistAlbums] = useState([]);
 	const [playlistItems, setPlaylistItems] = useState([]);
 	const [collectionSort, setCollectionSort] = useState(DEFAULT_SORT);
 	const [collectionCustomOrder, setCollectionCustomOrder] = useState([]);
 	const [collectionPlaylistLoading, setCollectionPlaylistLoading] = useState(false);
-	const [isLoading, setIsLoading] = useState(() => !restored && !seedToShow(initialItem, itemId));
-	const [episodeRatings, setEpisodeRatings] = useState(r.episodeRatings || {});
+	const [isLoading, setIsLoading] = useState(() => !seedToShow(initialItem, itemId));
+	const [episodeRatings, setEpisodeRatings] = useState({});
 
-	const [selectedVersionIndex, setSelectedVersionIndex] = useState(r.selectedVersionIndex || 0);
-	const [selectedAudioIndex, setSelectedAudioIndex] = useState(r.selectedAudioIndex || 0);
-	const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState(restored ? r.selectedSubtitleIndex : -1);
-	// What the kept screen is made of, read when the load has settled
-	const latestRef = useRef({});
-	latestRef.current = {
-		item, isSeed, isLoading, playListsLoaded, similarLoaded, seasons, episodes, seriesEpisodes, similar, similarSource, extras, cast,
-		nextUp, parentCollections, episodeRatings, selectedVersionIndex, selectedAudioIndex, selectedSubtitleIndex
-	};
+	const [selectedVersionIndex, setSelectedVersionIndex] = useState(0);
+	const [selectedAudioIndex, setSelectedAudioIndex] = useState(0);
+	const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState(-1);
 
 	const loadMoreCollectionItems = useCallback(async () => {
 		if (collectionLoadingRef.current || !collectionHasMoreRef.current) return;
@@ -261,38 +241,6 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 		// The Seerr pass is the one thing here that settles after the load has moved
 		// on, so its answer is dropped when the screen already shows something else.
 		let cancelled = false;
-		let stopKeeping = () => {};
-		// Reading the title again behind a kept screen that is already on screen, which changes nothing until the answers land
-		let quiet = false;
-
-		// The screen of this title as it was kept, which is taken back whole while nothing it was made from has changed
-		const key = detailsKey(effectiveServerUrl, getUserId(), itemId, settingsRef.current);
-		const drawn = mountedFromRef.current;
-		mountedFromRef.current = null;
-		const kept = drawn && drawn.item?.Id === itemId ? drawn : readDetails(key, seedRef.current);
-		if (kept && !isBlockedNow(kept.item)) {
-			setItem(kept.item);
-			setIsSeed(false);
-			setIsLoading(false);
-			setSelectedVersionIndex(kept.selectedVersionIndex || 0);
-			setSelectedAudioIndex(kept.selectedAudioIndex || 0);
-			setSelectedSubtitleIndex(kept.selectedSubtitleIndex ?? -1);
-			setSeasons(kept.seasons || []);
-			setEpisodes(kept.episodes || []);
-			setSeriesEpisodes(kept.seriesEpisodes || []);
-			setSimilar(kept.similar || []);
-			setSimilarSource(kept.similarSource);
-			setExtras(kept.extras || []);
-			setCast(kept.cast || []);
-			setNextUp(kept.nextUp || []);
-			setParentCollections(kept.parentCollections || []);
-			setEpisodeRatings(kept.episodeRatings || {});
-			setSimilarLoaded(true);
-			setPlayListsLoaded(true);
-			// A screen kept a while ago, or before something else was played, is read again behind what is drawn
-			if (kept.fresh) return () => { cancelled = true; };
-			quiet = true;
-		}
 
 		const refuse = () => {
 			setItem(null);
@@ -308,9 +256,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				return;
 			}
 			const seed = rowCopy && seedIsDecided(rowCopy) ? rowCopy : null;
-			if (quiet) {
-				// the kept screen is up and stays up
-			} else if (seed) {
+			if (seed) {
 				setItem(tagWithServerInfo(seed));
 				setIsSeed(true);
 				setIsLoading(false);
@@ -324,8 +270,6 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				data = await withProbedSources(effectiveApi, await effectiveApi.getItemForDetail(itemId));
 			} catch (err) {
 				console.error('[Details] Error loading item', err);
-				// the title is gone from the server, so what was kept of it is not kept any longer
-				if (quiet && err?.status === 404) dropKeptScreen(key);
 				setIsSeed(false);
 				setIsLoading(false);
 				return;
@@ -342,10 +286,10 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			observeItem(data);
 
 			setItem(tagWithServerInfo(data));
-			if (!quiet) setSelectedVersionIndex(0);
+			setSelectedVersionIndex(0);
 			// Kept whole, because the screens split this into cast and crew and
 			// capping here would drop the crew off the end of a long list.
-			if (!quiet && data.People?.length > 0) {
+			if (data.People?.length > 0) {
 				setCast(data.Type === 'Episode'
 					? mergeEpisodePeople({episodePeople: data.People, parentActors: []})
 					: data.People);
@@ -357,19 +301,6 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			// episodes with it.
 			const fallbackRating = data.OfficialRating;
 
-			// Whether anything the rows asked for failed, which keeps this screen from being kept as if it had finished
-			let rowsFailed = false;
-			let picksFailed = false;
-			let picksDone = false;
-			const noteRowFailed = () => {
-				rowsFailed = true;
-				return null;
-			};
-			const noteListFailed = () => {
-				rowsFailed = true;
-				return [];
-			};
-			let bgDone = false;
 			const bg = async () => {
 				let boxSetMembers = [];
 				if (data.Type === 'Series') {
@@ -380,14 +311,12 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					const wantsEpisodes = ['v4', 'v5', 'v6', 'v7', 'v9'].indexOf(style) >= 0;
 					const nextUpRequest = ++nextUpRequestRef.current;
 					const [seasonsData, nextUpData, episodesData] = await Promise.all([
-						effectiveApi.getSeasons(itemId).catch(noteRowFailed),
-						effectiveApi.getNextUp(1, itemId).catch(noteRowFailed),
-						wantsEpisodes ? effectiveApi.getEpisodes(itemId).catch(noteRowFailed) : null
+						effectiveApi.getSeasons(itemId).catch(() => null),
+						effectiveApi.getNextUp(1, itemId).catch(() => null),
+						wantsEpisodes ? effectiveApi.getEpisodes(itemId).catch(() => null) : null
 					]);
 					if (seasonsData) setSeasons(tagWithServerInfo(withoutBlockedItems(seasonsData.Items || [], fallbackRating)));
 					if (nextUpData?.Items?.length > 0 && nextUpRequest === nextUpRequestRef.current) setNextUp(tagWithServerInfo(nextUpData.Items));
-					// a kept screen whose series has nothing left to watch no longer shows a next up
-					else if (quiet && nextUpData && nextUpRequest === nextUpRequestRef.current) setNextUp([]);
 					if (episodesData) setSeriesEpisodes(tagWithServerInfo(withoutBlockedItems(episodesData.Items || [], fallbackRating)));
 				}
 
@@ -399,7 +328,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 							setCast(mergeEpisodeCast({episodeActors: data.People || [], parentActors}));
 						});
 					}
-					const episodesData = await effectiveApi.getEpisodes(data.SeriesId, data.Id).catch(noteRowFailed);
+					const episodesData = await effectiveApi.getEpisodes(data.SeriesId, data.Id).catch(() => null);
 					if (cancelled) return;
 					if (episodesData) setEpisodes(tagWithServerInfo(withoutBlockedItems(episodesData.Items || [], fallbackRating)));
 				}
@@ -423,9 +352,9 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					});
 					const [seasonData, seriesData] = await Promise.all([
 						data.SeriesId && seasonId
-							? effectiveApi.getEpisodes(data.SeriesId, seasonId).catch(noteRowFailed)
+							? effectiveApi.getEpisodes(data.SeriesId, seasonId).catch(() => null)
 							: null,
-						wantsWholeSeries ? effectiveApi.getEpisodes(data.SeriesId).catch(noteRowFailed) : null
+						wantsWholeSeries ? effectiveApi.getEpisodes(data.SeriesId).catch(() => null) : null
 					]);
 					if (cancelled) return;
 					if (seasonData) setEpisodes(tagWithServerInfo(withoutBlockedItems(seasonData.Items || [], fallbackRating)));
@@ -441,7 +370,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 							ParentId: data.Id,
 							...COLLECTION_TITLES_QUERY,
 							Fields: 'PrimaryImageAspectRatio,ProductionYear,ProviderIds'
-						}).catch(noteRowFailed),
+						}).catch(() => null),
 						readCollectionTitles(titlesRef.current)
 					]);
 					if (cancelled) return;
@@ -464,8 +393,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 
 				if (data.Type === 'MusicAlbum') {
 					const [tracksData, albumSimilarData] = await Promise.all([
-						effectiveApi.getAlbumTracks(data.Id).catch(noteRowFailed),
-						effectiveApi.getSimilar(itemId).catch(noteRowFailed)
+						effectiveApi.getAlbumTracks(data.Id).catch(() => null),
+						effectiveApi.getSimilar(itemId).catch(() => null)
 					]);
 					if (tracksData) setAlbumTracks(tagWithServerInfo(withoutBlockedItems(tracksData.Items || [])));
 					if (albumSimilarData) setSimilar(tagWithServerInfo(withoutBlockedItems(albumSimilarData.Items || [])));
@@ -473,15 +402,15 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 
 				if (data.Type === 'MusicArtist') {
 					const [albumsData, artistSimilarData] = await Promise.all([
-						effectiveApi.getAlbumsByArtist(data.Id).catch(noteRowFailed),
-						effectiveApi.getSimilar(itemId).catch(noteRowFailed)
+						effectiveApi.getAlbumsByArtist(data.Id).catch(() => null),
+						effectiveApi.getSimilar(itemId).catch(() => null)
 					]);
 					if (albumsData) setArtistAlbums(tagWithServerInfo(withoutBlockedItems(albumsData.Items || [])));
 					if (artistSimilarData) setSimilar(tagWithServerInfo(withoutBlockedItems(artistSimilarData.Items || [])));
 				}
 
 				if (data.Type === 'Playlist') {
-					const entries = await fetchAllPlaylistItems(effectiveApi, data.Id).catch(noteRowFailed);
+					const entries = await fetchAllPlaylistItems(effectiveApi, data.Id).catch(() => null);
 					if (entries) setPlaylistItems(tagWithServerInfo(withoutBlockedItems(entries)));
 				}
 
@@ -502,17 +431,17 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					const currentSettings = settingsRef.current;
 					const source = currentSettings?.recommendationSystemSource || 'local';
 					const canScore = scoringRef.current && !!effectiveApi.getMoonfinSimilar;
-					const stock = () => effectiveApi.getSimilar(itemId, SIMILAR_LIMIT, 'moonfin').catch(noteRowFailed);
-					const scored = () => effectiveApi.getMoonfinSimilar(itemId, SIMILAR_LIMIT).catch(noteRowFailed);
+					const stock = () => effectiveApi.getSimilar(itemId, SIMILAR_LIMIT, 'moonfin').catch(() => null);
+					const scored = () => effectiveApi.getMoonfinSimilar(itemId, SIMILAR_LIMIT).catch(() => null);
 					const localScored = () => (canScoreSeedLocally(data)
-						? getRecommendations(effectiveApi, data, {includeWatched: true, limit: SIMILAR_LIMIT}).catch(noteListFailed)
+						? getRecommendations(effectiveApi, data, {includeWatched: true, limit: SIMILAR_LIMIT}).catch(() => [])
 						: Promise.resolve([]));
 
 					if (source === 'server') return {data: await stock(), source: 'jellyfin'};
 
 					if (source === 'online') {
 						const onlineLanguage = await currentMetadataLanguage().catch(() => null);
-						const onlineCards = await getOnlineRecommendations(data, onlineLanguage).catch(noteListFailed);
+						const onlineCards = await getOnlineRecommendations(data, onlineLanguage).catch(() => []);
 						if (onlineCards.length) return {data: {Items: onlineCards}, source: 'tmdb'};
 					}
 
@@ -534,16 +463,16 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						if (localRecs.length) return {data: {Items: localRecs}, source: 'moonfin'};
 					}
 
-					return {data: await effectiveApi.getSimilar(itemId, SIMILAR_LIMIT).catch(noteRowFailed), source: 'jellyfin'};
+					return {data: await effectiveApi.getSimilar(itemId, SIMILAR_LIMIT).catch(() => null), source: 'jellyfin'};
 				};
 
 				// Older servers have to ask every collection what it holds, so the rest isnt kept
 				// waiting on that.
-				const collectionsLookup = needsBoxSet ? findParentCollections(effectiveApi, data).catch(noteListFailed) : Promise.resolve([]);
+				const collectionsLookup = needsBoxSet ? findParentCollections(effectiveApi, data).catch(() => []) : Promise.resolve([]);
 				const [similarResult, extrasData, partsData] = await Promise.all([
 					fetchSimilar(),
-					needsExtras ? effectiveApi.getSpecialFeatures(itemId).catch(noteRowFailed) : Promise.resolve(null),
-					needsExtras && data.PartCount > 1 ? effectiveApi.getAdditionalParts(itemId).catch(noteRowFailed) : Promise.resolve(null)
+					needsExtras ? effectiveApi.getSpecialFeatures(itemId).catch(() => null) : Promise.resolve(null),
+					needsExtras && data.PartCount > 1 ? effectiveApi.getAdditionalParts(itemId).catch(() => null) : Promise.resolve(null)
 				]);
 
 				if (similarResult?.data) {
@@ -566,7 +495,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						// A box set has no people of its own, so its Cast card pools them from
 						// everything inside it.
 						Fields: 'PrimaryImageAspectRatio,ProductionYear,ProviderIds,People'
-					}).catch(noteRowFailed);
+					}).catch(() => null);
 					// A collection holding nothing but the title being looked at says nothing.
 					const members = withoutBlockedItems(colData?.Items || []);
 					if (members.length <= 1) continue;
@@ -603,7 +532,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 					setCollectionPlaylistLoading(true);
 					const [scanned, saved] = await Promise.all([
 						buildCollectionIndex(effectiveApi, itemId),
-						Promise.resolve(effectiveApi.getCollectionOrder?.(itemId)).catch(noteRowFailed)
+						Promise.resolve(effectiveApi.getCollectionOrder?.(itemId)).catch(() => null)
 					]);
 					if (cancelled || generation !== playlistGenerationRef.current) return;
 					// A scan that finds nothing leaves the collection's own playable members to stand in.
@@ -619,38 +548,12 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 				}
 
 				if (data.Type === 'Person') {
-					const filmography = await effectiveApi.getItemsByPerson(itemId, 50).catch(noteRowFailed);
+					const filmography = await effectiveApi.getItemsByPerson(itemId, 50).catch(() => null);
 					if (filmography) setSimilar(tagWithServerInfo(withPersonRoles(withoutBlockedItems(filmography.Items || []), itemId)));
 				}
-				bgDone = true;
 			};
 
 			bg().catch(() => {});
-
-			// Once the rows and the track picks are all in, the screen is kept for the next time this title is opened. A
-			// title in a collection that Seerr is asked about for its missing titles is left out, since those arrive later.
-			const openedFrom = seedFrom(seedRef.current, itemId);
-			let keepTimer = null;
-			stopKeeping = () => { if (keepTimer) clearTimeout(keepTimer); };
-			const keepWhenSettled = (tries) => {
-				if (cancelled || !isCacheableType(data)) return;
-				if (rowsFailed || picksFailed) return;
-				const now = latestRef.current;
-				if (bgDone && picksDone && !now.isSeed && !now.isLoading && now.item?.Id === data.Id) {
-					if (now.parentCollections.length > 0 && seerrEnabledRef.current) return;
-					saveDetails(key, {
-						item: now.item, seasons: now.seasons, episodes: now.episodes, seriesEpisodes: now.seriesEpisodes, similar: now.similar,
-						similarSource: now.similarSource, extras: now.extras, cast: now.cast, nextUp: now.nextUp, parentCollections: now.parentCollections,
-						episodeRatings: now.episodeRatings, selectedVersionIndex: now.selectedVersionIndex, selectedAudioIndex: now.selectedAudioIndex,
-						selectedSubtitleIndex: now.selectedSubtitleIndex
-					}, openedFrom);
-					// its picture is read ahead too, so opening the screen again draws it at once
-					warmDetailsBackdrop(now.item, effectiveServerUrl, settingsRef.current);
-					return;
-				}
-				if (tries < 40) keepTimer = setTimeout(() => keepWhenSettled(tries + 1), 150);
-			};
-			keepTimer = setTimeout(() => keepWhenSettled(0), 300);
 
 			// A pick that cannot be read (storage, the plugin) leaves the tracks at their defaults rather than the screen as a seed
 			try {
@@ -687,8 +590,7 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						audioPos = initAudioStreams.findIndex(s => s.Index === ms.DefaultAudioStreamIndex);
 					}
 					if (cancelled) return;
-					// a screen read again behind a kept one leaves the picks that are on it, which the viewer may have changed
-					if (!quiet && audioPos >= 0) setSelectedAudioIndex(audioPos);
+					if (audioPos >= 0) setSelectedAudioIndex(audioPos);
 					// Show the track playback will start on as active, picked the way the player picks it: the remembered pick for
 					// this episode or its series first, then the subtitle mode and languages from Settings.
 					const subtitlePos = await detailsSubtitlePosition(data, ms, settingsRef.current, initAudioStreams[Math.max(0, audioPos)]);
@@ -701,18 +603,14 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 						tracks: (ms.MediaStreams || []).filter(s => s.Type === 'Subtitle').map(s => `${s.Index}:${s.Language || '?'}${s.IsDefault ? ':default' : ''}${s.IsForced ? ':forced' : ''}`),
 						picked: subtitlePos
 					});
-					if (!quiet) setSelectedSubtitleIndex(subtitlePos);
+					setSelectedSubtitleIndex(subtitlePos);
 				} else {
-					if (!quiet) {
-						setSelectedAudioIndex(0);
-						setSelectedSubtitleIndex(-1);
-					}
+					setSelectedAudioIndex(0);
+					setSelectedSubtitleIndex(-1);
 				}
 			} catch (err) {
-				picksFailed = true;
 				console.warn('[Details] Could not pick the tracks', err);
 			}
-			picksDone = true;
 			// Still a seed until the picked tracks above are in, or the track buttons read their
 			// unset defaults (Subtitle: Off) for as long as the prefs take to come back.
 			if (cancelled) return;
@@ -720,11 +618,8 @@ const useDetailsItem = ({itemId, initialItem, effectiveApi, effectiveServerUrl, 
 			setIsLoading(false);
 		};
 		loadItem();
-		return () => {
-			cancelled = true;
-			stopKeeping();
-		};
-	}, [effectiveApi, effectiveServerUrl, itemId, tagWithServerInfo, skip, startCollectionPlaylist, readCollectionTitles]);
+		return () => { cancelled = true; };
+	}, [effectiveApi, itemId, tagWithServerInfo, skip, startCollectionPlaylist, readCollectionTitles]);
 
 	const chooseCollectionSort = useCallback((option) => {
 		if (option === collectionSortRef.current) return;
