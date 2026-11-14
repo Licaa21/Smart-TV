@@ -1,4 +1,4 @@
-import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
+import {useLayoutEffect, useState, useEffect, useCallback, useRef, useMemo} from 'react';
 import Spotlight from '@enact/spotlight';
 import Button from '@enact/sandstone/Button';
 import $L from '@enact/i18n/$L';
@@ -19,6 +19,7 @@ import {KEYS, isBackKey, isMediaKey, remoteShortcut} from '../../utils/keys';
 import {trackShortcutAction} from './trackShortcut';
 import {isTvKeyboardVisible} from '../../components/TVKeyboard/keyboardBus';
 import {playerClockStale, playerClockWanted} from '../../utils/playerClock';
+import {concealControlsNow, revealControlsNow} from '../../utils/revealControlsNow';
 import {blockedKeysReport} from '../../utils/blockedKeys';
 import {isPreroll, nextInQueue, shouldAutoAdvance} from '../../utils/cinemaMode';
 import {driftMs, needsSeek, correctionOptions, partyHoldBackMs, DRIFT_CHECK_MS, GROUP_SEEK_SETTLE_TIMEOUT_MS, PARTY_LANDING_READ_MS,
@@ -272,6 +273,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	const controlsVisibleRef = useRef(false);
 	controlsVisibleRef.current = controlsVisible;
 	const [activeModal, setActiveModal] = useState(null);
+	const shownModalRef = useRef(null);
+	shownModalRef.current = activeModal;
+	const revealReconcileRef = useRef(null);
+	// Every draw of the player puts the controls' class right against its state, since React never removes a class it did not add
+	useLayoutEffect(() => {
+		concealControlsNow(css.visible, controlsVisible && !activeModal);
+	}, [controlsVisible, activeModal]);
+	useEffect(() => () => {
+		if (revealReconcileRef.current) clearTimeout(revealReconcileRef.current);
+	}, []);
 	// Read by the time update, which runs from an interval or a media event and so sees no fresh state.
 	const episodesOpenRef = useRef(false);
 	episodesOpenRef.current = activeModal === 'episodes';
@@ -2611,6 +2622,16 @@ const Player = ({item, resume, initialMediaSourceId, initialAudioIndex, initialS
 	// ==============================
 	const showControls = useCallback((isModalOpen = activeModal) => {
 		if (!controlsVisibleRef.current && !isAudioMode && !isLiveTV) setFocusRow('progress');
+		// the controls come up with the key, not after the player has drawn again
+		if (!isModalOpen && revealControlsNow(css.visible)) {
+			// what the state says wins: a hide in the same press, which changes nothing the render sees, must not leave the
+			// class behind (a dialog in the same press is put right when the player draws, below)
+			if (revealReconcileRef.current) clearTimeout(revealReconcileRef.current);
+			revealReconcileRef.current = setTimeout(() => {
+				revealReconcileRef.current = null;
+				concealControlsNow(css.visible, controlsVisibleRef.current && !shownModalRef.current);
+			}, 1200);
+		}
 		setControlsVisible(true);
 		if (controlsTimeoutRef.current) {
 			clearTimeout(controlsTimeoutRef.current);

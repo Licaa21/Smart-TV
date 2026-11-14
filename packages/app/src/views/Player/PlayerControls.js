@@ -149,6 +149,8 @@ const PlayerControls = ({
 	const controlsShown = controlsVisible && !activeModal;
 	// White reads far brighter next to an HDR picture. Opacity is the cheap way to tone it down on a raster bound set.
 	const hdrDimming = controlsShown && isHdrContent ? settings.hdrControlsDimming : 0;
+	// controls that dim in HDR draw their own opacity, so they are left to the render and not shown ahead of it
+	const dimsInHdr = Boolean(isHdrContent && settings.hdrControlsDimming > 0);
 
 	const subtitleSlotLabel = (index) => {
 		const stream = subtitleStreams.find((s) => s.index === index);
@@ -283,6 +285,7 @@ const PlayerControls = ({
 	return (
 		<>
 			<div
+				data-player-controls={isAudioMode ? 'audio' : dimsInHdr ? 'dimmed' : 'video'}
 				className={`${css.playerControls} ${controlsShown ? css.visible : ''} ${isAudioMode ? css.audioControls : ''}`}
 				style={hdrDimming > 0 ? {opacity: 1 - hdrDimming / 100} : undefined}
 			>

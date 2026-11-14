@@ -80,6 +80,11 @@
 	pointer-events: all;
 }
 
+// they come up at once and still fade away, so the fade belongs to the hidden state alone
+.playerControls.visible:not(.audioControls) {
+	transition: none;
+}
+
 .playerControls:not(.audioControls) {
 	background: rgba(0, 0, 0, 0.3);
 }
