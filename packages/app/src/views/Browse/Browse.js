@@ -52,7 +52,8 @@ import {glideScroll, isGliding, smoothScrollingOn, stopScrollAnimation} from '..
 import {writingGlide} from '../../utils/glideState';
 import {homeRowSpacing, isCarouselRow} from '../../components/MediaCard/modernCardLayout';
 import {rowImageType, rowPeekHeight} from './rowPeek';
-import {pickPrefetchTargets, setPrefetchTargets} from '../../utils/detailsPrefetchTargets';
+import {pickBackdropTargets, pickPrefetchTargets, setPrefetchTargets} from '../../utils/detailsPrefetchTargets';
+import {decodeDetailsBackdrop, feedBackdrops, stopFeedingBackdrops} from '../../utils/detailsBackdrop';
 
 import css from './Browse.module.less';
 
@@ -249,6 +250,8 @@ const Browse = ({
 		showTopInfoArea,
 		useModernRows,
 		navbarPosition: settings.navbarPosition,
+		serverUrl,
+		settings,
 		onFocusItemThemeMusic,
 		onBlurItemThemeMusic,
 		onUnfocusItemThemeMusic
@@ -337,9 +340,14 @@ const Browse = ({
 	// What Home shows of Continue Watching and Next Up is what gets its details screens filled in ahead of time
 	useEffect(() => {
 		setPrefetchTargets(pickPrefetchTargets(filteredRows));
-	}, [filteredRows]);
+		// and the backdrop behind every card of those rows is read ahead, so any of them opens on its picture
+		feedBackdrops(pickBackdropTargets(filteredRows), serverUrl, settings);
+	}, [filteredRows, serverUrl, settings.backdropBlurDetail, settings.detailsBackdropEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 	// Home going away (sign out, another account) takes its titles with it, so nothing is filled in for them
-	useEffect(() => () => setPrefetchTargets([]), []);
+	useEffect(() => () => {
+		setPrefetchTargets([]);
+		stopFeedingBackdrops();
+	}, []);
 	const handleJoinParty = useCallback(async (room) => {
 		if (room.kind === 'syncplay') {
 			if (await joinSyncPlayGroup(room.roomId)) openSyncPlayDialog();
@@ -965,14 +973,16 @@ const Browse = ({
 			clearTimeout(backdropTimerRef.current);
 			backdropTimerRef.current = setTimeout(() => setFocusedItemForBackdrop(item), BACKDROP_SETTLE_MS);
 		}
-		// The theme belongs to the title. An episode or a season of a series plays the series' theme, so the
-		// Continue Watching and Next Up rows have one, and the next episode of the same show keeps it going.
-		// A library title that a TMDB or Seerr row swapped in keeps its real Id, and so its theme. One that is only
-		// on TMDB or Seerr has no theme to fetch.
 		// Home stays mounted under the screens opened from it, and a focus landing on a card while one of them (or Settings) is up,
 		// as the app comes back to the front or Home restores its card, is not the viewer choosing it: it must neither start
 		// its theme nor end the one the other screen is playing.
 		if (!isVisibleRef.current) return;
+		// The card in focus is the likeliest to be opened next, so the picture behind its details screen is decoded ahead
+		if (!item?._external && !item?._seerr) decodeDetailsBackdrop(item, item?._serverUrl || live.serverUrl, live.settings);
+		// The theme belongs to the title. An episode or a season of a series plays the series' theme, so the
+		// Continue Watching and Next Up rows have one, and the next episode of the same show keeps it going.
+		// A library title that a TMDB or Seerr row swapped in keeps its real Id, and so its theme. One that is only
+		// on TMDB or Seerr has no theme to fetch.
 		const notInLibrary = (item?._external || item?._seerr) && !item?._resolvedFromExternal;
 		const themeId = notInLibrary ? null
 			: (item?.Type === 'Movie' || item?.Type === 'Series') ? item.Id

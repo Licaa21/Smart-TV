@@ -63,15 +63,50 @@ const decoded = new Map();
 let heldBytes = 0;
 // The picture the focused card draws, which is never the one let go.
 let drawnUrl = null;
-// Pictures that are not let go for the card art that keeps coming (the backdrops of details screens kept to open at once).
-// The oldest pin is let go of when there are more than PINNED_MAX.
-const PINNED_MAX = 10;
-const pinned = new Set();
-export const pinArt = (url) => {
-	// pinned already: it keeps its place, so drawing a screen again does not shuffle the pins
-	if (pinned.has(url)) return;
-	pinned.add(url);
-	if (pinned.size > PINNED_MAX) pinned.delete(pinned.values().next().value);
+// Pictures that are not let go for the card art that keeps coming (the backdrops of the details screens that may be opened).
+// They have a budget of their own, apart from the one above, which counts only what is not pinned. A pin has an owner (the
+// cards of the Home rows, or the screens that were kept) and a rank, the lower the likelier the picture is to be opened (the
+// place of its card in Continue Watching), and one owner letting go of a picture leaves the other's pin. When there are more
+// than PINNED_MAX pictures pinned, or the held ones are over PINNED_MAX_BYTES, the one with the highest rank is let go of and
+// held like any other. A pin asked for with no rank is for a screen that was kept, ranked after every card of the rows, the
+// newer the lower.
+const PINNED_MAX = 120;
+const PINNED_MAX_BYTES = 24 * 1024 * 1024;
+const LOOSE_PIN_RANK = 1000000000;
+const pinned = new Map();
+let pinSeq = 0;
+const pinRank = (owners) => {
+	let best = Infinity;
+	owners.forEach((rank) => {
+		if (rank < best) best = rank;
+	});
+	return best;
+};
+const worstPin = (heldOnly) => {
+	let worst = null;
+	pinned.forEach((owners, key) => {
+		if (heldOnly && !held.has(key)) return;
+		const rank = pinRank(owners);
+		if (worst === null || rank > worst.rank) worst = {key, rank};
+	});
+	return worst;
+};
+export const pinArt = (url, rank, owner = 'screen') => {
+	const next = rank === undefined ? LOOSE_PIN_RANK - (pinSeq += 1) : rank;
+	let owners = pinned.get(url);
+	if (!owners) {
+		owners = new Map();
+		pinned.set(url, owners);
+	}
+	// an owner's rank is set outright, so a card that moved back in the row loses the better place it had
+	owners.set(owner, next);
+	while (pinned.size > PINNED_MAX) pinned.delete(worstPin(false).key);
+};
+export const unpinArt = (url, owner = 'screen') => {
+	const owners = pinned.get(url);
+	if (!owners) return;
+	owners.delete(owner);
+	if (owners.size === 0) pinned.delete(url);
 };
 
 // Art that came in the plain way, and addresses that are loaded that way for a while after a read failed.
@@ -133,7 +168,24 @@ const hold = (url, blob) => {
 	}
 	held.set(url, {blobUrl: URL.createObjectURL(blob), size: blob.size, blob});
 	heldBytes += blob.size;
-	while (held.size > 1 && (heldBytes > MAX_BYTES || held.size > MAX_HELD)) {
+	// the pins that are held have their own budget
+	let pinnedBytes = 0;
+	let pinnedCount = 0;
+	pinned.forEach((owners, key) => {
+		const entry = held.get(key);
+		if (entry) {
+			pinnedBytes += entry.size;
+			pinnedCount += 1;
+		}
+	});
+	while (pinnedBytes > PINNED_MAX_BYTES) {
+		const worst = worstPin(true);
+		if (!worst) break;
+		pinnedBytes -= held.get(worst.key).size;
+		pinnedCount -= 1;
+		pinned.delete(worst.key);
+	}
+	while (held.size > 1 && (heldBytes - pinnedBytes > MAX_BYTES || held.size - pinnedCount > MAX_HELD)) {
 		const oldest = [...held.keys()].find((key) => key !== drawnUrl && key !== url && !pinned.has(key));
 		if (oldest === undefined) break;
 		const entry = held.get(oldest);
@@ -210,10 +262,7 @@ const pumpDecode = () => {
 		const img = new window.Image();
 		img.src = entry.blobUrl;
 		decoded.set(url, {img, blobUrl: entry.blobUrl});
-		if (decoded.size > DECODED_MAX) {
-			const letGo = [...decoded.keys()].find((key) => !pinned.has(key));
-			if (letGo !== undefined) decoded.delete(letGo);
-		}
+		if (decoded.size > DECODED_MAX) decoded.delete(decoded.keys().next().value);
 		if (typeof img.decode === 'function') img.decode().then(() => finish(true), () => finish(false));
 		else finish(true);
 	} catch (err) {
