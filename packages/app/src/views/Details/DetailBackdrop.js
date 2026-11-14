@@ -1,5 +1,6 @@
 import {useSettings} from '../../context/SettingsContext';
 import {scrimStyle} from '../../utils/scrimImage';
+import {heldBackdrop} from '../../utils/detailsBackdrop';
 import {serverBlurredUrl} from '../../utils/serverBlur';
 
 import css from './Details.module.less';
@@ -17,7 +18,7 @@ const DetailBackdrop = ({backdropUrl, isPerson, blur}) => {
 			{backdropUrl && !isPerson && (
 				<div className={css.backdrop}>
 					<img
-						src={blurredUrl || backdropUrl}
+						src={heldBackdrop(blurredUrl || backdropUrl)}
 						className={css.backdropImage}
 						alt=""
 						style={!blurredUrl && blur > 0 ? {filter: `blur(${blur}px)`} : undefined}

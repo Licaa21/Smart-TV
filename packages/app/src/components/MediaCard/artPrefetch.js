@@ -63,6 +63,16 @@ const decoded = new Map();
 let heldBytes = 0;
 // The picture the focused card draws, which is never the one let go.
 let drawnUrl = null;
+// Pictures that are not let go for the card art that keeps coming (the backdrops of details screens kept to open at once).
+// The oldest pin is let go of when there are more than PINNED_MAX.
+const PINNED_MAX = 10;
+const pinned = new Set();
+export const pinArt = (url) => {
+	// pinned already: it keeps its place, so drawing a screen again does not shuffle the pins
+	if (pinned.has(url)) return;
+	pinned.add(url);
+	if (pinned.size > PINNED_MAX) pinned.delete(pinned.values().next().value);
+};
 
 // Art that came in the plain way, and addresses that are loaded that way for a while after a read failed.
 const ART_MEMORY = 200;
@@ -124,7 +134,7 @@ const hold = (url, blob) => {
 	held.set(url, {blobUrl: URL.createObjectURL(blob), size: blob.size, blob});
 	heldBytes += blob.size;
 	while (held.size > 1 && (heldBytes > MAX_BYTES || held.size > MAX_HELD)) {
-		const oldest = [...held.keys()].find((key) => key !== drawnUrl && key !== url);
+		const oldest = [...held.keys()].find((key) => key !== drawnUrl && key !== url && !pinned.has(key));
 		if (oldest === undefined) break;
 		const entry = held.get(oldest);
 		held.delete(oldest);
@@ -200,7 +210,10 @@ const pumpDecode = () => {
 		const img = new window.Image();
 		img.src = entry.blobUrl;
 		decoded.set(url, {img, blobUrl: entry.blobUrl});
-		if (decoded.size > DECODED_MAX) decoded.delete(decoded.keys().next().value);
+		if (decoded.size > DECODED_MAX) {
+			const letGo = [...decoded.keys()].find((key) => !pinned.has(key));
+			if (letGo !== undefined) decoded.delete(letGo);
+		}
 		if (typeof img.decode === 'function') img.decode().then(() => finish(true), () => finish(false));
 		else finish(true);
 	} catch (err) {

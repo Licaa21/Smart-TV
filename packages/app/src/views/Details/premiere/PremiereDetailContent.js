@@ -25,6 +25,7 @@ import {premiereDim, premiereNeighbour, premiereScrim} from './premiereRules';
 
 import stageCss from '../stage/StageDetailContent.module.less';
 import css from './PremiereDetailContent.module.less';
+import {heldBackdrop} from '../../../utils/detailsBackdrop';
 
 // The title centered over its backdrop, filling the first screen, with the buttons and ratings
 // under it. Every other part of the page is a framed section further down, each its own stop for
@@ -190,7 +191,7 @@ const PremiereScreen = (props) => {
 		>
 			<div className={css.hero}>
 				<div className={css.backdrop}>
-					{backdropShown && <img className={css.backdropImage} src={backdropUrl} alt="" />}
+					{backdropShown && <img className={css.backdropImage} src={heldBackdrop(backdropUrl)} alt="" />}
 					<div className={css.scrim} style={scrimStyle(scrim)} />
 				</div>
 				<div className={css.heroText}>

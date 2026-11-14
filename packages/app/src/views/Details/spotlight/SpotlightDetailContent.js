@@ -34,6 +34,7 @@ import useCollectionSort from '../useCollectionSort';
 import {sortLabel} from '../nouveau/nouveauCollectionSort';
 import NouveauSortDialog from '../nouveau/sections/NouveauSortDialog';
 import css from './SpotlightDetailContent.module.less';
+import {heldBackdrop} from '../../../utils/detailsBackdrop';
 
 const BandContainer = SpotlightContainerDecorator({enterTo: 'last-focused'}, 'div');
 
@@ -373,7 +374,7 @@ const SpotlightDetailContent = (props) => {
 	return (
 		<>
 			<div className={`${css.backdrop} ${isPerson ? css.backdropPerson : ''}`} style={backdropStyle}>
-				{settings.detailsBackdropEnabled !== false && backdropUrl && <img className={css.backdropImage} src={backdropUrl} alt="" />}
+				{settings.detailsBackdropEnabled !== false && backdropUrl && <img className={css.backdropImage} src={heldBackdrop(backdropUrl)} alt="" />}
 				<div className={css.scrim} style={scrimStyle(SCRIM, backdropStyle['--gradient-scale'])} />
 			</div>
 			<div className={`${css.page} ${settings.navbarPosition === 'left' ? css.sidebarOffset : css.topbarOffset}`} onFocus={keepFocusInView}>

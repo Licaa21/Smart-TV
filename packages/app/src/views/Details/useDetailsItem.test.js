@@ -19,10 +19,12 @@ jest.mock('../../services/parentalControls', () => ({
 	getBlockedRatings: () => [], getBlockedSeriesIds: () => []
 }));
 jest.mock('./parentCollection', () => ({findParentCollections: () => Promise.resolve([])}));
+jest.mock('../../utils/detailsBackdrop', () => ({warmDetailsBackdrop: jest.fn()}));
 
 import * as userDataSync from '../../services/userDataSync';
 import useDetailsItem from './useDetailsItem';
 import {clearDetailsCache} from './detailsCache';
+import {warmDetailsBackdrop} from '../../utils/detailsBackdrop';
 
 const SERIES = {Id: 'series', Type: 'Series', Name: 'Show'};
 const episode = (id, userData = {}) => ({Id: id, Type: 'Episode', SeriesId: 'series', UserData: userData});
@@ -262,5 +264,13 @@ describe('a title opened again', () => {
 		renderMovie(api, {...MOVIE});
 		await settle();
 		expect(api.getItemForDetail.mock.calls.length).toBe(count + 1);
+	});
+
+	test('has the picture behind a screen read ahead once the screen is kept', async () => {
+		warmDetailsBackdrop.mockClear();
+		const api = movieApi();
+		await loadAndKeep(api, {...MOVIE});
+		expect(warmDetailsBackdrop).toHaveBeenCalledTimes(1);
+		expect(warmDetailsBackdrop.mock.calls[0][0].Id).toBe('movie');
 	});
 });

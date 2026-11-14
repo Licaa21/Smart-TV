@@ -50,6 +50,7 @@ import {scrimStyle} from '../../../utils/scrimImage';
 
 import sectionsCss from './sections/NouveauSections.module.less';
 import css from './NouveauDetailContent.module.less';
+import {heldBackdrop} from '../../../utils/detailsBackdrop';
 
 // Nouveau puts everything on one page. The backdrop sits behind, the hero sits at the top, and
 // every section follows it down the page as its own band rather than hiding behind a tab or a card.
@@ -862,7 +863,7 @@ const NouveauDetailContent = (props) => {
 				className={`${css.backdrop} ${isPerson ? css.backdropPerson : ''}`}
 				style={backdropStyle}
 			>
-				{settings.detailsBackdropEnabled !== false && backdropUrl && <img className={css.backdropImage} src={backdropUrl} alt="" />}
+				{settings.detailsBackdropEnabled !== false && backdropUrl && <img className={css.backdropImage} src={heldBackdrop(backdropUrl)} alt="" />}
 				<div className={css.scrim} style={scrimStyle(SCRIM, backdropStyle['--gradient-scale'])} />
 			</div>
 			<div ref={scrollerRef} className={css.scroller}>

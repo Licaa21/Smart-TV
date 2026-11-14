@@ -39,6 +39,7 @@ import {
 } from './frostRules';
 
 import css from './FrostDetailContent.module.less';
+import {heldBackdrop} from '../../../utils/detailsBackdrop';
 
 // The title floats in a glass window over a blurred, dimmed copy of its own art. The buttons sit in a
 // toolbar over the window's foot, with the title's parts in a bar of tabs under it. A title that's
@@ -632,7 +633,7 @@ const FrostScreen = (props) => {
 				{backdropShown && (
 					<img
 						className={css.environmentImage}
-						src={blurredUrl || backdropUrl}
+						src={heldBackdrop(blurredUrl || backdropUrl)}
 						alt=""
 						style={blurredUrl ? undefined : {filter: `blur(${ENVIRONMENT_BLUR}px)`}}
 					/>
@@ -642,7 +643,7 @@ const FrostScreen = (props) => {
 			<div className={css.stage} style={frostStageStyle(navbarTop)}>
 				<div className={css.window}>
 					<div className={`${css.art} ${shownTab === 'overview' ? '' : css.artHidden}`}>
-						{backdropShown && <img className={css.artImage} src={backdropUrl} alt="" />}
+						{backdropShown && <img className={css.artImage} src={heldBackdrop(backdropUrl)} alt="" />}
 						<div className={css.artFade} style={scrimStyle(scrims.artFade)} />
 					</div>
 					{shownTab !== 'overview' && (

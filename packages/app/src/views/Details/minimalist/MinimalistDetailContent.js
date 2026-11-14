@@ -14,6 +14,7 @@ import {
 } from './minimalistRules';
 
 import css from './MinimalistDetailContent.module.less';
+import {heldBackdrop} from '../../../utils/detailsBackdrop';
 
 // The smallest detail screen: artwork, the title, one row of buttons and the episodes. No cast, no
 // chapters, no collection, no recommendations.
@@ -82,7 +83,7 @@ const MinimalistDetailContent = (props) => {
 	return (
 		<>
 			<div className={css.backdrop}>
-				{settings.detailsBackdropEnabled !== false && backdropUrl && <img className={css.backdropImage} src={backdropUrl} alt="" />}
+				{settings.detailsBackdropEnabled !== false && backdropUrl && <img className={css.backdropImage} src={heldBackdrop(backdropUrl)} alt="" />}
 				<div className={css.scrim} style={scrimStyle} />
 			</div>
 			<div className={`${css.content} ${settings.navbarPosition === 'left' ? css.sidebarOffset : ''}`}>

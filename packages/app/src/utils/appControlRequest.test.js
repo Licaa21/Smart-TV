@@ -14,6 +14,11 @@ describe('readRequestedDeepLink', () => {
 		expect(found.detail).toEqual({id: 'e1', type: 'episode', serverId: 's1', seasonId: 'se1', seriesId: 'sr1'});
 	});
 
+	it('ignores fields it does not know, and carries the stamp of the sender when there is one', () => {
+		const found = readRequestedDeepLink(tizenWith({serverid: 's1', id: 'e1', type: 'episode', other: 'x', n: 1731558000000}));
+		expect(found.detail).toEqual({id: 'e1', type: 'episode', serverId: 's1', n: '1731558000000'});
+	});
+
 	it('is null with no request, no title or no Tizen', () => {
 		expect(readRequestedDeepLink(undefined)).toBeNull();
 		expect(readRequestedDeepLink({application: {getCurrentApplication: () => ({getRequestedAppControl: () => null})}})).toBeNull();
@@ -48,6 +53,23 @@ describe('makeDeepLinkGate', () => {
 		gate.markHandled(detail);
 		expect(gate(detail, {now: 5000, onlyNew: true})).toBe(false);
 		expect(gate(detail, {now: 5001})).toBe(true);
+	});
+
+	it('takes the same title pressed again when it carries a new stamp, even where it is only looked for again', () => {
+		const gate = makeDeepLinkGate();
+		const first = {...detail, n: '100'};
+		gate.markHandled(first);
+		expect(gate(first, {now: 60000, onlyNew: true})).toBe(false);
+		expect(gate({...detail, n: '200'}, {now: 61000, onlyNew: true})).toBe(true);
+		expect(gate({...detail, n: '200'}, {now: 90000, onlyNew: true})).toBe(false);
+		expect(gate({...detail, n: '300'}, {now: 91000})).toBe(true);
+	});
+
+	it('does not reopen the stale request the platform keeps answering with once a newer stamped one was opened', () => {
+		const gate = makeDeepLinkGate();
+		gate.markHandled({...detail, n: '100'});
+		expect(gate({...detail, id: 'e2', n: '200'}, {now: 1000, onlyNew: true})).toBe(true);
+		expect(gate({...detail, n: '100'}, {now: 9000, onlyNew: true})).toBe(false);
 	});
 
 	it('ignores a request with no title', () => {

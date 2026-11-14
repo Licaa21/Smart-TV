@@ -1,6 +1,6 @@
 import * as userDataSync from '../../services/userDataSync';
 import * as parentalControls from '../../services/parentalControls';
-import {clearDetailsCache, detailsKey, isCacheableType, keptAge, loadKeptScreens, onDetailsKept, readDetails, saveDetails, userDataStamp} from './detailsCache';
+import {clearDetailsCache, detailsKey, isCacheableType, keptAge, keptTitles, loadKeptScreens, onDetailsKept, readDetails, saveDetails, userDataStamp} from './detailsCache';
 
 jest.mock('./detailsStore', () => ({
 	loadScreens: jest.fn(() => Promise.resolve([])),
@@ -168,6 +168,19 @@ describe('the kept details screens', () => {
 		expect(readDetails('other-build', null)).toBeNull();
 		expect(store.deleteScreen).toHaveBeenCalledWith('old');
 		expect(store.deleteScreen).toHaveBeenCalledWith('other-build');
+	});
+
+	it('lists the titles kept, the newest first, and leaves out a screen that has no title', async () => {
+		jest.spyOn(Date, 'now').mockReturnValue(1000);
+		saveDetails('a', snapshot(record({Id: 'a'})));
+		Date.now.mockReturnValue(2000);
+		saveDetails('b', snapshot(record({Id: 'b'})));
+		store.loadScreens.mockResolvedValueOnce([{v: 1, key: 'broken', at: 3000, stamp: '', seedStamp: null, snapshot: {}}]);
+		await loadKeptScreens();
+		expect(keptTitles(5).map((title) => title.Id)).toEqual(['b', 'a']);
+		expect(keptTitles(5, 'other-account|')).toEqual([]);
+		expect(keptTitles(1)).toHaveLength(1);
+		Date.now.mockRestore();
 	});
 
 	it('clears out of the store what it has no room to hold', async () => {
